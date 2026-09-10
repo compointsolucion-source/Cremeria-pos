@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mostrador - Cremería POS</title>
+<link rel="stylesheet" href="css/app-theme.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  .layout { display: flex; height: calc(100vh - 60px); }
+  .panel-productos { flex: 2; padding: 14px; overflow-y: auto; }
+  .panel-carrito { flex: 1; min-width: 300px; padding: 14px; background: white; display: flex; flex-direction: column; }
+  .categorias { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; }
+  .categoria-tab {
+    padding: 10px 16px; border-radius: 20px; background: #E0E0E0; white-space: nowrap;
+    cursor: pointer; font-weight: 600; font-size: 14px;
+  }
+  .categoria-tab.activa { background: #2E7D32; color: white; }
+  .categoria-tab.kits { background: #F9A825; color: white; }
+  .grid-productos {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;
+  }
+  .producto-card {
+    background: white; border-radius: 14px; overflow: hidden; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08); text-align: center; user-select: none;
+    transition: transform 0.1s; position: relative;
+  }
+  .producto-card:active { transform: scale(0.96); background: #E8F5E9; }
+  .producto-card img { width: 100%; height: 90px; object-fit: cover; background: #EEE; }
+  .producto-card .nombre { padding: 8px 6px 2px; font-size: 13px; font-weight: 600; }
+  .producto-card .precio { padding: 0 6px 8px; font-size: 12px; color: #555; }
+  .badge-tipo {
+    position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 8px; color: white;
+  }
+  .badge-peso { background: #1565C0; }
+  .badge-unidad { background: #6A1B9A; }
+  .badge-kit { background: #F9A825; }
+  .carrito-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .carrito-item button { background: none; border: none; color: #C62828; font-size: 18px; cursor: pointer; }
+  .total-box { font-size: 22px; font-weight: 700; text-align: right; margin: 12px 0; }
+  #scannerProducto { width: 100%; max-width: 320px; margin-bottom: 10px; }
+
+  /* Modal genérico */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-overlay.abierto { display: flex; }
+  .modal-caja { background: white; border-radius: 16px; padding: 20px; width: 300px; }
+  .modal-caja h3 { margin-top: 0; text-align: center; }
+  .display-valor {
+    font-size: 36px; text-align: center; padding: 14px; background: #F4F5F6;
+    border-radius: 10px; margin: 14px 0; font-weight: 700;
+  }
+  .teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tecla {
+    background: #F4F5F6; border: none; border-radius: 10px; font-size: 22px;
+    padding: 16px 0; cursor: pointer; font-weight: 600;
+  }
+  .tecla:active { background: #DDD; }
+  .subtotal-preview { text-align: center; color: #555; margin-top: 8px; }
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 14px 0; }
+  .stepper button {
+    width: 54px; height: 54px; border-radius: 50%; border: none; background: #2E7D32;
+    color: white; font-size: 28px; cursor: pointer;
+  }
+  .stepper .cantidad-num { font-size: 32px; font-weight: 700; min-width: 60px; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>🥩 Mostrador</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="layout">
+    <div class="panel-productos">
+      <button class="btn btn-secondary" style="margin-bottom:10px;" onclick="toggleScannerProducto()">📷 Escanear código de barras</button>
+      <div id="scannerProducto"></div>
+
+      <div class="categorias" id="categorias"></div>
+      <div class="grid-productos" id="gridProductos"></div>
+    </div>
+
+    <div class="panel-carrito">
+      <h3>Ticket actual</h3>
+      <div id="carritoItems" style="flex:1; overflow-y:auto;"></div>
+      <div class="total-box">Total: $<span id="totalTicket">0.00</span></div>
+      <button class="btn btn-primary" style="width:100%" onclick="generarTicket()">🖨 Generar e Imprimir Ticket</button>
+    </div>
+  </div>
+
+  <!-- Modal para capturar peso (productos a granel) -->
+  <div class="modal-overlay" id="modalPeso">
+    <div class="modal-caja">
+      <h3 id="modalProductoNombre">Producto</h3>
+      <div class="display-valor" id="displayPeso">0.000</div>
+      <div class="subtotal-preview" id="subtotalPreview">Subtotal: $0.00</div>
+      <div class="teclado">
+        <button class="tecla" onclick="teclear('1')">1</button>
+        <button class="tecla" onclick="teclear('2')">2</button>
+        <button class="tecla" onclick="teclear('3')">3</button>
+        <button class="tecla" onclick="teclear('4')">4</button>
+        <button class="tecla" onclick="teclear('5')">5</button>
+        <button class="tecla" onclick="teclear('6')">6</button>
+        <button class="tecla" onclick="teclear('7')">7</button>
+        <button class="tecla" onclick="teclear('8')">8</button>
+        <button class="tecla" onclick="teclear('9')">9</button>
+        <button class="tecla" onclick="teclear('.')">.</button>
+        <button class="tecla" onclick="teclear('0')">0</button>
+        <button class="tecla" onclick="borrarUltimo()">⌫</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modalPeso')">Cancelar</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmarPeso()">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para capturar cantidad (productos por unidad) -->
+  <div class="modal-overlay" id="modalUnidad">
+    <div class="modal-caja">
+      <h3 id="modalUnidadNombre">Producto</h3>
+      <div class="stepper">
+        <button onclick="cambiarCantidadUnidad(-1)">−</button>
+        <div class="cantidad-num" id="cantidadUnidadNum">1</div>
+        <button onclick="cambiarCantidadUnidad(1)">+</button>
+      </div>
+      <div class="subtotal-preview" id="subtotalUnidadPreview">Subtotal: $0.00</div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modalUnidad')">Cancelar</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmarUnidad()">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script>
+requiereLogin();
+
+let productos = [];
+let kits = [];
+let categorias = [];
+let categoriaActiva = null; // null=todos, 'kits'=kits, número=categoría
+let carrito = [];
+let productoSeleccionado = null;
+let pesoActual = '';
+let cantidadUnidad = 1;
+let scannerActivo = false;
+let html5QrCode;
+
+async function cargarDatos() {
+  try {
+    productos = await apiFetch('/productos');
+    kits = await apiFetch('/kits');
+    categorias = await apiFetch('/productos/categorias');
+    renderCategorias();
+    renderProductos();
+  } catch (err) {
+    alert('Error al cargar productos: ' + err.message);
+  }
+}
+
+function renderCategorias() {
+  const cont = document.getElementById('categorias');
+  cont.innerHTML = '';
+  const todas = document.createElement('div');
+  todas.className = 'categoria-tab' + (categoriaActiva === null ? ' activa' : '');
+  todas.textContent = 'Todos';
+  todas.onclick = () => { categoriaActiva = null; renderCategorias(); renderProductos(); };
+  cont.appendChild(todas);
+
+  categorias.forEach(cat => {
+    const tab = document.createElement('div');
+    tab.className = 'categoria-tab' + (categoriaActiva === cat.id ? ' activa' : '');
+    tab.textContent = cat.nombre;
+    tab.onclick = () => { categoriaActiva = cat.id; renderCategorias(); renderProductos(); };
+    cont.appendChild(tab);
+  });
+
+  if (kits.length > 0) {
+    const tabKits = document.createElement('div');
+    tabKits.className = 'categoria-tab kits' + (categoriaActiva === 'kits' ? ' activa' : '');
+    tabKits.textContent = '📦 Kits/Combos';
+    tabKits.onclick = () => { categoriaActiva = 'kits'; renderCategorias(); renderProductos(); };
+    cont.appendChild(tabKits);
+  }
+}
+
+function renderProductos() {
+  const grid = document.getElementById('gridProductos');
+  grid.innerHTML = '';
+
+  if (categoriaActiva === 'kits') {
+    kits.forEach(k => {
+      const card = document.createElement('div');
+      card.className = 'producto-card';
+      card.innerHTML = `
+        <span class="badge-tipo badge-kit">KIT</span>
+        <img src="${k.imagen_url || 'img/kit-generico.png'}" alt="${k.nombre}">
+        <div class="nombre">${k.nombre}</div>
+        <div class="precio">$${parseFloat(k.precio_kit).toFixed(2)}</div>
+      `;
+      card.onclick = () => agregarKit(k);
+      grid.appendChild(card);
+    });
+    return;
+  }
+
+  const lista = categoriaActiva ? productos.filter(p => p.categoria_id === categoriaActiva) : productos;
+
+  lista.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'producto-card';
+    const badge = p.tipo_venta === 'unidad'
+      ? '<span class="badge-tipo badge-unidad">PZA</span>'
+      : '<span class="badge-tipo badge-peso">KG</span>';
+    const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
+    card.innerHTML = `
+      ${badge}
+      <img src="${p.imagen_url || 'img/producto-generico.png'}" alt="${p.nombre}">
+      <div class="nombre">${p.nombre}</div>
+      <div class="precio">${precioLabel}</div>
+    `;
+    card.onclick = () => seleccionarProducto(p);
+    grid.appendChild(card);
+  });
+}
+
+function seleccionarProducto(producto) {
+  if (producto.tipo_venta === 'unidad') abrirModalUnidad(producto);
+  else abrirModalPeso(producto);
+}
+
+// ---------- Modal de PESO (a granel) ----------
+function abrirModalPeso(producto) {
+  productoSeleccionado = producto;
+  pesoActual = '';
+  document.getElementById('modalProductoNombre').textContent = producto.nombre;
+  actualizarDisplayPeso();
+  document.getElementById('modalPeso').classList.add('abierto');
+}
+
+function teclear(valor) {
+  if (valor === '.' && pesoActual.includes('.')) return;
+  if (pesoActual.length >= 6) return;
+  pesoActual += valor;
+  actualizarDisplayPeso();
+}
+
+function borrarUltimo() {
+  pesoActual = pesoActual.slice(0, -1);
+  actualizarDisplayPeso();
+}
+
+function actualizarDisplayPeso() {
+  const peso = parseFloat(pesoActual || '0');
+  document.getElementById('displayPeso').textContent = (pesoActual || '0');
+  const subtotal = peso * productoSeleccionado.precio;
+  document.getElementById('subtotalPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}`;
+}
+
+function confirmarPeso() {
+  const peso = parseFloat(pesoActual || '0');
+  if (peso <= 0) { alert('Ingresa un peso válido'); return; }
+
+  carrito.push({
+    tipo: 'producto',
+    producto_id: productoSeleccionado.id,
+    nombre_producto: productoSeleccionado.nombre,
+    cantidad: peso,
+    precio_unitario: parseFloat(productoSeleccionado.precio)
+  });
+
+  renderCarrito();
+  cerrarModal('modalPeso');
+}
+
+// ---------- Modal de UNIDAD (piezas) ----------
+function abrirModalUnidad(producto) {
+  productoSeleccionado = producto;
+  cantidadUnidad = 1;
+  document.getElementById('modalUnidadNombre').textContent = producto.nombre;
+  actualizarDisplayUnidad();
+  document.getElementById('modalUnidad').classList.add('abierto');
+}
+
+function cambiarCantidadUnidad(delta) {
+  cantidadUnidad = Math.max(1, cantidadUnidad + delta);
+  actualizarDisplayUnidad();
+}
+
+function actualizarDisplayUnidad() {
+  document.getElementById('cantidadUnidadNum').textContent = cantidadUnidad;
+  const subtotal = cantidadUnidad * productoSeleccionado.precio;
+  document.getElementById('subtotalUnidadPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}`;
+}
+
+function confirmarUnidad() {
+  carrito.push({
+    tipo: 'producto',
+    producto_id: productoSeleccionado.id,
+    nombre_producto: productoSeleccionado.nombre,
+    cantidad: cantidadUnidad,
+    precio_unitario: parseFloat(productoSeleccionado.precio)
+  });
+
+  renderCarrito();
+  cerrarModal('modalUnidad');
+}
+
+// ---------- Kits ----------
+function agregarKit(kit) {
+  carrito.push({
+    tipo: 'kit',
+    kit_id: kit.id,
+    nombre_producto: '📦 ' + kit.nombre,
+    cantidad: 1,
+    precio_unitario: parseFloat(kit.precio_kit)
+  });
+  renderCarrito();
+}
+
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('abierto');
+}
+
+// ---------- Escáner de código de barras ----------
+function toggleScannerProducto() {
+  if (scannerActivo) {
+    html5QrCode.stop();
+    scannerActivo = false;
+    return;
+  }
+  html5QrCode = new Html5Qrcode("scannerProducto");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 200 },
+    async (codigo) => {
+      html5QrCode.stop();
+      scannerActivo = false;
+      await buscarPorCodigo(codigo);
+    }
+  );
+  scannerActivo = true;
+}
+
+async function buscarPorCodigo(codigo) {
+  try {
+    const producto = await apiFetch(`/productos/codigo/${codigo}`);
+    seleccionarProducto(producto);
+  } catch (err) {
+    try {
+      const kit = await apiFetch(`/kits/codigo/${codigo}`);
+      agregarKit(kit);
+    } catch (err2) {
+      alert('No se encontró ningún producto o kit con ese código: ' + codigo);
+    }
+  }
+}
+
+// ---------- Carrito ----------
+function renderCarrito() {
+  const cont = document.getElementById('carritoItems');
+  cont.innerHTML = '';
+  let total = 0;
+
+  carrito.forEach((item, idx) => {
+    const subtotal = item.cantidad * item.precio_unitario;
+    total += subtotal;
+    const detalle = item.tipo === 'kit' ? 'Kit' : `${item.cantidad} × $${item.precio_unitario}`;
+    const div = document.createElement('div');
+    div.className = 'carrito-item';
+    div.innerHTML = `
+      <span>${item.nombre_producto}<br><small>${detalle}</small></span>
+      <span>$${subtotal.toFixed(2)} <button onclick="quitarItem(${idx})">✕</button></span>
+    `;
+    cont.appendChild(div);
+  });
+
+  document.getElementById('totalTicket').textContent = total.toFixed(2);
+}
+
+function quitarItem(idx) {
+  carrito.splice(idx, 1);
+  renderCarrito();
+}
+
+async function generarTicket() {
+  if (carrito.length === 0) { alert('Agrega al menos un producto'); return; }
+
+  try {
+    const ticket = await apiFetch('/tickets', {
+      method: 'POST',
+      body: JSON.stringify({ items: carrito })
+    });
+
+    imprimirTicket(ticket);
+    carrito = [];
+    renderCarrito();
+  } catch (err) {
+    alert('Error al generar el ticket: ' + err.message);
+  }
+}
+
+function imprimirTicket(ticket) {
+  alert(`Ticket generado: ${ticket.folio}\nTotal: $${ticket.total}\n\n(Aquí se conecta la impresión térmica)`);
+}
+
+cargarDatos();
+</script>
+</body>
+</html>

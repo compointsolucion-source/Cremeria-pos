@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caja - Cremería POS</title>
+<link rel="stylesheet" href="css/app-theme.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  .layout { display: flex; height: calc(100vh - 60px); }
+  .panel-bandeja { flex: 1; padding: 14px; overflow-y: auto; border-right: 1px solid #DDD; }
+  .panel-cobro { flex: 1.2; padding: 14px; overflow-y: auto; }
+  .ticket-pendiente {
+    background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer;
+  }
+  .ticket-pendiente:active { background: #F0F0F0; }
+  #scanner { width: 100%; max-width: 320px; margin-bottom: 14px; }
+  .metodo-pago-btns { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+  .metodo-pago-btns button { flex: 1; min-width: 80px; }
+  .metodo-pago-btns button.activo { background: #2E7D32; color: white; }
+  .detalle-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .detalle-item .acciones { display: flex; gap: 4px; align-items: center; }
+  .detalle-item .acciones button { background: #EEE; border: none; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; }
+  .detalle-item .quitar { color: #C62828; background: none; }
+  .resultado-cliente { background: white; border-radius: 10px; padding: 10px; margin-top: 8px; cursor: pointer; }
+  .resultado-cliente:active { background: #F0F0F0; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>💰 Caja</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="layout">
+    <div class="panel-bandeja">
+      <h3>Tickets pendientes</h3>
+      <div id="scanner"></div>
+      <button class="btn btn-secondary" style="width:100%; margin-bottom:14px;" onclick="toggleScanner()">📷 Escanear código</button>
+      <div id="bandeja"></div>
+    </div>
+
+    <div class="panel-cobro card" id="panelCobro">
+      <p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script>
+requiereLogin();
+const usuario = getUsuario();
+let ticketActual = null;
+let metodoPago = 'efectivo';
+let clienteSeleccionado = null;
+let scannerActivo = false;
+let html5QrCode;
+
+const socket = io(API_URL.replace('/api', ''));
+socket.emit('unirse_sucursal', usuario.sucursal_id);
+socket.on('nuevo_ticket', () => cargarBandeja());
+socket.on('ticket_pagado', () => cargarBandeja());
+
+async function cargarBandeja() {
+  try {
+    const pendientes = await apiFetch('/tickets/pendientes');
+    const cont = document.getElementById('bandeja');
+    cont.innerHTML = '';
+    pendientes.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'ticket-pendiente';
+      div.innerHTML = `<span><b>${t.folio}</b></span><span>$${parseFloat(t.total).toFixed(2)}</span>`;
+      div.onclick = () => cargarTicket(t.folio);
+      cont.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function cargarTicket(folio) {
+  try {
+    ticketActual = await apiFetch(`/tickets/folio/${folio}`);
+    clienteSeleccionado = null;
+    renderPanelCobro();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function renderPanelCobro() {
+  const t = ticketActual;
+  const panel = document.getElementById('panelCobro');
+  let itemsHtml = t.items.map(i => {
+    const detalle = i.tipo === 'kit' ? 'Kit (fijo)' : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`;
+    const puedeEditar = i.tipo !== 'kit';
+    return `
+      <div class="detalle-item">
+        <span>${i.nombre_producto}<br><small>${detalle}</small></span>
+        <span class="acciones">
+          $${parseFloat(i.subtotal).toFixed(2)}
+          ${puedeEditar ? `<button onclick="editarCantidad(${i.id}, ${i.cantidad})">✏️</button>` : ''}
+          <button class="quitar" onclick="quitarItem(${i.id})">✕</button>
+        </span>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <h3>Ticket ${t.folio}</h3>
+    ${itemsHtml}
+    <div class="total-box" style="font-size:24px; font-weight:700; text-align:right; margin:14px 0;">Total: $${parseFloat(t.total).toFixed(2)}</div>
+
+    <div class="metodo-pago-btns">
+      <button class="btn btn-secondary" id="btnEfectivo" onclick="setMetodo('efectivo')">Efectivo</button>
+      <button class="btn btn-secondary" id="btnTarjeta" onclick="setMetodo('tarjeta')">Tarjeta</button>
+      <button class="btn btn-secondary" id="btnCodi" onclick="setMetodo('codi')">CoDi</button>
+      <button class="btn btn-secondary" id="btnMixto" onclick="setMetodo('mixto')">Mixto</button>
+      <button class="btn btn-secondary" id="btnCredito" onclick="setMetodo('credito')">💳 Fiado</button>
+    </div>
+
+    <div id="camposPago"></div>
+
+    <button class="btn btn-primary" style="width:100%; margin-top:14px;" onclick="cobrar()">✅ Confirmar Pago</button>
+  `;
+  setMetodo('efectivo');
+}
+
+async function editarCantidad(itemId, cantidadActual) {
+  const nueva = prompt('Nueva cantidad:', cantidadActual);
+  if (nueva === null) return;
+  const cantidad = parseFloat(nueva);
+  if (!cantidad || cantidad <= 0) { alert('Cantidad inválida'); return; }
+
+  try {
+    await apiFetch(`/tickets/item/${itemId}`, { method: 'PUT', body: JSON.stringify({ cantidad }) });
+    await cargarTicket(ticketActual.folio);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function quitarItem(itemId) {
+  if (!confirm('¿Quitar este producto del ticket?')) return;
+  try {
+    await apiFetch(`/tickets/item/${itemId}`, { method: 'DELETE' });
+    await cargarTicket(ticketActual.folio);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function setMetodo(m) {
+  metodoPago = m;
+  ['Efectivo','Tarjeta','Codi','Mixto','Credito'].forEach(nombre => {
+    const btn = document.getElementById('btn' + nombre);
+    if (btn) btn.classList.toggle('activo', nombre.toLowerCase() === m);
+  });
+
+  const camposDiv = document.getElementById('camposPago');
+  if (m === 'mixto') {
+    camposDiv.innerHTML = `
+      <input type="number" id="montoEfectivo" placeholder="Monto en efectivo" style="margin-bottom:8px;">
+      <input type="number" id="montoTarjeta" placeholder="Monto en tarjeta">
+    `;
+  } else if (m === 'efectivo') {
+    camposDiv.innerHTML = `
+      <input type="number" id="montoRecibido" placeholder="Efectivo recibido" oninput="calcularCambio()">
+      <p id="cambioTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+    `;
+  } else if (m === 'credito') {
+    camposDiv.innerHTML = `
+      <input type="text" id="buscarCliente" placeholder="Buscar cliente por nombre..." oninput="buscarClientes()">
+      <div id="resultadosCliente"></div>
+      <div id="clienteElegido" style="margin-top:8px; font-weight:600;"></div>
+    `;
+  } else {
+    camposDiv.innerHTML = '';
+  }
+}
+
+function calcularCambio() {
+  const recibido = parseFloat(document.getElementById('montoRecibido').value || 0);
+  const cambio = recibido - ticketActual.total;
+  document.getElementById('cambioTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Falta: $${Math.abs(cambio).toFixed(2)}`;
+}
+
+let debounceBusqueda;
+function buscarClientes() {
+  clearTimeout(debounceBusqueda);
+  debounceBusqueda = setTimeout(async () => {
+    const texto = document.getElementById('buscarCliente').value.trim();
+    if (texto.length < 2) { document.getElementById('resultadosCliente').innerHTML = ''; return; }
+    const resultados = await apiFetch(`/clientes/buscar/${texto}`);
+    document.getElementById('resultadosCliente').innerHTML = resultados.map(c => `
+      <div class="resultado-cliente" onclick='elegirCliente(${JSON.stringify(c)})'>
+        ${c.nombre} — Debe $${parseFloat(c.saldo_actual).toFixed(2)} / Límite $${parseFloat(c.limite_credito).toFixed(2)}
+      </div>
+    `).join('');
+  }, 300);
+}
+
+function elegirCliente(cliente) {
+  clienteSeleccionado = cliente;
+  document.getElementById('resultadosCliente').innerHTML = '';
+  document.getElementById('buscarCliente').value = '';
+  document.getElementById('clienteElegido').textContent = `Cliente seleccionado: ${cliente.nombre}`;
+}
+
+async function cobrar() {
+  try {
+    const turno = await apiFetch('/turnos/actual');
+    if (!turno) { alert('No hay un turno de caja abierto. Ábrelo desde el panel de administración.'); return; }
+
+    let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
+
+    if (metodoPago === 'efectivo') {
+      montoEfectivo = ticketActual.total;
+    } else if (metodoPago === 'tarjeta' || metodoPago === 'codi') {
+      montoTarjeta = ticketActual.total;
+    } else if (metodoPago === 'mixto') {
+      montoEfectivo = parseFloat(document.getElementById('montoEfectivo').value || 0);
+      montoTarjeta = parseFloat(document.getElementById('montoTarjeta').value || 0);
+      if (Math.abs((montoEfectivo + montoTarjeta) - ticketActual.total) > 0.01) {
+        alert('La suma de efectivo y tarjeta debe ser igual al total');
+        return;
+      }
+    } else if (metodoPago === 'credito') {
+      if (!clienteSeleccionado) { alert('Selecciona un cliente para autorizar el fiado'); return; }
+      cliente_id = clienteSeleccionado.id;
+    }
+
+    await apiFetch(`/tickets/${ticketActual.id}/pagar`, {
+      method: 'POST',
+      body: JSON.stringify({
+        metodo_pago: metodoPago === 'codi' ? 'tarjeta' : metodoPago,
+        monto_efectivo: montoEfectivo,
+        monto_tarjeta: montoTarjeta,
+        turno_id: turno.id,
+        cliente_id
+      })
+    });
+
+    alert('Pago procesado. Imprimiendo comprobante...');
+    ticketActual = null;
+    clienteSeleccionado = null;
+    document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+    cargarBandeja();
+  } catch (err) {
+    alert('Error al cobrar: ' + err.message);
+  }
+}
+
+function toggleScanner() {
+  if (scannerActivo) {
+    html5QrCode.stop();
+    scannerActivo = false;
+    return;
+  }
+  html5QrCode = new Html5Qrcode("scanner");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 200 },
+    (folio) => { cargarTicket(folio); html5QrCode.stop(); scannerActivo = false; }
+  );
+  scannerActivo = true;
+}
+
+cargarBandeja();
+setInterval(cargarBandeja, 15000);
+</script>
+</body>
+</html>

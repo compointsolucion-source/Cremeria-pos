@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iniciar sesión - Cremería POS</title>
+<link rel="stylesheet" href="css/app-theme.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; height: 100vh; }
+  .login-box { width: 320px; }
+  .login-box h2 { text-align: center; margin-bottom: 20px; }
+  .login-box input { margin-bottom: 12px; }
+  #error { color: #C62828; text-align: center; font-size: 14px; min-height: 18px; }
+</style>
+</head>
+<body>
+  <div class="card login-box">
+    <h2>Cremería POS</h2>
+    <input type="text" id="usuario" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+    <div id="error"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="login()">Entrar</button>
+  </div>
+
+<script src="js/api.js"></script>
+<script>
+async function login() {
+  const usuario = document.getElementById('usuario').value.trim();
+  const password = document.getElementById('password').value;
+  const errorDiv = document.getElementById('error');
+  errorDiv.textContent = '';
+
+  if (!usuario || !password) {
+    errorDiv.textContent = 'Ingresa usuario y contraseña';
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ usuario, password })
+    });
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('usuario', JSON.stringify(data.usuario));
+
+    // Redirigir según rol
+    if (data.usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
+    else if (data.usuario.rol === 'cajero') window.location.href = 'caja.html';
+    else window.location.href = 'admin/dashboard.html';
+  } catch (err) {
+    errorDiv.textContent = err.message;
+  }
+}
+
+document.getElementById('password').addEventListener('keyup', (e) => {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>

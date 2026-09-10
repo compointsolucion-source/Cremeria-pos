@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compras y Proveedores - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button.activo { background: #2E7D32; color: white; }
+  .form-grupo { display: grid; gap: 10px; margin-bottom: 20px; }
+  .fila-doble { display: flex; gap: 10px; }
+  .fila-doble > * { flex: 1; }
+  .item-compra { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #EEE; }
+  .item-compra select { flex: 2; }
+  .item-compra input { flex: 1; }
+  .compra-card { background: white; border-radius: 12px; padding: 12px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .compra-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>🚚 Compras y Proveedores</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="tabs">
+      <button class="btn btn-secondary activo" id="tabProveedores" onclick="cambiarTab('proveedores')">Proveedores</button>
+      <button class="btn btn-secondary" id="tabCompras" onclick="cambiarTab('compras')">Registrar Compra</button>
+      <button class="btn btn-secondary" id="tabHistorial" onclick="cambiarTab('historial')">Historial</button>
+    </div>
+
+    <!-- Tab: Proveedores -->
+    <div id="seccionProveedores">
+      <div class="card form-grupo">
+        <h3>Nuevo proveedor</h3>
+        <input type="text" id="nombreProveedor" placeholder="Nombre del proveedor">
+        <div class="fila-doble">
+          <input type="text" id="contactoProveedor" placeholder="Persona de contacto">
+          <input type="text" id="telefonoProveedor" placeholder="Teléfono">
+        </div>
+        <button class="btn btn-primary" onclick="guardarProveedor()">Guardar Proveedor</button>
+      </div>
+      <div id="listaProveedores"></div>
+    </div>
+
+    <!-- Tab: Registrar Compra -->
+    <div id="seccionCompras" style="display:none;">
+      <div class="card form-grupo">
+        <h3>Nueva compra</h3>
+        <select id="proveedorCompra"></select>
+
+        <div id="itemsCompra"></div>
+        <button class="btn btn-secondary" onclick="agregarFilaCompra()">+ Agregar producto</button>
+        <div style="text-align:right; font-weight:700; margin-top:10px;">Total: $<span id="totalCompra">0.00</span></div>
+        <button class="btn btn-primary" onclick="guardarCompra()">Registrar Compra</button>
+      </div>
+    </div>
+
+    <!-- Tab: Historial -->
+    <div id="seccionHistorial" style="display:none;">
+      <div id="listaCompras"></div>
+    </div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+let productosDisponibles = [];
+let proveedores = [];
+
+function cambiarTab(tab) {
+  document.getElementById('seccionProveedores').style.display = tab === 'proveedores' ? 'block' : 'none';
+  document.getElementById('seccionCompras').style.display = tab === 'compras' ? 'block' : 'none';
+  document.getElementById('seccionHistorial').style.display = tab === 'historial' ? 'block' : 'none';
+  document.getElementById('tabProveedores').classList.toggle('activo', tab === 'proveedores');
+  document.getElementById('tabCompras').classList.toggle('activo', tab === 'compras');
+  document.getElementById('tabHistorial').classList.toggle('activo', tab === 'historial');
+  if (tab === 'historial') cargarHistorial();
+}
+
+async function cargarProveedores() {
+  proveedores = await apiFetch('/proveedores');
+  const cont = document.getElementById('listaProveedores');
+  cont.innerHTML = proveedores.map(p => `
+    <div class="compra-card"><div class="titulo"><span>${p.nombre}</span><span>${p.telefono || ''}</span></div></div>
+  `).join('');
+
+  const select = document.getElementById('proveedorCompra');
+  select.innerHTML = proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+}
+
+async function guardarProveedor() {
+  const nombre = document.getElementById('nombreProveedor').value.trim();
+  const contacto = document.getElementById('contactoProveedor').value.trim();
+  const telefono = document.getElementById('telefonoProveedor').value.trim();
+  if (!nombre) { alert('El nombre es obligatorio'); return; }
+
+  try {
+    await apiFetch('/proveedores', { method: 'POST', body: JSON.stringify({ nombre, contacto, telefono }) });
+    document.getElementById('nombreProveedor').value = '';
+    document.getElementById('contactoProveedor').value = '';
+    document.getElementById('telefonoProveedor').value = '';
+    cargarProveedores();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function cargarProductosDisponibles() {
+  productosDisponibles = await apiFetch('/productos');
+}
+
+function agregarFilaCompra() {
+  const cont = document.getElementById('itemsCompra');
+  const fila = document.createElement('div');
+  fila.className = 'item-compra';
+  const opciones = productosDisponibles.map(p => `<option value="${p.id}" data-tipo="${p.tipo_venta}">${p.nombre}</option>`).join('');
+  fila.innerHTML = `
+    <select class="prod-select">${opciones}</select>
+    <input type="number" class="cant-input" placeholder="Cant." step="0.01">
+    <input type="number" class="costo-input" placeholder="Costo/u" step="0.01">
+    <input type="number" class="precio-input" placeholder="Nuevo precio (opc.)" step="0.01">
+    <button onclick="this.parentElement.remove(); calcularTotalCompra();" style="background:none; border:none; color:#C62828; font-size:18px;">✕</button>
+  `;
+  fila.querySelectorAll('input').forEach(inp => inp.addEventListener('input', calcularTotalCompra));
+  cont.appendChild(fila);
+}
+
+function calcularTotalCompra() {
+  let total = 0;
+  document.querySelectorAll('#itemsCompra .item-compra').forEach(fila => {
+    const cant = parseFloat(fila.querySelector('.cant-input').value || 0);
+    const costo = parseFloat(fila.querySelector('.costo-input').value || 0);
+    total += cant * costo;
+  });
+  document.getElementById('totalCompra').textContent = total.toFixed(2);
+}
+
+async function guardarCompra() {
+  const proveedor_id = document.getElementById('proveedorCompra').value;
+  if (!proveedor_id) { alert('Selecciona un proveedor'); return; }
+
+  const items = [];
+  document.querySelectorAll('#itemsCompra .item-compra').forEach(fila => {
+    const producto_id = fila.querySelector('.prod-select').value;
+    const cantidad = parseFloat(fila.querySelector('.cant-input').value || 0);
+    const costo_unitario = parseFloat(fila.querySelector('.costo-input').value || 0);
+    const precio_venta_nuevo = parseFloat(fila.querySelector('.precio-input').value || 0) || null;
+    if (producto_id && cantidad > 0 && costo_unitario > 0) {
+      items.push({ producto_id, cantidad, costo_unitario, precio_venta_nuevo });
+    }
+  });
+
+  if (items.length === 0) { alert('Agrega al menos un producto válido'); return; }
+
+  try {
+    await apiFetch('/compras', { method: 'POST', body: JSON.stringify({ proveedor_id, items }) });
+    alert('Compra registrada. Inventario y precios actualizados.');
+    document.getElementById('itemsCompra').innerHTML = '';
+    document.getElementById('totalCompra').textContent = '0.00';
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function cargarHistorial() {
+  const compras = await apiFetch('/compras');
+  const cont = document.getElementById('listaCompras');
+  cont.innerHTML = compras.map(c => `
+    <div class="compra-card">
+      <div class="titulo"><span>${c.proveedor_nombre}</span><span>$${parseFloat(c.total).toFixed(2)}</span></div>
+      <small>${new Date(c.fecha).toLocaleString()}</small>
+    </div>
+  `).join('');
+}
+
+cargarProveedores();
+cargarProductosDisponibles();
+</script>
+</body>
+</html>

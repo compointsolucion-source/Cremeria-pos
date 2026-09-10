@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clientes y Créditos - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
+  .form-cliente { display: grid; gap: 10px; margin-bottom: 20px; }
+  .fila-doble { display: flex; gap: 10px; }
+  .fila-doble > * { flex: 1; }
+  .cliente-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; }
+  .cliente-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
+  .cliente-card .saldo { font-size: 13px; color: #C62828; margin-top: 4px; }
+  .cliente-card .saldo.al-corriente { color: #2E7D32; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+  .modal-overlay.abierto { display: flex; }
+  .modal-cuenta { background: white; border-radius: 16px; padding: 20px; width: 90%; max-width: 420px; max-height: 80vh; overflow-y: auto; }
+  .movimiento-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #EEE; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>👤 Clientes y Créditos</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-cliente">
+      <h3>Nuevo cliente</h3>
+      <input type="text" id="nombreCliente" placeholder="Nombre completo">
+      <div class="fila-doble">
+        <input type="text" id="telefonoCliente" placeholder="Teléfono">
+        <input type="number" id="limiteCredito" placeholder="Límite de crédito ($)">
+      </div>
+      <button class="btn btn-primary" onclick="guardarCliente()">Guardar Cliente</button>
+    </div>
+
+    <h3>Clientes registrados</h3>
+    <div id="listaClientes"></div>
+  </div>
+
+  <div class="modal-overlay" id="modalCuenta">
+    <div class="modal-cuenta">
+      <h3 id="nombreClienteModal"></h3>
+      <p>Saldo actual: $<span id="saldoActualModal"></span> / Límite: $<span id="limiteModal"></span></p>
+
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <input type="number" id="montoAbono" placeholder="Monto del abono">
+        <button class="btn btn-primary" onclick="registrarAbono()">Registrar Abono</button>
+      </div>
+
+      <h4>Cargos (fiados)</h4>
+      <div id="listaCargos"></div>
+
+      <h4>Abonos</h4>
+      <div id="listaAbonos"></div>
+
+      <button class="btn btn-secondary" style="width:100%; margin-top:14px;" onclick="cerrarModalCuenta()">Cerrar</button>
+    </div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+let clienteActualId = null;
+
+async function cargarClientes() {
+  const clientes = await apiFetch('/clientes');
+  const cont = document.getElementById('listaClientes');
+  cont.innerHTML = '';
+  clientes.forEach(c => {
+    const saldoClase = parseFloat(c.saldo_actual) > 0 ? 'saldo' : 'saldo al-corriente';
+    const div = document.createElement('div');
+    div.className = 'cliente-card';
+    div.innerHTML = `
+      <div class="titulo"><span>${c.nombre}</span><span>${c.telefono || ''}</span></div>
+      <div class="${saldoClase}">Debe: $${parseFloat(c.saldo_actual).toFixed(2)} / Límite: $${parseFloat(c.limite_credito).toFixed(2)}</div>
+    `;
+    div.onclick = () => abrirEstadoCuenta(c.id);
+    cont.appendChild(div);
+  });
+}
+
+async function guardarCliente() {
+  const nombre = document.getElementById('nombreCliente').value.trim();
+  const telefono = document.getElementById('telefonoCliente').value.trim();
+  const limite_credito = parseFloat(document.getElementById('limiteCredito').value || 0);
+
+  if (!nombre) { alert('El nombre es obligatorio'); return; }
+
+  try {
+    await apiFetch('/clientes', { method: 'POST', body: JSON.stringify({ nombre, telefono, limite_credito }) });
+    document.getElementById('nombreCliente').value = '';
+    document.getElementById('telefonoCliente').value = '';
+    document.getElementById('limiteCredito').value = '';
+    cargarClientes();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function abrirEstadoCuenta(id) {
+  clienteActualId = id;
+  const data = await apiFetch(`/clientes/${id}/estado-cuenta`);
+  document.getElementById('nombreClienteModal').textContent = data.cliente.nombre;
+  document.getElementById('saldoActualModal').textContent = parseFloat(data.cliente.saldo_actual).toFixed(2);
+  document.getElementById('limiteModal').textContent = parseFloat(data.cliente.limite_credito).toFixed(2);
+
+  const cargosCont = document.getElementById('listaCargos');
+  cargosCont.innerHTML = data.cargos.map(c => `
+    <div class="movimiento-row"><span>Ticket ${c.folio}</span><span>$${parseFloat(c.monto).toFixed(2)}</span></div>
+  `).join('') || '<p style="color:#888; font-size:13px;">Sin cargos</p>';
+
+  const abonosCont = document.getElementById('listaAbonos');
+  abonosCont.innerHTML = data.abonos.map(a => `
+    <div class="movimiento-row"><span>${new Date(a.fecha).toLocaleDateString()} (${a.metodo_pago})</span><span>$${parseFloat(a.monto).toFixed(2)}</span></div>
+  `).join('') || '<p style="color:#888; font-size:13px;">Sin abonos</p>';
+
+  document.getElementById('modalCuenta').classList.add('abierto');
+}
+
+function cerrarModalCuenta() {
+  document.getElementById('modalCuenta').classList.remove('abierto');
+  cargarClientes();
+}
+
+async function registrarAbono() {
+  const monto = parseFloat(document.getElementById('montoAbono').value || 0);
+  if (monto <= 0) { alert('Ingresa un monto válido'); return; }
+
+  try {
+    await apiFetch(`/clientes/${clienteActualId}/abono`, {
+      method: 'POST',
+      body: JSON.stringify({ monto, metodo_pago: 'efectivo' })
+    });
+    document.getElementById('montoAbono').value = '';
+    abrirEstadoCuenta(clienteActualId);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+cargarClientes();
+</script>
+</body>
+</html>

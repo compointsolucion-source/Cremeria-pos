@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventario - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
+  .tabla-inv { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+  .tabla-inv th, .tabla-inv td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .fila-baja { background: #FFEBEE; }
+  .form-ajuste { display: grid; gap: 10px; margin-bottom: 20px; }
+  .fila-doble { display: flex; gap: 10px; }
+  .fila-doble > * { flex: 1; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>📊 Inventario</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-ajuste">
+      <h3>Registrar merma o ajuste</h3>
+      <select id="productoAjuste"></select>
+      <div class="fila-doble">
+        <select id="tipoAjuste">
+          <option value="merma">Merma (caducidad/desperdicio)</option>
+          <option value="ajuste_manual">Ajuste manual (conteo físico)</option>
+        </select>
+        <input type="number" id="cantidadAjuste" placeholder="Cantidad a descontar" step="0.01">
+      </div>
+      <input type="text" id="motivoAjuste" placeholder="Motivo (ej. Caducó, se cayó al piso)">
+      <button class="btn btn-danger" onclick="registrarAjuste()">Registrar</button>
+    </div>
+
+    <h3>Existencias actuales</h3>
+    <table class="tabla-inv">
+      <thead><tr><th>Producto</th><th>Existencia</th><th>Mínimo</th><th>Ajustar mínimo</th></tr></thead>
+      <tbody id="tablaInventario"></tbody>
+    </table>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+
+async function cargarInventario() {
+  const inventario = await apiFetch('/inventario');
+  const tbody = document.getElementById('tablaInventario');
+  tbody.innerHTML = '';
+  inventario.forEach(i => {
+    const unidad = i.tipo_venta === 'unidad' ? 'pzas' : 'kg';
+    const bajo = parseFloat(i.existencia_actual) <= parseFloat(i.stock_minimo);
+    const tr = document.createElement('tr');
+    if (bajo) tr.className = 'fila-baja';
+    tr.innerHTML = `
+      <td>${i.nombre}${bajo ? ' ⚠️' : ''}</td>
+      <td>${parseFloat(i.existencia_actual).toFixed(2)} ${unidad}</td>
+      <td>${parseFloat(i.stock_minimo).toFixed(2)} ${unidad}</td>
+      <td><input type="number" value="${i.stock_minimo}" style="width:80px;" onchange="actualizarMinimo(${i.producto_id}, this.value)"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Selector del formulario de ajuste
+  const select = document.getElementById('productoAjuste');
+  select.innerHTML = inventario.map(i => `<option value="${i.producto_id}">${i.nombre}</option>`).join('');
+}
+
+async function actualizarMinimo(producto_id, valor) {
+  try {
+    await apiFetch(`/inventario/${producto_id}/minimo`, { method: 'PUT', body: JSON.stringify({ stock_minimo: parseFloat(valor || 0) }) });
+    cargarInventario();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function registrarAjuste() {
+  const producto_id = document.getElementById('productoAjuste').value;
+  const tipo = document.getElementById('tipoAjuste').value;
+  const cantidad = parseFloat(document.getElementById('cantidadAjuste').value || 0);
+  const motivo = document.getElementById('motivoAjuste').value.trim();
+
+  if (!producto_id || cantidad <= 0) { alert('Selecciona un producto y una cantidad válida'); return; }
+
+  try {
+    await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo, motivo }) });
+    document.getElementById('cantidadAjuste').value = '';
+    document.getElementById('motivoAjuste').value = '';
+    cargarInventario();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+cargarInventario();
+</script>
+</body>
+</html>

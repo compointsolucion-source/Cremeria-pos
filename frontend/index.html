@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="0; url=login.html">
+<title>Cremería POS</title>
+<script>
+  // Si ya hay sesión activa, mándalo directo a su pantalla según su rol
+  const token = localStorage.getItem('token');
+  const usuarioStr = localStorage.getItem('usuario');
+  if (token && usuarioStr) {
+    const usuario = JSON.parse(usuarioStr);
+    if (usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
+    else if (usuario.rol === 'cajero') window.location.href = 'caja.html';
+    else window.location.href = 'admin/dashboard.html';
+  } else {
+    window.location.href = 'login.html';
+  }
+</script>
+</head>
+<body></body>
+</html>

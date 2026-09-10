@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kits/Combos - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
+  .form-kit { display: grid; gap: 10px; margin-bottom: 20px; }
+  .selector-productos { max-height: 220px; overflow-y: auto; border: 1px solid #DDD; border-radius: 10px; padding: 8px; }
+  .fila-producto-select { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid #F0F0F0; }
+  .fila-producto-select input[type="number"] { width: 80px; }
+  .fila-producto-select label { flex: 1; font-size: 14px; }
+  .kit-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .kit-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
+  .kit-card .incluye { font-size: 13px; color: #666; margin-top: 6px; }
+  .preview-img { width: 70px; height: 70px; object-fit: cover; border-radius: 10px; background: #EEE; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>📦 Kits / Combos</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-kit">
+      <h3>Nuevo kit</h3>
+      <input type="text" id="nombreKit" placeholder="Nombre del kit (ej. Combo desayuno)">
+      <input type="number" id="precioKit" placeholder="Precio fijo del kit ($)" step="0.01">
+      <input type="text" id="codigoBarrasKit" placeholder="Código de barras (opcional)">
+
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img id="previewImgKit" class="preview-img" src="">
+        <input type="file" id="imagenInputKit" accept="image/*">
+      </div>
+
+      <p style="margin:6px 0 2px; font-weight:600;">Selecciona los productos que incluye:</p>
+      <div class="selector-productos" id="selectorProductos"></div>
+
+      <button class="btn btn-primary" onclick="guardarKit()">Guardar Kit</button>
+    </div>
+
+    <h3>Kits actuales</h3>
+    <div id="listaKits"></div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+let productosDisponibles = [];
+let imagenKitBase64 = '';
+
+document.getElementById('imagenInputKit').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    imagenKitBase64 = ev.target.result;
+    document.getElementById('previewImgKit').src = imagenKitBase64;
+  };
+  reader.readAsDataURL(file);
+});
+
+async function cargarProductosDisponibles() {
+  productosDisponibles = await apiFetch('/productos');
+  const cont = document.getElementById('selectorProductos');
+  cont.innerHTML = '';
+  productosDisponibles.forEach(p => {
+    const unidad = p.tipo_venta === 'unidad' ? 'pzas' : 'kg';
+    const fila = document.createElement('div');
+    fila.className = 'fila-producto-select';
+    fila.innerHTML = `
+      <input type="checkbox" id="chk_${p.id}" onchange="toggleCantidad(${p.id})">
+      <label for="chk_${p.id}">${p.nombre}</label>
+      <input type="number" id="cant_${p.id}" placeholder="${unidad}" step="0.01" disabled style="width:70px;">
+    `;
+    cont.appendChild(fila);
+  });
+}
+
+function toggleCantidad(id) {
+  const chk = document.getElementById(`chk_${id}`);
+  const cant = document.getElementById(`cant_${id}`);
+  cant.disabled = !chk.checked;
+  if (chk.checked) cant.value = cant.value || 1;
+}
+
+async function cargarKits() {
+  const kits = await apiFetch('/kits');
+  const cont = document.getElementById('listaKits');
+  cont.innerHTML = '';
+  kits.forEach(k => {
+    const incluye = k.productos.map(p => `${p.nombre} (${p.cantidad} ${p.tipo_venta === 'unidad' ? 'pzas' : 'kg'})`).join(', ');
+    const div = document.createElement('div');
+    div.className = 'kit-card';
+    div.innerHTML = `
+      <div class="titulo"><span>${k.nombre}</span><span>$${parseFloat(k.precio_kit).toFixed(2)}</span></div>
+      <div class="incluye">Incluye: ${incluye || '(sin productos)'}</div>
+      <button class="btn btn-secondary" style="margin-top:8px;" onclick="eliminarKit(${k.id})">Eliminar</button>
+    `;
+    cont.appendChild(div);
+  });
+}
+
+async function guardarKit() {
+  const nombre = document.getElementById('nombreKit').value.trim();
+  const precio_kit = parseFloat(document.getElementById('precioKit').value || 0);
+  const codigo_barras = document.getElementById('codigoBarrasKit').value.trim() || null;
+
+  if (!nombre || precio_kit <= 0) { alert('Nombre y precio son obligatorios'); return; }
+
+  const productosSeleccionados = productosDisponibles
+    .filter(p => document.getElementById(`chk_${p.id}`).checked)
+    .map(p => ({ producto_id: p.id, cantidad: parseFloat(document.getElementById(`cant_${p.id}`).value || 1) }));
+
+  if (productosSeleccionados.length === 0) { alert('Selecciona al menos un producto para el kit'); return; }
+
+  try {
+    await apiFetch('/kits', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, precio_kit, imagen_url: imagenKitBase64, codigo_barras, productos: productosSeleccionados })
+    });
+    document.getElementById('nombreKit').value = '';
+    document.getElementById('precioKit').value = '';
+    document.getElementById('codigoBarrasKit').value = '';
+    document.getElementById('previewImgKit').src = '';
+    imagenKitBase64 = '';
+    cargarProductosDisponibles();
+    cargarKits();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function eliminarKit(id) {
+  if (!confirm('¿Eliminar este kit?')) return;
+  await apiFetch(`/kits/${id}`, { method: 'DELETE' });
+  cargarKits();
+}
+
+cargarProductosDisponibles();
+cargarKits();
+</script>
+</body>
+</html>

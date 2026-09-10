@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Productos - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
+  .tabla-productos { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+  .tabla-productos th, .tabla-productos td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .tabla-productos img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; }
+  .form-producto { display: grid; gap: 10px; margin-bottom: 20px; }
+  .preview-img { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; background: #EEE; }
+  .fila-doble { display: flex; gap: 10px; }
+  .fila-doble > * { flex: 1; }
+  .tipo-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; color: white; }
+  .tag-peso { background: #1565C0; }
+  .tag-unidad { background: #6A1B9A; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>🖼️ Productos</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-producto">
+      <h3>Nuevo producto</h3>
+      <input type="text" id="nombre" placeholder="Nombre del producto">
+
+      <div class="fila-doble">
+        <select id="tipoVenta">
+          <option value="peso">Venta a granel (por kg)</option>
+          <option value="unidad">Venta por pieza (unidad)</option>
+        </select>
+        <input type="number" id="precio" placeholder="Precio ($)" step="0.01">
+      </div>
+
+      <input type="text" id="codigoBarras" placeholder="Código de barras (opcional, escanéalo o escríbelo)">
+      <select id="categoriaId"><option value="">Sin categoría</option></select>
+
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img id="previewImg" class="preview-img" src="">
+        <input type="file" id="imagenInput" accept="image/*">
+      </div>
+      <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero)</label>
+      <button class="btn btn-primary" onclick="guardarProducto()">Guardar Producto</button>
+    </div>
+
+    <h3>Catálogo actual</h3>
+    <table class="tabla-productos">
+      <thead><tr><th>Imagen</th><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Código</th><th>Acciones</th></tr></thead>
+      <tbody id="tablaBody"></tbody>
+    </table>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+let imagenBase64 = '';
+
+document.getElementById('imagenInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    imagenBase64 = ev.target.result;
+    document.getElementById('previewImg').src = imagenBase64;
+  };
+  reader.readAsDataURL(file);
+});
+
+async function cargarCategorias() {
+  const cats = await apiFetch('/productos/categorias');
+  const select = document.getElementById('categoriaId');
+  cats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.nombre;
+    select.appendChild(opt);
+  });
+}
+
+async function cargarProductos() {
+  const productos = await apiFetch('/productos');
+  const tbody = document.getElementById('tablaBody');
+  tbody.innerHTML = '';
+  productos.forEach(p => {
+    const tag = p.tipo_venta === 'unidad'
+      ? '<span class="tipo-tag tag-unidad">Pieza</span>'
+      : '<span class="tipo-tag tag-peso">Kg</span>';
+    const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><img src="${p.imagen_url || ''}"></td>
+      <td>${p.nombre}</td>
+      <td>${tag}</td>
+      <td>${precioLabel}</td>
+      <td>${p.codigo_barras || '—'}</td>
+      <td><button class="btn btn-secondary" onclick="eliminarProducto(${p.id})">Eliminar</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function guardarProducto() {
+  const nombre = document.getElementById('nombre').value.trim();
+  const precio = parseFloat(document.getElementById('precio').value || 0);
+  const categoria_id = document.getElementById('categoriaId').value || null;
+  const favorito = document.getElementById('favorito').checked;
+  const tipo_venta = document.getElementById('tipoVenta').value;
+  const codigo_barras = document.getElementById('codigoBarras').value.trim() || null;
+
+  if (!nombre || precio <= 0) { alert('Nombre y precio son obligatorios'); return; }
+
+  try {
+    await apiFetch('/productos', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, precio, categoria_id, imagen_url: imagenBase64, favorito, tipo_venta, codigo_barras })
+    });
+    document.getElementById('nombre').value = '';
+    document.getElementById('precio').value = '';
+    document.getElementById('codigoBarras').value = '';
+    document.getElementById('previewImg').src = '';
+    imagenBase64 = '';
+    cargarProductos();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function eliminarProducto(id) {
+  if (!confirm('¿Eliminar este producto?')) return;
+  await apiFetch(`/productos/${id}`, { method: 'DELETE' });
+  cargarProductos();
+}
+
+cargarCategorias();
+cargarProductos();
+</script>
+</body>
+</html>

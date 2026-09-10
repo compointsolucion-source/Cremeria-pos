@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corte de Caja - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
+  .saldo-actual { background: #2A2B2E; color: white; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 16px; }
+  .saldo-actual .monto { font-size: 32px; font-weight: 700; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tabs button { flex: 1; }
+  .tabs button.activo { background: #2E7D32; color: white; }
+  .movimiento-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .ingreso { color: #2E7D32; }
+  .egreso { color: #C62828; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>📊 Corte de Caja</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div id="sinTurno" style="display:none;">
+      <div class="card">
+        <h3>No hay turno abierto</h3>
+        <input type="number" id="fondoInicial" placeholder="Fondo inicial ($)">
+        <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="abrirTurno()">Abrir Turno</button>
+      </div>
+    </div>
+
+    <div id="conTurno" style="display:none;">
+      <div class="saldo-actual">
+        <div>Turno abierto desde <span id="fechaApertura"></span></div>
+        <div class="monto">Fondo inicial: $<span id="fondoInicialLbl"></span></div>
+      </div>
+
+      <div class="tabs">
+        <button class="btn btn-secondary activo" id="tabIngreso" onclick="cambiarTab('ingreso')">➕ Ingreso</button>
+        <button class="btn btn-secondary" id="tabEgreso" onclick="cambiarTab('egreso')">➖ Egreso</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <input type="number" id="montoMovimiento" placeholder="Monto" style="margin-bottom:8px;">
+        <input type="text" id="conceptoMovimiento" placeholder="Concepto (ej. compra de bolsas)" style="margin-bottom:8px;">
+        <button class="btn btn-primary" style="width:100%;" onclick="registrarMovimiento()">Registrar</button>
+      </div>
+
+      <h4>Movimientos de hoy</h4>
+      <div id="listaMovimientos"></div>
+
+      <button class="btn btn-danger" style="width:100%; margin-top:20px;" onclick="mostrarCierre()">🔒 Realizar Corte de Turno</button>
+
+      <div id="formCierre" style="display:none; margin-top:14px;">
+        <div class="card">
+          <p>Cuenta el efectivo físico en caja e ingrésalo aquí:</p>
+          <input type="number" id="saldoContado" placeholder="Efectivo contado ($)">
+          <button class="btn btn-danger" style="width:100%; margin-top:10px;" onclick="cerrarTurno()">Confirmar Cierre</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+let turnoActual = null;
+let tipoMovimiento = 'ingreso';
+
+async function cargarTurno() {
+  try {
+    turnoActual = await apiFetch('/turnos/actual');
+    if (!turnoActual) {
+      document.getElementById('sinTurno').style.display = 'block';
+      document.getElementById('conTurno').style.display = 'none';
+    } else {
+      document.getElementById('sinTurno').style.display = 'none';
+      document.getElementById('conTurno').style.display = 'block';
+      document.getElementById('fechaApertura').textContent = new Date(turnoActual.fecha_apertura).toLocaleString();
+      document.getElementById('fondoInicialLbl').textContent = parseFloat(turnoActual.fondo_inicial).toFixed(2);
+      cargarMovimientos();
+    }
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function abrirTurno() {
+  const fondo = parseFloat(document.getElementById('fondoInicial').value || 0);
+  try {
+    await apiFetch('/turnos/abrir', { method: 'POST', body: JSON.stringify({ fondo_inicial: fondo }) });
+    cargarTurno();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function cambiarTab(tipo) {
+  tipoMovimiento = tipo;
+  document.getElementById('tabIngreso').classList.toggle('activo', tipo === 'ingreso');
+  document.getElementById('tabEgreso').classList.toggle('activo', tipo === 'egreso');
+}
+
+async function registrarMovimiento() {
+  const monto = parseFloat(document.getElementById('montoMovimiento').value || 0);
+  const concepto = document.getElementById('conceptoMovimiento').value.trim();
+  if (monto <= 0) { alert('Ingresa un monto válido'); return; }
+
+  try {
+    await apiFetch('/movimientos', {
+      method: 'POST',
+      body: JSON.stringify({ turno_id: turnoActual.id, tipo: tipoMovimiento, monto, concepto })
+    });
+    document.getElementById('montoMovimiento').value = '';
+    document.getElementById('conceptoMovimiento').value = '';
+    cargarMovimientos();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function cargarMovimientos() {
+  try {
+    const movs = await apiFetch(`/movimientos/turno/${turnoActual.id}`);
+    const cont = document.getElementById('listaMovimientos');
+    cont.innerHTML = '';
+    movs.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'movimiento-row';
+      div.innerHTML = `
+        <span>${m.concepto || '(sin concepto)'}</span>
+        <span class="${m.tipo}">${m.tipo === 'ingreso' ? '+' : '-'}$${parseFloat(m.monto).toFixed(2)}</span>
+      `;
+      cont.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function mostrarCierre() {
+  document.getElementById('formCierre').style.display = 'block';
+}
+
+async function cerrarTurno() {
+  const saldoContado = parseFloat(document.getElementById('saldoContado').value || 0);
+  if (!confirm('¿Confirmas el cierre de turno? Esta acción no se puede deshacer.')) return;
+
+  try {
+    const resultado = await apiFetch(`/turnos/${turnoActual.id}/cerrar`, {
+      method: 'POST',
+      body: JSON.stringify({ saldo_contado: saldoContado })
+    });
+    const r = resultado.resumen;
+    alert(`Corte realizado.\nSaldo teórico: $${r.diferencia === 0 ? '' : ''}${resultado.saldo_teorico}\nDiferencia: $${r.diferencia.toFixed(2)}`);
+    cargarTurno();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+cargarTurno();
+</script>
+</body>
+</html>
