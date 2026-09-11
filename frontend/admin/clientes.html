@@ -58,7 +58,8 @@
       <h4>Abonos</h4>
       <div id="listaAbonos"></div>
 
-      <button class="btn btn-secondary" style="width:100%; margin-top:14px;" onclick="cerrarModalCuenta()">Cerrar</button>
+      <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="generarComprobante()">🖨️ Generar Comprobante</button>
+      <button class="btn btn-secondary" style="width:100%; margin-top:8px;" onclick="cerrarModalCuenta()">Cerrar</button>
     </div>
   </div>
 
@@ -129,9 +130,12 @@ async function guardarCliente() {
   }
 }
 
+let estadoCuentaActual = null;
+
 async function abrirEstadoCuenta(id) {
   clienteActualId = id;
   const data = await apiFetch(`/clientes/${id}/estado-cuenta`);
+  estadoCuentaActual = data;
   document.getElementById('nombreClienteModal').textContent = data.cliente.nombre;
   document.getElementById('saldoActualModal').textContent = parseFloat(data.cliente.saldo_actual).toFixed(2);
   document.getElementById('limiteModal').textContent = parseFloat(data.cliente.limite_credito).toFixed(2);
@@ -147,6 +151,54 @@ async function abrirEstadoCuenta(id) {
   `).join('') || '<p style="color:#888; font-size:13px;">Sin abonos</p>';
 
   document.getElementById('modalCuenta').classList.add('abierto');
+}
+
+function generarComprobante() {
+  const data = estadoCuentaActual;
+  if (!data) return;
+
+  const filasCargos = data.cargos.map(c => `<tr><td>Cargo — Ticket ${c.folio}</td><td>${new Date(c.fecha).toLocaleDateString()}</td><td style="color:#C62828;">+$${parseFloat(c.monto).toFixed(2)}</td></tr>`).join('');
+  const filasAbonos = data.abonos.map(a => `<tr><td>Abono (${a.metodo_pago})</td><td>${new Date(a.fecha).toLocaleDateString()}</td><td style="color:#2E7D32;">-$${parseFloat(a.monto).toFixed(2)}</td></tr>`).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Estado de Cuenta - ${data.cliente.nombre}</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 30px; color: #2A2B2E; }
+      h1 { font-size: 20px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+      th, td { padding: 8px; text-align: left; border-bottom: 1px solid #DDD; font-size: 13px; }
+      .resumen { background: #F4F5F6; padding: 14px; border-radius: 8px; margin-top: 14px; }
+      .resumen b { font-size: 18px; }
+    </style>
+    </head>
+    <body>
+      <h1>Estado de Cuenta</h1>
+      <p><b>Cliente:</b> ${data.cliente.nombre}${data.cliente.telefono ? ' — ' + data.cliente.telefono : ''}</p>
+      <p><b>Fecha de emisión:</b> ${new Date().toLocaleString()}</p>
+
+      <div class="resumen">
+        Saldo actual: <b>$${parseFloat(data.cliente.saldo_actual).toFixed(2)}</b> / Límite de crédito: $${parseFloat(data.cliente.limite_credito).toFixed(2)}
+      </div>
+
+      <table>
+        <thead><tr><th>Movimiento</th><th>Fecha</th><th>Monto</th></tr></thead>
+        <tbody>${filasCargos}${filasAbonos}</tbody>
+      </table>
+
+      <p style="margin-top:30px; font-size:12px; color:#888;">Este documento es un estado de cuenta informativo, generado por el sistema Cremería POS.</p>
+
+      <script>window.onload = () => window.print();<\/script>
+    </body>
+    </html>
+  `;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
 }
 
 function cerrarModalCuenta() {

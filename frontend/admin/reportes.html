@@ -19,6 +19,7 @@
   .tabla-reportes { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
   .tabla-reportes th, .tabla-reportes td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
   .nota { font-size: 12px; color: #888; margin-top: -10px; margin-bottom: 20px; }
+  .btn-secondary.activo { background: var(--primary, #2E7D32); color: white; }
 </style>
 </head>
 <body>
@@ -28,6 +29,12 @@
   </div>
 
   <div class="contenido">
+    <div class="filtros" style="margin-bottom:8px;">
+      <button class="btn btn-secondary" id="tabVentas" onclick="cambiarTabReporte('ventas')">Ventas</button>
+      <button class="btn btn-secondary" id="tabCompras" onclick="cambiarTabReporte('compras')">Compras</button>
+      <button class="btn btn-secondary" id="tabClientes" onclick="cambiarTabReporte('clientes')">Clientes</button>
+    </div>
+
     <div class="filtros">
       <input type="date" id="fechaDesde">
       <input type="date" id="fechaHasta">
@@ -38,6 +45,7 @@
       <button class="btn btn-secondary" onclick="exportarCSV()">⬇️ Exportar CSV</button>
     </div>
 
+    <div id="seccionVentas">
     <div class="tarjetas-resumen" id="tarjetasResumen"></div>
 
     <h3>Ventas por método de pago</h3>
@@ -63,6 +71,36 @@
       <thead><tr><th>Producto</th><th>Cantidad</th><th>Monto</th></tr></thead>
       <tbody id="tablaProductos"></tbody>
     </table>
+    </div>
+
+    <div id="seccionCompras" style="display:none;">
+      <div class="tarjetas-resumen" id="tarjetasCompras"></div>
+      <h3>Gasto por proveedor</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Proveedor</th><th>Compras</th><th>Total</th></tr></thead>
+        <tbody id="tablaProveedores"></tbody>
+      </table>
+      <h3>Evolución de costo (primera vs. última compra en el rango)</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Producto</th><th>Costo inicial</th><th>Costo reciente</th></tr></thead>
+        <tbody id="tablaEvolucionCosto"></tbody>
+      </table>
+    </div>
+
+    <div id="seccionClientes" style="display:none;">
+      <div class="tarjetas-resumen" id="tarjetasClientes"></div>
+      <h3>Clientes con mayor deuda</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Cliente</th><th>Debe</th><th>Límite</th></tr></thead>
+        <tbody id="tablaMayorDeuda"></tbody>
+      </table>
+      <h3>Clientes más frecuentes (compras a crédito en el rango)</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Cliente</th><th>Tickets</th><th>Total comprado</th></tr></thead>
+        <tbody id="tablaFrecuentes"></tbody>
+      </table>
+      <p class="nota">Nota: "más frecuentes" solo cuenta compras pagadas como Fiado — no hay forma de identificar al cliente en ventas de contado, ya que esas no piden asociar un cliente.</p>
+    </div>
   </div>
 
 <script src="../js/api.js"></script>
@@ -97,13 +135,76 @@ function construirQueryFechas() {
   return `?desde=${desde}&hasta=${formatearFechaInput(hastaFin)}`;
 }
 
+let tabReporteActual = 'ventas';
+
+function cambiarTabReporte(tab) {
+  tabReporteActual = tab;
+  document.getElementById('seccionVentas').style.display = tab === 'ventas' ? 'block' : 'none';
+  document.getElementById('seccionCompras').style.display = tab === 'compras' ? 'block' : 'none';
+  document.getElementById('seccionClientes').style.display = tab === 'clientes' ? 'block' : 'none';
+  ['Ventas','Compras','Clientes'].forEach(nombre => {
+    document.getElementById('tab' + nombre).classList.toggle('activo', nombre.toLowerCase() === tab);
+  });
+  cargarReporte();
+}
+
 async function cargarReporte() {
   try {
-    const data = await apiFetch(`/reportes/ventas${construirQueryFechas()}`);
-    renderResumen(data);
+    if (tabReporteActual === 'ventas') {
+      const data = await apiFetch(`/reportes/ventas${construirQueryFechas()}`);
+      renderResumen(data);
+    } else if (tabReporteActual === 'compras') {
+      const data = await apiFetch(`/reportes/compras${construirQueryFechas()}`);
+      renderCompras(data);
+    } else if (tabReporteActual === 'clientes') {
+      const data = await apiFetch(`/reportes/clientes${construirQueryFechas()}`);
+      renderClientes(data);
+    }
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+}
+
+function renderCompras(data) {
+  document.getElementById('tarjetasCompras').innerHTML = `
+    <div class="tarjeta-metrica">
+      <div class="valor">$${parseFloat(data.total_general.total).toFixed(2)}</div>
+      <div class="etiqueta">Total Comprado</div>
+    </div>
+    <div class="tarjeta-metrica">
+      <div class="valor">${data.total_general.num_compras}</div>
+      <div class="etiqueta">Compras Registradas</div>
+    </div>
+  `;
+  document.getElementById('tablaProveedores').innerHTML = data.por_proveedor.map(p => `
+    <tr><td>${p.proveedor}</td><td>${p.num_compras}</td><td>$${parseFloat(p.total).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3">Sin compras en este rango</td></tr>';
+
+  document.getElementById('tablaEvolucionCosto').innerHTML = data.evolucion_costo.map(e => {
+    const subio = parseFloat(e.costo_reciente) > parseFloat(e.costo_inicial);
+    const flecha = subio ? '🔺' : (parseFloat(e.costo_reciente) < parseFloat(e.costo_inicial) ? '🔻' : '➡️');
+    return `<tr><td>${e.nombre}</td><td>$${parseFloat(e.costo_inicial).toFixed(2)}</td><td>${flecha} $${parseFloat(e.costo_reciente).toFixed(2)}</td></tr>`;
+  }).join('') || '<tr><td colspan="3">No hay productos con más de una compra en este rango</td></tr>';
+}
+
+function renderClientes(data) {
+  document.getElementById('tarjetasClientes').innerHTML = `
+    <div class="tarjeta-metrica">
+      <div class="valor">$${data.deuda_activa_total.toFixed(2)}</div>
+      <div class="etiqueta">Deuda Activa Total</div>
+    </div>
+    <div class="tarjeta-metrica tarjeta-ganancia">
+      <div class="valor">$${parseFloat(data.abonos_rango.total).toFixed(2)}</div>
+      <div class="etiqueta">Abonos Recibidos</div>
+    </div>
+  `;
+  document.getElementById('tablaMayorDeuda').innerHTML = data.mayor_deuda.map(c => `
+    <tr><td>${c.nombre}</td><td>$${parseFloat(c.saldo_actual).toFixed(2)}</td><td>$${parseFloat(c.limite_credito).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3">Sin clientes con deuda activa</td></tr>';
+
+  document.getElementById('tablaFrecuentes').innerHTML = data.mas_frecuentes.map(c => `
+    <tr><td>${c.nombre}</td><td>${c.num_tickets}</td><td>$${parseFloat(c.total_comprado).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3">Sin compras a crédito en este rango</td></tr>';
 }
 
 async function exportarCSV() {
@@ -169,6 +270,7 @@ function renderResumen(data) {
   document.getElementById('tarjetasResumen').after(nota);
 }
 
+document.getElementById('tabVentas').classList.add('activo');
 filtroRapido('hoy');
 </script>
 </body>

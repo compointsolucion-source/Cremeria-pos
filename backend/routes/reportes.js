@@ -142,4 +142,90 @@ router.get('/ventas/exportar-csv', verificarToken, async (req, res) => {
   }
 });
 
+// Reporte de Compras: gasto por proveedor y evolución de costo por producto
+router.get('/compras', verificarToken, async (req, res) => {
+  try {
+    const { desde, hasta } = resolverRango(req.query);
+    const sucursalId = req.usuario.sucursal_id;
+
+    const porProveedor = await pool.query(
+      `SELECT pr.nombre AS proveedor, COALESCE(SUM(c.total),0) AS total, COUNT(*) AS num_compras
+       FROM compras c JOIN proveedores pr ON c.proveedor_id = pr.id
+       WHERE c.sucursal_id = $1 AND c.fecha BETWEEN $2 AND $3
+       GROUP BY pr.nombre ORDER BY total DESC`,
+      [sucursalId, desde, hasta]
+    );
+
+    const totalGeneral = await pool.query(
+      `SELECT COALESCE(SUM(total),0) AS total, COUNT(*) AS num_compras FROM compras WHERE sucursal_id = $1 AND fecha BETWEEN $2 AND $3`,
+      [sucursalId, desde, hasta]
+    );
+
+    // Evolución de costo: para cada producto comprado en el rango, precio más antiguo vs. más reciente
+    const evolucionCosto = await pool.query(
+      `SELECT p.nombre,
+              (ARRAY_AGG(cd.costo_unitario ORDER BY c.fecha ASC))[1] AS costo_inicial,
+              (ARRAY_AGG(cd.costo_unitario ORDER BY c.fecha DESC))[1] AS costo_reciente
+       FROM compra_detalle cd
+       JOIN compras c ON cd.compra_id = c.id
+       JOIN productos p ON cd.producto_id = p.id
+       WHERE c.sucursal_id = $1 AND c.fecha BETWEEN $2 AND $3
+       GROUP BY p.nombre
+       HAVING COUNT(*) > 1
+       ORDER BY p.nombre ASC`,
+      [sucursalId, desde, hasta]
+    );
+
+    res.json({ total_general: totalGeneral.rows[0], por_proveedor: porProveedor.rows, evolucion_costo: evolucionCosto.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al generar el reporte de compras' });
+  }
+});
+
+// Reporte de Clientes: deuda activa, abonos del rango, clientes más frecuentes
+router.get('/clientes', verificarToken, async (req, res) => {
+  try {
+    const { desde, hasta } = resolverRango(req.query);
+    const sucursalId = req.usuario.sucursal_id;
+
+    const deudaActiva = await pool.query(
+      `SELECT COALESCE(SUM(saldo_actual),0) AS total FROM clientes WHERE sucursal_id = $1 AND activo = true`,
+      [sucursalId]
+    );
+
+    const mayorDeuda = await pool.query(
+      `SELECT nombre, saldo_actual, limite_credito FROM clientes
+       WHERE sucursal_id = $1 AND activo = true AND saldo_actual > 0
+       ORDER BY saldo_actual DESC LIMIT 10`,
+      [sucursalId]
+    );
+
+    const abonosRango = await pool.query(
+      `SELECT COALESCE(SUM(ca.monto),0) AS total, COUNT(*) AS num_abonos
+       FROM creditos_abono ca JOIN clientes cl ON ca.cliente_id = cl.id
+       WHERE cl.sucursal_id = $1 AND ca.fecha BETWEEN $2 AND $3`,
+      [sucursalId, desde, hasta]
+    );
+
+    const masFrecuentes = await pool.query(
+      `SELECT cl.nombre, COUNT(*) AS num_tickets, COALESCE(SUM(t.total),0) AS total_comprado
+       FROM tickets t JOIN clientes cl ON t.cliente_id = cl.id
+       WHERE t.estado = 'pagado' AND t.sucursal_id = $1 AND t.fecha_pago BETWEEN $2 AND $3
+       GROUP BY cl.nombre ORDER BY num_tickets DESC LIMIT 10`,
+      [sucursalId, desde, hasta]
+    );
+
+    res.json({
+      deuda_activa_total: parseFloat(deudaActiva.rows[0].total),
+      mayor_deuda: mayorDeuda.rows,
+      abonos_rango: abonosRango.rows[0],
+      mas_frecuentes: masFrecuentes.rows
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al generar el reporte de clientes' });
+  }
+});
+
 module.exports = router;
