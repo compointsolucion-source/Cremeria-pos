@@ -140,6 +140,7 @@
   </div>
 
 <script src="js/api.js"></script>
+<script src="js/ui-components.js"></script>
 <script src="js/impresora-termica.js"></script>
 <script>
 requiereLogin();
@@ -163,7 +164,7 @@ async function cargarDatos() {
     renderCategorias();
     renderProductos();
   } catch (err) {
-    alert('Error al cargar productos: ' + err.message);
+    mostrarToast('Error al cargar productos: ' + err.message, 'error');
   }
 }
 
@@ -268,7 +269,7 @@ function actualizarDisplayPeso() {
 
 function confirmarPeso() {
   const peso = parseFloat(pesoActual || '0');
-  if (peso <= 0) { alert('Ingresa un peso válido'); return; }
+  if (peso <= 0) { mostrarToast('Ingresa un peso válido', 'error'); return; }
 
   carrito.push({
     tipo: 'producto',
@@ -360,7 +361,7 @@ async function buscarPorCodigo(codigo) {
       const kit = await apiFetch(`/kits/codigo/${codigo}`);
       agregarKit(kit);
     } catch (err2) {
-      alert('No se encontró ningún producto o kit con ese código: ' + codigo);
+      mostrarToast('No se encontró ningún producto o kit con ese código: ' + codigo, 'error');
     }
   }
 }
@@ -411,12 +412,12 @@ async function conectarImpresoraMostrador() {
     await conectarImpresora();
     actualizarBannerImpresora();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
 async function generarTicket() {
-  if (carrito.length === 0) { alert('Agrega al menos un producto'); return; }
+  if (carrito.length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
 
   try {
     const ticket = await apiFetch('/tickets', {
@@ -427,8 +428,9 @@ async function generarTicket() {
     await imprimirTicket(ticket);
     carrito = [];
     renderCarrito();
+    mostrarToast(`Ticket ${ticket.folio} generado`, 'exito');
   } catch (err) {
-    alert('Error al generar el ticket: ' + err.message);
+    mostrarToast('Error al generar el ticket: ' + err.message, 'error');
   }
 }
 
@@ -453,9 +455,11 @@ async function imprimirTicket(ticket) {
 
   try {
     await imprimirTicketBLE(datosTicket);
+    mostrarToast('Ticket impreso correctamente', 'exito');
   } catch (err) {
     actualizarBannerImpresora();
-    const usarRespaldo = confirm(`No se pudo imprimir automáticamente (${err.message}).\n\nTicket generado: ${ticket.folio} — Total: $${ticket.total}\n\n¿Quieres compartir el ticket como texto (WhatsApp, etc.) mientras se resuelve la impresora?`);
+    mostrarToast(`No se pudo imprimir: ${err.message}`, 'error');
+    const usarRespaldo = await confirmarAccion(`Ticket generado: ${ticket.folio} — Total: $${ticket.total}. ¿Compartir como texto (WhatsApp, etc.) mientras se resuelve la impresora?`);
     if (usarRespaldo) await compartirTicketComoTexto(datosTicket);
   }
 }

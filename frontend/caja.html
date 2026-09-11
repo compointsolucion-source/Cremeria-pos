@@ -53,6 +53,7 @@
   </div>
 
 <script src="js/api.js"></script>
+<script src="js/ui-components.js"></script>
 <script src="js/impresora-termica.js"></script>
 <script>
 requiereLogin();
@@ -91,7 +92,7 @@ async function cargarTicket(folio) {
     clienteSeleccionado = null;
     renderPanelCobro();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -136,23 +137,24 @@ async function editarCantidad(itemId, cantidadActual) {
   const nueva = prompt('Nueva cantidad:', cantidadActual);
   if (nueva === null) return;
   const cantidad = parseFloat(nueva);
-  if (!cantidad || cantidad <= 0) { alert('Cantidad inválida'); return; }
+  if (!cantidad || cantidad <= 0) { mostrarToast('Cantidad inválida', 'error'); return; }
 
   try {
     await apiFetch(`/tickets/item/${itemId}`, { method: 'PUT', body: JSON.stringify({ cantidad }) });
     await cargarTicket(ticketActual.folio);
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
 async function quitarItem(itemId) {
-  if (!confirm('¿Quitar este producto del ticket?')) return;
+  const confirmado = await confirmarAccion('¿Quitar este producto del ticket?');
+  if (!confirmado) return;
   try {
     await apiFetch(`/tickets/item/${itemId}`, { method: 'DELETE' });
     await cargarTicket(ticketActual.folio);
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -216,7 +218,7 @@ function elegirCliente(cliente) {
 async function cobrar() {
   try {
     const turno = await apiFetch('/turnos/actual');
-    if (!turno) { alert('No hay un turno de caja abierto. Ábrelo desde el panel de administración.'); return; }
+    if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo desde el panel de administración.', 'error'); return; }
 
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
 
@@ -228,11 +230,11 @@ async function cobrar() {
       montoEfectivo = parseFloat(document.getElementById('montoEfectivo').value || 0);
       montoTarjeta = parseFloat(document.getElementById('montoTarjeta').value || 0);
       if (Math.abs((montoEfectivo + montoTarjeta) - ticketActual.total) > 0.01) {
-        alert('La suma de efectivo y tarjeta debe ser igual al total');
+        mostrarToast('La suma de efectivo y tarjeta debe ser igual al total', 'error');
         return;
       }
     } else if (metodoPago === 'credito') {
-      if (!clienteSeleccionado) { alert('Selecciona un cliente para autorizar el fiado'); return; }
+      if (!clienteSeleccionado) { mostrarToast('Selecciona un cliente para autorizar el fiado', 'error'); return; }
       cliente_id = clienteSeleccionado.id;
     }
 
@@ -247,13 +249,14 @@ async function cobrar() {
       })
     });
 
+    mostrarToast('Pago procesado correctamente', 'exito');
     await imprimirComprobante(ticketActual, metodoPago);
     ticketActual = null;
     clienteSeleccionado = null;
     document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
     cargarBandeja();
   } catch (err) {
-    alert('Error al cobrar: ' + err.message);
+    mostrarToast('Error al cobrar: ' + err.message, 'error');
   }
 }
 
@@ -289,7 +292,7 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     await imprimirTicketBLE(datosTicket);
   } catch (err) {
     actualizarBannerImpresoraCaja();
-    const usarRespaldo = confirm(`Pago procesado correctamente, pero no se pudo imprimir automáticamente (${err.message}).\n\n¿Compartir el comprobante como texto mientras tanto?`);
+    const usarRespaldo = await confirmarAccion(`No se pudo imprimir el comprobante (${err.message}). ¿Compartir como texto mientras tanto?`);
     if (usarRespaldo) await compartirTicketComoTexto(datosTicket);
   }
 }
@@ -304,7 +307,7 @@ async function conectarImpresoraCaja() {
     await conectarImpresora();
     actualizarBannerImpresoraCaja();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 setTimeout(actualizarBannerImpresoraCaja, 500);
