@@ -115,7 +115,7 @@ function renderPanelCobro() {
     <div class="metodo-pago-btns">
       <button class="btn btn-secondary" id="btnEfectivo" onclick="setMetodo('efectivo')">Efectivo</button>
       <button class="btn btn-secondary" id="btnTarjeta" onclick="setMetodo('tarjeta')">Tarjeta</button>
-      <button class="btn btn-secondary" id="btnCodi" onclick="setMetodo('codi')">CoDi</button>
+      <button class="btn btn-secondary" id="btnTransferencia" onclick="setMetodo('transferencia')">Transferencia</button>
       <button class="btn btn-secondary" id="btnMixto" onclick="setMetodo('mixto')">Mixto</button>
       <button class="btn btn-secondary" id="btnCredito" onclick="setMetodo('credito')">💳 Fiado</button>
     </div>
@@ -153,7 +153,7 @@ async function quitarItem(itemId) {
 
 function setMetodo(m) {
   metodoPago = m;
-  ['Efectivo','Tarjeta','Codi','Mixto','Credito'].forEach(nombre => {
+  ['Efectivo','Tarjeta','Transferencia','Mixto','Credito'].forEach(nombre => {
     const btn = document.getElementById('btn' + nombre);
     if (btn) btn.classList.toggle('activo', nombre.toLowerCase() === m);
   });
@@ -217,7 +217,7 @@ async function cobrar() {
 
     if (metodoPago === 'efectivo') {
       montoEfectivo = ticketActual.total;
-    } else if (metodoPago === 'tarjeta' || metodoPago === 'codi') {
+    } else if (metodoPago === 'tarjeta' || metodoPago === 'transferencia') {
       montoTarjeta = ticketActual.total;
     } else if (metodoPago === 'mixto') {
       montoEfectivo = parseFloat(document.getElementById('montoEfectivo').value || 0);
@@ -234,7 +234,7 @@ async function cobrar() {
     await apiFetch(`/tickets/${ticketActual.id}/pagar`, {
       method: 'POST',
       body: JSON.stringify({
-        metodo_pago: metodoPago === 'codi' ? 'tarjeta' : metodoPago,
+        metodo_pago: metodoPago,
         monto_efectivo: montoEfectivo,
         monto_tarjeta: montoTarjeta,
         turno_id: turno.id,
