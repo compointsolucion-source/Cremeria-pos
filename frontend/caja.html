@@ -395,19 +395,26 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`
   };
 
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  if (modoImpresion === 'sistema') {
+    imprimirConDialogoDelSistema(datosTicket);
+    return;
+  }
+
   try {
     await imprimirTicketBLE(datosTicket);
   } catch (err) {
     actualizarBannerImpresoraCaja();
-    const usarRespaldo = await confirmarAccion(`No se pudo imprimir el comprobante (${err.message}). ¿Compartir como texto mientras tanto?`);
-    if (usarRespaldo) await compartirTicketComoTexto(datosTicket);
+    const usarRespaldo = await confirmarAccion(`No se pudo imprimir el comprobante por Bluetooth/USB (${err.message}). ¿Imprimir con una impresora ya instalada en esta computadora (Windows)?`);
+    if (usarRespaldo) imprimirConDialogoDelSistema(datosTicket);
   }
 }
 
 cargarConfiguracionNegocioCaja();
 
 function actualizarBannerImpresoraCaja() {
-  document.getElementById('bannerImpresoraCaja').style.display = impresoraConectada() ? 'none' : 'block';
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  document.getElementById('bannerImpresoraCaja').style.display = (modoImpresion === 'sistema' || impresoraConectada()) ? 'none' : 'block';
 }
 async function conectarImpresoraCaja() {
   try {

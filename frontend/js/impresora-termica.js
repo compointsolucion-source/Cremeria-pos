@@ -349,3 +349,33 @@ async function compartirTicketComoTexto(datosTicket) {
     alert('Tu navegador no soporta compartir directo. El ticket se copió al portapapeles.');
   }
 }
+
+// Imprime usando el diálogo normal de impresión del navegador — funciona con
+// CUALQUIER impresora que Windows/Mac ya tenga instalada (USB, red, la que
+// sea), porque el sistema operativo maneja la comunicación, no el navegador.
+// No corta el papel automáticamente ni usa comandos ESC/POS — es un respaldo
+// universal, no un reemplazo de la impresión térmica directa.
+function imprimirConDialogoDelSistema(datosTicket) {
+  const columnas = datosTicket.ancho_ticket === '58mm' ? 32 : 48;
+  const anchoMM = datosTicket.ancho_ticket === '58mm' ? '58mm' : '80mm';
+  const lineas = formatearTicket(datosTicket);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Ticket ${datosTicket.folio}</title>
+    <style>
+      @page { size: ${anchoMM} auto; margin: 2mm; }
+      body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; }
+    </style>
+    </head>
+    <body>${lineas.join('\n')}<script>window.onload = () => window.print();<\/script></body>
+    </html>
+  `;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+}

@@ -29,6 +29,15 @@
       <p style="font-size:13px; color:#888;">Debes conectarla una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
     </div>
 
+    <div class="card form-config" style="margin-bottom:16px;">
+      <h3>Método de impresión en ESTE dispositivo</h3>
+      <p style="font-size:13px; color:#888;">Esta opción es por dispositivo (computadora/tablet), no se comparte con el resto del negocio.</p>
+      <select id="modoImpresion" onchange="guardarModoImpresion()">
+        <option value="directo">Directo (Bluetooth/USB) — imprime solo, corta el papel</option>
+        <option value="sistema">Impresora ya instalada en esta computadora (Windows/Mac) — más simple, abre un diálogo de impresión</option>
+      </select>
+    </div>
+
     <div class="card form-config">
       <h3>Datos del negocio (aparecen en el ticket)</h3>
       <input type="text" id="direccion" placeholder="Dirección">
@@ -101,6 +110,16 @@ async function guardarConfiguracion() {
   }
 }
 
+function cargarModoImpresion() {
+  document.getElementById('modoImpresion').value = localStorage.getItem('modo_impresion') || 'directo';
+}
+
+function guardarModoImpresion() {
+  localStorage.setItem('modo_impresion', document.getElementById('modoImpresion').value);
+  mostrarToast('Método de impresión guardado para este dispositivo', 'exito');
+}
+
+cargarModoImpresion();
 cargarConfiguracion();
 </script>
 </body>

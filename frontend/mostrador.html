@@ -447,7 +447,8 @@ async function cargarConfiguracionNegocio() {
 }
 
 function actualizarBannerImpresora() {
-  document.getElementById('bannerImpresora').style.display = impresoraConectada() ? 'none' : 'block';
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  document.getElementById('bannerImpresora').style.display = (modoImpresion === 'sistema' || impresoraConectada()) ? 'none' : 'block';
 }
 
 async function conectarImpresoraMostrador() {
@@ -505,14 +506,20 @@ async function imprimirTicket(ticket) {
     piePagina: 'Presenta este ticket en caja para pagar'
   };
 
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  if (modoImpresion === 'sistema') {
+    imprimirConDialogoDelSistema(datosTicket);
+    return;
+  }
+
   try {
     await imprimirTicketBLE(datosTicket);
     mostrarToast('Ticket impreso correctamente', 'exito');
   } catch (err) {
     actualizarBannerImpresora();
     mostrarToast(`No se pudo imprimir: ${err.message}`, 'error');
-    const usarRespaldo = await confirmarAccion(`Ticket generado: ${ticket.folio} — Total: $${ticket.total}. ¿Compartir como texto (WhatsApp, etc.) mientras se resuelve la impresora?`);
-    if (usarRespaldo) await compartirTicketComoTexto(datosTicket);
+    const usarRespaldo = await confirmarAccion(`Ticket generado: ${ticket.folio} — Total: $${ticket.total}. No se pudo imprimir por Bluetooth/USB. ¿Imprimir con una impresora ya instalada en esta computadora (Windows)?`);
+    if (usarRespaldo) imprimirConDialogoDelSistema(datosTicket);
   }
 }
 
