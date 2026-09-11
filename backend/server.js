@@ -51,6 +51,7 @@ app.use('/api/configuracion', require('./routes/configuracion'));
 app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/devoluciones', require('./routes/devoluciones'));
 
 app.get('/', (req, res) => res.send('Cremería POS backend funcionando'));
 

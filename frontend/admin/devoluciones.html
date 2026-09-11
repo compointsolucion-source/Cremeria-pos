@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devoluciones - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 700px; margin: 20px auto; padding: 0 14px; }
+  .buscar-ticket { display: flex; gap: 8px; margin-bottom: 20px; }
+  .buscar-ticket input { flex: 1; }
+  .item-devolucion { background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .item-devolucion .nombre { font-weight: 700; margin-bottom: 6px; }
+  .item-devolucion .disponible { font-size: 12px; color: #888; margin-bottom: 8px; }
+  .fila-controles { display: flex; gap: 8px; align-items: center; }
+  .fila-controles input[type="number"] { width: 90px; }
+  .fila-controles label { display: flex; align-items: center; gap: 4px; font-size: 13px; flex: 1; }
+  .agotado-devolver { opacity: 0.5; }
+  .resumen-devolucion { background: white; border-radius: 12px; padding: 14px; margin-top: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .historial-item { background: white; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; justify-content: space-between; font-size: 14px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>↩️ Devoluciones</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="buscar-ticket">
+      <input type="text" id="folioBusqueda" placeholder="Folio del ticket (ej. S1-A2F91)">
+      <button class="btn btn-primary" onclick="buscarTicket()">Buscar</button>
+    </div>
+
+    <div id="detalleTicket"></div>
+
+    <h3 style="margin-top:30px;">Historial de devoluciones</h3>
+    <div id="listaHistorial"></div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+let ticketEncontrado = null;
+
+async function buscarTicket() {
+  const folio = document.getElementById('folioBusqueda').value.trim();
+  if (!folio) { mostrarToast('Ingresa un folio', 'error'); return; }
+
+  try {
+    ticketEncontrado = await apiFetch(`/tickets/folio/${folio}`);
+    if (ticketEncontrado.estado !== 'pagado') {
+      mostrarToast('Este ticket no está pagado, no se puede procesar una devolución', 'error');
+      document.getElementById('detalleTicket').innerHTML = '';
+      return;
+    }
+    renderDetalleTicket();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    document.getElementById('detalleTicket').innerHTML = '';
+  }
+}
+
+function renderDetalleTicket() {
+  const t = ticketEncontrado;
+  const cont = document.getElementById('detalleTicket');
+
+  const filasItems = t.items.map(item => {
+    const disponible = parseFloat(item.cantidad) - parseFloat(item.cantidad_devuelta || 0);
+    if (disponible <= 0) {
+      return `<div class="item-devolucion agotado-devolver">
+        <div class="nombre">${item.nombre_producto}</div>
+        <div class="disponible">Ya se devolvió por completo</div>
+      </div>`;
+    }
+    return `
+      <div class="item-devolucion" data-item-id="${item.id}">
+        <div class="nombre">${item.nombre_producto}</div>
+        <div class="disponible">Disponible para devolver: ${disponible} (de ${item.cantidad} vendido)</div>
+        <div class="fila-controles">
+          <input type="number" class="cant-devolver" min="0" max="${disponible}" step="0.01" placeholder="0">
+          <label><input type="checkbox" class="regresa-inv" checked> Regresa a inventario</label>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const esCredito = t.metodo_pago === 'credito';
+
+  cont.innerHTML = `
+    <div class="card">
+      <h3>Ticket ${t.folio}</h3>
+      <p style="color:#666; font-size:13px;">Pagado con: ${t.metodo_pago} — Total original: $${parseFloat(t.total).toFixed(2)}</p>
+      ${filasItems}
+
+      <input type="text" id="motivoDevolucion" placeholder="Motivo de la devolución" style="margin-top:10px;">
+
+      <select id="metodoReembolso" style="margin-top:10px;">
+        <option value="efectivo">Reembolsar en efectivo (de la caja)</option>
+        ${esCredito ? '<option value="ajuste_credito">Reducir saldo del cliente (fiado)</option>' : ''}
+        <option value="sin_reembolso">Sin reembolso de dinero (solo ajuste de inventario)</option>
+      </select>
+
+      <button class="btn btn-danger" style="width:100%; margin-top:14px;" onclick="procesarDevolucion()">Procesar Devolución</button>
+    </div>
+  `;
+}
+
+async function procesarDevolucion() {
+  const items = [];
+  document.querySelectorAll('.item-devolucion[data-item-id]').forEach(div => {
+    const cantidad = parseFloat(div.querySelector('.cant-devolver').value || 0);
+    if (cantidad > 0) {
+      items.push({
+        ticket_detalle_id: parseInt(div.dataset.itemId),
+        cantidad_devuelta: cantidad,
+        regresa_inventario: div.querySelector('.regresa-inv').checked
+      });
+    }
+  });
+
+  if (items.length === 0) { mostrarToast('Ingresa al menos una cantidad a devolver', 'error'); return; }
+
+  const metodo_reembolso = document.getElementById('metodoReembolso').value;
+  const motivo = document.getElementById('motivoDevolucion').value.trim();
+
+  let turno_id = null;
+  if (metodo_reembolso === 'efectivo') {
+    try {
+      const turno = await apiFetch('/turnos/actual');
+      if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo antes de reembolsar en efectivo.', 'error'); return; }
+      turno_id = turno.id;
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+      return;
+    }
+  }
+
+  const confirmado = await confirmarAccion('¿Confirmas procesar esta devolución? Esta acción ajusta inventario y caja/crédito automáticamente.');
+  if (!confirmado) return;
+
+  try {
+    const resultado = await apiFetch('/devoluciones', {
+      method: 'POST',
+      body: JSON.stringify({ ticket_id: ticketEncontrado.id, items, metodo_reembolso, motivo, turno_id })
+    });
+    mostrarToast(`Devolución registrada: $${parseFloat(resultado.monto_total).toFixed(2)}`, 'exito');
+    document.getElementById('folioBusqueda').value = '';
+    document.getElementById('detalleTicket').innerHTML = '';
+    ticketEncontrado = null;
+    cargarHistorial();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function cargarHistorial() {
+  try {
+    const historial = await apiFetch('/devoluciones');
+    document.getElementById('listaHistorial').innerHTML = historial.map(d => `
+      <div class="historial-item">
+        <span>Ticket ${d.folio} — ${d.motivo || 'Sin motivo especificado'}</span>
+        <span>$${parseFloat(d.monto_total).toFixed(2)} (${new Date(d.fecha).toLocaleDateString()})</span>
+      </div>
+    `).join('') || '<p style="color:#888; font-size:13px;">Sin devoluciones registradas</p>';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+cargarHistorial();
+</script>
+</body>
+</html>
