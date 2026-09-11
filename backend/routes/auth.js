@@ -2,10 +2,22 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { verificarToken } = require('../middleware/auth');
 
-router.post('/login', async (req, res) => {
+// Máximo 8 intentos de login por IP cada 15 minutos. Suficiente para que una
+// persona real que se equivoca de contraseña no se quede bloqueada, pero
+// frena un ataque de fuerza bruta automatizado contra el usuario Admin.
+const limitadorLogin = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos de inicio de sesión. Espera unos minutos e intenta de nuevo.' }
+});
+
+router.post('/login', limitadorLogin, async (req, res) => {
   try {
     const { usuario, password } = req.body;
     if (!usuario || !password) {

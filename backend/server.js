@@ -9,6 +9,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
+// Render/Cloudflare actúan como proxy delante del servidor: sin esto, Express
+// vería siempre la IP interna del proxy en vez de la IP real del navegador,
+// lo que rompería el límite de intentos de login (afectaría a todos por igual).
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.set('io', io);
