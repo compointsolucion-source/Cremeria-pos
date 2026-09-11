@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backups - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 600px; margin: 20px auto; padding: 0 14px; }
+  .nota-limitacion { background: #FFF3E0; color: #7A5B00; padding: 14px; border-radius: 12px; font-size: 14px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>💾 Backups</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="nota-limitacion">
+      ⚠️ <b>Importante sobre esta función:</b> este botón descarga un archivo JSON con tus datos actuales (productos, clientes, tickets, turnos, inventario, configuración). <b>No es un backup restaurable con un clic</b> — si necesitas recuperar datos desde este archivo, requeriría reinsertarlos manualmente en la base de datos con ayuda técnica. Para restauración automática de los últimos cambios, Neon ya incluye un "point-in-time restore" de 6 horas en su plan gratuito, sin que tengas que hacer nada.
+    </div>
+
+    <div class="card">
+      <h3>Exportar datos actuales</h3>
+      <p style="font-size:13px; color:#666;">Se descargará un archivo .json con la información de tu sucursal. Las contraseñas nunca se incluyen.</p>
+      <button class="btn btn-primary" style="width:100%;" onclick="exportarDatos()">⬇️ Descargar Exportación</button>
+    </div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+
+async function exportarDatos() {
+  try {
+    mostrarToast('Generando exportación, puede tardar unos segundos...', 'info');
+    const datos = await apiFetch('/backups/exportar');
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cremeria-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    mostrarToast('Exportación descargada', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+</script>
+</body>
+</html>
