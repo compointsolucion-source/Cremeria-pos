@@ -6,14 +6,47 @@
 <title>Panel de Administración - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <style>
-  .contenido { max-width: 700px; margin: 20px auto; padding: 0 14px; }
-  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; margin-top: 24px; }
   .menu-card {
     background: white; border-radius: 14px; padding: 20px; text-align: center;
     box-shadow: 0 2px 6px rgba(0,0,0,0.08); cursor: pointer; text-decoration: none; color: #2A2B2E;
   }
   .menu-card:active { background: #F0F0F0; }
   .menu-card .icono { font-size: 32px; margin-bottom: 8px; }
+
+  .tarjetas-metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tarjeta-metrica { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center; }
+  .tarjeta-metrica .valor { font-size: 20px; font-weight: 700; }
+  .tarjeta-metrica .etiqueta { font-size: 12px; color: #666; margin-top: 4px; }
+  .tarjeta-utilidad { background: #E8F5E9; }
+  .tarjeta-utilidad .valor { color: #2E7D32; }
+  .tarjeta-fiado { background: #FFF3E0; }
+  .tarjeta-fiado .valor { color: #E65100; }
+  .tarjeta-alerta { background: #FFEBEE; }
+  .tarjeta-alerta .valor { color: #C62828; }
+
+  .seccion-dashboard { margin-bottom: 20px; }
+  .seccion-dashboard h3 { margin-bottom: 8px; }
+
+  .barra-hora { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; }
+  .barra-hora .etiqueta-hora { width: 40px; color: #666; }
+  .barra-hora .barra-fondo { flex: 1; background: #F0F0F0; border-radius: 6px; height: 18px; overflow: hidden; }
+  .barra-hora .barra-relleno { background: #2E7D32; height: 100%; border-radius: 6px; }
+  .barra-hora .monto-hora { width: 70px; text-align: right; font-weight: 600; }
+
+  .lista-alerta { background: white; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .fila-alerta { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F0F0F0; font-size: 14px; }
+  .fila-alerta:last-child { border-bottom: none; }
+
+  .fila-actividad { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F0F0F0; font-size: 14px; }
+  .tag-actividad { font-size: 10px; padding: 2px 6px; border-radius: 6px; color: white; margin-right: 6px; }
+  .tag-venta { background: #2E7D32; }
+  .tag-compra { background: #1565C0; }
+  .tag-abono { background: #F9A825; }
+  .tag-merma, .tag-ajuste_manual { background: #C62828; }
+
+  .sin-datos { color: #888; font-size: 13px; text-align: center; padding: 10px; }
 </style>
 </head>
 <body>
@@ -23,6 +56,23 @@
   </div>
 
   <div class="contenido">
+    <div class="tarjetas-metricas" id="tarjetasMetricas"></div>
+
+    <div class="seccion-dashboard">
+      <h3>Ventas de hoy por hora</h3>
+      <div id="ventasPorHora" class="lista-alerta"></div>
+    </div>
+
+    <div class="seccion-dashboard" id="seccionAlertas" style="display:none;">
+      <h3>⚠️ Alertas</h3>
+      <div id="listaAlertas" class="lista-alerta"></div>
+    </div>
+
+    <div class="seccion-dashboard">
+      <h3>Actividad reciente</h3>
+      <div id="listaActividad" class="lista-alerta"></div>
+    </div>
+
     <div class="menu-grid">
       <a class="menu-card" href="productos.html"><div class="icono">🖼️</div>Productos</a>
       <a class="menu-card" href="kits.html"><div class="icono">📦</div>Kits/Combos</a>
@@ -40,6 +90,101 @@
   </div>
 
 <script src="../js/api.js"></script>
-<script>requiereLogin();</script>
+<script>
+requiereLogin();
+
+const nombresTipoActividad = { venta: 'Venta', compra: 'Compra', abono: 'Abono', merma: 'Merma', ajuste_manual: 'Ajuste' };
+
+async function cargarDashboard() {
+  try {
+    const data = await apiFetch('/dashboard/resumen');
+    renderTarjetas(data);
+    renderVentasPorHora(data.ventas_por_hora);
+    renderAlertas(data);
+    renderActividad(data.actividad_reciente);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderTarjetas(data) {
+  const cont = document.getElementById('tarjetasMetricas');
+  cont.innerHTML = `
+    <div class="tarjeta-metrica">
+      <div class="valor">$${parseFloat(data.ventas_hoy.total).toFixed(2)}</div>
+      <div class="etiqueta">Ventas de Hoy</div>
+    </div>
+    <div class="tarjeta-metrica">
+      <div class="valor">${data.ventas_hoy.num_tickets}</div>
+      <div class="etiqueta">Tickets Hoy</div>
+    </div>
+    <div class="tarjeta-metrica tarjeta-utilidad">
+      <div class="valor">$${data.utilidad_hoy.ganancia.toFixed(2)}</div>
+      <div class="etiqueta">Utilidad Estimada*</div>
+    </div>
+    <div class="tarjeta-metrica tarjeta-fiado">
+      <div class="valor">$${data.fiado_total.toFixed(2)}</div>
+      <div class="etiqueta">Fiado Pendiente</div>
+    </div>
+    <div class="tarjeta-metrica ${data.stock_bajo.length > 0 ? 'tarjeta-alerta' : ''}">
+      <div class="valor">${data.stock_bajo.length}</div>
+      <div class="etiqueta">Stock Bajo</div>
+    </div>
+    <div class="tarjeta-metrica ${data.agotados.length > 0 ? 'tarjeta-alerta' : ''}">
+      <div class="valor">${data.agotados.length}</div>
+      <div class="etiqueta">Agotados</div>
+    </div>
+  `;
+}
+
+function renderVentasPorHora(porHora) {
+  const cont = document.getElementById('ventasPorHora');
+  if (!porHora || porHora.length === 0) {
+    cont.innerHTML = '<div class="sin-datos">Sin ventas registradas hoy todavía</div>';
+    return;
+  }
+  const maxTotal = Math.max(...porHora.map(h => parseFloat(h.total)));
+  cont.innerHTML = porHora.map(h => {
+    const porcentaje = maxTotal > 0 ? (parseFloat(h.total) / maxTotal) * 100 : 0;
+    const horaTexto = `${String(h.hora).padStart(2, '0')}:00`;
+    return `
+      <div class="barra-hora">
+        <span class="etiqueta-hora">${horaTexto}</span>
+        <div class="barra-fondo"><div class="barra-relleno" style="width:${porcentaje}%"></div></div>
+        <span class="monto-hora">$${parseFloat(h.total).toFixed(2)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderAlertas(data) {
+  const hayAlertas = data.stock_bajo.length > 0 || data.agotados.length > 0 || data.creditos_cerca_limite.length > 0;
+  document.getElementById('seccionAlertas').style.display = hayAlertas ? 'block' : 'none';
+  if (!hayAlertas) return;
+
+  let html = '';
+  data.agotados.forEach(p => { html += `<div class="fila-alerta"><span>🔴 ${p.nombre}</span><span>Agotado</span></div>`; });
+  data.stock_bajo.forEach(p => { html += `<div class="fila-alerta"><span>🟡 ${p.nombre}</span><span>${parseFloat(p.existencia_actual).toFixed(2)} / mín. ${parseFloat(p.stock_minimo).toFixed(2)}</span></div>`; });
+  data.creditos_cerca_limite.forEach(c => { html += `<div class="fila-alerta"><span>💳 ${c.nombre}</span><span>$${parseFloat(c.saldo_actual).toFixed(2)} / $${parseFloat(c.limite_credito).toFixed(2)}</span></div>`; });
+
+  document.getElementById('listaAlertas').innerHTML = html;
+}
+
+function renderActividad(actividad) {
+  const cont = document.getElementById('listaActividad');
+  if (!actividad || actividad.length === 0) {
+    cont.innerHTML = '<div class="sin-datos">Sin actividad reciente</div>';
+    return;
+  }
+  cont.innerHTML = actividad.map(a => `
+    <div class="fila-actividad">
+      <span><span class="tag-actividad tag-${a.tipo}">${nombresTipoActividad[a.tipo] || a.tipo}</span>${a.referencia}</span>
+      <span>${new Date(a.fecha).toLocaleString()}</span>
+    </div>
+  `).join('');
+}
+
+cargarDashboard();
+</script>
 </body>
 </html>
