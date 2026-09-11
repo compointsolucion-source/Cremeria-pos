@@ -73,6 +73,10 @@ async function cargarEquipo() {
             <button class="btn btn-secondary" onclick="cambiarRol(${u.id})">Cambiar rol</button>
             <button class="btn btn-secondary" onclick="restablecerPassword(${u.id})">Restablecer contraseña</button>
           </div>
+          <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px;">
+            <input type="checkbox" ${u.permisos && u.permisos.DESCUENTO_APLICAR ? 'checked' : ''} onchange="togglePermisoDescuento(${u.id}, this.checked)">
+            Puede aplicar descuentos en Caja (los mayores al 15% igual piden autorización)
+          </label>
         ` : ''}
       </div>
     `).join('');
@@ -128,6 +132,16 @@ async function restablecerPassword(id) {
     mostrarToast('Contraseña restablecida', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
+  }
+}
+
+async function togglePermisoDescuento(id, activado) {
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ permisos: { DESCUENTO_APLICAR: activado } }) });
+    mostrarToast(activado ? 'Permiso de descuento activado' : 'Permiso de descuento desactivado', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    cargarEquipo();
   }
 }
 

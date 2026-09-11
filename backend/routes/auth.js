@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { verificarToken } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Máximo 8 intentos de login por IP cada 15 minutos. Suficiente para que una
 // persona real que se equivoca de contraseña no se quede bloqueada, pero
@@ -53,6 +54,13 @@ router.post('/login', limitadorLogin, async (req, res) => {
       { expiresIn: '12h' }
     );
 
+    await registrarBitacora(pool, {
+      usuario_id: user.id,
+      accion: 'login',
+      modulo: 'usuarios',
+      referencia_id: user.id
+    });
+
     res.json({
       token,
       usuario: {
@@ -94,6 +102,18 @@ router.put('/cambiar-password', verificarToken, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Error al cambiar la contraseña' });
   }
+});
+
+// Registra el cierre de sesión en la bitácora. El JWT sigue siendo válido
+// hasta que expire (es stateless), esto solo deja constancia de la acción.
+router.post('/logout', verificarToken, async (req, res) => {
+  await registrarBitacora(pool, {
+    usuario_id: req.usuario.id,
+    accion: 'logout',
+    modulo: 'usuarios',
+    referencia_id: req.usuario.id
+  });
+  res.json({ ok: true });
 });
 
 module.exports = router;

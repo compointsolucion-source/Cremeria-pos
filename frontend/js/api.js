@@ -10,6 +10,11 @@ function getUsuario() {
 }
 
 function cerrarSesion() {
+  const token = getToken();
+  if (token) {
+    // "Fire and forget": no bloqueamos el cierre de sesión esperando la respuesta.
+    fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  }
   localStorage.removeItem('token');
   localStorage.removeItem('usuario');
   window.location.href = 'login.html';

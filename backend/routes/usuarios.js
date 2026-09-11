@@ -59,16 +59,16 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
   }
 });
 
-// Editar nombre/rol/activo de un empleado (dueño/gerente)
+// Editar nombre/rol/activo/permisos de un empleado (dueño/gerente)
 router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
   try {
-    const { nombre, rol, activo } = req.body;
+    const { nombre, rol, activo, permisos } = req.body;
     if (rol && !['gerente', 'cajero', 'mostrador'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
 
     // Nunca permitir que se edite/desactive al usuario dueño desde aquí
-    const objetivo = await pool.query('SELECT rol, nombre, activo FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    const objetivo = await pool.query('SELECT rol, nombre, activo, permisos FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede modificar al usuario dueño desde aquí' });
     const valorAnterior = objetivo.rows[0];
@@ -77,10 +77,11 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
       `UPDATE usuarios SET
         nombre = COALESCE($1, nombre),
         rol = COALESCE($2, rol),
-        activo = COALESCE($3, activo)
-       WHERE id = $4 AND sucursal_id = $5
-       RETURNING id, nombre, usuario, rol, activo`,
-      [nombre, rol, activo, req.params.id, req.usuario.sucursal_id]
+        activo = COALESCE($3, activo),
+        permisos = COALESCE($4, permisos)
+       WHERE id = $5 AND sucursal_id = $6
+       RETURNING id, nombre, usuario, rol, activo, permisos`,
+      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.usuario.sucursal_id]
     );
 
     await registrarBitacora(pool, {

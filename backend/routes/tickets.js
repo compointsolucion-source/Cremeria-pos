@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requierePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+const bcrypt = require('bcryptjs');
 
 // Generar folio corto único: M<sucursal>-<timestamp base36>
 function generarFolio(sucursalId) {
@@ -134,6 +135,66 @@ router.delete('/item/:itemId', verificarToken, async (req, res) => {
   }
 });
 
+// Aplicar un descuento al ticket antes de cobrar. Descuentos mayores al 15%
+// requieren autorización extra (usuario y contraseña de un dueño/gerente),
+// aunque quien esté cobrando ya tenga el permiso DESCUENTO_APLICAR — es una
+// segunda capa para descuentos grandes, no un reemplazo del permiso.
+router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'), async (req, res) => {
+  try {
+    const { porcentaje, monto, motivo, autorizacion } = req.body;
+    if (!motivo) return res.status(400).json({ error: 'El motivo del descuento es obligatorio' });
+    if (!porcentaje && !monto) return res.status(400).json({ error: 'Especifica un porcentaje o un monto de descuento' });
+
+    const ticketResult = await pool.query('SELECT * FROM tickets WHERE id = $1 AND sucursal_id = $2 AND estado = $3', [req.params.id, req.usuario.sucursal_id, 'pendiente']);
+    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado o ya no está pendiente' });
+    const ticket = ticketResult.rows[0];
+
+    const descuentoMonto = porcentaje ? (parseFloat(ticket.total) * (parseFloat(porcentaje) / 100)) : parseFloat(monto);
+    if (descuentoMonto <= 0 || descuentoMonto > parseFloat(ticket.total)) {
+      return res.status(400).json({ error: 'El descuento debe ser mayor a 0 y no puede superar el total del ticket' });
+    }
+
+    const porcentajeEfectivo = (descuentoMonto / parseFloat(ticket.total)) * 100;
+    let autorizadoPor = req.usuario.id;
+
+    if (porcentajeEfectivo > 15) {
+      if (!autorizacion || !autorizacion.usuario || !autorizacion.password) {
+        return res.status(403).json({ error: 'Este descuento supera el 15% y requiere autorización de un dueño o gerente (usuario y contraseña)' });
+      }
+      const autorizador = await pool.query(
+        `SELECT * FROM usuarios WHERE usuario = $1 AND sucursal_id = $2 AND activo = true AND rol IN ('dueno','gerente')`,
+        [autorizacion.usuario, req.usuario.sucursal_id]
+      );
+      if (autorizador.rows.length === 0) {
+        return res.status(403).json({ error: 'Usuario de autorización no encontrado o no tiene rango suficiente' });
+      }
+      const passwordValida = await bcrypt.compare(autorizacion.password, autorizador.rows[0].password_hash);
+      if (!passwordValida) {
+        return res.status(403).json({ error: 'Contraseña de autorización incorrecta' });
+      }
+      autorizadoPor = autorizador.rows[0].id;
+    }
+
+    await pool.query(
+      'UPDATE tickets SET descuento_monto = $1, descuento_motivo = $2, descuento_autorizado_por = $3 WHERE id = $4',
+      [descuentoMonto, motivo, autorizadoPor, req.params.id]
+    );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'aplicar_descuento',
+      modulo: 'tickets',
+      referencia_id: parseInt(req.params.id),
+      valor_nuevo: { descuento_monto: descuentoMonto, motivo, autorizado_por: autorizadoPor, porcentaje: porcentajeEfectivo.toFixed(1) }
+    });
+
+    res.json({ ok: true, descuento_monto: descuentoMonto, total_final: parseFloat(ticket.total) - descuentoMonto });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al aplicar el descuento' });
+  }
+});
+
 // Cobrar ticket (efectivo/tarjeta/mixto/crédito) + descuenta inventario automáticamente
 router.post('/:id/pagar', verificarToken, async (req, res) => {
   const conexion = await pool.connect();
@@ -158,6 +219,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
       return res.status(409).json({ error: 'Este ticket ya fue pagado, cancelado, o no existe' });
     }
     const ticketActual = ticketActualResult.rows[0];
+    const totalNeto = parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0);
 
     // Validar límite de crédito si aplica
     if (metodo_pago === 'credito') {
@@ -167,7 +229,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
         return res.status(404).json({ error: 'Cliente no encontrado' });
       }
       const c = clienteResult.rows[0];
-      const nuevoSaldo = parseFloat(c.saldo_actual) + parseFloat(ticketActual.total);
+      const nuevoSaldo = parseFloat(c.saldo_actual) + totalNeto;
       if (nuevoSaldo > parseFloat(c.limite_credito)) {
         await conexion.query('ROLLBACK');
         return res.status(400).json({ error: `Límite de crédito excedido. Saldo actual: $${c.saldo_actual}, límite: $${c.limite_credito}` });
@@ -193,13 +255,14 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     }
     const ticketPagado = result.rows[0];
 
-    // Si es fiado: registrar el cargo y actualizar saldo del cliente
+    // Si es fiado: registrar el cargo y actualizar saldo del cliente (usando el
+    // total NETO, es decir ya con el descuento aplicado si lo hubo)
     if (metodo_pago === 'credito') {
       await conexion.query(
         `INSERT INTO creditos_cargo (cliente_id, ticket_id, monto, autorizado_por) VALUES ($1, $2, $3, $4)`,
-        [cliente_id, ticketPagado.id, ticketPagado.total, req.usuario.id]
+        [cliente_id, ticketPagado.id, totalNeto, req.usuario.id]
       );
-      await conexion.query('UPDATE clientes SET saldo_actual = saldo_actual + $1 WHERE id = $2', [ticketPagado.total, cliente_id]);
+      await conexion.query('UPDATE clientes SET saldo_actual = saldo_actual + $1 WHERE id = $2', [totalNeto, cliente_id]);
     }
 
     // Descontar inventario automáticamente por cada producto vendido (no aplica a kits, que descuentan sus componentes)
@@ -254,7 +317,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     const io = req.app.get('io');
     if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ticket_pagado', { id: req.params.id });
 
-    res.json(ticketPagado);
+    res.json({ ...ticketPagado, total_neto: totalNeto });
   } catch (err) {
     await conexion.query('ROLLBACK');
     console.error(err);
@@ -267,10 +330,21 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
 // Cancelar ticket
 router.post('/:id/cancelar', verificarToken, async (req, res) => {
   try {
-    await pool.query(
-      `UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente'`,
+    const result = await pool.query(
+      `UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente' RETURNING folio`,
       [req.params.id]
     );
+
+    if (result.rows.length > 0) {
+      await registrarBitacora(pool, {
+        usuario_id: req.usuario.id,
+        accion: 'cancelar_ticket',
+        modulo: 'tickets',
+        referencia_id: parseInt(req.params.id),
+        valor_nuevo: { folio: result.rows[0].folio }
+      });
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
