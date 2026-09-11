@@ -10,7 +10,12 @@ const { registrarBitacora } = require('../utils/bitacora');
 router.get('/', verificarToken, async (req, res) => {
   try {
     const { limit, offset } = req.query;
-    let query = `SELECT p.*, c.nombre AS categoria_nombre
+    let query = `SELECT p.*, c.nombre AS categoria_nombre,
+         COALESCE(
+           (SELECT json_agg(json_build_object('cantidad_minima', pr.cantidad_minima, 'precio_promocional', pr.precio_promocional) ORDER BY pr.cantidad_minima ASC)
+            FROM promociones pr WHERE pr.producto_id = p.id AND pr.activo = true),
+           '[]'::json
+         ) AS promociones
        FROM productos p
        LEFT JOIN categorias c ON p.categoria_id = c.id
        WHERE p.sucursal_id = $1 AND p.activo = true

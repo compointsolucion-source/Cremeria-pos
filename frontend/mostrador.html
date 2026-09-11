@@ -267,11 +267,14 @@ function renderProductos() {
       ? '<span class="badge-tipo badge-unidad">PZA</span>'
       : '<span class="badge-tipo badge-peso">KG</span>';
     const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
+    const tienePromo = p.promociones && p.promociones.length > 0;
+    const avisoPromo = tienePromo ? `<div style="font-size:10px; color:#F9A825; font-weight:700;">🏷️ ${p.promociones[0].cantidad_minima}+ = $${parseFloat(p.promociones[0].precio_promocional).toFixed(2)}</div>` : '';
     card.innerHTML = `
       ${badge}
       <img src="${p.imagen_url || 'img/producto-generico.png'}" alt="${p.nombre}">
       <div class="nombre">${p.nombre}</div>
       <div class="precio">${precioLabel}</div>
+      ${avisoPromo}
     `;
     card.onclick = () => seleccionarProducto(p);
     grid.appendChild(card);
@@ -284,6 +287,18 @@ function seleccionarProducto(producto) {
 }
 
 // ---------- Modal de PESO (a granel) ----------
+// Calcula el precio real a cobrar según las promociones por cantidad del
+// producto (si tiene): usa el escalón más alto que la cantidad alcance a
+// cubrir. Si no tiene promociones o no alcanza ningún escalón, es el precio normal.
+function precioEfectivo(producto, cantidad) {
+  if (!producto.promociones || producto.promociones.length === 0) return parseFloat(producto.precio);
+  let mejorPrecio = parseFloat(producto.precio);
+  producto.promociones.forEach(promo => {
+    if (cantidad >= parseFloat(promo.cantidad_minima)) mejorPrecio = parseFloat(promo.precio_promocional);
+  });
+  return mejorPrecio;
+}
+
 function abrirModalPeso(producto) {
   productoSeleccionado = producto;
   pesoActual = '';
@@ -307,8 +322,10 @@ function borrarUltimo() {
 function actualizarDisplayPeso() {
   const peso = parseFloat(pesoActual || '0');
   document.getElementById('displayPeso').textContent = (pesoActual || '0');
-  const subtotal = peso * productoSeleccionado.precio;
-  document.getElementById('subtotalPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}`;
+  const precioAplicado = precioEfectivo(productoSeleccionado, peso);
+  const subtotal = peso * precioAplicado;
+  const textoPromo = precioAplicado < parseFloat(productoSeleccionado.precio) ? ' 🏷️ Precio promocional aplicado' : '';
+  document.getElementById('subtotalPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}${textoPromo}`;
 }
 
 function confirmarPeso() {
@@ -320,7 +337,7 @@ function confirmarPeso() {
     producto_id: productoSeleccionado.id,
     nombre_producto: productoSeleccionado.nombre,
     cantidad: peso,
-    precio_unitario: parseFloat(productoSeleccionado.precio)
+    precio_unitario: precioEfectivo(productoSeleccionado, peso)
   });
 
   renderCarrito();
@@ -343,8 +360,10 @@ function cambiarCantidadUnidad(delta) {
 
 function actualizarDisplayUnidad() {
   document.getElementById('cantidadUnidadNum').textContent = cantidadUnidad;
-  const subtotal = cantidadUnidad * productoSeleccionado.precio;
-  document.getElementById('subtotalUnidadPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}`;
+  const precioAplicado = precioEfectivo(productoSeleccionado, cantidadUnidad);
+  const subtotal = cantidadUnidad * precioAplicado;
+  const textoPromo = precioAplicado < parseFloat(productoSeleccionado.precio) ? ' 🏷️ Precio promocional aplicado' : '';
+  document.getElementById('subtotalUnidadPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}${textoPromo}`;
 }
 
 function confirmarUnidad() {
@@ -353,7 +372,7 @@ function confirmarUnidad() {
     producto_id: productoSeleccionado.id,
     nombre_producto: productoSeleccionado.nombre,
     cantidad: cantidadUnidad,
-    precio_unitario: parseFloat(productoSeleccionado.precio)
+    precio_unitario: precioEfectivo(productoSeleccionado, cantidadUnidad)
   });
 
   renderCarrito();

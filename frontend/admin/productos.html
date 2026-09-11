@@ -79,6 +79,22 @@
     </table>
   </div>
 
+  <div class="modal-overlay" id="modalPromociones" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100;">
+    <div class="card" style="width:90%; max-width:420px;">
+      <h3 id="nombreProductoPromo"></h3>
+      <p style="font-size:13px; color:#666;">Precio normal: $<span id="precioNormalPromo"></span> — Costo: $<span id="costoPromo">N/D</span></p>
+
+      <div id="listaEscalones" style="margin-bottom:14px;"></div>
+
+      <div class="fila-doble" style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="number" id="cantidadMinimaNueva" placeholder="A partir de (ej. 6)" step="0.01">
+        <input type="number" id="precioPromoNuevo" placeholder="Precio promo" step="0.01">
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="agregarEscalon()">Agregar escalón</button>
+      <button class="btn btn-secondary" style="width:100%; margin-top:8px;" onclick="cerrarModalPromociones()">Cerrar</button>
+    </div>
+  </div>
+
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
@@ -170,7 +186,10 @@ async function cargarProductos(reiniciar = true) {
       <td>${tag}</td>
       <td>${precioLabel}</td>
       <td>${p.codigo_barras || '—'}</td>
-      <td><button class="btn btn-secondary" onclick="eliminarProducto(${p.id})">Eliminar</button></td>
+      <td>
+        <button class="btn btn-secondary" onclick="abrirPromociones(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, ${p.precio_costo || 'null'})">🏷️ Promos</button>
+        <button class="btn btn-secondary" onclick="eliminarProducto(${p.id})">Eliminar</button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -243,6 +262,70 @@ async function eliminarProducto(id) {
   try {
     await apiFetch(`/productos/${id}`, { method: 'DELETE' });
     cargarProductos();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+let productoPromoActual = null;
+
+async function abrirPromociones(id, nombre, precio, costo) {
+  productoPromoActual = { id, nombre, precio, costo };
+  document.getElementById('nombreProductoPromo').textContent = `Promociones: ${nombre}`;
+  document.getElementById('precioNormalPromo').textContent = parseFloat(precio).toFixed(2);
+  document.getElementById('costoPromo').textContent = costo ? parseFloat(costo).toFixed(2) : 'N/D';
+  document.getElementById('modalPromociones').style.display = 'flex';
+  await cargarEscalones();
+}
+
+function cerrarModalPromociones() {
+  document.getElementById('modalPromociones').style.display = 'none';
+  cargarProductos();
+}
+
+async function cargarEscalones() {
+  try {
+    const escalones = await apiFetch(`/promociones/${productoPromoActual.id}`);
+    document.getElementById('listaEscalones').innerHTML = escalones.map(e => {
+      const margen = productoPromoActual.costo ? (parseFloat(e.precio_promocional) - parseFloat(productoPromoActual.costo)).toFixed(2) : 'N/D';
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #EEE; font-size:14px;">
+          <span>${e.cantidad_minima}+ unidades → $${parseFloat(e.precio_promocional).toFixed(2)} <small style="color:#888;">(margen: $${margen})</small></span>
+          <button onclick="eliminarEscalon(${e.id})" style="background:none; border:none; color:#C62828; font-size:16px;">✕</button>
+        </div>
+      `;
+    }).join('') || '<p style="color:#888; font-size:13px;">Sin escalones configurados todavía</p>';
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function agregarEscalon() {
+  const cantidad_minima = parseFloat(document.getElementById('cantidadMinimaNueva').value || 0);
+  const precio_promocional = parseFloat(document.getElementById('precioPromoNuevo').value || 0);
+
+  if (cantidad_minima <= 0 || precio_promocional <= 0) { mostrarToast('Completa ambos campos con valores mayores a 0', 'error'); return; }
+
+  try {
+    await apiFetch(`/promociones/${productoPromoActual.id}`, {
+      method: 'POST',
+      body: JSON.stringify({ cantidad_minima, precio_promocional })
+    });
+    document.getElementById('cantidadMinimaNueva').value = '';
+    document.getElementById('precioPromoNuevo').value = '';
+    mostrarToast('Escalón agregado', 'exito');
+    cargarEscalones();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function eliminarEscalon(id) {
+  const confirmado = await confirmarAccion('¿Eliminar este escalón de precio?');
+  if (!confirmado) return;
+  try {
+    await apiFetch(`/promociones/escalon/${id}`, { method: 'DELETE' });
+    cargarEscalones();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
