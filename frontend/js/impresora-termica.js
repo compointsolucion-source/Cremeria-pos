@@ -78,12 +78,93 @@ function construirComandosTexto(lineas) {
   return resultado;
 }
 
+// Convierte un canvas (con una imagen en blanco y negro, ej. un QR) a los
+// comandos ESC/POS de imagen raster (GS v 0) que la mayoría de impresoras
+// térmicas entienden para imprimir gráficos.
+function canvasAComandosRaster(canvas) {
+  const ctx = canvas.getContext('2d');
+  const ancho = canvas.width;
+  const alto = canvas.height;
+  const datos = ctx.getImageData(0, 0, ancho, alto).data;
+  const anchoBytes = Math.ceil(ancho / 8);
+
+  const encabezado = new Uint8Array([
+    0x1D, 0x76, 0x30, 0x00,
+    anchoBytes & 0xFF, (anchoBytes >> 8) & 0xFF,
+    alto & 0xFF, (alto >> 8) & 0xFF
+  ]);
+
+  const cuerpo = new Uint8Array(anchoBytes * alto);
+  let puntero = 0;
+  for (let y = 0; y < alto; y++) {
+    for (let bx = 0; bx < anchoBytes; bx++) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const x = bx * 8 + bit;
+        if (x < ancho) {
+          const idx = (y * ancho + x) * 4;
+          const brillo = (datos[idx] + datos[idx + 1] + datos[idx + 2]) / 3;
+          if (brillo < 128) byte |= (1 << (7 - bit));
+        }
+      }
+      cuerpo[puntero++] = byte;
+    }
+  }
+
+  const resultado = new Uint8Array(encabezado.length + cuerpo.length);
+  resultado.set(encabezado, 0);
+  resultado.set(cuerpo, encabezado.length);
+  return resultado;
+}
+
+// Genera un QR con el folio en un canvas oculto, usando la librería QRCode
+// (cargada por separado en la página). Devuelve el canvas listo para imprimir.
+function generarCanvasQR(texto, tamanoPx) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    QRCode.toCanvas(canvas, texto, { width: tamanoPx, margin: 1 }, (err) => {
+      if (err) reject(err);
+      else resolve(canvas);
+    });
+  });
+}
+
+function bytesJuntos(listaDeArrays) {
+  const total = listaDeArrays.reduce((sum, a) => sum + a.length, 0);
+  const resultado = new Uint8Array(total);
+  let offset = 0;
+  listaDeArrays.forEach(a => { resultado.set(a, offset); offset += a.length; });
+  return resultado;
+}
+
+function bytesDeLineas(lineas) {
+  const encoder = new TextEncoder();
+  return bytesJuntos(lineas.map(l => encoder.encode(l + '\n')));
+}
+
 // Arma un ticket de texto plano, ajustado al ancho de papel (32 caracteres para
 // 58mm, 48 para 80mm), centrando el título y alineando montos a la derecha.
-function formatearTicket({ ancho_ticket, negocio, folio, fecha, items, total, piePagina }) {
+function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
   const columnas = ancho_ticket === '58mm' ? 32 : 48;
-  const lineas = [];
+  const centrar = (texto) => {
+    const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
+    return ' '.repeat(espacios) + texto;
+  };
+  const separador = '-'.repeat(columnas);
 
+  const lineas = [];
+  if (negocio.nombre) lineas.push(centrar(negocio.nombre));
+  if (negocio.direccion) lineas.push(centrar(negocio.direccion));
+  if (negocio.telefono) lineas.push(centrar(`Tel: ${negocio.telefono}`));
+  lineas.push(separador);
+  lineas.push(`Folio: ${folio}`);
+  lineas.push(`Fecha: ${fecha}`);
+  lineas.push(separador);
+  return lineas;
+}
+
+function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina }) {
+  const columnas = ancho_ticket === '58mm' ? 32 : 48;
   const centrar = (texto) => {
     const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
     return ' '.repeat(espacios) + texto;
@@ -95,14 +176,7 @@ function formatearTicket({ ancho_ticket, negocio, folio, fecha, items, total, pi
     return etiqueta + ' '.repeat(espacios) + montoTexto;
   };
 
-  if (negocio.nombre) lineas.push(centrar(negocio.nombre));
-  if (negocio.direccion) lineas.push(centrar(negocio.direccion));
-  if (negocio.telefono) lineas.push(centrar(`Tel: ${negocio.telefono}`));
-  lineas.push(separador);
-  lineas.push(`Folio: ${folio}`);
-  lineas.push(`Fecha: ${fecha}`);
-  lineas.push(separador);
-
+  const lineas = [''];
   items.forEach(item => {
     lineas.push(item.nombre_producto);
     lineas.push(filaMonto(`  ${item.detalle}`, item.subtotal));
@@ -114,12 +188,18 @@ function formatearTicket({ ancho_ticket, negocio, folio, fecha, items, total, pi
 
   if (piePagina) lineas.push(centrar(piePagina));
   lineas.push('');
-
   return lineas;
 }
 
-// Imprime un ticket completo. Lanza error si no hay impresora conectada —
-// quien llama debe mostrar el banner de "Reconectar" en ese caso.
+// Mantiene compatibilidad con quien todavía use formatearTicket() completo
+// (ej. el respaldo de texto compartido, que no imprime imagen QR).
+function formatearTicket(datosTicket) {
+  return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket)];
+}
+
+// Imprime un ticket completo, incluyendo un QR gráfico escaneable con el folio.
+// Lanza error si no hay impresora conectada — quien llama debe mostrar el
+// banner de "Reconectar" en ese caso.
 async function imprimirTicketBLE(datosTicket) {
   if (!impresoraConectada()) {
     await reconectarSiEsPosible();
@@ -128,9 +208,25 @@ async function imprimirTicketBLE(datosTicket) {
     throw new Error('No hay impresora conectada. Toca "Conectar impresora" primero.');
   }
 
-  const lineas = formatearTicket(datosTicket);
-  const comandos = construirComandosTexto(lineas);
-  await enviarBytes(comandos);
+  const ESC = 0x1B;
+  const inicializar = new Uint8Array([ESC, 0x40]);
+  const encabezado = bytesDeLineas(formatearEncabezadoTicket(datosTicket));
+  const cuerpo = bytesDeLineas(formatearCuerpoTicket(datosTicket));
+  const cierre = new Uint8Array([0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]); // espacio + cortar papel
+
+  let comandosQR = new Uint8Array(0);
+  try {
+    if (typeof QRCode !== 'undefined') {
+      const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
+      const canvasQR = await generarCanvasQR(datosTicket.folio, anchoPx);
+      comandosQR = bytesJuntos([canvasAComandosRaster(canvasQR), new Uint8Array([0x0A])]);
+    }
+  } catch (err) {
+    console.error('No se pudo generar el QR, se imprime solo el folio en texto:', err.message);
+  }
+
+  const comandosFinales = bytesJuntos([inicializar, encabezado, comandosQR, cuerpo, cierre]);
+  await enviarBytes(comandosFinales);
 }
 
 // Respaldo cuando no hay impresora BLE conectada o el navegador no la soporta:

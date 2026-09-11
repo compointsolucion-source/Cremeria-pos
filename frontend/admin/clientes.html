@@ -67,11 +67,19 @@
 requiereLogin();
 let clienteActualId = null;
 
-async function cargarClientes() {
-  const clientes = await apiFetch('/clientes');
+let clientesOffsetActual = 0;
+const CLIENTES_POR_PAGINA = 30;
+
+async function cargarClientes(reiniciar = true) {
+  if (reiniciar) {
+    clientesOffsetActual = 0;
+    document.getElementById('listaClientes').innerHTML = '';
+  }
+
+  const data = await apiFetch(`/clientes?limit=${CLIENTES_POR_PAGINA}&offset=${clientesOffsetActual}`);
   const cont = document.getElementById('listaClientes');
-  cont.innerHTML = '';
-  clientes.forEach(c => {
+
+  data.clientes.forEach(c => {
     const saldoClase = parseFloat(c.saldo_actual) > 0 ? 'saldo' : 'saldo al-corriente';
     const div = document.createElement('div');
     div.className = 'cliente-card';
@@ -82,6 +90,23 @@ async function cargarClientes() {
     div.onclick = () => abrirEstadoCuenta(c.id);
     cont.appendChild(div);
   });
+
+  clientesOffsetActual += data.clientes.length;
+
+  let botonCargarMas = document.getElementById('btnCargarMasClientes');
+  if (clientesOffsetActual < data.total) {
+    if (!botonCargarMas) {
+      botonCargarMas = document.createElement('button');
+      botonCargarMas.id = 'btnCargarMasClientes';
+      botonCargarMas.className = 'btn btn-secondary';
+      botonCargarMas.style.marginTop = '10px';
+      botonCargarMas.textContent = 'Cargar más clientes';
+      botonCargarMas.onclick = () => cargarClientes(false);
+      cont.after(botonCargarMas);
+    }
+  } else if (botonCargarMas) {
+    botonCargarMas.remove();
+  }
 }
 
 async function guardarCliente() {

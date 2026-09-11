@@ -30,6 +30,11 @@
         <option value="usuarios">Usuarios</option>
         <option value="configuracion">Configuración</option>
         <option value="devoluciones">Devoluciones</option>
+        <option value="productos">Productos</option>
+        <option value="clientes">Clientes</option>
+        <option value="compras">Compras</option>
+        <option value="inventario">Inventario</option>
+        <option value="kits">Kits</option>
       </select>
       <button class="btn btn-primary" onclick="cargarBitacora()">Filtrar</button>
     </div>
@@ -50,7 +55,9 @@ const nombresAccion = {
   crear_empleado: 'Creó empleado', editar_empleado: 'Editó empleado', restablecer_password: 'Restableció contraseña',
   actualizar_configuracion: 'Actualizó configuración',
   procesar_devolucion: 'Procesó devolución',
-  cobrar_ticket: 'Cobró ticket'
+  cobrar_ticket: 'Cobró ticket',
+  crear_producto: 'Creó producto', crear_cliente: 'Creó cliente', registrar_compra: 'Registró compra',
+  ajustar_inventario: 'Ajustó inventario', registrar_merma: 'Registró merma', crear_kit: 'Creó kit'
 };
 
 async function cargarBitacora() {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Listar kits activos con sus productos incluidos
 router.get('/', verificarToken, async (req, res) => {
@@ -68,6 +69,14 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
         [kit.id, p.producto_id, p.cantidad]
       );
     }
+
+    await registrarBitacora(cliente, {
+      usuario_id: req.usuario.id,
+      accion: 'crear_kit',
+      modulo: 'kits',
+      referencia_id: kit.id,
+      valor_nuevo: { nombre, precio_kit, num_productos: productos.length }
+    });
 
     await cliente.query('COMMIT');
     res.json(kit);

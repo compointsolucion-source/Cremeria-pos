@@ -2,19 +2,41 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
-// Listar productos activos (para mostrador y admin)
+// Listar productos activos (para mostrador y admin). Soporta paginación
+// opcional con ?limit=&offset= — si no se pasan, devuelve todo (compatibilidad
+// con el Mostrador, que necesita el catálogo completo de una vez).
 router.get('/', verificarToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT p.*, c.nombre AS categoria_nombre
+    const { limit, offset } = req.query;
+    let query = `SELECT p.*, c.nombre AS categoria_nombre
        FROM productos p
        LEFT JOIN categorias c ON p.categoria_id = c.id
        WHERE p.sucursal_id = $1 AND p.activo = true
-       ORDER BY p.favorito DESC, p.orden ASC, p.nombre ASC`,
-      [req.usuario.sucursal_id]
-    );
-    res.json(result.rows);
+       ORDER BY p.favorito DESC, p.orden ASC, p.nombre ASC`;
+    const valores = [req.usuario.sucursal_id];
+
+    if (limit) {
+      valores.push(parseInt(limit));
+      query += ` LIMIT $${valores.length}`;
+      if (offset) {
+        valores.push(parseInt(offset));
+        query += ` OFFSET $${valores.length}`;
+      }
+    }
+
+    const result = await pool.query(query, valores);
+
+    if (limit) {
+      const totalResult = await pool.query(
+        'SELECT COUNT(*) FROM productos WHERE sucursal_id = $1 AND activo = true',
+        [req.usuario.sucursal_id]
+      );
+      res.json({ productos: result.rows, total: parseInt(totalResult.rows[0].count) });
+    } else {
+      res.json(result.rows);
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener productos' });
@@ -63,6 +85,15 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [req.usuario.sucursal_id, categoria_id || null, nombre, precio, imagen_url || null, favorito || false, orden || 0, codigo_barras || null, tipo_venta || 'peso']
     );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'crear_producto',
+      modulo: 'productos',
+      referencia_id: result.rows[0].id,
+      valor_nuevo: { nombre, precio, tipo_venta: tipo_venta || 'peso' }
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);

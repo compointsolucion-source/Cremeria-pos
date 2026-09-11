@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Listado de existencias con datos del producto
 router.get('/', verificarToken, async (req, res) => {
@@ -82,6 +83,14 @@ router.post('/ajuste', verificarToken, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5)`,
       [producto_id, tipo, -cantidad, motivo || null, req.usuario.id]
     );
+
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id,
+      accion: tipo === 'merma' ? 'registrar_merma' : 'ajustar_inventario',
+      modulo: 'inventario',
+      referencia_id: producto_id,
+      valor_nuevo: { cantidad, motivo }
+    });
 
     await conexion.query('COMMIT');
     res.json({ ok: true });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Historial de compras
 router.get('/', verificarToken, async (req, res) => {
@@ -67,6 +68,14 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
         [item.producto_id, item.cantidad, compra.id, req.usuario.id]
       );
     }
+
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id,
+      accion: 'registrar_compra',
+      modulo: 'compras',
+      referencia_id: compra.id,
+      valor_nuevo: { proveedor_id, total, num_items: items.length }
+    });
 
     await conexion.query('COMMIT');
     res.json(compra);

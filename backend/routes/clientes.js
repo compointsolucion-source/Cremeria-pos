@@ -2,15 +2,35 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
-// Listar clientes
+// Listar clientes. Soporta paginación opcional con ?limit=&offset=
 router.get('/', verificarToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM clientes WHERE sucursal_id = $1 AND activo = true ORDER BY nombre ASC',
-      [req.usuario.sucursal_id]
-    );
-    res.json(result.rows);
+    const { limit, offset } = req.query;
+    let query = 'SELECT * FROM clientes WHERE sucursal_id = $1 AND activo = true ORDER BY nombre ASC';
+    const valores = [req.usuario.sucursal_id];
+
+    if (limit) {
+      valores.push(parseInt(limit));
+      query += ` LIMIT $${valores.length}`;
+      if (offset) {
+        valores.push(parseInt(offset));
+        query += ` OFFSET $${valores.length}`;
+      }
+    }
+
+    const result = await pool.query(query, valores);
+
+    if (limit) {
+      const totalResult = await pool.query(
+        'SELECT COUNT(*) FROM clientes WHERE sucursal_id = $1 AND activo = true',
+        [req.usuario.sucursal_id]
+      );
+      res.json({ clientes: result.rows, total: parseInt(totalResult.rows[0].count) });
+    } else {
+      res.json(result.rows);
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener clientes' });
@@ -41,6 +61,15 @@ router.post('/', verificarToken, async (req, res) => {
       `INSERT INTO clientes (sucursal_id, nombre, telefono, limite_credito) VALUES ($1, $2, $3, $4) RETURNING *`,
       [req.usuario.sucursal_id, nombre, telefono || null, limite_credito || 0]
     );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'crear_cliente',
+      modulo: 'clientes',
+      referencia_id: result.rows[0].id,
+      valor_nuevo: { nombre, telefono, limite_credito: limite_credito || 0 }
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);

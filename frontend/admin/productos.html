@@ -85,11 +85,19 @@ async function cargarCategorias() {
   });
 }
 
-async function cargarProductos() {
-  const productos = await apiFetch('/productos');
+let productosOffsetActual = 0;
+const PRODUCTOS_POR_PAGINA = 30;
+
+async function cargarProductos(reiniciar = true) {
+  if (reiniciar) {
+    productosOffsetActual = 0;
+    document.getElementById('tablaBody').innerHTML = '';
+  }
+
+  const data = await apiFetch(`/productos?limit=${PRODUCTOS_POR_PAGINA}&offset=${productosOffsetActual}`);
   const tbody = document.getElementById('tablaBody');
-  tbody.innerHTML = '';
-  productos.forEach(p => {
+
+  data.productos.forEach(p => {
     const tag = p.tipo_venta === 'unidad'
       ? '<span class="tipo-tag tag-unidad">Pieza</span>'
       : '<span class="tipo-tag tag-peso">Kg</span>';
@@ -105,6 +113,23 @@ async function cargarProductos() {
     `;
     tbody.appendChild(tr);
   });
+
+  productosOffsetActual += data.productos.length;
+
+  let botonCargarMas = document.getElementById('btnCargarMasProductos');
+  if (productosOffsetActual < data.total) {
+    if (!botonCargarMas) {
+      botonCargarMas = document.createElement('button');
+      botonCargarMas.id = 'btnCargarMasProductos';
+      botonCargarMas.className = 'btn btn-secondary';
+      botonCargarMas.style.marginTop = '10px';
+      botonCargarMas.textContent = 'Cargar más productos';
+      botonCargarMas.onclick = () => cargarProductos(false);
+      tbody.parentElement.after(botonCargarMas);
+    }
+  } else if (botonCargarMas) {
+    botonCargarMas.remove();
+  }
 }
 
 async function guardarProducto() {
