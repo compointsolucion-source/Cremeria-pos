@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipo - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 700px; margin: 20px auto; padding: 0 14px; }
+  .form-empleado { display: grid; gap: 10px; margin-bottom: 20px; }
+  .fila-doble { display: flex; gap: 10px; }
+  .fila-doble > * { flex: 1; }
+  .empleado-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .empleado-card .titulo { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+  .rol-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: #E0E0E0; }
+  .rol-dueno { background: #F9A825; color: white; }
+  .rol-gerente { background: #1565C0; color: white; }
+  .rol-cajero { background: #2E7D32; color: white; }
+  .rol-mostrador { background: #6A1B9A; color: white; }
+  .inactivo { opacity: 0.5; }
+  .acciones-empleado { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .acciones-empleado button { font-size: 13px; padding: 6px 10px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>👥 Equipo</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-empleado">
+      <h3>Nuevo empleado</h3>
+      <input type="text" id="nombreEmpleado" placeholder="Nombre completo">
+      <div class="fila-doble">
+        <input type="text" id="usuarioEmpleado" placeholder="Usuario para iniciar sesión">
+        <input type="password" id="passwordEmpleado" placeholder="Contraseña (mínimo 6 caracteres)">
+      </div>
+      <select id="rolEmpleado">
+        <option value="mostrador">Mostrador</option>
+        <option value="cajero">Cajero</option>
+        <option value="gerente">Gerente</option>
+      </select>
+      <button class="btn btn-primary" onclick="crearEmpleado()">Guardar Empleado</button>
+    </div>
+
+    <h3>Equipo actual</h3>
+    <div id="listaEquipo"></div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+
+const rolNombres = { dueno: 'Dueño', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador' };
+
+async function cargarEquipo() {
+  try {
+    const equipo = await apiFetch('/usuarios');
+    const cont = document.getElementById('listaEquipo');
+    cont.innerHTML = equipo.map(u => `
+      <div class="empleado-card ${u.activo ? '' : 'inactivo'}">
+        <div class="titulo">
+          <span>${u.nombre} <span class="rol-tag rol-${u.rol}">${rolNombres[u.rol]}</span></span>
+          <span style="font-size:13px; color:#888;">${u.usuario}</span>
+        </div>
+        ${u.rol !== 'dueno' ? `
+          <div class="acciones-empleado">
+            <button class="btn btn-secondary" onclick="toggleActivo(${u.id}, ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>
+            <button class="btn btn-secondary" onclick="cambiarRol(${u.id})">Cambiar rol</button>
+            <button class="btn btn-secondary" onclick="restablecerPassword(${u.id})">Restablecer contraseña</button>
+          </div>
+        ` : ''}
+      </div>
+    `).join('');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function crearEmpleado() {
+  const nombre = document.getElementById('nombreEmpleado').value.trim();
+  const usuario = document.getElementById('usuarioEmpleado').value.trim();
+  const password = document.getElementById('passwordEmpleado').value;
+  const rol = document.getElementById('rolEmpleado').value;
+
+  if (!nombre || !usuario || !password) { alert('Completa todos los campos'); return; }
+
+  try {
+    await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify({ nombre, usuario, password, rol }) });
+    document.getElementById('nombreEmpleado').value = '';
+    document.getElementById('usuarioEmpleado').value = '';
+    document.getElementById('passwordEmpleado').value = '';
+    cargarEquipo();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function toggleActivo(id, nuevoEstado) {
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ activo: nuevoEstado }) });
+    cargarEquipo();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function cambiarRol(id) {
+  const nuevoRol = prompt('Nuevo rol (mostrador, cajero o gerente):');
+  if (!nuevoRol) return;
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ rol: nuevoRol.trim() }) });
+    cargarEquipo();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function restablecerPassword(id) {
+  const nueva = prompt('Nueva contraseña para este empleado (mínimo 6 caracteres):');
+  if (!nueva) return;
+  try {
+    await apiFetch(`/usuarios/${id}/restablecer-password`, { method: 'PUT', body: JSON.stringify({ password_nueva: nueva }) });
+    alert('Contraseña restablecida');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+cargarEquipo();
+</script>
+</body>
+</html>
