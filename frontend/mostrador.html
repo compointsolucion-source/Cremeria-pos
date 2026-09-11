@@ -85,6 +85,8 @@
       <button class="btn btn-secondary" style="margin-bottom:10px;" onclick="toggleScannerProducto()">📷 Escanear código de barras</button>
       <div id="scannerProducto"></div>
 
+      <input type="text" id="buscadorProductos" placeholder="🔍 Buscar producto por nombre... (F1)" style="margin-bottom:10px;" oninput="filtrarProductosPorTexto()">
+
       <div class="categorias" id="categorias"></div>
       <div class="grid-productos" id="gridProductos"></div>
     </div>
@@ -200,6 +202,43 @@ function renderCategorias() {
 function renderProductos() {
   const grid = document.getElementById('gridProductos');
   grid.innerHTML = '';
+
+  const textoBusqueda = document.getElementById('buscadorProductos').value.trim().toLowerCase();
+
+  // Si hay texto en el buscador, ignora las categorías y busca en todo
+  // (incluyendo kits), por nombre.
+  if (textoBusqueda) {
+    const productosFiltrados = productos.filter(p => p.nombre.toLowerCase().includes(textoBusqueda));
+    const kitsFiltrados = kits.filter(k => k.nombre.toLowerCase().includes(textoBusqueda));
+
+    kitsFiltrados.forEach(k => {
+      const card = document.createElement('div');
+      card.className = 'producto-card';
+      card.innerHTML = `
+        <span class="badge-tipo badge-kit">KIT</span>
+        <img src="${k.imagen_url || 'img/kit-generico.png'}" alt="${k.nombre}">
+        <div class="nombre">${k.nombre}</div>
+        <div class="precio">$${parseFloat(k.precio_kit).toFixed(2)}</div>
+      `;
+      card.onclick = () => agregarKit(k);
+      grid.appendChild(card);
+    });
+
+    productosFiltrados.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'producto-card';
+      const badge = p.tipo_venta === 'unidad' ? '<span class="badge-tipo badge-unidad">PZA</span>' : '<span class="badge-tipo badge-peso">KG</span>';
+      const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
+      card.innerHTML = `${badge}<img src="${p.imagen_url || 'img/producto-generico.png'}" alt="${p.nombre}"><div class="nombre">${p.nombre}</div><div class="precio">${precioLabel}</div>`;
+      card.onclick = () => seleccionarProducto(p);
+      grid.appendChild(card);
+    });
+
+    if (productosFiltrados.length === 0 && kitsFiltrados.length === 0) {
+      grid.innerHTML = '<p style="color:#888; padding:20px;">Sin resultados para esa búsqueda</p>';
+    }
+    return;
+  }
 
   if (categoriaActiva === 'kits') {
     kits.forEach(k => {
@@ -470,18 +509,19 @@ async function imprimirTicket(ticket) {
 cargarConfiguracionNegocio();
 setTimeout(actualizarBannerImpresora, 500);
 
-// Atajos de teclado: F2 escanear, F3 nueva venta (vaciar carrito), F4 generar
-// ticket, ESC cerrar modal abierto. F1 (buscar) y DELETE no aplican todavía
-// porque el Mostrador no tiene un buscador de texto ni un ítem "seleccionado"
-// en el carrito — se documentan como pendientes, no se simulan.
+// Atajos de teclado: F1 buscar (ahora sí existe el buscador), F2 escanear,
+// F3 nueva venta (vaciar carrito), F4 generar ticket, ESC cerrar modal abierto.
+// DELETE sigue sin aplicar: no hay un ítem "seleccionado" en el carrito.
 document.addEventListener('keydown', async (e) => {
   const enCampoDeTexto = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
 
   if (e.key === 'Escape') {
     cerrarModal('modalPeso');
     cerrarModal('modalUnidad');
+    document.getElementById('buscadorProductos').blur();
     return;
   }
+  if (e.key === 'F1') { e.preventDefault(); document.getElementById('buscadorProductos').focus(); return; }
   if (enCampoDeTexto) return; // no interferir con lo que el usuario esté escribiendo
 
   if (e.key === 'F2') { e.preventDefault(); toggleScannerProducto(); }
@@ -493,6 +533,10 @@ document.addEventListener('keydown', async (e) => {
   }
   else if (e.key === 'F4') { e.preventDefault(); generarTicket(); }
 });
+
+function filtrarProductosPorTexto() {
+  renderProductos();
+}
 
 cargarDatos();
 </script>

@@ -48,6 +48,16 @@
   .tag-merma, .tag-ajuste_manual { background: #C62828; }
 
   .sin-datos { color: #888; font-size: 13px; text-align: center; padding: 10px; }
+
+  .grupo-navegacion { margin-bottom: 16px; }
+  .grupo-header {
+    background: white; border-radius: 12px; padding: 14px 18px; font-weight: 700;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  }
+  .grupo-header .flecha { transition: transform 0.2s; }
+  .grupo-header.colapsado .flecha { transform: rotate(-90deg); }
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 10px; }
+  .menu-grid.colapsado { display: none; }
 </style>
 </head>
 <body>
@@ -74,22 +84,49 @@
       <div id="listaActividad" class="lista-alerta"></div>
     </div>
 
-    <div class="menu-grid">
-      <a class="menu-card" href="productos.html"><div class="icono">🖼️</div>Productos</a>
-      <a class="menu-card" href="kits.html"><div class="icono">📦</div>Kits/Combos</a>
-      <a class="menu-card" href="clientes.html"><div class="icono">👤</div>Clientes/Créditos</a>
-      <a class="menu-card" href="compras.html"><div class="icono">🚚</div>Compras/Proveedores</a>
-      <a class="menu-card" href="inventario.html"><div class="icono">📊</div>Inventario</a>
-      <a class="menu-card" href="caja-turno.html"><div class="icono">📊</div>Corte de Caja</a>
-      <a class="menu-card" href="equipo.html"><div class="icono">👥</div>Equipo</a>
-      <a class="menu-card" href="reportes.html"><div class="icono">📈</div>Reportes</a>
-      <a class="menu-card" href="../mostrador.html"><div class="icono">🥩</div>Ir a Mostrador</a>
-      <a class="menu-card" href="../caja.html"><div class="icono">💰</div>Ir a Caja</a>
-      <a class="menu-card" href="cambiar-password.html"><div class="icono">🔒</div>Cambiar Contraseña</a>
-      <a class="menu-card" href="configuracion.html"><div class="icono">⚙️</div>Configuración</a>
-      <a class="menu-card" href="devoluciones.html"><div class="icono">↩️</div>Devoluciones</a>
-      <a class="menu-card" href="bitacora.html"><div class="icono">📋</div>Bitácora</a>
-      <a class="menu-card" href="backups.html"><div class="icono">💾</div>Backups</a>
+    <div class="grupo-navegacion">
+      <div class="grupo-header" onclick="toggleGrupo('grupoVentas')">🥩 Ventas <span class="flecha" id="flechaGrupoVentas">▾</span></div>
+      <div class="menu-grid" id="grupoVentas">
+        <a class="menu-card" href="../mostrador.html"><div class="icono">🥩</div>Mostrador</a>
+        <a class="menu-card" href="../caja.html"><div class="icono">💰</div>Caja</a>
+        <a class="menu-card" href="devoluciones.html"><div class="icono">↩️</div>Devoluciones</a>
+        <a class="menu-card" href="caja-turno.html"><div class="icono">📊</div>Corte de Caja</a>
+      </div>
+    </div>
+
+    <div class="grupo-navegacion">
+      <div class="grupo-header" onclick="toggleGrupo('grupoCatalogo')">📦 Catálogo e Inventario <span class="flecha" id="flechaGrupoCatalogo">▾</span></div>
+      <div class="menu-grid" id="grupoCatalogo">
+        <a class="menu-card" href="productos.html"><div class="icono">🖼️</div>Productos</a>
+        <a class="menu-card" href="kits.html"><div class="icono">📦</div>Kits/Combos</a>
+        <a class="menu-card" href="inventario.html"><div class="icono">📊</div>Inventario</a>
+        <a class="menu-card" href="compras.html"><div class="icono">🚚</div>Compras/Proveedores</a>
+      </div>
+    </div>
+
+    <div class="grupo-navegacion">
+      <div class="grupo-header" onclick="toggleGrupo('grupoClientes')">👤 Clientes <span class="flecha" id="flechaGrupoClientes">▾</span></div>
+      <div class="menu-grid" id="grupoClientes">
+        <a class="menu-card" href="clientes.html"><div class="icono">👤</div>Clientes/Créditos</a>
+      </div>
+    </div>
+
+    <div class="grupo-navegacion">
+      <div class="grupo-header" onclick="toggleGrupo('grupoReportes')">📈 Reportes <span class="flecha" id="flechaGrupoReportes">▾</span></div>
+      <div class="menu-grid" id="grupoReportes">
+        <a class="menu-card" href="reportes.html"><div class="icono">📈</div>Reportes</a>
+        <a class="menu-card" href="bitacora.html"><div class="icono">📋</div>Bitácora</a>
+      </div>
+    </div>
+
+    <div class="grupo-navegacion">
+      <div class="grupo-header" onclick="toggleGrupo('grupoAdmin')">⚙️ Administración <span class="flecha" id="flechaGrupoAdmin">▾</span></div>
+      <div class="menu-grid" id="grupoAdmin">
+        <a class="menu-card" href="equipo.html"><div class="icono">👥</div>Equipo</a>
+        <a class="menu-card" href="configuracion.html"><div class="icono">⚙️</div>Configuración</a>
+        <a class="menu-card" href="cambiar-password.html"><div class="icono">🔒</div>Cambiar Contraseña</a>
+        <a class="menu-card" href="backups.html"><div class="icono">💾</div>Backups</a>
+      </div>
     </div>
   </div>
 
@@ -189,6 +226,26 @@ function renderActividad(actividad) {
   `).join('');
 }
 
+function toggleGrupo(idGrupo) {
+  const grupo = document.getElementById(idGrupo);
+  const flecha = document.getElementById('flecha' + idGrupo.charAt(0).toUpperCase() + idGrupo.slice(1));
+  const header = grupo.previousElementSibling;
+  grupo.classList.toggle('colapsado');
+  header.classList.toggle('colapsado');
+
+  const colapsados = JSON.parse(localStorage.getItem('grupos_colapsados') || '{}');
+  colapsados[idGrupo] = grupo.classList.contains('colapsado');
+  localStorage.setItem('grupos_colapsados', JSON.stringify(colapsados));
+}
+
+function restaurarEstadoGrupos() {
+  const colapsados = JSON.parse(localStorage.getItem('grupos_colapsados') || '{}');
+  Object.keys(colapsados).forEach(idGrupo => {
+    if (colapsados[idGrupo]) toggleGrupo(idGrupo);
+  });
+}
+
+restaurarEstadoGrupos();
 cargarDashboard();
 </script>
 </body>
