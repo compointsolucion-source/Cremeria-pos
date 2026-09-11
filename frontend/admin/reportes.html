@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reportes - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
+  .filtros { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .filtros input { flex: 1; min-width: 140px; }
+  .tarjetas-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tarjeta-metrica { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center; }
+  .tarjeta-metrica .valor { font-size: 22px; font-weight: 700; }
+  .tarjeta-metrica .etiqueta { font-size: 12px; color: #666; margin-top: 4px; }
+  .tarjeta-ganancia { background: #E8F5E9; }
+  .tarjeta-ganancia .valor { color: #2E7D32; }
+  .tabla-reportes { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .tabla-reportes th, .tabla-reportes td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .nota { font-size: 12px; color: #888; margin-top: -10px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>📈 Reportes</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="filtros">
+      <input type="date" id="fechaDesde">
+      <input type="date" id="fechaHasta">
+      <button class="btn btn-primary" onclick="cargarReporte()">Consultar</button>
+      <button class="btn btn-secondary" onclick="filtroRapido('hoy')">Hoy</button>
+      <button class="btn btn-secondary" onclick="filtroRapido('semana')">Últimos 7 días</button>
+      <button class="btn btn-secondary" onclick="filtroRapido('mes')">Este mes</button>
+    </div>
+
+    <div class="tarjetas-resumen" id="tarjetasResumen"></div>
+
+    <h3>Ventas por método de pago</h3>
+    <table class="tabla-reportes">
+      <thead><tr><th>Método</th><th>Tickets</th><th>Total</th></tr></thead>
+      <tbody id="tablaMetodos"></tbody>
+    </table>
+
+    <h3>Ventas por departamento</h3>
+    <table class="tabla-reportes">
+      <thead><tr><th>Categoría</th><th>Total</th></tr></thead>
+      <tbody id="tablaCategorias"></tbody>
+    </table>
+
+    <h3>Productos más vendidos</h3>
+    <table class="tabla-reportes">
+      <thead><tr><th>Producto</th><th>Cantidad</th><th>Monto</th></tr></thead>
+      <tbody id="tablaProductos"></tbody>
+    </table>
+  </div>
+
+<script src="../js/api.js"></script>
+<script>
+requiereLogin();
+
+function formatearFechaInput(fecha) {
+  return fecha.toISOString().split('T')[0];
+}
+
+function filtroRapido(tipo) {
+  const hoy = new Date();
+  let desde = new Date(hoy);
+  if (tipo === 'semana') desde.setDate(hoy.getDate() - 6);
+  if (tipo === 'mes') desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+  document.getElementById('fechaDesde').value = formatearFechaInput(desde);
+  document.getElementById('fechaHasta').value = formatearFechaInput(hoy);
+  cargarReporte();
+}
+
+async function cargarReporte() {
+  const desde = document.getElementById('fechaDesde').value;
+  const hasta = document.getElementById('fechaHasta').value;
+
+  let url = '/reportes/ventas';
+  if (desde && hasta) {
+    // El backend espera "hasta" como límite exclusivo del día siguiente para incluir todo el día
+    const hastaFin = new Date(hasta);
+    hastaFin.setDate(hastaFin.getDate() + 1);
+    url += `?desde=${desde}&hasta=${formatearFechaInput(hastaFin)}`;
+  }
+
+  try {
+    const data = await apiFetch(url);
+    renderResumen(data);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function renderResumen(data) {
+  const tarjetas = document.getElementById('tarjetasResumen');
+  const g = data.ganancia_estimada;
+  tarjetas.innerHTML = `
+    <div class="tarjeta-metrica">
+      <div class="valor">$${parseFloat(data.total_general.total).toFixed(2)}</div>
+      <div class="etiqueta">Total Vendido</div>
+    </div>
+    <div class="tarjeta-metrica">
+      <div class="valor">${data.total_general.num_tickets}</div>
+      <div class="etiqueta">Tickets Cobrados</div>
+    </div>
+    <div class="tarjeta-metrica tarjeta-ganancia">
+      <div class="valor">$${g.ganancia.toFixed(2)}</div>
+      <div class="etiqueta">Ganancia Estimada*</div>
+    </div>
+  `;
+
+  const metodosNombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mixto: 'Mixto', credito: 'Fiado' };
+  document.getElementById('tablaMetodos').innerHTML = data.por_metodo_pago.map(m => `
+    <tr><td>${metodosNombres[m.metodo_pago] || m.metodo_pago || 'Sin especificar'}</td><td>${m.num_tickets}</td><td>$${parseFloat(m.total).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3">Sin ventas en este rango</td></tr>';
+
+  document.getElementById('tablaCategorias').innerHTML = data.por_categoria.map(c => `
+    <tr><td>${c.categoria}</td><td>$${parseFloat(c.total).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="2">Sin ventas en este rango</td></tr>';
+
+  document.getElementById('tablaProductos').innerHTML = data.top_productos.map(p => `
+    <tr><td>${p.nombre_producto}</td><td>${parseFloat(p.cantidad_total).toFixed(2)}</td><td>$${parseFloat(p.monto_total).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3">Sin ventas en este rango</td></tr>';
+
+  const notaExistente = document.querySelector('.nota');
+  if (notaExistente) notaExistente.remove();
+  const nota = document.createElement('p');
+  nota.className = 'nota';
+  nota.textContent = '* ' + g.nota;
+  document.getElementById('tarjetasResumen').after(nota);
+}
+
+filtroRapido('hoy');
+</script>
+</body>
+</html>
