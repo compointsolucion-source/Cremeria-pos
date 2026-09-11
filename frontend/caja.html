@@ -60,6 +60,7 @@
 <script src="js/api.js"></script>
 <script src="js/estado-conexion.js"></script>
 <script src="js/ui-components.js"></script>
+<script src="js/lector-fisico.js"></script>
 <script src="js/impresora-termica.js"></script>
 <script>
 requiereLogin();
@@ -441,6 +442,10 @@ function toggleScanner() {
   );
   scannerActivo = true;
 }
+
+// Lector de código de barras físico: escanea el folio del ticket y lo carga
+// automáticamente, igual que si se hubiera escaneado con la cámara.
+activarLectorFisico(cargarTicket);
 
 cargarBandeja();
 setInterval(cargarBandeja, 15000);

@@ -146,6 +146,7 @@
 <script src="js/api.js"></script>
 <script src="js/estado-conexion.js"></script>
 <script src="js/ui-components.js"></script>
+<script src="js/lector-fisico.js"></script>
 <script src="js/impresora-termica.js"></script>
 <script>
 requiereLogin();
@@ -546,6 +547,10 @@ document.addEventListener('keydown', async (e) => {
 function filtrarProductosPorTexto() {
   renderProductos();
 }
+
+// Lector de código de barras físico: escanea y agrega el producto/kit
+// automáticamente, igual que si se hubiera escaneado con la cámara.
+activarLectorFisico(buscarPorCodigo);
 
 cargarDatos();
 </script>
