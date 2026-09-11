@@ -4,6 +4,52 @@ const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
+// Inventario valorizado: costo total, valor potencial de venta, margen potencial.
+// El "costo" usa el promedio de costo_unitario de las compras registradas de
+// cada producto — si un producto nunca se ha comprado (solo se dio de alta a
+// mano), no hay costo real y se indica "Costo no disponible" en vez de inventarlo.
+router.get('/valorizado', verificarToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `WITH costos_promedio AS (
+         SELECT producto_id, AVG(costo_unitario) AS costo_promedio
+         FROM compra_detalle
+         GROUP BY producto_id
+       )
+       SELECT
+         p.id AS producto_id,
+         p.nombre,
+         p.tipo_venta,
+         p.precio,
+         COALESCE(i.existencia_actual, 0) AS existencia_actual,
+         cp.costo_promedio,
+         CASE WHEN cp.costo_promedio IS NOT NULL THEN COALESCE(i.existencia_actual, 0) * cp.costo_promedio ELSE NULL END AS valor_costo,
+         COALESCE(i.existencia_actual, 0) * p.precio AS valor_venta_potencial
+       FROM productos p
+       LEFT JOIN inventario i ON p.id = i.producto_id
+       LEFT JOIN costos_promedio cp ON p.id = cp.producto_id
+       WHERE p.sucursal_id = $1 AND p.activo = true
+       ORDER BY p.nombre ASC`,
+      [req.usuario.sucursal_id]
+    );
+
+    const totalCosto = result.rows.reduce((sum, r) => sum + (r.valor_costo ? parseFloat(r.valor_costo) : 0), 0);
+    const totalVentaPotencial = result.rows.reduce((sum, r) => sum + parseFloat(r.valor_venta_potencial), 0);
+
+    res.json({
+      productos: result.rows,
+      totales: {
+        valor_costo: totalCosto,
+        valor_venta_potencial: totalVentaPotencial,
+        margen_potencial: totalVentaPotencial - totalCosto
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al calcular el inventario valorizado' });
+  }
+});
+
 // Listado de existencias con datos del producto
 router.get('/', verificarToken, async (req, res) => {
   try {

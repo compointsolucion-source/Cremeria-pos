@@ -37,6 +37,9 @@
       <button class="btn btn-danger" onclick="registrarAjuste()">Registrar</button>
     </div>
 
+    <h3>Inventario Valorizado</h3>
+    <div class="tarjetas-valorizado" id="tarjetasValorizado" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px;"></div>
+
     <h3>Existencias actuales</h3>
     <table class="tabla-inv">
       <thead><tr><th>Producto</th><th>Existencia</th><th>Mínimo</th><th>Ajustar mínimo</th></tr></thead>
@@ -100,7 +103,31 @@ async function registrarAjuste() {
   }
 }
 
+async function cargarValorizado() {
+  try {
+    const data = await apiFetch('/inventario/valorizado');
+    const t = data.totales;
+    document.getElementById('tarjetasValorizado').innerHTML = `
+      <div class="card" style="text-align:center;">
+        <div style="font-size:20px; font-weight:700;">$${t.valor_costo.toFixed(2)}</div>
+        <div style="font-size:12px; color:#666;">Valor de costo</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div style="font-size:20px; font-weight:700;">$${t.valor_venta_potencial.toFixed(2)}</div>
+        <div style="font-size:12px; color:#666;">Valor potencial de venta</div>
+      </div>
+      <div class="card" style="text-align:center; background:#E8F5E9;">
+        <div style="font-size:20px; font-weight:700; color:#2E7D32;">$${t.margen_potencial.toFixed(2)}</div>
+        <div style="font-size:12px; color:#666;">Margen potencial</div>
+      </div>
+    `;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 cargarInventario();
+cargarValorizado();
 </script>
 </body>
 </html>

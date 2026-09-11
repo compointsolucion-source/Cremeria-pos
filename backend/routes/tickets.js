@@ -139,6 +139,28 @@ router.delete('/item/:itemId', verificarToken, async (req, res) => {
 // requieren autorización extra (usuario y contraseña de un dueño/gerente),
 // aunque quien esté cobrando ya tenga el permiso DESCUENTO_APLICAR — es una
 // segunda capa para descuentos grandes, no un reemplazo del permiso.
+// Valida la autorización extra requerida cuando un descuento supera el 15%.
+// Devuelve el id de quien autoriza, o lanza un objeto {status, error} si falla.
+async function verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, usuarioActual, sucursalId) {
+  if (porcentajeEfectivo <= 15) return usuarioActual.id;
+
+  if (!autorizacion || !autorizacion.usuario || !autorizacion.password) {
+    throw { status: 403, error: 'Este descuento supera el 15% y requiere autorización de un dueño o gerente (usuario y contraseña)' };
+  }
+  const autorizador = await pool.query(
+    `SELECT * FROM usuarios WHERE usuario = $1 AND sucursal_id = $2 AND activo = true AND rol IN ('dueno','gerente')`,
+    [autorizacion.usuario, sucursalId]
+  );
+  if (autorizador.rows.length === 0) {
+    throw { status: 403, error: 'Usuario de autorización no encontrado o no tiene rango suficiente' };
+  }
+  const passwordValida = await bcrypt.compare(autorizacion.password, autorizador.rows[0].password_hash);
+  if (!passwordValida) {
+    throw { status: 403, error: 'Contraseña de autorización incorrecta' };
+  }
+  return autorizador.rows[0].id;
+}
+
 router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'), async (req, res) => {
   try {
     const { porcentaje, monto, motivo, autorizacion } = req.body;
@@ -155,25 +177,7 @@ router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'
     }
 
     const porcentajeEfectivo = (descuentoMonto / parseFloat(ticket.total)) * 100;
-    let autorizadoPor = req.usuario.id;
-
-    if (porcentajeEfectivo > 15) {
-      if (!autorizacion || !autorizacion.usuario || !autorizacion.password) {
-        return res.status(403).json({ error: 'Este descuento supera el 15% y requiere autorización de un dueño o gerente (usuario y contraseña)' });
-      }
-      const autorizador = await pool.query(
-        `SELECT * FROM usuarios WHERE usuario = $1 AND sucursal_id = $2 AND activo = true AND rol IN ('dueno','gerente')`,
-        [autorizacion.usuario, req.usuario.sucursal_id]
-      );
-      if (autorizador.rows.length === 0) {
-        return res.status(403).json({ error: 'Usuario de autorización no encontrado o no tiene rango suficiente' });
-      }
-      const passwordValida = await bcrypt.compare(autorizacion.password, autorizador.rows[0].password_hash);
-      if (!passwordValida) {
-        return res.status(403).json({ error: 'Contraseña de autorización incorrecta' });
-      }
-      autorizadoPor = autorizador.rows[0].id;
-    }
+    const autorizadoPor = await verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, req.usuario, req.usuario.sucursal_id);
 
     await pool.query(
       'UPDATE tickets SET descuento_monto = $1, descuento_motivo = $2, descuento_autorizado_por = $3 WHERE id = $4',
@@ -190,8 +194,55 @@ router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'
 
     res.json({ ok: true, descuento_monto: descuentoMonto, total_final: parseFloat(ticket.total) - descuentoMonto });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.error });
     console.error(err);
     res.status(500).json({ error: 'Error al aplicar el descuento' });
+  }
+});
+
+// Descuento sobre un producto/línea específica del ticket (en vez de todo el ticket)
+router.put('/item/:itemId/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'), async (req, res) => {
+  try {
+    const { porcentaje, monto, motivo, autorizacion } = req.body;
+    if (!motivo) return res.status(400).json({ error: 'El motivo del descuento es obligatorio' });
+    if (!porcentaje && !monto) return res.status(400).json({ error: 'Especifica un porcentaje o un monto de descuento' });
+
+    const itemResult = await pool.query(
+      `SELECT td.*, t.sucursal_id, t.estado FROM ticket_detalle td
+       JOIN tickets t ON td.ticket_id = t.id WHERE td.id = $1`,
+      [req.params.itemId]
+    );
+    if (itemResult.rows.length === 0) return res.status(404).json({ error: 'Producto del ticket no encontrado' });
+    const item = itemResult.rows[0];
+    if (item.sucursal_id !== req.usuario.sucursal_id) return res.status(404).json({ error: 'Producto del ticket no encontrado' });
+    if (item.estado !== 'pendiente') return res.status(400).json({ error: 'El ticket ya no está pendiente' });
+
+    const descuentoMonto = porcentaje ? (parseFloat(item.subtotal) * (parseFloat(porcentaje) / 100)) : parseFloat(monto);
+    if (descuentoMonto <= 0 || descuentoMonto > parseFloat(item.subtotal)) {
+      return res.status(400).json({ error: 'El descuento debe ser mayor a 0 y no puede superar el subtotal de ese producto' });
+    }
+
+    const porcentajeEfectivo = (descuentoMonto / parseFloat(item.subtotal)) * 100;
+    const autorizadoPor = await verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, req.usuario, req.usuario.sucursal_id);
+
+    await pool.query(
+      'UPDATE ticket_detalle SET descuento_monto = $1, descuento_motivo = $2 WHERE id = $3',
+      [descuentoMonto, motivo, item.id]
+    );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'aplicar_descuento',
+      modulo: 'tickets',
+      referencia_id: item.ticket_id,
+      valor_nuevo: { producto: item.nombre_producto, descuento_monto: descuentoMonto, motivo, autorizado_por: autorizadoPor }
+    });
+
+    res.json({ ok: true, descuento_monto: descuentoMonto });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.error });
+    console.error(err);
+    res.status(500).json({ error: 'Error al aplicar el descuento al producto' });
   }
 });
 
@@ -219,7 +270,12 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
       return res.status(409).json({ error: 'Este ticket ya fue pagado, cancelado, o no existe' });
     }
     const ticketActual = ticketActualResult.rows[0];
-    const totalNeto = parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0);
+    const itemsDescuentoResult = await conexion.query(
+      'SELECT COALESCE(SUM(descuento_monto),0) AS total FROM ticket_detalle WHERE ticket_id = $1',
+      [req.params.id]
+    );
+    const descuentoItems = parseFloat(itemsDescuentoResult.rows[0].total);
+    const totalNeto = parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0) - descuentoItems;
 
     // Validar límite de crédito si aplica
     if (metodo_pago === 'credito') {

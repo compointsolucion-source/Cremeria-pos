@@ -79,6 +79,17 @@ router.get('/ventas', verificarToken, async (req, res) => {
       [sucursalId, desde, hasta]
     );
 
+    // Ventas por empleado (cajero que cobró)
+    const porEmpleado = await pool.query(
+      `SELECT u.nombre AS empleado, COALESCE(SUM(t.total),0) AS total, COUNT(*) AS num_tickets
+       FROM tickets t
+       JOIN usuarios u ON t.cajero_usuario_id = u.id
+       WHERE t.estado = 'pagado' AND t.sucursal_id = $1 AND t.fecha_pago BETWEEN $2 AND $3
+       GROUP BY u.nombre
+       ORDER BY total DESC`,
+      [sucursalId, desde, hasta]
+    );
+
     const ventasProductos = parseFloat(ganancia.rows[0].ventas_productos);
     const costoEstimado = parseFloat(ganancia.rows[0].costo_estimado);
 
@@ -87,6 +98,7 @@ router.get('/ventas', verificarToken, async (req, res) => {
       total_general: totalGeneral.rows[0],
       por_metodo_pago: porMetodo.rows,
       por_categoria: porCategoria.rows,
+      por_empleado: porEmpleado.rows,
       top_productos: topProductos.rows,
       ganancia_estimada: {
         ventas_productos: ventasProductos,
@@ -98,6 +110,35 @@ router.get('/ventas', verificarToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al generar el reporte' });
+  }
+});
+
+// Exportar el listado de ventas del rango a CSV (abre directo en Excel/Sheets)
+router.get('/ventas/exportar-csv', verificarToken, async (req, res) => {
+  try {
+    const { desde, hasta } = resolverRango(req.query);
+    const sucursalId = req.usuario.sucursal_id;
+
+    const result = await pool.query(
+      `SELECT t.folio, t.fecha_pago, t.metodo_pago, t.total, t.descuento_monto, u.nombre AS cajero
+       FROM tickets t
+       LEFT JOIN usuarios u ON t.cajero_usuario_id = u.id
+       WHERE t.estado = 'pagado' AND t.sucursal_id = $1 AND t.fecha_pago BETWEEN $2 AND $3
+       ORDER BY t.fecha_pago ASC`,
+      [sucursalId, desde, hasta]
+    );
+
+    const encabezado = 'Folio,Fecha,Metodo de Pago,Total,Descuento,Cajero\n';
+    const filas = result.rows.map(r =>
+      `${r.folio},${new Date(r.fecha_pago).toISOString()},${r.metodo_pago},${r.total},${r.descuento_monto || 0},${r.cajero || ''}`
+    ).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="ventas-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(encabezado + filas);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al exportar el CSV' });
   }
 });
 

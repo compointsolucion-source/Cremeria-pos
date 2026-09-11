@@ -113,7 +113,8 @@ async function cargarTicket(folio) {
 }
 
 function totalNetoActual() {
-  return parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0);
+  const descuentoItems = ticketActual.items.reduce((sum, i) => sum + parseFloat(i.descuento_monto || 0), 0);
+  return parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0) - descuentoItems;
 }
 
 function renderPanelCobro() {
@@ -122,12 +123,17 @@ function renderPanelCobro() {
   let itemsHtml = t.items.map(i => {
     const detalle = i.tipo === 'kit' ? 'Kit (fijo)' : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`;
     const puedeEditar = i.tipo !== 'kit';
+    const tieneDescuentoItem = parseFloat(i.descuento_monto || 0) > 0;
+    const lineaDescuentoItem = tieneDescuentoItem
+      ? `<div style="font-size:12px; color:#C62828;">Descuento (${i.descuento_motivo || ''}): -$${parseFloat(i.descuento_monto).toFixed(2)}</div>`
+      : '';
     return `
       <div class="detalle-item">
-        <span>${i.nombre_producto}<br><small>${detalle}</small></span>
+        <span>${i.nombre_producto}<br><small>${detalle}</small>${lineaDescuentoItem}</span>
         <span class="acciones">
           $${parseFloat(i.subtotal).toFixed(2)}
           ${puedeEditar ? `<button onclick="editarCantidad(${i.id}, ${i.cantidad})">✏️</button>` : ''}
+          ${puedeEditar && !tieneDescuentoItem ? `<button onclick="abrirDescuentoItem(${i.id})">🏷️</button>` : ''}
           <button class="quitar" onclick="quitarItem(${i.id})">✕</button>
         </span>
       </div>`;
@@ -213,6 +219,41 @@ function setMetodo(m) {
     `;
   } else {
     camposDiv.innerHTML = '';
+  }
+}
+
+async function abrirDescuentoItem(itemId) {
+  const motivo = await solicitarTexto('Motivo del descuento para este producto:');
+  if (!motivo) return;
+
+  const entrada = await solicitarTexto('Porcentaje de descuento (ej. 10), o escribe "monto:20" para un monto fijo en pesos:');
+  if (!entrada) return;
+
+  let body = { motivo };
+  if (entrada.trim().toLowerCase().startsWith('monto:')) {
+    body.monto = parseFloat(entrada.split(':')[1]);
+  } else {
+    body.porcentaje = parseFloat(entrada);
+  }
+
+  await intentarAplicarDescuentoItem(itemId, body);
+}
+
+async function intentarAplicarDescuentoItem(itemId, body) {
+  try {
+    await apiFetch(`/tickets/item/${itemId}/descuento`, { method: 'PUT', body: JSON.stringify(body) });
+    mostrarToast('Descuento aplicado al producto', 'exito');
+    await cargarTicket(ticketActual.folio);
+  } catch (err) {
+    if (err.message.includes('supera el 15%') || err.message.includes('autorización')) {
+      const usuarioAutoriza = await solicitarTexto('Este descuento requiere autorización. Usuario de un dueño/gerente:');
+      if (!usuarioAutoriza) return;
+      const passwordAutoriza = await solicitarTexto('Contraseña de autorización:');
+      if (!passwordAutoriza) return;
+      await intentarAplicarDescuentoItem(itemId, { ...body, autorizacion: { usuario: usuarioAutoriza, password: passwordAutoriza } });
+    } else {
+      mostrarToast(err.message, 'error');
+    }
   }
 }
 
