@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requierePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Obtener turno abierto actual de la sucursal
@@ -19,7 +19,7 @@ router.get('/actual', verificarToken, async (req, res) => {
 });
 
 // Abrir turno
-router.post('/abrir', verificarToken, async (req, res) => {
+router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req, res) => {
   try {
     const { fondo_inicial } = req.body;
 
@@ -52,7 +52,7 @@ router.post('/abrir', verificarToken, async (req, res) => {
 });
 
 // Cerrar turno (corte de caja)
-router.post('/:id/cerrar', verificarToken, async (req, res) => {
+router.post('/:id/cerrar', verificarToken, requierePermiso('CAJA_CERRAR'), async (req, res) => {
   try {
     const { saldo_contado } = req.body;
     const turnoId = req.params.id;

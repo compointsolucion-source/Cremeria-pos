@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requierePermiso, tienePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Listar productos activos (para mostrador y admin). Soporta paginación
@@ -70,7 +70,7 @@ router.get('/codigo/:codigo', verificarToken, async (req, res) => {
 });
 
 // Crear producto (solo dueño/gerente)
-router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.post('/', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req, res) => {
   try {
     const { nombre, precio, categoria_id, imagen_url, favorito, orden, codigo_barras, tipo_venta } = req.body;
     if (!nombre || !precio) {
@@ -103,9 +103,20 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
 });
 
 // Editar producto
-router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.put('/:id', verificarToken, async (req, res) => {
   try {
     const { nombre, precio, categoria_id, imagen_url, favorito, orden, activo, codigo_barras, tipo_venta } = req.body;
+
+    const camposDistintosDePrecio = [nombre, categoria_id, imagen_url, favorito, orden, activo, codigo_barras, tipo_venta]
+      .some(campo => campo !== undefined);
+
+    if (camposDistintosDePrecio && !tienePermiso(req.usuario, 'PRODUCTOS_EDITAR')) {
+      return res.status(403).json({ error: 'No tienes el permiso "PRODUCTOS_EDITAR" para cambiar estos datos del producto.' });
+    }
+    if (precio !== undefined && !tienePermiso(req.usuario, 'PRODUCTOS_PRECIO') && !tienePermiso(req.usuario, 'PRODUCTOS_EDITAR')) {
+      return res.status(403).json({ error: 'No tienes el permiso "PRODUCTOS_PRECIO" para cambiar el precio.' });
+    }
+
     const result = await pool.query(
       `UPDATE productos SET
         nombre = COALESCE($1, nombre),

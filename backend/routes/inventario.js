@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requierePermiso, tienePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Inventario valorizado: costo total, valor potencial de venta, margen potencial.
 // El "costo" usa el promedio de costo_unitario de las compras registradas de
 // cada producto — si un producto nunca se ha comprado (solo se dio de alta a
 // mano), no hay costo real y se indica "Costo no disponible" en vez de inventarlo.
-router.get('/valorizado', verificarToken, async (req, res) => {
+router.get('/valorizado', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, res) => {
   try {
     const result = await pool.query(
       `WITH costos_promedio AS (
@@ -51,7 +51,7 @@ router.get('/valorizado', verificarToken, async (req, res) => {
 });
 
 // Listado de existencias con datos del producto
-router.get('/', verificarToken, async (req, res) => {
+router.get('/', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT p.id AS producto_id, p.nombre, p.tipo_venta, p.imagen_url,
@@ -112,6 +112,11 @@ router.post('/ajuste', verificarToken, async (req, res) => {
     }
     if (!['merma', 'ajuste_manual'].includes(tipo)) {
       return res.status(400).json({ error: 'Tipo de ajuste inválido' });
+    }
+
+    const permisoRequerido = tipo === 'merma' ? 'INVENTARIO_MERMA' : 'INVENTARIO_AJUSTAR';
+    if (!tienePermiso(req.usuario, permisoRequerido)) {
+      return res.status(403).json({ error: `No tienes el permiso "${permisoRequerido}" para esta acción. Pide a tu gerente que te lo asigne en Equipo.` });
     }
 
     await conexion.query('BEGIN');

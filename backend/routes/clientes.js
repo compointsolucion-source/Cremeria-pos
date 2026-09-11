@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requierePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Listar clientes. Soporta paginación opcional con ?limit=&offset=
@@ -52,7 +52,7 @@ router.get('/buscar/:texto', verificarToken, async (req, res) => {
 });
 
 // Crear cliente
-router.post('/', verificarToken, async (req, res) => {
+router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, res) => {
   try {
     const { nombre, telefono, limite_credito } = req.body;
     if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
@@ -122,7 +122,7 @@ router.get('/:id/estado-cuenta', verificarToken, async (req, res) => {
 });
 
 // Registrar un abono (pago a cuenta)
-router.post('/:id/abono', verificarToken, async (req, res) => {
+router.post('/:id/abono', verificarToken, requierePermiso('CREDITO_ABONO'), async (req, res) => {
   const cliente = await pool.connect();
   try {
     const { monto, metodo_pago, turno_id } = req.body;

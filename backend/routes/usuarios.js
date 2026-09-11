@@ -2,10 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, tienePermiso, TODOS_LOS_PERMISOS } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
-// Listar el equipo de la sucursal (nunca se devuelve el password_hash)
+// Listar el equipo de la sucursal (nunca se devuelve el password_hash).
+// Incluye "permisos_efectivos": la lista de qué SÍ puede hacer cada empleado
+// ahora mismo, combinando lo que trae su rol por defecto con cualquier
+// override que se le haya puesto — para que la pantalla de Equipo sepa
+// exactamente qué casillas marcar sin tener que recalcularlo ella misma.
 router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
   try {
     const result = await pool.query(
@@ -13,7 +17,13 @@ router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
        FROM usuarios WHERE sucursal_id = $1 ORDER BY creado_en ASC`,
       [req.usuario.sucursal_id]
     );
-    res.json(result.rows);
+
+    const equipo = result.rows.map(u => ({
+      ...u,
+      permisos_efectivos: TODOS_LOS_PERMISOS.filter(p => tienePermiso(u, p))
+    }));
+
+    res.json(equipo);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener el equipo' });
@@ -78,7 +88,7 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
         nombre = COALESCE($1, nombre),
         rol = COALESCE($2, rol),
         activo = COALESCE($3, activo),
-        permisos = COALESCE($4, permisos)
+        permisos = COALESCE(permisos, '{}'::jsonb) || COALESCE($4::jsonb, '{}'::jsonb)
        WHERE id = $5 AND sucursal_id = $6
        RETURNING id, nombre, usuario, rol, activo, permisos`,
       [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.usuario.sucursal_id]

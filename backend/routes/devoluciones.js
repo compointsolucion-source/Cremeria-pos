@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requierePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Historial de devoluciones
@@ -24,7 +24,7 @@ router.get('/', verificarToken, async (req, res) => {
 });
 
 // Registrar una devolución
-router.post('/', verificarToken, async (req, res) => {
+router.post('/', verificarToken, requierePermiso('VENTAS_DEVOLVER'), async (req, res) => {
   const conexion = await pool.connect();
   try {
     const { ticket_id, items, metodo_reembolso, motivo, turno_id } = req.body;

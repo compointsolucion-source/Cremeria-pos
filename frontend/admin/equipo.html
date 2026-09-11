@@ -57,11 +57,34 @@ requiereLogin();
 
 const rolNombres = { dueno: 'Dueño', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador' };
 
+// Agrupados por tema, solo para que se vean ordenados en pantalla — el
+// backend es quien realmente los exige, esto es nada más presentación.
+const GRUPOS_PERMISOS = {
+  'Ventas': ['VENTAS_CREAR', 'VENTAS_CANCELAR', 'VENTAS_DEVOLVER', 'DESCUENTO_APLICAR'],
+  'Inventario': ['INVENTARIO_VER', 'INVENTARIO_AJUSTAR', 'INVENTARIO_MERMA'],
+  'Caja': ['CAJA_ABRIR', 'CAJA_CERRAR', 'CAJA_MOVIMIENTO'],
+  'Reportes': ['REPORTES_VER'],
+  'Productos': ['PRODUCTOS_CREAR', 'PRODUCTOS_EDITAR', 'PRODUCTOS_PRECIO'],
+  'Clientes': ['CLIENTES_CREAR', 'CREDITO_ABONO']
+};
+
+const ETIQUETAS_PERMISOS = {
+  VENTAS_CREAR: 'Generar tickets de venta', VENTAS_CANCELAR: 'Cancelar tickets', VENTAS_DEVOLVER: 'Procesar devoluciones',
+  DESCUENTO_APLICAR: 'Aplicar descuentos (>15% pide autorización aparte)',
+  INVENTARIO_VER: 'Ver inventario', INVENTARIO_AJUSTAR: 'Hacer ajustes manuales', INVENTARIO_MERMA: 'Registrar mermas',
+  CAJA_ABRIR: 'Abrir turno de caja', CAJA_CERRAR: 'Cerrar turno de caja', CAJA_MOVIMIENTO: 'Registrar entradas/salidas de efectivo',
+  REPORTES_VER: 'Ver reportes',
+  PRODUCTOS_CREAR: 'Dar de alta productos', PRODUCTOS_EDITAR: 'Editar productos existentes', PRODUCTOS_PRECIO: 'Cambiar precios',
+  CLIENTES_CREAR: 'Dar de alta clientes', CREDITO_ABONO: 'Registrar abonos a crédito'
+};
+
+let equipoActual = [];
+
 async function cargarEquipo() {
   try {
-    const equipo = await apiFetch('/usuarios');
+    equipoActual = await apiFetch('/usuarios');
     const cont = document.getElementById('listaEquipo');
-    cont.innerHTML = equipo.map(u => `
+    cont.innerHTML = equipoActual.map(u => `
       <div class="empleado-card ${u.activo ? '' : 'inactivo'}">
         <div class="titulo">
           <span>${u.nombre} <span class="rol-tag rol-${u.rol}">${rolNombres[u.rol]}</span></span>
@@ -72,16 +95,47 @@ async function cargarEquipo() {
             <button class="btn btn-secondary" onclick="toggleActivo(${u.id}, ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>
             <button class="btn btn-secondary" onclick="cambiarRol(${u.id})">Cambiar rol</button>
             <button class="btn btn-secondary" onclick="restablecerPassword(${u.id})">Restablecer contraseña</button>
+            <button class="btn btn-secondary" onclick="togglePermisosVisibles(${u.id})">Permisos ▾</button>
           </div>
-          <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px;">
-            <input type="checkbox" ${u.permisos && u.permisos.DESCUENTO_APLICAR ? 'checked' : ''} onchange="togglePermisoDescuento(${u.id}, this.checked)">
-            Puede aplicar descuentos en Caja (los mayores al 15% igual piden autorización)
-          </label>
+          <div class="panel-permisos" id="permisos-${u.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #EEE;">
+            ${renderPermisosEmpleado(u)}
+          </div>
         ` : ''}
       </div>
     `).join('');
   } catch (err) {
     mostrarToast(err.message, 'error');
+  }
+}
+
+function renderPermisosEmpleado(u) {
+  const efectivos = u.permisos_efectivos || [];
+  return Object.entries(GRUPOS_PERMISOS).map(([grupo, claves]) => `
+    <div style="margin-bottom:8px;">
+      <div style="font-weight:600; font-size:12px; color:#888; margin-bottom:4px;">${grupo}</div>
+      ${claves.map(clave => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:4px;">
+          <input type="checkbox" ${efectivos.includes(clave) ? 'checked' : ''} onchange="togglePermiso(${u.id}, '${clave}', this.checked)">
+          ${ETIQUETAS_PERMISOS[clave]}
+        </label>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function togglePermisosVisibles(id) {
+  const panel = document.getElementById(`permisos-${id}`);
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function togglePermiso(id, clave, activado) {
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ permisos: { [clave]: activado } }) });
+    mostrarToast(`${ETIQUETAS_PERMISOS[clave]}: ${activado ? 'activado' : 'desactivado'}`, 'exito');
+    cargarEquipo();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    cargarEquipo();
   }
 }
 
@@ -132,16 +186,6 @@ async function restablecerPassword(id) {
     mostrarToast('Contraseña restablecida', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
-  }
-}
-
-async function togglePermisoDescuento(id, activado) {
-  try {
-    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ permisos: { DESCUENTO_APLICAR: activado } }) });
-    mostrarToast(activado ? 'Permiso de descuento activado' : 'Permiso de descuento desactivado', 'exito');
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-    cargarEquipo();
   }
 }
 

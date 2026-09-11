@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requierePermiso } = require('../middleware/auth');
 
 // Registrar entrada o salida de dinero
-router.post('/', verificarToken, async (req, res) => {
+router.post('/', verificarToken, requierePermiso('CAJA_MOVIMIENTO'), async (req, res) => {
   try {
     const { turno_id, tipo, monto, concepto } = req.body;
 

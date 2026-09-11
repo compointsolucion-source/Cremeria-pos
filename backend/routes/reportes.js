@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requierePermiso } = require('../middleware/auth');
 
 // Resuelve el rango de fechas: si no se especifica, usa "hoy" completo.
 function resolverRango(query) {
@@ -14,7 +14,7 @@ function resolverRango(query) {
   return { desde, hasta };
 }
 
-router.get('/ventas', verificarToken, async (req, res) => {
+router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
     const sucursalId = req.usuario.sucursal_id;
@@ -114,7 +114,7 @@ router.get('/ventas', verificarToken, async (req, res) => {
 });
 
 // Exportar el listado de ventas del rango a CSV (abre directo en Excel/Sheets)
-router.get('/ventas/exportar-csv', verificarToken, async (req, res) => {
+router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
     const sucursalId = req.usuario.sucursal_id;
@@ -143,7 +143,7 @@ router.get('/ventas/exportar-csv', verificarToken, async (req, res) => {
 });
 
 // Reporte de Compras: gasto por proveedor y evolución de costo por producto
-router.get('/compras', verificarToken, async (req, res) => {
+router.get('/compras', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
     const sucursalId = req.usuario.sucursal_id;
@@ -184,7 +184,7 @@ router.get('/compras', verificarToken, async (req, res) => {
 });
 
 // Reporte de Clientes: deuda activa, abonos del rango, clientes más frecuentes
-router.get('/clientes', verificarToken, async (req, res) => {
+router.get('/clientes', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
     const sucursalId = req.usuario.sucursal_id;

@@ -12,7 +12,7 @@ function generarFolio(sucursalId) {
 }
 
 // Crear ticket desde mostrador
-router.post('/', verificarToken, async (req, res) => {
+router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
   const cliente = await pool.connect();
   try {
     const { items } = req.body; // [{tipo, producto_id|kit_id, nombre_producto, cantidad, precio_unitario}]
@@ -384,7 +384,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
 });
 
 // Cancelar ticket
-router.post('/:id/cancelar', verificarToken, async (req, res) => {
+router.post('/:id/cancelar', verificarToken, requierePermiso('VENTAS_CANCELAR'), async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente' RETURNING folio`,
