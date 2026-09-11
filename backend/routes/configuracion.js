@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Obtener la configuración de la sucursal (crea una fila por defecto si no existe)
 router.get('/', verificarToken, async (req, res) => {
@@ -46,6 +47,15 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
        RETURNING *`,
       [req.usuario.sucursal_id, logo_url || null, direccion || null, telefono || null, rfc || null, ancho_ticket || '80mm', terminos || null]
     );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'actualizar_configuracion',
+      modulo: 'configuracion',
+      referencia_id: req.usuario.sucursal_id,
+      valor_nuevo: { direccion, telefono, rfc, ancho_ticket, terminos } // logo_url excluido: puede pesar varios KB en base64
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);

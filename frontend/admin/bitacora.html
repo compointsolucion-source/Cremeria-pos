@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitácora - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
+  .filtros { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filtros select { flex: 1; min-width: 140px; }
+  .tabla-bitacora { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+  .tabla-bitacora th, .tabla-bitacora td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 13px; vertical-align: top; }
+  .tag-accion { font-size: 11px; padding: 2px 8px; border-radius: 8px; color: white; background: #6B6E73; white-space: nowrap; }
+  .valor-json { font-family: monospace; font-size: 11px; color: #666; max-width: 260px; word-break: break-word; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>📋 Bitácora de Auditoría</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="filtros">
+      <select id="filtroModulo">
+        <option value="">Todos los módulos</option>
+        <option value="tickets">Tickets</option>
+        <option value="turnos">Turnos</option>
+        <option value="usuarios">Usuarios</option>
+        <option value="configuracion">Configuración</option>
+        <option value="devoluciones">Devoluciones</option>
+      </select>
+      <button class="btn btn-primary" onclick="cargarBitacora()">Filtrar</button>
+    </div>
+
+    <table class="tabla-bitacora">
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Detalle</th></tr></thead>
+      <tbody id="tablaBitacora"></tbody>
+    </table>
+  </div>
+
+<script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+
+const nombresAccion = {
+  abrir_turno: 'Abrió turno', cerrar_turno: 'Cerró turno',
+  crear_empleado: 'Creó empleado', editar_empleado: 'Editó empleado', restablecer_password: 'Restableció contraseña',
+  actualizar_configuracion: 'Actualizó configuración',
+  procesar_devolucion: 'Procesó devolución',
+  cobrar_ticket: 'Cobró ticket'
+};
+
+async function cargarBitacora() {
+  try {
+    const modulo = document.getElementById('filtroModulo').value;
+    const url = modulo ? `/bitacora?modulo=${modulo}` : '/bitacora';
+    const registros = await apiFetch(url);
+
+    document.getElementById('tablaBitacora').innerHTML = registros.map(r => {
+      const valorNuevo = r.valor_nuevo ? JSON.stringify(r.valor_nuevo) : '';
+      const valorAnterior = r.valor_anterior ? `Antes: ${JSON.stringify(r.valor_anterior)}` : '';
+      return `
+        <tr>
+          <td>${new Date(r.fecha).toLocaleString()}</td>
+          <td>${r.usuario_nombre}</td>
+          <td><span class="tag-accion">${nombresAccion[r.accion] || r.accion}</span></td>
+          <td>${r.modulo}</td>
+          <td class="valor-json">${valorAnterior} ${valorNuevo}</td>
+        </tr>
+      `;
+    }).join('') || '<tr><td colspan="5">Sin registros</td></tr>';
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+cargarBitacora();
+</script>
+</body>
+</html>

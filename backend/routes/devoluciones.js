@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Historial de devoluciones
 router.get('/', verificarToken, async (req, res) => {
@@ -115,6 +116,14 @@ router.post('/', verificarToken, async (req, res) => {
     }
 
     await conexion.query('UPDATE devoluciones SET monto_total = $1 WHERE id = $2', [montoTotal, devolucion.id]);
+
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id,
+      accion: 'procesar_devolucion',
+      modulo: 'devoluciones',
+      referencia_id: devolucion.id,
+      valor_nuevo: { ticket_folio: ticket.folio, monto_total: montoTotal, metodo_reembolso, motivo }
+    });
 
     // Aplicar el reembolso según el método
     if (metodo_reembolso === 'efectivo') {

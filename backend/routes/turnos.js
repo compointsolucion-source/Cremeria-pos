@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Obtener turno abierto actual de la sucursal
 router.get('/actual', verificarToken, async (req, res) => {
@@ -34,6 +35,15 @@ router.post('/abrir', verificarToken, async (req, res) => {
       `INSERT INTO turnos (sucursal_id, usuario_id, fondo_inicial) VALUES ($1, $2, $3) RETURNING *`,
       [req.usuario.sucursal_id, req.usuario.id, fondo_inicial || 0]
     );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'abrir_turno',
+      modulo: 'turnos',
+      referencia_id: result.rows[0].id,
+      valor_nuevo: { fondo_inicial: fondo_inicial || 0 }
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -73,6 +83,15 @@ router.post('/:id/cerrar', verificarToken, async (req, res) => {
        WHERE id = $3 RETURNING *`,
       [saldoTeorico, saldo_contado, turnoId]
     );
+
+    const diferencia = saldo_contado - saldoTeorico;
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'cerrar_turno',
+      modulo: 'turnos',
+      referencia_id: parseInt(turnoId),
+      valor_nuevo: { saldo_teorico: saldoTeorico, saldo_contado, diferencia }
+    });
 
     res.json({
       ...result.rows[0],

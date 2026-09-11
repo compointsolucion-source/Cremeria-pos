@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Generar folio corto único: M<sucursal>-<timestamp base36>
 function generarFolio(sucursalId) {
@@ -239,6 +240,14 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
         }
       }
     }
+
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id,
+      accion: 'cobrar_ticket',
+      modulo: 'tickets',
+      referencia_id: ticketPagado.id,
+      valor_nuevo: { folio: ticketPagado.folio, total: ticketPagado.total, metodo_pago }
+    });
 
     await conexion.query('COMMIT');
 

@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 // Listar el equipo de la sucursal (nunca se devuelve el password_hash)
 router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
@@ -41,6 +42,15 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
        RETURNING id, nombre, usuario, rol, activo, creado_en`,
       [req.usuario.sucursal_id, nombre, usuario, passwordHash, rol]
     );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'crear_empleado',
+      modulo: 'usuarios',
+      referencia_id: result.rows[0].id,
+      valor_nuevo: { nombre, usuario, rol }
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -58,9 +68,10 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
     }
 
     // Nunca permitir que se edite/desactive al usuario dueño desde aquí
-    const objetivo = await pool.query('SELECT rol FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    const objetivo = await pool.query('SELECT rol, nombre, activo FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede modificar al usuario dueño desde aquí' });
+    const valorAnterior = objetivo.rows[0];
 
     const result = await pool.query(
       `UPDATE usuarios SET
@@ -71,6 +82,16 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
        RETURNING id, nombre, usuario, rol, activo`,
       [nombre, rol, activo, req.params.id, req.usuario.sucursal_id]
     );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'editar_empleado',
+      modulo: 'usuarios',
+      referencia_id: parseInt(req.params.id),
+      valor_anterior: valorAnterior,
+      valor_nuevo: { nombre: result.rows[0].nombre, rol: result.rows[0].rol, activo: result.rows[0].activo }
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -92,6 +113,15 @@ router.put('/:id/restablecer-password', verificarToken, requiereRol('dueno', 'ge
 
     const nuevoHash = await bcrypt.hash(password_nueva, 10);
     await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [nuevoHash, req.params.id]);
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'restablecer_password',
+      modulo: 'usuarios',
+      referencia_id: parseInt(req.params.id)
+      // Sin valor_anterior/valor_nuevo: nunca se registra información de contraseñas
+    });
+
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
