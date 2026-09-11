@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Corte de Caja - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
 <style>
   .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
   .saldo-actual { background: #2A2B2E; color: white; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 16px; }
@@ -156,7 +157,7 @@ async function cerrarTurno() {
       body: JSON.stringify({ saldo_contado: saldoContado })
     });
     const r = resultado.resumen;
-    mostrarToast(`Corte realizado.\nSaldo teórico: $${r.diferencia === 0 ? '' : ''}${resultado.saldo_teorico}\nDiferencia: $${r.diferencia.toFixed(2)}`, 'error');
+    mostrarToast(`Corte realizado. Saldo teórico: $${resultado.saldo_teorico} — Diferencia: $${r.diferencia.toFixed(2)}`, 'exito', 6000);
     cargarTurno();
   } catch (err) {
     mostrarToast(err.message, 'error');

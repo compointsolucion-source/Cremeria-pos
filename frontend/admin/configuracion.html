@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Configuración - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
 <style>
   .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
   .form-config { display: grid; gap: 10px; }
@@ -82,7 +83,7 @@ async function guardarConfiguracion() {
         terminos: document.getElementById('terminos').value.trim()
       })
     });
-    mostrarToast('Configuración guardada', 'error');
+    mostrarToast('Configuración guardada', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }

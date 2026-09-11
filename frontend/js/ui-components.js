@@ -50,6 +50,54 @@ function asegurarModalConfirmacion() {
   return overlay;
 }
 
+function asegurarModalInput() {
+  let overlay = document.getElementById('modalInputGlobal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modalInputGlobal';
+    overlay.className = 'modal-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="modal-confirm-caja">
+        <p id="modalInputMensaje"></p>
+        <input type="text" id="modalInputCampo" style="margin-bottom:14px;">
+        <div class="modal-confirm-botones">
+          <button class="btn btn-secondary" id="modalInputCancelar">Cancelar</button>
+          <button class="btn btn-primary" id="modalInputAceptar">Aceptar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+}
+
+// Reemplaza prompt(): devuelve una Promise<string|null>. Uso: const valor = await solicitarTexto('Mensaje', 'valor inicial');
+function solicitarTexto(mensaje, valorInicial = '') {
+  return new Promise((resolve) => {
+    const overlay = asegurarModalInput();
+    document.getElementById('modalInputMensaje').textContent = mensaje;
+    const campo = document.getElementById('modalInputCampo');
+    campo.value = valorInicial;
+    overlay.classList.add('abierto');
+    campo.focus();
+
+    const limpiar = (resultado) => {
+      overlay.classList.remove('abierto');
+      botonAceptar.removeEventListener('click', onAceptar);
+      botonCancelar.removeEventListener('click', onCancelar);
+      campo.removeEventListener('keyup', onEnter);
+      resolve(resultado);
+    };
+    const botonAceptar = document.getElementById('modalInputAceptar');
+    const botonCancelar = document.getElementById('modalInputCancelar');
+    const onAceptar = () => limpiar(campo.value);
+    const onCancelar = () => limpiar(null);
+    const onEnter = (e) => { if (e.key === 'Enter') limpiar(campo.value); };
+    botonAceptar.addEventListener('click', onAceptar);
+    botonCancelar.addEventListener('click', onCancelar);
+    campo.addEventListener('keyup', onEnter);
+  });
+}
 // Reemplaza confirm(): devuelve una Promise<boolean>. Uso: if (await confirmarAccion('¿Seguro?')) { ... }
 function confirmarAccion(mensaje) {
   return new Promise((resolve) => {

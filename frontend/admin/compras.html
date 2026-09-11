@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compras y Proveedores - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
 <style>
   .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -159,7 +160,7 @@ async function guardarCompra() {
 
   try {
     await apiFetch('/compras', { method: 'POST', body: JSON.stringify({ proveedor_id, items }) });
-    mostrarToast('Compra registrada. Inventario y precios actualizados.', 'error');
+    mostrarToast('Compra registrada. Inventario y precios actualizados.', 'exito');
     document.getElementById('itemsCompra').innerHTML = '';
     document.getElementById('totalCompra').textContent = '0.00';
   } catch (err) {

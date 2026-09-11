@@ -59,6 +59,39 @@ input, select {
   width: 100%;
 }
 
+[data-tema="oscuro"] {
+  --primary: #4CAF50;
+  --primary-dark: #388E3C;
+  --secondary: #3A3B3E;
+  --background: #1B1C1E;
+  --surface: #2A2B2E;
+  --text: #F0F0F0;
+  --muted: #A0A3A8;
+  --border: #45474A;
+}
+[data-tema="oscuro"] body { background: var(--background); color: var(--text); }
+[data-tema="oscuro"] .card { background: var(--surface); }
+[data-tema="oscuro"] input, [data-tema="oscuro"] select, [data-tema="oscuro"] textarea {
+  background: var(--surface); color: var(--text); border-color: var(--border);
+}
+[data-tema="oscuro"] .btn-secondary { background: var(--secondary); color: var(--text); }
+[data-tema="oscuro"] table, [data-tema="oscuro"] th, [data-tema="oscuro"] td { background: var(--surface); color: var(--text); border-color: var(--border); }
+
+.boton-tema-flotante {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 999;
+}
+
 /* ===== Toast (notificaciones) ===== */
 .toast-container {
   position: fixed;

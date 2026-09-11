@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Equipo - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
 <style>
   .contenido { max-width: 700px; margin: 20px auto; padding: 0 14px; }
   .form-empleado { display: grid; gap: 10px; margin-bottom: 20px; }
@@ -108,7 +109,7 @@ async function toggleActivo(id, nuevoEstado) {
 }
 
 async function cambiarRol(id) {
-  const nuevoRol = prompt('Nuevo rol (mostrador, cajero o gerente):');
+  const nuevoRol = await solicitarTexto('Nuevo rol (mostrador, cajero o gerente):');
   if (!nuevoRol) return;
   try {
     await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ rol: nuevoRol.trim() }) });
@@ -119,11 +120,11 @@ async function cambiarRol(id) {
 }
 
 async function restablecerPassword(id) {
-  const nueva = prompt('Nueva contraseña para este empleado (mínimo 6 caracteres):');
+  const nueva = await solicitarTexto('Nueva contraseña para este empleado (mínimo 6 caracteres):');
   if (!nueva) return;
   try {
     await apiFetch(`/usuarios/${id}/restablecer-password`, { method: 'PUT', body: JSON.stringify({ password_nueva: nueva }) });
-    mostrarToast('Contraseña restablecida', 'error');
+    mostrarToast('Contraseña restablecida', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }

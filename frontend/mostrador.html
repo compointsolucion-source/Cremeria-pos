@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mostrador - Cremería POS</title>
 <link rel="stylesheet" href="css/app-theme.css">
+<script src="js/tema.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
@@ -467,6 +468,30 @@ async function imprimirTicket(ticket) {
 
 cargarConfiguracionNegocio();
 setTimeout(actualizarBannerImpresora, 500);
+
+// Atajos de teclado: F2 escanear, F3 nueva venta (vaciar carrito), F4 generar
+// ticket, ESC cerrar modal abierto. F1 (buscar) y DELETE no aplican todavía
+// porque el Mostrador no tiene un buscador de texto ni un ítem "seleccionado"
+// en el carrito — se documentan como pendientes, no se simulan.
+document.addEventListener('keydown', async (e) => {
+  const enCampoDeTexto = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+
+  if (e.key === 'Escape') {
+    cerrarModal('modalPeso');
+    cerrarModal('modalUnidad');
+    return;
+  }
+  if (enCampoDeTexto) return; // no interferir con lo que el usuario esté escribiendo
+
+  if (e.key === 'F2') { e.preventDefault(); toggleScannerProducto(); }
+  else if (e.key === 'F3') {
+    e.preventDefault();
+    if (carrito.length === 0) return;
+    const confirmado = await confirmarAccion('¿Vaciar el ticket actual y empezar una venta nueva?');
+    if (confirmado) { carrito = []; renderCarrito(); }
+  }
+  else if (e.key === 'F4') { e.preventDefault(); generarTicket(); }
+});
 
 cargarDatos();
 </script>
