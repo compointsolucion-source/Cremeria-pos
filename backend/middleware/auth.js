@@ -6,7 +6,7 @@ function verificarToken(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Token requerido' });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
-    if (err) return res.status(403).json({ error: 'Token inválido o expirado' });
+    if (err) return res.status(401).json({ error: 'Token inválido o expirado' });
     req.usuario = usuario;
     next();
   });
