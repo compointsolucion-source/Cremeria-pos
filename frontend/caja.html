@@ -41,7 +41,7 @@
   </div>
 
   <div id="bannerImpresoraCaja" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
-    🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraCaja(); return false;" style="color:#7A5B00; font-weight:700;">Conectar ahora</a>
+    🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraCaja(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraCajaUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
   </div>
 
   <div class="layout">
@@ -411,6 +411,15 @@ function actualizarBannerImpresoraCaja() {
 async function conectarImpresoraCaja() {
   try {
     await conectarImpresora();
+    actualizarBannerImpresoraCaja();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function conectarImpresoraCajaUSB() {
+  try {
+    await conectarImpresoraUSB();
     actualizarBannerImpresoraCaja();
   } catch (err) {
     mostrarToast(err.message, 'error');

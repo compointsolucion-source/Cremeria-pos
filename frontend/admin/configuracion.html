@@ -25,6 +25,7 @@
       <h3>Impresora Térmica</h3>
       <div class="estado-impresora desconectada" id="estadoImpresora">Sin conectar en este dispositivo</div>
       <button class="btn btn-primary" onclick="conectar()">🔵 Conectar Impresora Bluetooth</button>
+      <button class="btn btn-secondary" onclick="conectarUSB()" style="margin-top:8px;">🔌 Conectar Impresora USB</button>
       <p style="font-size:13px; color:#888;">Debes conectarla una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
     </div>
 
@@ -52,6 +53,16 @@ requiereLogin();
 async function conectar() {
   try {
     const nombre = await conectarImpresora();
+    document.getElementById('estadoImpresora').className = 'estado-impresora conectada';
+    document.getElementById('estadoImpresora').textContent = `Conectada: ${nombre}`;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function conectarUSB() {
+  try {
+    const nombre = await conectarImpresoraUSB();
     document.getElementById('estadoImpresora').className = 'estado-impresora conectada';
     document.getElementById('estadoImpresora').textContent = `Conectada: ${nombre}`;
   } catch (err) {
