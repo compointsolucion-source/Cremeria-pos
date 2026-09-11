@@ -49,6 +49,7 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
 
@@ -74,7 +75,7 @@ async function cargarEquipo() {
       </div>
     `).join('');
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -84,7 +85,7 @@ async function crearEmpleado() {
   const password = document.getElementById('passwordEmpleado').value;
   const rol = document.getElementById('rolEmpleado').value;
 
-  if (!nombre || !usuario || !password) { alert('Completa todos los campos'); return; }
+  if (!nombre || !usuario || !password) { mostrarToast('Completa todos los campos', 'error'); return; }
 
   try {
     await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify({ nombre, usuario, password, rol }) });
@@ -93,7 +94,7 @@ async function crearEmpleado() {
     document.getElementById('passwordEmpleado').value = '';
     cargarEquipo();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -102,7 +103,7 @@ async function toggleActivo(id, nuevoEstado) {
     await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ activo: nuevoEstado }) });
     cargarEquipo();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -113,7 +114,7 @@ async function cambiarRol(id) {
     await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ rol: nuevoRol.trim() }) });
     cargarEquipo();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -122,9 +123,9 @@ async function restablecerPassword(id) {
   if (!nueva) return;
   try {
     await apiFetch(`/usuarios/${id}/restablecer-password`, { method: 'PUT', body: JSON.stringify({ password_nueva: nueva }) });
-    alert('Contraseña restablecida');
+    mostrarToast('Contraseña restablecida', 'error');
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 

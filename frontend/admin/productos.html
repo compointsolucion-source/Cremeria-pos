@@ -57,19 +57,21 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/imagen-utils.js"></script>
 <script>
 requiereLogin();
 let imagenBase64 = '';
 
-document.getElementById('imagenInput').addEventListener('change', (e) => {
+document.getElementById('imagenInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    imagenBase64 = ev.target.result;
+  try {
+    imagenBase64 = await comprimirImagen(file);
     document.getElementById('previewImg').src = imagenBase64;
-  };
-  reader.readAsDataURL(file);
+  } catch (err) {
+    mostrarToast('No se pudo procesar la imagen: ' + err.message, 'error');
+  }
 });
 
 async function cargarCategorias() {
@@ -113,7 +115,7 @@ async function guardarProducto() {
   const tipo_venta = document.getElementById('tipoVenta').value;
   const codigo_barras = document.getElementById('codigoBarras').value.trim() || null;
 
-  if (!nombre || precio <= 0) { alert('Nombre y precio son obligatorios'); return; }
+  if (!nombre || precio <= 0) { mostrarToast('Nombre y precio son obligatorios', 'error'); return; }
 
   try {
     await apiFetch('/productos', {
@@ -127,12 +129,12 @@ async function guardarProducto() {
     imagenBase64 = '';
     cargarProductos();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
 async function eliminarProducto(id) {
-  if (!confirm('¿Eliminar este producto?')) return;
+  if (!(await confirmarAccion('¿Eliminar este producto?'))) return;
   await apiFetch(`/productos/${id}`, { method: 'DELETE' });
   cargarProductos();
 }

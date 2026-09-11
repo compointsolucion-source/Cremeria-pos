@@ -65,6 +65,7 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
 let turnoActual = null;
@@ -84,7 +85,7 @@ async function cargarTurno() {
       cargarMovimientos();
     }
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -94,7 +95,7 @@ async function abrirTurno() {
     await apiFetch('/turnos/abrir', { method: 'POST', body: JSON.stringify({ fondo_inicial: fondo }) });
     cargarTurno();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -107,7 +108,7 @@ function cambiarTab(tipo) {
 async function registrarMovimiento() {
   const monto = parseFloat(document.getElementById('montoMovimiento').value || 0);
   const concepto = document.getElementById('conceptoMovimiento').value.trim();
-  if (monto <= 0) { alert('Ingresa un monto válido'); return; }
+  if (monto <= 0) { mostrarToast('Ingresa un monto válido', 'error'); return; }
 
   try {
     await apiFetch('/movimientos', {
@@ -118,7 +119,7 @@ async function registrarMovimiento() {
     document.getElementById('conceptoMovimiento').value = '';
     cargarMovimientos();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -147,7 +148,7 @@ function mostrarCierre() {
 
 async function cerrarTurno() {
   const saldoContado = parseFloat(document.getElementById('saldoContado').value || 0);
-  if (!confirm('¿Confirmas el cierre de turno? Esta acción no se puede deshacer.')) return;
+  if (!(await confirmarAccion('¿Confirmas el cierre de turno? Esta acción no se puede deshacer.'))) return;
 
   try {
     const resultado = await apiFetch(`/turnos/${turnoActual.id}/cerrar`, {
@@ -155,10 +156,10 @@ async function cerrarTurno() {
       body: JSON.stringify({ saldo_contado: saldoContado })
     });
     const r = resultado.resumen;
-    alert(`Corte realizado.\nSaldo teórico: $${r.diferencia === 0 ? '' : ''}${resultado.saldo_teorico}\nDiferencia: $${r.diferencia.toFixed(2)}`);
+    mostrarToast(`Corte realizado.\nSaldo teórico: $${r.diferencia === 0 ? '' : ''}${resultado.saldo_teorico}\nDiferencia: $${r.diferencia.toFixed(2)}`, 'error');
     cargarTurno();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 

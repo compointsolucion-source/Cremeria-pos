@@ -44,6 +44,7 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
 
@@ -75,7 +76,7 @@ async function actualizarMinimo(producto_id, valor) {
     await apiFetch(`/inventario/${producto_id}/minimo`, { method: 'PUT', body: JSON.stringify({ stock_minimo: parseFloat(valor || 0) }) });
     cargarInventario();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -85,7 +86,7 @@ async function registrarAjuste() {
   const cantidad = parseFloat(document.getElementById('cantidadAjuste').value || 0);
   const motivo = document.getElementById('motivoAjuste').value.trim();
 
-  if (!producto_id || cantidad <= 0) { alert('Selecciona un producto y una cantidad válida'); return; }
+  if (!producto_id || cantidad <= 0) { mostrarToast('Selecciona un producto y una cantidad válida', 'error'); return; }
 
   try {
     await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo, motivo }) });
@@ -93,7 +94,7 @@ async function registrarAjuste() {
     document.getElementById('motivoAjuste').value = '';
     cargarInventario();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 

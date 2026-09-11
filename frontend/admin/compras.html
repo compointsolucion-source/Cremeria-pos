@@ -66,6 +66,7 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
 let productosDisponibles = [];
@@ -96,7 +97,7 @@ async function guardarProveedor() {
   const nombre = document.getElementById('nombreProveedor').value.trim();
   const contacto = document.getElementById('contactoProveedor').value.trim();
   const telefono = document.getElementById('telefonoProveedor').value.trim();
-  if (!nombre) { alert('El nombre es obligatorio'); return; }
+  if (!nombre) { mostrarToast('El nombre es obligatorio', 'error'); return; }
 
   try {
     await apiFetch('/proveedores', { method: 'POST', body: JSON.stringify({ nombre, contacto, telefono }) });
@@ -105,7 +106,7 @@ async function guardarProveedor() {
     document.getElementById('telefonoProveedor').value = '';
     cargarProveedores();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
@@ -141,7 +142,7 @@ function calcularTotalCompra() {
 
 async function guardarCompra() {
   const proveedor_id = document.getElementById('proveedorCompra').value;
-  if (!proveedor_id) { alert('Selecciona un proveedor'); return; }
+  if (!proveedor_id) { mostrarToast('Selecciona un proveedor', 'error'); return; }
 
   const items = [];
   document.querySelectorAll('#itemsCompra .item-compra').forEach(fila => {
@@ -154,15 +155,15 @@ async function guardarCompra() {
     }
   });
 
-  if (items.length === 0) { alert('Agrega al menos un producto válido'); return; }
+  if (items.length === 0) { mostrarToast('Agrega al menos un producto válido', 'error'); return; }
 
   try {
     await apiFetch('/compras', { method: 'POST', body: JSON.stringify({ proveedor_id, items }) });
-    alert('Compra registrada. Inventario y precios actualizados.');
+    mostrarToast('Compra registrada. Inventario y precios actualizados.', 'error');
     document.getElementById('itemsCompra').innerHTML = '';
     document.getElementById('totalCompra').textContent = '0.00';
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 

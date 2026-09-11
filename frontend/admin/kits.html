@@ -47,20 +47,22 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/imagen-utils.js"></script>
 <script>
 requiereLogin();
 let productosDisponibles = [];
 let imagenKitBase64 = '';
 
-document.getElementById('imagenInputKit').addEventListener('change', (e) => {
+document.getElementById('imagenInputKit').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    imagenKitBase64 = ev.target.result;
+  try {
+    imagenKitBase64 = await comprimirImagen(file);
     document.getElementById('previewImgKit').src = imagenKitBase64;
-  };
-  reader.readAsDataURL(file);
+  } catch (err) {
+    mostrarToast('No se pudo procesar la imagen: ' + err.message, 'error');
+  }
 });
 
 async function cargarProductosDisponibles() {
@@ -109,13 +111,13 @@ async function guardarKit() {
   const precio_kit = parseFloat(document.getElementById('precioKit').value || 0);
   const codigo_barras = document.getElementById('codigoBarrasKit').value.trim() || null;
 
-  if (!nombre || precio_kit <= 0) { alert('Nombre y precio son obligatorios'); return; }
+  if (!nombre || precio_kit <= 0) { mostrarToast('Nombre y precio son obligatorios', 'error'); return; }
 
   const productosSeleccionados = productosDisponibles
     .filter(p => document.getElementById(`chk_${p.id}`).checked)
     .map(p => ({ producto_id: p.id, cantidad: parseFloat(document.getElementById(`cant_${p.id}`).value || 1) }));
 
-  if (productosSeleccionados.length === 0) { alert('Selecciona al menos un producto para el kit'); return; }
+  if (productosSeleccionados.length === 0) { mostrarToast('Selecciona al menos un producto para el kit', 'error'); return; }
 
   try {
     await apiFetch('/kits', {
@@ -130,12 +132,12 @@ async function guardarKit() {
     cargarProductosDisponibles();
     cargarKits();
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
 async function eliminarKit(id) {
-  if (!confirm('¿Eliminar este kit?')) return;
+  if (!(await confirmarAccion('¿Eliminar este kit?'))) return;
   await apiFetch(`/kits/${id}`, { method: 'DELETE' });
   cargarKits();
 }

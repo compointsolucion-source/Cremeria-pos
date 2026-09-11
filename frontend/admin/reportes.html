@@ -58,6 +58,7 @@
   </div>
 
 <script src="../js/api.js"></script>
+<script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
 
@@ -92,7 +93,7 @@ async function cargarReporte() {
     const data = await apiFetch(url);
     renderResumen(data);
   } catch (err) {
-    alert(err.message);
+    mostrarToast(err.message, 'error');
   }
 }
 
