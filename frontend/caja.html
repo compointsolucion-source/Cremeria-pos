@@ -35,6 +35,10 @@
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
+  <div id="bannerImpresoraCaja" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
+    🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraCaja(); return false;" style="color:#7A5B00; font-weight:700;">Conectar ahora</a>
+  </div>
+
   <div class="layout">
     <div class="panel-bandeja">
       <h3>Tickets pendientes</h3>
@@ -49,6 +53,7 @@
   </div>
 
 <script src="js/api.js"></script>
+<script src="js/impresora-termica.js"></script>
 <script>
 requiereLogin();
 const usuario = getUsuario();
@@ -242,7 +247,7 @@ async function cobrar() {
       })
     });
 
-    alert('Pago procesado. Imprimiendo comprobante...');
+    await imprimirComprobante(ticketActual, metodoPago);
     ticketActual = null;
     clienteSeleccionado = null;
     document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
@@ -251,6 +256,58 @@ async function cobrar() {
     alert('Error al cobrar: ' + err.message);
   }
 }
+
+let configuracionNegocioCaja = null;
+async function cargarConfiguracionNegocioCaja() {
+  try {
+    configuracionNegocioCaja = await apiFetch('/configuracion');
+  } catch (err) {
+    configuracionNegocioCaja = { ancho_ticket: '80mm' };
+  }
+}
+
+async function imprimirComprobante(ticket, metodoPagoUsado) {
+  const datosTicket = {
+    ancho_ticket: (configuracionNegocioCaja && configuracionNegocioCaja.ancho_ticket) || '80mm',
+    negocio: {
+      nombre: 'Compoint Punto de Soluciones',
+      direccion: configuracionNegocioCaja ? configuracionNegocioCaja.direccion : '',
+      telefono: configuracionNegocioCaja ? configuracionNegocioCaja.telefono : ''
+    },
+    folio: ticket.folio,
+    fecha: new Date().toLocaleString(),
+    items: ticket.items.map(i => ({
+      nombre_producto: i.nombre_producto,
+      detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+      subtotal: parseFloat(i.subtotal).toFixed(2)
+    })),
+    total: parseFloat(ticket.total).toFixed(2),
+    piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`
+  };
+
+  try {
+    await imprimirTicketBLE(datosTicket);
+  } catch (err) {
+    actualizarBannerImpresoraCaja();
+    const usarRespaldo = confirm(`Pago procesado correctamente, pero no se pudo imprimir automáticamente (${err.message}).\n\n¿Compartir el comprobante como texto mientras tanto?`);
+    if (usarRespaldo) await compartirTicketComoTexto(datosTicket);
+  }
+}
+
+cargarConfiguracionNegocioCaja();
+
+function actualizarBannerImpresoraCaja() {
+  document.getElementById('bannerImpresoraCaja').style.display = impresoraConectada() ? 'none' : 'block';
+}
+async function conectarImpresoraCaja() {
+  try {
+    await conectarImpresora();
+    actualizarBannerImpresoraCaja();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+setTimeout(actualizarBannerImpresoraCaja, 500);
 
 function toggleScanner() {
   if (scannerActivo) {

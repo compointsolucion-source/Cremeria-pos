@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configuración - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<style>
+  .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
+  .form-config { display: grid; gap: 10px; }
+  .estado-impresora { padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
+  .conectada { background: #E8F5E9; color: #2E7D32; }
+  .desconectada { background: #FFEBEE; color: #C62828; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>⚙️ Configuración</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-config" style="margin-bottom:16px;">
+      <h3>Impresora Térmica</h3>
+      <div class="estado-impresora desconectada" id="estadoImpresora">Sin conectar en este dispositivo</div>
+      <button class="btn btn-primary" onclick="conectar()">🔵 Conectar Impresora Bluetooth</button>
+      <p style="font-size:13px; color:#888;">Debes conectarla una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
+    </div>
+
+    <div class="card form-config">
+      <h3>Datos del negocio (aparecen en el ticket)</h3>
+      <input type="text" id="direccion" placeholder="Dirección">
+      <input type="text" id="telefono" placeholder="Teléfono">
+      <input type="text" id="rfc" placeholder="RFC (opcional)">
+      <select id="anchoTicket">
+        <option value="80mm">Papel de 80mm</option>
+        <option value="58mm">Papel de 58mm</option>
+      </select>
+      <textarea id="terminos" placeholder="Texto al pie del ticket (ej. políticas de devolución)" rows="3" style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
+      <button class="btn btn-primary" onclick="guardarConfiguracion()">Guardar Configuración</button>
+    </div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script src="../js/impresora-termica.js"></script>
+<script>
+requiereLogin();
+
+async function conectar() {
+  try {
+    const nombre = await conectarImpresora();
+    document.getElementById('estadoImpresora').className = 'estado-impresora conectada';
+    document.getElementById('estadoImpresora').textContent = `Conectada: ${nombre}`;
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function cargarConfiguracion() {
+  try {
+    const config = await apiFetch('/configuracion');
+    document.getElementById('direccion').value = config.direccion || '';
+    document.getElementById('telefono').value = config.telefono || '';
+    document.getElementById('rfc').value = config.rfc || '';
+    document.getElementById('anchoTicket').value = config.ancho_ticket || '80mm';
+    document.getElementById('terminos').value = config.terminos || '';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function guardarConfiguracion() {
+  try {
+    await apiFetch('/configuracion', {
+      method: 'PUT',
+      body: JSON.stringify({
+        direccion: document.getElementById('direccion').value.trim(),
+        telefono: document.getElementById('telefono').value.trim(),
+        rfc: document.getElementById('rfc').value.trim(),
+        ancho_ticket: document.getElementById('anchoTicket').value,
+        terminos: document.getElementById('terminos').value.trim()
+      })
+    });
+    alert('Configuración guardada');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+cargarConfiguracion();
+</script>
+</body>
+</html>

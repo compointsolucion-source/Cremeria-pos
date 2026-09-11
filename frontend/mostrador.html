@@ -74,6 +74,10 @@
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
+  <div id="bannerImpresora" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
+    🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraMostrador(); return false;" style="color:#7A5B00; font-weight:700;">Conectar ahora</a>
+  </div>
+
   <div class="layout">
     <div class="panel-productos">
       <button class="btn btn-secondary" style="margin-bottom:10px;" onclick="toggleScannerProducto()">📷 Escanear código de barras</button>
@@ -136,6 +140,7 @@
   </div>
 
 <script src="js/api.js"></script>
+<script src="js/impresora-termica.js"></script>
 <script>
 requiereLogin();
 
@@ -387,6 +392,29 @@ function quitarItem(idx) {
   renderCarrito();
 }
 
+let configuracionNegocio = null;
+
+async function cargarConfiguracionNegocio() {
+  try {
+    configuracionNegocio = await apiFetch('/configuracion');
+  } catch (err) {
+    configuracionNegocio = { ancho_ticket: '80mm' };
+  }
+}
+
+function actualizarBannerImpresora() {
+  document.getElementById('bannerImpresora').style.display = impresoraConectada() ? 'none' : 'block';
+}
+
+async function conectarImpresoraMostrador() {
+  try {
+    await conectarImpresora();
+    actualizarBannerImpresora();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
 async function generarTicket() {
   if (carrito.length === 0) { alert('Agrega al menos un producto'); return; }
 
@@ -396,7 +424,7 @@ async function generarTicket() {
       body: JSON.stringify({ items: carrito })
     });
 
-    imprimirTicket(ticket);
+    await imprimirTicket(ticket);
     carrito = [];
     renderCarrito();
   } catch (err) {
@@ -404,9 +432,36 @@ async function generarTicket() {
   }
 }
 
-function imprimirTicket(ticket) {
-  alert(`Ticket generado: ${ticket.folio}\nTotal: $${ticket.total}\n\n(Aquí se conecta la impresión térmica)`);
+async function imprimirTicket(ticket) {
+  const datosTicket = {
+    ancho_ticket: (configuracionNegocio && configuracionNegocio.ancho_ticket) || '80mm',
+    negocio: {
+      nombre: 'Compoint Punto de Soluciones',
+      direccion: configuracionNegocio ? configuracionNegocio.direccion : '',
+      telefono: configuracionNegocio ? configuracionNegocio.telefono : ''
+    },
+    folio: ticket.folio,
+    fecha: new Date().toLocaleString(),
+    items: ticket.items.map(i => ({
+      nombre_producto: i.nombre_producto,
+      detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+      subtotal: parseFloat(i.subtotal).toFixed(2)
+    })),
+    total: parseFloat(ticket.total).toFixed(2),
+    piePagina: 'Presenta este ticket en caja para pagar'
+  };
+
+  try {
+    await imprimirTicketBLE(datosTicket);
+  } catch (err) {
+    actualizarBannerImpresora();
+    const usarRespaldo = confirm(`No se pudo imprimir automáticamente (${err.message}).\n\nTicket generado: ${ticket.folio} — Total: $${ticket.total}\n\n¿Quieres compartir el ticket como texto (WhatsApp, etc.) mientras se resuelve la impresora?`);
+    if (usarRespaldo) await compartirTicketComoTexto(datosTicket);
+  }
 }
+
+cargarConfiguracionNegocio();
+setTimeout(actualizarBannerImpresora, 500);
 
 cargarDatos();
 </script>
