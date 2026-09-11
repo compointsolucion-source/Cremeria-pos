@@ -69,10 +69,40 @@ router.get('/codigo/:codigo', verificarToken, async (req, res) => {
   }
 });
 
+// Busca un código de barras en Open Food Facts (base de datos pública y
+// gratuita) para autocompletar nombre e imagen de un producto que NUNCA
+// se ha dado de alta — típicamente refrescos, botanas y productos empacados
+// con marca. No tiene nada que ver con TU catálogo; es solo para no escribir
+// a mano productos comerciales conocidos. Si no lo encuentra, no es un error:
+// simplemente no hay datos que autocompletar.
+router.get('/buscar-externo/:codigo', verificarToken, async (req, res) => {
+  try {
+    const respuesta = await fetch(`https://world.openfoodfacts.org/api/v2/product/${req.params.codigo}.json`);
+    const datos = await respuesta.json();
+
+    if (datos.status !== 1 || !datos.product) {
+      return res.status(404).json({ error: 'No se encontró este código en la base de datos pública' });
+    }
+
+    res.json({
+      nombre: datos.product.product_name || datos.product.product_name_es || null,
+      imagen_url: datos.product.image_url || datos.product.image_front_url || null
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: 'No se pudo consultar la base de datos externa en este momento' });
+  }
+});
+
 // Crear producto (solo dueño/gerente)
 router.post('/', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
   try {
-    const { nombre, precio, categoria_id, imagen_url, favorito, orden, codigo_barras, tipo_venta } = req.body;
+    const {
+      nombre, precio, categoria_id, imagen_url, favorito, orden, codigo_barras, tipo_venta,
+      precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario,
+      existencia_inicial, stock_minimo, stock_maximo
+    } = req.body;
     if (!nombre || !precio) {
       return res.status(400).json({ error: 'Nombre y precio son requeridos' });
     }
@@ -80,34 +110,61 @@ router.post('/', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req,
       return res.status(400).json({ error: 'Tipo de venta inválido' });
     }
 
-    const result = await pool.query(
-      `INSERT INTO productos (sucursal_id, categoria_id, nombre, precio, imagen_url, favorito, orden, codigo_barras, tipo_venta)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [req.usuario.sucursal_id, categoria_id || null, nombre, precio, imagen_url || null, favorito || false, orden || 0, codigo_barras || null, tipo_venta || 'peso']
-    );
+    await conexion.query('BEGIN');
 
-    await registrarBitacora(pool, {
+    const result = await conexion.query(
+      `INSERT INTO productos (
+         sucursal_id, categoria_id, nombre, precio, imagen_url, favorito, orden, codigo_barras, tipo_venta,
+         precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [
+        req.usuario.sucursal_id, categoria_id || null, nombre, precio, imagen_url || null, favorito || false,
+        orden || 0, codigo_barras || null, tipo_venta || 'peso',
+        precio_costo || null, ganancia_porcentaje || null, precio_mayoreo || null, usa_inventario !== false
+      ]
+    );
+    const producto = result.rows[0];
+
+    // Si se especificó una existencia inicial (o mínimo/máximo), crea el
+    // registro de inventario de una vez — así no hay que ir a otra pantalla.
+    if (usa_inventario !== false && (existencia_inicial !== undefined || stock_minimo !== undefined || stock_maximo !== undefined)) {
+      await conexion.query(
+        `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
+         VALUES ($1, $2, $3, $4)`,
+        [producto.id, existencia_inicial || 0, stock_minimo || 0, stock_maximo || null]
+      );
+    }
+
+    await registrarBitacora(conexion, {
       usuario_id: req.usuario.id,
       accion: 'crear_producto',
       modulo: 'productos',
-      referencia_id: result.rows[0].id,
+      referencia_id: producto.id,
       valor_nuevo: { nombre, precio, tipo_venta: tipo_venta || 'peso' }
     });
 
-    res.json(result.rows[0]);
+    await conexion.query('COMMIT');
+    res.json(producto);
   } catch (err) {
+    await conexion.query('ROLLBACK');
     console.error(err);
     if (err.code === '23505') return res.status(400).json({ error: 'Ese código de barras ya está en uso' });
     res.status(500).json({ error: 'Error al crear producto' });
+  } finally {
+    conexion.release();
   }
 });
 
 // Editar producto
 router.put('/:id', verificarToken, async (req, res) => {
   try {
-    const { nombre, precio, categoria_id, imagen_url, favorito, orden, activo, codigo_barras, tipo_venta } = req.body;
+    const {
+      nombre, precio, categoria_id, imagen_url, favorito, orden, activo, codigo_barras, tipo_venta,
+      precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario
+    } = req.body;
 
-    const camposDistintosDePrecio = [nombre, categoria_id, imagen_url, favorito, orden, activo, codigo_barras, tipo_venta]
+    const camposDistintosDePrecio = [nombre, categoria_id, imagen_url, favorito, orden, activo, codigo_barras, tipo_venta, precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario]
       .some(campo => campo !== undefined);
 
     if (camposDistintosDePrecio && !tienePermiso(req.usuario, 'PRODUCTOS_EDITAR')) {
@@ -127,9 +184,14 @@ router.put('/:id', verificarToken, async (req, res) => {
         orden = COALESCE($6, orden),
         activo = COALESCE($7, activo),
         codigo_barras = $8,
-        tipo_venta = COALESCE($9, tipo_venta)
-       WHERE id = $10 AND sucursal_id = $11 RETURNING *`,
-      [nombre, precio, categoria_id, imagen_url, favorito, orden, activo, codigo_barras || null, tipo_venta, req.params.id, req.usuario.sucursal_id]
+        tipo_venta = COALESCE($9, tipo_venta),
+        precio_costo = COALESCE($10, precio_costo),
+        ganancia_porcentaje = COALESCE($11, ganancia_porcentaje),
+        precio_mayoreo = COALESCE($12, precio_mayoreo),
+        usa_inventario = COALESCE($13, usa_inventario)
+       WHERE id = $14 AND sucursal_id = $15 RETURNING *`,
+      [nombre, precio, categoria_id, imagen_url, favorito, orden, activo, codigo_barras || null, tipo_venta,
+       precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario, req.params.id, req.usuario.sucursal_id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json(result.rows[0]);

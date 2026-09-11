@@ -89,11 +89,13 @@ router.get('/alertas', verificarToken, async (req, res) => {
 // Configurar el stock mínimo de un producto
 router.put('/:producto_id/minimo', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
   try {
-    const { stock_minimo } = req.body;
+    const { stock_minimo, stock_maximo } = req.body;
     await pool.query(
-      `INSERT INTO inventario (producto_id, stock_minimo) VALUES ($1, $2)
-       ON CONFLICT (producto_id) DO UPDATE SET stock_minimo = $2`,
-      [req.params.producto_id, stock_minimo]
+      `INSERT INTO inventario (producto_id, stock_minimo, stock_maximo) VALUES ($1, $2, $3)
+       ON CONFLICT (producto_id) DO UPDATE SET
+         stock_minimo = COALESCE($2, inventario.stock_minimo),
+         stock_maximo = COALESCE($3, inventario.stock_maximo)`,
+      [req.params.producto_id, stock_minimo, stock_maximo !== undefined ? stock_maximo : null]
     );
     res.json({ ok: true });
   } catch (err) {

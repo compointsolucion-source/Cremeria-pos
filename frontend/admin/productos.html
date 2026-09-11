@@ -15,9 +15,14 @@
   .preview-img { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; background: #EEE; }
   .fila-doble { display: flex; gap: 10px; }
   .fila-doble > * { flex: 1; }
+  .fila-triple { display: flex; gap: 10px; }
+  .fila-triple > * { flex: 1; }
   .tipo-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; color: white; }
   .tag-peso { background: #1565C0; }
   .tag-unidad { background: #6A1B9A; }
+  .seccion-titulo { font-weight: 700; font-size: 14px; margin-top: 10px; color: #555; }
+  .buscando-externo { font-size: 12px; color: #888; }
+  .btn-cargar-mas { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -29,24 +34,41 @@
   <div class="contenido">
     <div class="card form-producto">
       <h3>Nuevo producto</h3>
-      <input type="text" id="nombre" placeholder="Nombre del producto">
 
-      <div class="fila-doble">
+      <input type="text" id="codigoBarras" placeholder="Código de barras (escanéalo o escríbelo)" onblur="buscarCodigoExterno()">
+      <div id="estadoBusquedaExterna" class="buscando-externo"></div>
+
+      <input type="text" id="nombre" placeholder="Descripción / Nombre del producto">
+
+      <div class="fila-triple">
         <select id="tipoVenta">
-          <option value="peso">Venta a granel (por kg)</option>
-          <option value="unidad">Venta por pieza (unidad)</option>
+          <option value="peso">A granel (usa decimales, por kg)</option>
+          <option value="unidad">Por unidad / pieza</option>
         </select>
-        <input type="number" id="precio" placeholder="Precio ($)" step="0.01">
+        <select id="categoriaId"><option value="">Sin departamento</option></select>
       </div>
 
-      <input type="text" id="codigoBarras" placeholder="Código de barras (opcional, escanéalo o escríbelo)">
-      <select id="categoriaId"><option value="">Sin categoría</option></select>
+      <div class="seccion-titulo">Precios</div>
+      <div class="fila-triple">
+        <input type="number" id="precioCosto" placeholder="Precio costo" step="0.01" oninput="calcularPrecioVenta()">
+        <input type="number" id="gananciaPorcentaje" placeholder="Ganancia %" step="0.01" oninput="calcularPrecioVenta()">
+        <input type="number" id="precio" placeholder="Precio de venta *" step="0.01">
+      </div>
+      <input type="number" id="precioMayoreo" placeholder="Precio mayoreo (opcional)" step="0.01">
+
+      <div class="seccion-titulo">Inventario</div>
+      <label><input type="checkbox" id="usaInventario" checked onchange="toggleCamposInventario()"> Este producto SÍ utiliza inventario</label>
+      <div class="fila-triple" id="camposInventario">
+        <input type="number" id="existenciaInicial" placeholder="Hay (existencia inicial)" step="0.01">
+        <input type="number" id="stockMinimo" placeholder="Mínimo" step="0.01">
+        <input type="number" id="stockMaximo" placeholder="Máximo" step="0.01">
+      </div>
 
       <div style="display:flex; align-items:center; gap:12px;">
         <img id="previewImg" class="preview-img" src="">
         <input type="file" id="imagenInput" accept="image/*">
       </div>
-      <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero)</label>
+      <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero en Mostrador)</label>
       <button class="btn btn-primary" onclick="guardarProducto()">Guardar Producto</button>
     </div>
 
@@ -65,6 +87,48 @@
 requiereLogin();
 let imagenBase64 = '';
 
+function toggleCamposInventario() {
+  document.getElementById('camposInventario').style.display = document.getElementById('usaInventario').checked ? 'flex' : 'none';
+}
+
+function calcularPrecioVenta() {
+  const costo = parseFloat(document.getElementById('precioCosto').value || 0);
+  const ganancia = parseFloat(document.getElementById('gananciaPorcentaje').value || 0);
+  if (costo > 0 && ganancia > 0) {
+    const precioCalculado = costo * (1 + ganancia / 100);
+    document.getElementById('precio').value = precioCalculado.toFixed(2);
+  }
+}
+
+// Al salir del campo de código de barras, busca en TU catálogo primero (por si
+// ya existe) y si no, en Open Food Facts (productos comerciales conocidos).
+async function buscarCodigoExterno() {
+  const codigo = document.getElementById('codigoBarras').value.trim();
+  const estado = document.getElementById('estadoBusquedaExterna');
+  if (!codigo || codigo.length < 6) { estado.textContent = ''; return; }
+
+  estado.textContent = 'Buscando...';
+  try {
+    const productoPropio = await apiFetch(`/productos/codigo/${codigo}`);
+    estado.textContent = `⚠️ Ya tienes este código dado de alta: "${productoPropio.nombre}"`;
+    return;
+  } catch (err) {
+    // No está en tu catálogo — sigue buscando en la base pública, es normal.
+  }
+
+  try {
+    const externo = await apiFetch(`/productos/buscar-externo/${codigo}`);
+    if (externo.nombre) document.getElementById('nombre').value = externo.nombre;
+    if (externo.imagen_url) {
+      imagenBase64 = externo.imagen_url;
+      document.getElementById('previewImg').src = externo.imagen_url;
+    }
+    estado.textContent = '✅ Autocompletado desde base de datos pública (Open Food Facts)';
+  } catch (err) {
+    estado.textContent = 'No se encontró en la base de datos pública — captura los datos a mano';
+  }
+}
+
 document.getElementById('imagenInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -77,14 +141,9 @@ document.getElementById('imagenInput').addEventListener('change', async (e) => {
 });
 
 async function cargarCategorias() {
-  const cats = await apiFetch('/productos/categorias');
+  const cats = await apiFetch('/departamentos');
   const select = document.getElementById('categoriaId');
-  cats.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.nombre;
-    select.appendChild(opt);
-  });
+  select.innerHTML = '<option value="">Sin departamento</option>' + cats.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
 
 let productosOffsetActual = 0;
@@ -123,8 +182,7 @@ async function cargarProductos(reiniciar = true) {
     if (!botonCargarMas) {
       botonCargarMas = document.createElement('button');
       botonCargarMas.id = 'btnCargarMasProductos';
-      botonCargarMas.className = 'btn btn-secondary';
-      botonCargarMas.style.marginTop = '10px';
+      botonCargarMas.className = 'btn btn-secondary btn-cargar-mas';
       botonCargarMas.textContent = 'Cargar más productos';
       botonCargarMas.onclick = () => cargarProductos(false);
       tbody.parentElement.after(botonCargarMas);
@@ -141,17 +199,36 @@ async function guardarProducto() {
   const favorito = document.getElementById('favorito').checked;
   const tipo_venta = document.getElementById('tipoVenta').value;
   const codigo_barras = document.getElementById('codigoBarras').value.trim() || null;
+  const precio_costo = parseFloat(document.getElementById('precioCosto').value || 0) || null;
+  const ganancia_porcentaje = parseFloat(document.getElementById('gananciaPorcentaje').value || 0) || null;
+  const precio_mayoreo = parseFloat(document.getElementById('precioMayoreo').value || 0) || null;
+  const usa_inventario = document.getElementById('usaInventario').checked;
+  const existencia_inicial = parseFloat(document.getElementById('existenciaInicial').value || 0) || 0;
+  const stock_minimo = parseFloat(document.getElementById('stockMinimo').value || 0) || 0;
+  const stock_maximo = parseFloat(document.getElementById('stockMaximo').value || 0) || null;
 
-  if (!nombre || precio <= 0) { mostrarToast('Nombre y precio son obligatorios', 'error'); return; }
+  if (!nombre || precio <= 0) { mostrarToast('Descripción y precio de venta son obligatorios', 'error'); return; }
 
   try {
     await apiFetch('/productos', {
       method: 'POST',
-      body: JSON.stringify({ nombre, precio, categoria_id, imagen_url: imagenBase64, favorito, tipo_venta, codigo_barras })
+      body: JSON.stringify({
+        nombre, precio, categoria_id, imagen_url: imagenBase64, favorito, tipo_venta, codigo_barras,
+        precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario,
+        existencia_inicial, stock_minimo, stock_maximo
+      })
     });
+    mostrarToast('Producto guardado', 'exito');
     document.getElementById('nombre').value = '';
     document.getElementById('precio').value = '';
+    document.getElementById('precioCosto').value = '';
+    document.getElementById('gananciaPorcentaje').value = '';
+    document.getElementById('precioMayoreo').value = '';
     document.getElementById('codigoBarras').value = '';
+    document.getElementById('existenciaInicial').value = '';
+    document.getElementById('stockMinimo').value = '';
+    document.getElementById('stockMaximo').value = '';
+    document.getElementById('estadoBusquedaExterna').textContent = '';
     document.getElementById('previewImg').src = '';
     imagenBase64 = '';
     cargarProductos();
@@ -161,9 +238,14 @@ async function guardarProducto() {
 }
 
 async function eliminarProducto(id) {
-  if (!(await confirmarAccion('¿Eliminar este producto?'))) return;
-  await apiFetch(`/productos/${id}`, { method: 'DELETE' });
-  cargarProductos();
+  const confirmado = await confirmarAccion('¿Eliminar este producto?');
+  if (!confirmado) return;
+  try {
+    await apiFetch(`/productos/${id}`, { method: 'DELETE' });
+    cargarProductos();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
 }
 
 cargarCategorias();

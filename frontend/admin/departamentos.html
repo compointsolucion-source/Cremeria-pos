@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Departamentos - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
+  .form-depto { display: grid; gap: 10px; margin-bottom: 20px; }
+  .depto-card { background: white; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
+  .depto-card .acciones { display: flex; gap: 6px; }
+  .depto-card button { font-size: 12px; padding: 6px 10px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>🗂️ Departamentos</h1>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="card form-depto">
+      <h3>Nuevo departamento</h3>
+      <input type="text" id="nombreDepto" placeholder="Nombre (ej. Carnes, Lácteos, Embutidos)">
+      <button class="btn btn-primary" onclick="crearDepto()">Guardar</button>
+    </div>
+
+    <h3>Departamentos actuales</h3>
+    <div id="listaDeptos"></div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+
+async function cargarDeptos() {
+  try {
+    const deptos = await apiFetch('/departamentos');
+    document.getElementById('listaDeptos').innerHTML = deptos.map(d => `
+      <div class="depto-card">
+        <span>${d.nombre}</span>
+        <span class="acciones">
+          <button class="btn btn-secondary" onclick="editarDepto(${d.id}, '${d.nombre.replace(/'/g, "\\'")}')">Modificar</button>
+          <button class="btn btn-secondary" onclick="eliminarDepto(${d.id})">Eliminar</button>
+        </span>
+      </div>
+    `).join('') || '<p style="color:#888; font-size:13px;">Sin departamentos todavía</p>';
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function crearDepto() {
+  const nombre = document.getElementById('nombreDepto').value.trim();
+  if (!nombre) { mostrarToast('El nombre es obligatorio', 'error'); return; }
+  try {
+    await apiFetch('/departamentos', { method: 'POST', body: JSON.stringify({ nombre }) });
+    document.getElementById('nombreDepto').value = '';
+    cargarDeptos();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function editarDepto(id, nombreActual) {
+  const nuevoNombre = await solicitarTexto('Nuevo nombre del departamento:', nombreActual);
+  if (!nuevoNombre) return;
+  try {
+    await apiFetch(`/departamentos/${id}`, { method: 'PUT', body: JSON.stringify({ nombre: nuevoNombre }) });
+    cargarDeptos();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function eliminarDepto(id) {
+  const confirmado = await confirmarAccion('¿Eliminar este departamento? Los productos que lo usaban quedarán "Sin categoría".');
+  if (!confirmado) return;
+  try {
+    await apiFetch(`/departamentos/${id}`, { method: 'DELETE' });
+    cargarDeptos();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+cargarDeptos();
+</script>
+</body>
+</html>
