@@ -8,6 +8,7 @@
 <script src="js/tema.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
   .layout { display: flex; height: calc(100vh - 60px); }
   .panel-productos { flex: 2; padding: 14px; overflow-y: auto; }
@@ -488,12 +489,13 @@ async function generarTicket() {
 }
 
 async function imprimirTicket(ticket) {
+  const config = configuracionNegocio || {};
   const datosTicket = {
-    ancho_ticket: (configuracionNegocio && configuracionNegocio.ancho_ticket) || '80mm',
+    ancho_ticket: config.ancho_ticket || '80mm',
     negocio: {
       nombre: 'Compoint Punto de Soluciones',
-      direccion: configuracionNegocio ? configuracionNegocio.direccion : '',
-      telefono: configuracionNegocio ? configuracionNegocio.telefono : ''
+      direccion: config.direccion,
+      telefono: config.telefono
     },
     folio: ticket.folio,
     fecha: new Date().toLocaleString(),
@@ -503,7 +505,12 @@ async function imprimirTicket(ticket) {
       subtotal: parseFloat(i.subtotal).toFixed(2)
     })),
     total: parseFloat(ticket.total).toFixed(2),
-    piePagina: 'Presenta este ticket en caja para pagar'
+    piePagina: 'Presenta este ticket en caja para pagar',
+    lineasSuperiores: config.lineas_superiores || 0,
+    lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
+    incluirPrecioUnitario: config.incluir_precio_unitario !== false,
+    descripcionCompleta: config.descripcion_completa !== false,
+    tipoCodigoEscaneo: config.tipo_codigo_escaneo || 'qr'
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';

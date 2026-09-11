@@ -235,6 +235,22 @@ function generarCanvasQR(texto, tamanoPx) {
   });
 }
 
+// Genera un código de barras lineal (Code128) con el folio, usando la
+// librería JsBarcode (cargada por separado en la página) — para lectores
+// físicos básicos que solo leen códigos de barras, no QR.
+function generarCanvasBarras(texto, anchoTotalPx) {
+  const canvas = document.createElement('canvas');
+  JsBarcode(canvas, texto, {
+    format: 'CODE128',
+    width: Math.max(1, Math.floor(anchoTotalPx / (texto.length * 11))),
+    height: 60,
+    displayValue: true,
+    fontSize: 14,
+    margin: 4
+  });
+  return canvas;
+}
+
 function bytesJuntos(listaDeArrays) {
   const total = listaDeArrays.reduce((sum, a) => sum + a.length, 0);
   const resultado = new Uint8Array(total);
@@ -269,7 +285,7 @@ function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
   return lineas;
 }
 
-function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina }) {
+function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null }) {
   const columnas = ancho_ticket === '58mm' ? 32 : 48;
   const centrar = (texto) => {
     const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
@@ -281,11 +297,44 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina }) {
     const espacios = Math.max(1, columnas - etiqueta.length - montoTexto.length);
     return etiqueta + ' '.repeat(espacios) + montoTexto;
   };
+  // Corta un texto largo en varios renglones de máximo "columnas" caracteres,
+  // sin partir palabras a la mitad cuando es posible.
+  const envolverTexto = (texto) => {
+    if (texto.length <= columnas) return [texto];
+    const palabras = texto.split(' ');
+    const renglones = [];
+    let actual = '';
+    palabras.forEach(palabra => {
+      if ((actual + ' ' + palabra).trim().length > columnas) {
+        if (actual) renglones.push(actual.trim());
+        actual = palabra;
+      } else {
+        actual = (actual + ' ' + palabra).trim();
+      }
+    });
+    if (actual) renglones.push(actual);
+    return renglones;
+  };
 
   const lineas = [''];
+
+  if (cliente && cliente.nombre) {
+    lineas.push(`Cliente: ${cliente.nombre}`);
+    if (cliente.telefono) lineas.push(`Tel: ${cliente.telefono}`);
+    lineas.push(separador);
+  }
+
   items.forEach(item => {
-    lineas.push(item.nombre_producto);
-    lineas.push(filaMonto(`  ${item.detalle}`, item.subtotal));
+    if (descripcionCompleta) {
+      envolverTexto(item.nombre_producto).forEach(renglon => lineas.push(renglon));
+    } else {
+      lineas.push(item.nombre_producto.length > columnas ? item.nombre_producto.slice(0, columnas - 1) + '…' : item.nombre_producto);
+    }
+    if (incluirPrecioUnitario) {
+      lineas.push(filaMonto(`  ${item.detalle}`, item.subtotal));
+    } else {
+      lineas.push(filaMonto('  ', item.subtotal));
+    }
   });
 
   lineas.push(separador);
@@ -303,9 +352,9 @@ function formatearTicket(datosTicket) {
   return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket)];
 }
 
-// Imprime un ticket completo, incluyendo un QR gráfico escaneable con el folio.
-// Lanza error si no hay impresora conectada — quien llama debe mostrar el
-// banner de "Reconectar" en ese caso.
+// Imprime un ticket completo, incluyendo QR y/o código de barras escaneable
+// según la configuración. Lanza error si no hay impresora conectada — quien
+// llama debe mostrar el banner de "Reconectar" en ese caso.
 async function imprimirTicketBLE(datosTicket) {
   if (!impresoraConectada()) {
     await reconectarSiEsPosible();
@@ -316,22 +365,43 @@ async function imprimirTicketBLE(datosTicket) {
 
   const ESC = 0x1B;
   const inicializar = new Uint8Array([ESC, 0x40]);
-  const encabezado = bytesDeLineas(formatearEncabezadoTicket(datosTicket));
-  const cuerpo = bytesDeLineas(formatearCuerpoTicket(datosTicket));
-  const cierre = new Uint8Array([0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]); // espacio + cortar papel
 
-  let comandosQR = new Uint8Array(0);
+  const lineasSuperiores = datosTicket.lineasSuperiores || 0;
+  const lineasInferiores = datosTicket.lineasInferiores !== undefined ? datosTicket.lineasInferiores : 3;
+  const espacioArriba = bytesDeLineas(new Array(lineasSuperiores).fill(''));
+
+  const encabezado = bytesDeLineas(formatearEncabezadoTicket(datosTicket));
+  const cuerpo = bytesDeLineas(formatearCuerpoTicket({
+    ...datosTicket,
+    incluirPrecioUnitario: datosTicket.incluirPrecioUnitario !== false,
+    descripcionCompleta: datosTicket.descripcionCompleta !== false,
+    cliente: datosTicket.imprimirDatosCliente ? datosTicket.cliente : null
+  }));
+  const cierre = bytesJuntos([
+    bytesDeLineas(new Array(lineasInferiores).fill('')),
+    new Uint8Array([0x1D, 0x56, 0x00]) // cortar papel (si la impresora lo soporta)
+  ]);
+
+  const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'qr';
+  let comandosCodigo = new Uint8Array(0);
   try {
-    if (typeof QRCode !== 'undefined') {
-      const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
+    const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
+    const partesCodigo = [];
+
+    if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
       const canvasQR = await generarCanvasQR(datosTicket.folio, anchoPx);
-      comandosQR = bytesJuntos([canvasAComandosRaster(canvasQR), new Uint8Array([0x0A])]);
+      partesCodigo.push(canvasAComandosRaster(canvasQR), new Uint8Array([0x0A]));
     }
+    if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
+      const canvasBarras = generarCanvasBarras(datosTicket.folio, anchoPx);
+      partesCodigo.push(canvasAComandosRaster(canvasBarras), new Uint8Array([0x0A]));
+    }
+    comandosCodigo = bytesJuntos(partesCodigo);
   } catch (err) {
-    console.error('No se pudo generar el QR, se imprime solo el folio en texto:', err.message);
+    console.error('No se pudo generar el código escaneable, se imprime solo el folio en texto:', err.message);
   }
 
-  const comandosFinales = bytesJuntos([inicializar, encabezado, comandosQR, cuerpo, cierre]);
+  const comandosFinales = bytesJuntos([inicializar, espacioArriba, encabezado, comandosCodigo, cuerpo, cierre]);
   await enviarBytes(comandosFinales);
 }
 

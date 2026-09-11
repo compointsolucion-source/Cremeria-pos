@@ -6,12 +6,17 @@
 <title>Configuración - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <script src="../js/tema.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
   .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
   .form-config { display: grid; gap: 10px; }
   .estado-impresora { padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
   .conectada { background: #E8F5E9; color: #2E7D32; }
   .desconectada { background: #FFEBEE; color: #C62828; }
+  .fila-lineas { display: flex; align-items: center; gap: 10px; }
+  .fila-lineas input[type="number"] { width: 70px; }
+  .opcion-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -38,7 +43,7 @@
       </select>
     </div>
 
-    <div class="card form-config">
+    <div class="card form-config" style="margin-bottom:16px;">
       <h3>Datos del negocio (aparecen en el ticket)</h3>
       <input type="text" id="direccion" placeholder="Dirección">
       <input type="text" id="telefono" placeholder="Teléfono">
@@ -49,6 +54,42 @@
       </select>
       <textarea id="terminos" placeholder="Texto al pie del ticket (ej. políticas de devolución)" rows="3" style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
       <button class="btn btn-primary" onclick="guardarConfiguracion()">Guardar Configuración</button>
+    </div>
+
+    <div class="card form-config">
+      <h3>Personalización del Ticket de Venta</h3>
+
+      <div class="fila-lineas">
+        <span>Líneas en blanco arriba:</span>
+        <input type="number" id="lineasSuperiores" min="0" max="10">
+      </div>
+      <div class="fila-lineas">
+        <span>Líneas en blanco abajo:</span>
+        <input type="number" id="lineasInferiores" min="0" max="10">
+      </div>
+
+      <label class="opcion-check">
+        <input type="checkbox" id="incluirPrecioUnitario">
+        Incluir precio unitario en la impresión del ticket
+      </label>
+      <label class="opcion-check">
+        <input type="checkbox" id="descripcionCompleta">
+        Imprimir descripción completa (usar varios renglones si el nombre es largo)
+      </label>
+      <label class="opcion-check">
+        <input type="checkbox" id="imprimirDatosCliente">
+        Imprimir datos del cliente en el ticket (solo aplica en ventas a crédito/fiado)
+      </label>
+
+      <p style="margin:8px 0 2px; font-weight:600; font-size:14px;">Código para escanear en el ticket:</p>
+      <select id="tipoCodigoEscaneo">
+        <option value="qr">Código QR</option>
+        <option value="barras">Código de barras (para lectores físicos básicos)</option>
+        <option value="ambos">Ambos (QR y código de barras)</option>
+      </select>
+
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Personalización</button>
+      <button class="btn btn-secondary" onclick="probarImpresion()">🖨️ Probar impresión con ticket de prueba</button>
     </div>
   </div>
 
@@ -87,6 +128,13 @@ async function cargarConfiguracion() {
     document.getElementById('rfc').value = config.rfc || '';
     document.getElementById('anchoTicket').value = config.ancho_ticket || '80mm';
     document.getElementById('terminos').value = config.terminos || '';
+
+    document.getElementById('lineasSuperiores').value = config.lineas_superiores !== undefined ? config.lineas_superiores : 0;
+    document.getElementById('lineasInferiores').value = config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3;
+    document.getElementById('incluirPrecioUnitario').checked = config.incluir_precio_unitario !== false;
+    document.getElementById('descripcionCompleta').checked = config.descripcion_completa !== false;
+    document.getElementById('imprimirDatosCliente').checked = !!config.imprimir_datos_cliente;
+    document.getElementById('tipoCodigoEscaneo').value = config.tipo_codigo_escaneo || 'qr';
   } catch (err) {
     console.error(err);
   }
@@ -117,6 +165,64 @@ function cargarModoImpresion() {
 function guardarModoImpresion() {
   localStorage.setItem('modo_impresion', document.getElementById('modoImpresion').value);
   mostrarToast('Método de impresión guardado para este dispositivo', 'exito');
+}
+
+async function guardarPersonalizacionTicket() {
+  try {
+    await apiFetch('/configuracion', {
+      method: 'PUT',
+      body: JSON.stringify({
+        lineas_superiores: parseInt(document.getElementById('lineasSuperiores').value || 0),
+        lineas_inferiores: parseInt(document.getElementById('lineasInferiores').value || 3),
+        incluir_precio_unitario: document.getElementById('incluirPrecioUnitario').checked,
+        descripcion_completa: document.getElementById('descripcionCompleta').checked,
+        imprimir_datos_cliente: document.getElementById('imprimirDatosCliente').checked,
+        tipo_codigo_escaneo: document.getElementById('tipoCodigoEscaneo').value
+      })
+    });
+    mostrarToast('Personalización del ticket guardada', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function probarImpresion() {
+  const datosTicketPrueba = {
+    ancho_ticket: document.getElementById('anchoTicket').value,
+    negocio: {
+      nombre: 'Compoint Punto de Soluciones',
+      direccion: document.getElementById('direccion').value,
+      telefono: document.getElementById('telefono').value
+    },
+    folio: 'PRUEBA-001',
+    fecha: new Date().toLocaleString(),
+    items: [
+      { nombre_producto: 'Jamón de pavo (producto de prueba)', detalle: '0.500 x $180.00', subtotal: '90.00' },
+      { nombre_producto: 'Queso panela', detalle: '1 x $85.00', subtotal: '85.00' }
+    ],
+    total: '175.00',
+    piePagina: document.getElementById('terminos').value || 'Ticket de prueba',
+    lineasSuperiores: parseInt(document.getElementById('lineasSuperiores').value || 0),
+    lineasInferiores: parseInt(document.getElementById('lineasInferiores').value || 3),
+    incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
+    descripcionCompleta: document.getElementById('descripcionCompleta').checked,
+    tipoCodigoEscaneo: document.getElementById('tipoCodigoEscaneo').value,
+    imprimirDatosCliente: document.getElementById('imprimirDatosCliente').checked,
+    cliente: { nombre: 'Cliente de Prueba', telefono: '3312345678' }
+  };
+
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  if (modoImpresion === 'sistema') {
+    imprimirConDialogoDelSistema(datosTicketPrueba);
+    return;
+  }
+
+  try {
+    await imprimirTicketBLE(datosTicketPrueba);
+    mostrarToast('Ticket de prueba impreso', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
 }
 
 cargarModoImpresion();
