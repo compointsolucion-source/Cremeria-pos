@@ -32,14 +32,16 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     );
     const ticket = ticketResult.rows[0];
 
+    const itemsGuardados = [];
     for (const item of items) {
       const subtotal = item.cantidad * item.precio_unitario;
       const tipo = item.tipo === 'kit' ? 'kit' : 'producto';
-      await cliente.query(
+      const detalleResult = await cliente.query(
         `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
         [ticket.id, tipo, tipo === 'producto' ? (item.producto_id || null) : null, tipo === 'kit' ? (item.kit_id || null) : null, item.nombre_producto, item.cantidad, item.precio_unitario, subtotal]
       );
+      itemsGuardados.push(detalleResult.rows[0]);
     }
 
     await cliente.query('COMMIT');
@@ -48,7 +50,7 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     const io = req.app.get('io');
     if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('nuevo_ticket', { folio, total });
 
-    res.json({ ...ticket, items });
+    res.json({ ...ticket, items: itemsGuardados });
   } catch (err) {
     await cliente.query('ROLLBACK');
     console.error(err);

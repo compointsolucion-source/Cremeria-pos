@@ -88,6 +88,27 @@
         <option value="ambos">Ambos (QR y código de barras)</option>
       </select>
 
+      <p style="margin:8px 0 2px; font-weight:600; font-size:14px;">Logotipo del negocio (aparece arriba del ticket)</p>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img id="previewLogo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;" src="">
+        <input type="file" id="logoInput" accept="image/*">
+      </div>
+
+      <p style="margin:8px 0 2px; font-weight:600; font-size:14px;">Tamaño de letra del ticket</p>
+      <select id="tamanoLetra">
+        <option value="normal">Normal</option>
+        <option value="grande">Grande</option>
+      </select>
+
+      <label class="opcion-check">
+        <input type="checkbox" id="negocioNegritas">
+        Nombre del negocio en negritas
+      </label>
+      <label class="opcion-check">
+        <input type="checkbox" id="totalNegritas">
+        Total en negritas
+      </label>
+
       <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Personalización</button>
       <button class="btn btn-secondary" onclick="probarImpresion()">🖨️ Probar impresión con ticket de prueba</button>
     </div>
@@ -96,9 +117,22 @@
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
+<script src="../js/imagen-utils.js"></script>
 <script src="../js/impresora-termica.js"></script>
 <script>
 requiereLogin();
+let logoBase64 = '';
+
+document.getElementById('logoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    logoBase64 = await comprimirImagen(file, 300, 0.8);
+    document.getElementById('previewLogo').src = logoBase64;
+  } catch (err) {
+    mostrarToast('No se pudo procesar el logotipo: ' + err.message, 'error');
+  }
+});
 
 async function conectar() {
   try {
@@ -135,6 +169,13 @@ async function cargarConfiguracion() {
     document.getElementById('descripcionCompleta').checked = config.descripcion_completa !== false;
     document.getElementById('imprimirDatosCliente').checked = !!config.imprimir_datos_cliente;
     document.getElementById('tipoCodigoEscaneo').value = config.tipo_codigo_escaneo || 'qr';
+    document.getElementById('tamanoLetra').value = config.tamano_letra || 'normal';
+    document.getElementById('negocioNegritas').checked = config.negocio_negritas !== false;
+    document.getElementById('totalNegritas').checked = config.total_negritas !== false;
+    if (config.logo_url) {
+      logoBase64 = config.logo_url;
+      document.getElementById('previewLogo').src = config.logo_url;
+    }
   } catch (err) {
     console.error(err);
   }
@@ -177,7 +218,11 @@ async function guardarPersonalizacionTicket() {
         incluir_precio_unitario: document.getElementById('incluirPrecioUnitario').checked,
         descripcion_completa: document.getElementById('descripcionCompleta').checked,
         imprimir_datos_cliente: document.getElementById('imprimirDatosCliente').checked,
-        tipo_codigo_escaneo: document.getElementById('tipoCodigoEscaneo').value
+        tipo_codigo_escaneo: document.getElementById('tipoCodigoEscaneo').value,
+        logo_url: logoBase64 || null,
+        tamano_letra: document.getElementById('tamanoLetra').value,
+        negocio_negritas: document.getElementById('negocioNegritas').checked,
+        total_negritas: document.getElementById('totalNegritas').checked
       })
     });
     mostrarToast('Personalización del ticket guardada', 'exito');
@@ -208,12 +253,16 @@ async function probarImpresion() {
     descripcionCompleta: document.getElementById('descripcionCompleta').checked,
     tipoCodigoEscaneo: document.getElementById('tipoCodigoEscaneo').value,
     imprimirDatosCliente: document.getElementById('imprimirDatosCliente').checked,
-    cliente: { nombre: 'Cliente de Prueba', telefono: '3312345678' }
+    cliente: { nombre: 'Cliente de Prueba', telefono: '3312345678' },
+    logoUrl: logoBase64 || null,
+    tamanoLetra: document.getElementById('tamanoLetra').value,
+    negocioNegritas: document.getElementById('negocioNegritas').checked,
+    totalNegritas: document.getElementById('totalNegritas').checked
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
   if (modoImpresion === 'sistema') {
-    imprimirConDialogoDelSistema(datosTicketPrueba);
+    await imprimirConDialogoDelSistema(datosTicketPrueba);
     return;
   }
 

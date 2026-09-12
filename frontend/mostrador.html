@@ -529,12 +529,16 @@ async function imprimirTicket(ticket) {
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,
     descripcionCompleta: config.descripcion_completa !== false,
-    tipoCodigoEscaneo: config.tipo_codigo_escaneo || 'qr'
+    tipoCodigoEscaneo: config.tipo_codigo_escaneo || 'qr',
+    logoUrl: config.logo_url || null,
+    negocioNegritas: config.negocio_negritas !== false,
+    totalNegritas: config.total_negritas !== false,
+    tamanoLetra: config.tamano_letra || 'normal'
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
   if (modoImpresion === 'sistema') {
-    imprimirConDialogoDelSistema(datosTicket);
+    await imprimirConDialogoDelSistema(datosTicket);
     return;
   }
 
@@ -545,7 +549,7 @@ async function imprimirTicket(ticket) {
     actualizarBannerImpresora();
     mostrarToast(`No se pudo imprimir: ${err.message}`, 'error');
     const usarRespaldo = await confirmarAccion(`Ticket generado: ${ticket.folio} — Total: $${ticket.total}. No se pudo imprimir por Bluetooth/USB. ¿Imprimir con una impresora ya instalada en esta computadora (Windows)?`);
-    if (usarRespaldo) imprimirConDialogoDelSistema(datosTicket);
+    if (usarRespaldo) await imprimirConDialogoDelSistema(datosTicket);
   }
 }
 

@@ -164,6 +164,47 @@ async function enviarBytes(bytes) {
 // Intenta reconectar en automático apenas se carga la página.
 intentarReconexionAutomatica();
 
+// Comandos ESC/POS para negritas y tamaño de letra. Se usan para envolver
+// líneas específicas (ej. el nombre del negocio, o el TOTAL) sin afectar el
+// resto del ticket.
+const ESCPOS_NEGRITA_ON = new Uint8Array([0x1B, 0x45, 0x01]);
+const ESCPOS_NEGRITA_OFF = new Uint8Array([0x1B, 0x45, 0x00]);
+const ESCPOS_TAMANO_GRANDE = new Uint8Array([0x1D, 0x21, 0x11]); // doble alto y ancho
+const ESCPOS_TAMANO_NORMAL = new Uint8Array([0x1D, 0x21, 0x00]);
+
+function bytesConEstilo(texto, { negrita = false, grande = false } = {}) {
+  const encoder = new TextEncoder();
+  const partes = [];
+  if (negrita) partes.push(ESCPOS_NEGRITA_ON);
+  if (grande) partes.push(ESCPOS_TAMANO_GRANDE);
+  partes.push(encoder.encode(texto + '\n'));
+  if (grande) partes.push(ESCPOS_TAMANO_NORMAL);
+  if (negrita) partes.push(ESCPOS_NEGRITA_OFF);
+  return bytesJuntos(partes);
+}
+
+// Convierte una imagen ya cargada (base64/URL) a un canvas listo para
+// imprimir como logotipo, redimensionada a un ancho razonable para el papel.
+function generarCanvasLogo(imagenSrc, anchoMaximoPx) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const escala = Math.min(1, anchoMaximoPx / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas);
+    };
+    img.onerror = () => reject(new Error('No se pudo cargar el logotipo'));
+    img.src = imagenSrc;
+  });
+}
+
 // Convierte texto a bytes ESC/POS básicos: inicializa, imprime texto, corta el papel.
 function construirComandosTexto(lineas) {
   const ESC = 0x1B, GS = 0x1D;
@@ -370,13 +411,52 @@ async function imprimirTicketBLE(datosTicket) {
   const lineasInferiores = datosTicket.lineasInferiores !== undefined ? datosTicket.lineasInferiores : 3;
   const espacioArriba = bytesDeLineas(new Array(lineasSuperiores).fill(''));
 
-  const encabezado = bytesDeLineas(formatearEncabezadoTicket(datosTicket));
-  const cuerpo = bytesDeLineas(formatearCuerpoTicket({
+  // Logotipo (si se configuró uno en Configuración) — se imprime antes que todo.
+  let comandosLogo = new Uint8Array(0);
+  if (datosTicket.logoUrl) {
+    try {
+      const anchoLogoPx = datosTicket.ancho_ticket === '58mm' ? 200 : 300;
+      const canvasLogo = await generarCanvasLogo(datosTicket.logoUrl, anchoLogoPx);
+      comandosLogo = bytesJuntos([canvasAComandosRaster(canvasLogo), new Uint8Array([0x0A])]);
+    } catch (err) {
+      console.error('No se pudo imprimir el logotipo:', err.message);
+    }
+  }
+
+  // Encabezado: el nombre del negocio se imprime en negritas si está
+  // configurado así; el resto (dirección, teléfono, folio, fecha) normal.
+  const lineasEncabezado = formatearEncabezadoTicket(datosTicket);
+  const nombreEsPrimeraLinea = !!(datosTicket.negocio && datosTicket.negocio.nombre);
+  const encabezado = bytesJuntos(lineasEncabezado.map((linea, idx) => {
+    if (idx === 0 && nombreEsPrimeraLinea && datosTicket.negocioNegritas !== false) {
+      return bytesConEstilo(linea, { negrita: true });
+    }
+    return bytesConEstilo(linea);
+  }));
+
+  // Cuerpo: si "tamaño de letra" es "grande", todo el cuerpo se imprime al
+  // doble de tamaño. La línea de TOTAL además se pone en negritas si se
+  // configuró así (independiente del tamaño).
+  const letraGrande = datosTicket.tamanoLetra === 'grande';
+  const lineasCuerpo = formatearCuerpoTicket({
     ...datosTicket,
     incluirPrecioUnitario: datosTicket.incluirPrecioUnitario !== false,
     descripcionCompleta: datosTicket.descripcionCompleta !== false,
     cliente: datosTicket.imprimirDatosCliente ? datosTicket.cliente : null
-  }));
+  });
+  const cuerpoPartes = [];
+  if (letraGrande) cuerpoPartes.push(ESCPOS_TAMANO_GRANDE);
+  lineasCuerpo.forEach(linea => {
+    const esLineaTotal = linea.trim().startsWith('TOTAL');
+    if (esLineaTotal && datosTicket.totalNegritas !== false) {
+      cuerpoPartes.push(ESCPOS_NEGRITA_ON, new TextEncoder().encode(linea + '\n'), ESCPOS_NEGRITA_OFF);
+    } else {
+      cuerpoPartes.push(new TextEncoder().encode(linea + '\n'));
+    }
+  });
+  if (letraGrande) cuerpoPartes.push(ESCPOS_TAMANO_NORMAL);
+  const cuerpo = bytesJuntos(cuerpoPartes);
+
   const cierre = bytesJuntos([
     bytesDeLineas(new Array(lineasInferiores).fill('')),
     new Uint8Array([0x1D, 0x56, 0x00]) // cortar papel (si la impresora lo soporta)
@@ -401,7 +481,7 @@ async function imprimirTicketBLE(datosTicket) {
     console.error('No se pudo generar el código escaneable, se imprime solo el folio en texto:', err.message);
   }
 
-  const comandosFinales = bytesJuntos([inicializar, espacioArriba, encabezado, comandosCodigo, cuerpo, cierre]);
+  const comandosFinales = bytesJuntos([inicializar, comandosLogo, espacioArriba, encabezado, comandosCodigo, cuerpo, cierre]);
   await enviarBytes(comandosFinales);
 }
 
@@ -423,12 +503,46 @@ async function compartirTicketComoTexto(datosTicket) {
 // Imprime usando el diálogo normal de impresión del navegador — funciona con
 // CUALQUIER impresora que Windows/Mac ya tenga instalada (USB, red, la que
 // sea), porque el sistema operativo maneja la comunicación, no el navegador.
-// No corta el papel automáticamente ni usa comandos ESC/POS — es un respaldo
-// universal, no un reemplazo de la impresión térmica directa.
-function imprimirConDialogoDelSistema(datosTicket) {
-  const columnas = datosTicket.ancho_ticket === '58mm' ? 32 : 48;
+// No corta el papel automáticamente, pero SÍ incluye el QR/código de barras
+// como imagen (a diferencia de la versión anterior, que solo imprimía texto).
+async function imprimirConDialogoDelSistema(datosTicket) {
   const anchoMM = datosTicket.ancho_ticket === '58mm' ? '58mm' : '80mm';
   const lineas = formatearTicket(datosTicket);
+  const nombreEsPrimeraLinea = !!(datosTicket.negocio && datosTicket.negocio.nombre);
+  const tamanoFuente = datosTicket.tamanoLetra === 'grande' ? '18px' : '11px';
+
+  // Cada línea se envuelve individualmente para poder poner en negritas
+  // solo el nombre del negocio y el TOTAL, igual que en la impresión directa.
+  const lineasHtml = lineas.map((linea, idx) => {
+    const esNombre = idx === 0 && nombreEsPrimeraLinea && datosTicket.negocioNegritas !== false;
+    const esTotal = linea.trim().startsWith('TOTAL') && datosTicket.totalNegritas !== false;
+    const contenido = linea.replace(/ /g, '&nbsp;') || '&nbsp;';
+    return (esNombre || esTotal) ? `<b>${contenido}</b>` : contenido;
+  }).join('<br>');
+
+  let htmlCodigo = '';
+  try {
+    const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
+    const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'qr';
+    const imagenes = [];
+
+    if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
+      const canvasQR = await generarCanvasQR(datosTicket.folio, anchoPx);
+      imagenes.push(canvasQR.toDataURL());
+    }
+    if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
+      const canvasBarras = generarCanvasBarras(datosTicket.folio, anchoPx);
+      imagenes.push(canvasBarras.toDataURL());
+    }
+    htmlCodigo = imagenes.map(src => `<img src="${src}" style="display:block; margin:6px auto; max-width:100%;">`).join('');
+  } catch (err) {
+    console.error('No se pudo generar el código escaneable para el diálogo del sistema:', err.message);
+  }
+
+  let htmlLogo = '';
+  if (datosTicket.logoUrl) {
+    htmlLogo = `<img src="${datosTicket.logoUrl}" style="display:block; margin:0 auto 6px; max-width:80%;">`;
+  }
 
   const html = `
     <!DOCTYPE html>
@@ -438,10 +552,10 @@ function imprimirConDialogoDelSistema(datosTicket) {
     <title>Ticket ${datosTicket.folio}</title>
     <style>
       @page { size: ${anchoMM} auto; margin: 2mm; }
-      body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; }
+      body { font-family: 'Courier New', monospace; font-size: ${tamanoFuente}; margin: 0; }
     </style>
     </head>
-    <body>${lineas.join('\n')}<script>window.onload = () => window.print();<\/script></body>
+    <body>${htmlLogo}${htmlCodigo}${lineasHtml}<script>window.onload = () => window.print();<\/script></body>
     </html>
   `;
 

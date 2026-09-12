@@ -400,13 +400,17 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,
     descripcionCompleta: config.descripcion_completa !== false,
     tipoCodigoEscaneo: config.tipo_codigo_escaneo || 'qr',
+    logoUrl: config.logo_url || null,
+    negocioNegritas: config.negocio_negritas !== false,
+    totalNegritas: config.total_negritas !== false,
+    tamanoLetra: config.tamano_letra || 'normal',
     imprimirDatosCliente: !!config.imprimir_datos_cliente,
     cliente: clienteSeleccionado ? { nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
   if (modoImpresion === 'sistema') {
-    imprimirConDialogoDelSistema(datosTicket);
+    await imprimirConDialogoDelSistema(datosTicket);
     return;
   }
 
@@ -415,7 +419,7 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
   } catch (err) {
     actualizarBannerImpresoraCaja();
     const usarRespaldo = await confirmarAccion(`No se pudo imprimir el comprobante por Bluetooth/USB (${err.message}). ¿Imprimir con una impresora ya instalada en esta computadora (Windows)?`);
-    if (usarRespaldo) imprimirConDialogoDelSistema(datosTicket);
+    if (usarRespaldo) await imprimirConDialogoDelSistema(datosTicket);
   }
 }
 
