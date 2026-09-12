@@ -3,12 +3,26 @@ const router = express.Router();
 const pool = require('../db');
 const { verificarToken } = require('../middleware/auth');
 
+// Cancela automáticamente cualquier ficha que se haya quedado "esperando"
+// de un día anterior (nunca se atendió antes de cerrar el negocio). Se llama
+// de forma silenciosa cada vez que se genera o se llama una ficha nueva —
+// no requiere ningún botón ni proceso programado (cron) aparte.
+async function limpiarFichasDeDiasAnteriores(sucursalId) {
+  await pool.query(
+    `UPDATE fichas SET estado = 'cancelado'
+     WHERE sucursal_id = $1 AND estado = 'esperando' AND fecha_creacion::date < CURRENT_DATE`,
+    [sucursalId]
+  );
+}
+
 // Genera una nueva ficha de turno. El número reinicia cada día (busca el
 // máximo número creado HOY en esta sucursal, y suma 1; si no hay ninguna
 // hoy, empieza en 1).
 router.post('/', verificarToken, async (req, res) => {
   try {
     const sucursalId = req.usuario.sucursal_id;
+    await limpiarFichasDeDiasAnteriores(sucursalId);
+
     const maxResult = await pool.query(
       `SELECT COALESCE(MAX(numero), 0) AS maximo FROM fichas
        WHERE sucursal_id = $1 AND fecha_creacion::date = CURRENT_DATE`,
@@ -28,6 +42,23 @@ router.post('/', verificarToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al generar la ficha' });
+  }
+});
+
+// La última ficha generada HOY en esta sucursal — para el botón "Reimprimir
+// última ficha" en Mostrador (por si se atascó el papel o salió en blanco).
+router.get('/ultima', verificarToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM fichas WHERE sucursal_id = $1 AND fecha_creacion::date = CURRENT_DATE
+       ORDER BY fecha_creacion DESC LIMIT 1`,
+      [req.usuario.sucursal_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'No se ha generado ninguna ficha hoy' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener la última ficha' });
   }
 });
 
@@ -66,7 +97,8 @@ router.get('/recientes', verificarToken, async (req, res) => {
 router.get('/pendientes-count', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT COUNT(*) AS total FROM fichas WHERE sucursal_id = $1 AND estado = 'esperando'`,
+      `SELECT COUNT(*) AS total FROM fichas
+       WHERE sucursal_id = $1 AND estado = 'esperando' AND fecha_creacion::date = CURRENT_DATE`,
       [req.usuario.sucursal_id]
     );
     res.json({ total: parseInt(result.rows[0].total) });
@@ -82,6 +114,8 @@ router.post('/llamar-siguiente', verificarToken, async (req, res) => {
   try {
     const { mostrador } = req.body;
     if (!mostrador) return res.status(400).json({ error: 'Especifica qué mostrador está llamando' });
+
+    await limpiarFichasDeDiasAnteriores(req.usuario.sucursal_id);
 
     const siguienteResult = await pool.query(
       `SELECT * FROM fichas WHERE sucursal_id = $1 AND estado = 'esperando'

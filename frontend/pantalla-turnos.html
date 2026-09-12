@@ -28,6 +28,7 @@
   .historial-item .num { font-size: 28px; font-weight: 700; }
   .historial-item .mostrador { font-size: 14px; color: #A0A3A8; }
   .sin-turnos { font-size: 40px; color: #A0A3A8; }
+  .contador-esperando { position: fixed; top: 16px; left: 16px; font-size: 20px; color: #A0A3A8; background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 10px; }
   .pantalla-completa-btn {
     position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.1);
     border: none; color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;
@@ -36,6 +37,7 @@
 </head>
 <body>
   <button class="pantalla-completa-btn" onclick="document.documentElement.requestFullscreen()">⛶ Pantalla completa</button>
+  <div class="contador-esperando" id="contadorEsperando">Esperando: —</div>
 
   <div id="turnoActual">
     <div class="sin-turnos">Esperando el primer turno del día...</div>
@@ -108,8 +110,22 @@ async function cargarHistorial() {
   }
 }
 
+async function cargarContadorEsperando() {
+  try {
+    const data = await apiFetch('/fichas/pendientes-count');
+    document.getElementById('contadorEsperando').textContent = `Esperando: ${data.total}`;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+socket.on('nueva_ficha', cargarContadorEsperando);
+socket.on('ficha_llamada', cargarContadorEsperando);
+
 cargarTurnoActual();
 cargarHistorial();
+cargarContadorEsperando();
+setInterval(cargarContadorEsperando, 15000);
 </script>
 </body>
 </html>

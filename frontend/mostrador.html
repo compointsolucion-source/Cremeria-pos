@@ -80,6 +80,7 @@
   <div style="background:#F4F5F6; padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #DDD;">
     <button class="btn btn-secondary" onclick="generarFicha()">🎫 Generar Ficha</button>
     <button class="btn btn-primary" onclick="llamarSiguienteTurno()">▶️ Llamar Siguiente</button>
+    <button class="btn btn-secondary" onclick="reimprimirUltimaFicha()">🔁 Reimprimir Última</button>
     <span id="contadorFichasPendientes" style="font-size:13px; color:#666;"></span>
   </div>
 
@@ -634,6 +635,23 @@ async function llamarSiguienteTurno() {
     });
     mostrarToast(`Llamando turno #${String(ficha.numero).padStart(3,'0')} → ${nombreMostrador}`, 'exito');
     actualizarContadorFichas();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function reimprimirUltimaFicha() {
+  try {
+    const ficha = await apiFetch('/fichas/ultima');
+    const anchoTicket = (configuracionNegocio && configuracionNegocio.ancho_ticket) || '80mm';
+    const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+
+    if (modoImpresion === 'sistema') {
+      imprimirFichaConDialogoDelSistema(ficha.numero, anchoTicket);
+    } else {
+      await imprimirFicha(ficha.numero, anchoTicket);
+    }
+    mostrarToast(`Reimprimiendo ficha #${String(ficha.numero).padStart(3,'0')}`, 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }

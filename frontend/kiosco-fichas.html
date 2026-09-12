@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Saca tu Turno - Cremería POS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(160deg, #2E7D32, #1B5E20);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    user-select: none;
+  }
+  .titulo { font-size: 32px; font-weight: 700; margin-bottom: 40px; }
+  .boton-ficha {
+    width: 80vw;
+    max-width: 500px;
+    height: 45vh;
+    max-height: 400px;
+    border-radius: 30px;
+    border: none;
+    background: white;
+    color: #1B5E20;
+    font-size: 48px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    transition: transform 0.1s;
+  }
+  .boton-ficha:active { transform: scale(0.96); }
+  .subtexto { margin-top: 30px; font-size: 20px; opacity: 0.85; }
+
+  .pantalla-resultado {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .numero-grande { font-size: 180px; font-weight: 800; line-height: 1; }
+  .mensaje-espera { font-size: 28px; margin-top: 20px; }
+
+  .salir-discreto {
+    position: fixed; bottom: 10px; right: 10px; opacity: 0.15;
+    background: none; border: none; color: white; font-size: 12px; cursor: pointer; padding: 10px;
+  }
+</style>
+</head>
+<body>
+  <div id="pantallaInicial">
+    <div class="titulo">Bienvenido</div>
+    <button class="boton-ficha" onclick="sacarFicha()">🎫<br>TOCA AQUÍ<br>PARA SACAR<br>TU TURNO</button>
+    <div class="subtexto" id="contadorEsperandoKiosco"></div>
+  </div>
+
+  <div class="pantalla-resultado" id="pantallaResultado">
+    <div class="titulo">Tu turno es el</div>
+    <div class="numero-grande" id="numeroFichaGrande"></div>
+    <div class="mensaje-espera">Espere a ser llamado — gracias por su paciencia</div>
+  </div>
+
+  <button class="salir-discreto" onclick="salirDeKiosco()">Salir (personal autorizado)</button>
+
+<script src="js/api.js"></script>
+<script src="js/ui-components.js"></script>
+<script src="js/impresora-termica.js"></script>
+<script>
+requiereLogin();
+const usuario = getUsuario();
+
+const socket = io(API_URL.replace('/api', ''));
+socket.emit('unirse_sucursal', usuario.sucursal_id);
+socket.on('nueva_ficha', actualizarContadorKiosco);
+socket.on('ficha_llamada', actualizarContadorKiosco);
+
+let configuracionKiosco = null;
+async function cargarConfiguracionKiosco() {
+  try {
+    configuracionKiosco = await apiFetch('/configuracion');
+  } catch (err) {
+    configuracionKiosco = { ancho_ticket: '80mm' };
+  }
+}
+
+async function actualizarContadorKiosco() {
+  try {
+    const data = await apiFetch('/fichas/pendientes-count');
+    document.getElementById('contadorEsperandoKiosco').textContent =
+      data.total > 0 ? `${data.total} persona(s) esperando antes que tú` : '';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function sacarFicha() {
+  try {
+    const ficha = await apiFetch('/fichas', { method: 'POST' });
+    mostrarNumeroFicha(ficha.numero);
+
+    const anchoTicket = (configuracionKiosco && configuracionKiosco.ancho_ticket) || '80mm';
+    const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+    try {
+      if (modoImpresion === 'sistema') {
+        imprimirFichaConDialogoDelSistema(ficha.numero, anchoTicket);
+      } else {
+        await imprimirFicha(ficha.numero, anchoTicket);
+      }
+    } catch (err) {
+      console.error('No se pudo imprimir la ficha automáticamente:', err.message);
+    }
+
+    setTimeout(volverAInicio, 6000);
+  } catch (err) {
+    mostrarToast('No se pudo generar tu turno, por favor pide ayuda al personal.', 'error');
+  }
+}
+
+function mostrarNumeroFicha(numero) {
+  document.getElementById('pantallaInicial').style.display = 'none';
+  document.getElementById('pantallaResultado').style.display = 'flex';
+  document.getElementById('numeroFichaGrande').textContent = String(numero).padStart(3, '0');
+}
+
+function volverAInicio() {
+  document.getElementById('pantallaResultado').style.display = 'none';
+  document.getElementById('pantallaInicial').style.display = 'block';
+  actualizarContadorKiosco();
+}
+
+async function salirDeKiosco() {
+  const confirmar = await solicitarTexto('Escribe "SALIR" para cerrar el modo kiosco:');
+  if (confirmar === 'SALIR') {
+    cerrarSesion();
+  }
+}
+
+cargarConfiguracionKiosco();
+actualizarContadorKiosco();
+setInterval(actualizarContadorKiosco, 15000);
+</script>
+</body>
+</html>
