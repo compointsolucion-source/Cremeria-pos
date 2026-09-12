@@ -462,7 +462,7 @@ async function imprimirTicketBLE(datosTicket) {
     new Uint8Array([0x1D, 0x56, 0x00]) // cortar papel (si la impresora lo soporta)
   ]);
 
-  const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'qr';
+  const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'ninguno';
   let comandosCodigo = new Uint8Array(0);
   try {
     const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
@@ -523,7 +523,7 @@ async function imprimirConDialogoDelSistema(datosTicket) {
   let htmlCodigo = '';
   try {
     const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
-    const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'qr';
+    const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'ninguno';
     const imagenes = [];
 
     if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {

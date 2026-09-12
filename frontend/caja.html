@@ -399,7 +399,9 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,
     descripcionCompleta: config.descripcion_completa !== false,
-    tipoCodigoEscaneo: config.tipo_codigo_escaneo || 'qr',
+    // El comprobante final (ya pagado) NO lleva QR/código de barras — ese
+    // código es solo para que Caja localice el pedido antes de cobrar; una
+    // vez cobrado, ya no hay nada que escanear.
     logoUrl: config.logo_url || null,
     negocioNegritas: config.negocio_negritas !== false,
     totalNegritas: config.total_negritas !== false,
