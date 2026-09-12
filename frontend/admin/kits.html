@@ -60,8 +60,10 @@ document.getElementById('imagenInputKit').addEventListener('change', async (e) =
   const file = e.target.files[0];
   if (!file) return;
   try {
-    imagenKitBase64 = await comprimirImagen(file);
-    document.getElementById('previewImgKit').src = imagenKitBase64;
+    const comprimida = await comprimirImagen(file);
+    document.getElementById('previewImgKit').src = comprimida;
+    mostrarToast('Subiendo imagen...', 'info');
+    imagenKitBase64 = await subirImagenACloudinary(comprimida, 'kits');
   } catch (err) {
     mostrarToast('No se pudo procesar la imagen: ' + err.message, 'error');
   }

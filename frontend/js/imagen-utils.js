@@ -31,3 +31,14 @@ function comprimirImagen(file, maxAncho = 500, calidad = 0.7) {
     reader.readAsDataURL(file);
   });
 }
+
+// Sube una imagen ya comprimida (base64) a Cloudinary a través del backend,
+// y devuelve la URL final corta que se debe guardar (no el base64 completo).
+// "carpeta" organiza las imágenes en Cloudinary (ej. 'productos', 'kits', 'logos').
+async function subirImagenACloudinary(imagenBase64, carpeta = 'general') {
+  const data = await apiFetch('/imagenes/subir', {
+    method: 'POST',
+    body: JSON.stringify({ imagen_base64: imagenBase64, carpeta })
+  });
+  return data.url;
+}

@@ -170,8 +170,10 @@ document.getElementById('logoInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
-    logoBase64 = await comprimirImagen(file, 300, 0.8);
-    document.getElementById('previewLogo').src = logoBase64;
+    const comprimida = await comprimirImagen(file, 300, 0.8);
+    document.getElementById('previewLogo').src = comprimida;
+    mostrarToast('Subiendo logotipo...', 'info');
+    logoBase64 = await subirImagenACloudinary(comprimida, 'logos');
   } catch (err) {
     mostrarToast('No se pudo procesar el logotipo: ' + err.message, 'error');
   }
