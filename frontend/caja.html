@@ -460,7 +460,7 @@ function toggleScanner() {
   html5QrCode = new Html5Qrcode("scanner");
   html5QrCode.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 200 },
+    { fps: 10, qrbox: { width: 280, height: 160 } },
     (folio) => { cargarTicket(folio); html5QrCode.stop(); scannerActivo = false; }
   );
   scannerActivo = true;

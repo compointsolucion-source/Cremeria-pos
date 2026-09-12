@@ -86,7 +86,7 @@
       <button class="btn btn-secondary" style="margin-bottom:10px;" onclick="toggleScannerProducto()">📷 Escanear código de barras</button>
       <div id="scannerProducto"></div>
 
-      <input type="text" id="buscadorProductos" placeholder="🔍 Buscar producto por nombre... (F1)" style="margin-bottom:10px;" oninput="filtrarProductosPorTexto()">
+      <input type="text" id="buscadorProductos" placeholder="🔍 Buscar por nombre o código de barras... (F1)" style="margin-bottom:10px;" oninput="filtrarProductosPorTexto()">
 
       <div class="categorias" id="categorias"></div>
       <div class="grid-productos" id="gridProductos"></div>
@@ -210,7 +210,10 @@ function renderProductos() {
   // Si hay texto en el buscador, ignora las categorías y busca en todo
   // (incluyendo kits), por nombre.
   if (textoBusqueda) {
-    const productosFiltrados = productos.filter(p => p.nombre.toLowerCase().includes(textoBusqueda));
+    const productosFiltrados = productos.filter(p =>
+      p.nombre.toLowerCase().includes(textoBusqueda) ||
+      (p.codigo_barras && p.codigo_barras.toLowerCase().includes(textoBusqueda))
+    );
     const kitsFiltrados = kits.filter(k => k.nombre.toLowerCase().includes(textoBusqueda));
 
     kitsFiltrados.forEach(k => {
@@ -405,7 +408,7 @@ function toggleScannerProducto() {
   html5QrCode = new Html5Qrcode("scannerProducto");
   html5QrCode.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 200 },
+    { fps: 10, qrbox: { width: 280, height: 160 } },
     async (codigo) => {
       html5QrCode.stop();
       scannerActivo = false;
