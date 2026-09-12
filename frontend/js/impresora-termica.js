@@ -161,8 +161,78 @@ async function enviarBytes(bytes) {
   }
 }
 
+// Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
+// detalle de productos — es un boleto de espera, no un ticket de venta.
 // Intenta reconectar en automático apenas se carga la página.
 intentarReconexionAutomatica();
+
+// Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
+// detalle de productos — es un boleto de espera, no un ticket de venta.
+async function imprimirFicha(numero, ancho_ticket) {
+  if (!impresoraConectada()) {
+    await reconectarSiEsPosible();
+  }
+  if (!impresoraConectada()) {
+    throw new Error('No hay impresora conectada. Toca "Conectar impresora" primero.');
+  }
+
+  const columnas = ancho_ticket === '58mm' ? 32 : 48;
+  const centrar = (texto) => {
+    const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
+    return ' '.repeat(espacios) + texto;
+  };
+
+  const ESC = 0x1B, GS = 0x1D;
+  const inicializar = new Uint8Array([ESC, 0x40]);
+  const numeroTexto = String(numero).padStart(3, '0');
+
+  const comandos = bytesJuntos([
+    inicializar,
+    bytesConEstilo(centrar('SU TURNO'), {}),
+    new Uint8Array([0x0A]),
+    new Uint8Array([GS, 0x21, 0x33]), // letra muy grande (x4 alto, x4 ancho)
+    new TextEncoder().encode(centrar(numeroTexto) + '\n'),
+    new Uint8Array([GS, 0x21, 0x00]), // tamaño normal
+    new Uint8Array([0x0A]),
+    bytesConEstilo(centrar('Espere a ser llamado'), {}),
+    bytesDeLineas(['', '', '']),
+    new Uint8Array([GS, 0x56, 0x00]) // cortar papel
+  ]);
+
+  await enviarBytes(comandos);
+}
+
+// Respaldo de ficha usando el diálogo de impresión del navegador (para
+// cuando el dispositivo está configurado en modo "impresora del sistema").
+function imprimirFichaConDialogoDelSistema(numero, ancho_ticket) {
+  const anchoMM = ancho_ticket === '58mm' ? '58mm' : '80mm';
+  const numeroTexto = String(numero).padStart(3, '0');
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Ficha ${numeroTexto}</title>
+    <style>
+      @page { size: ${anchoMM} auto; margin: 2mm; }
+      body { font-family: 'Courier New', monospace; text-align: center; margin: 0; }
+      .numero { font-size: 60px; font-weight: bold; margin: 10px 0; }
+    </style>
+    </head>
+    <body>
+      <div>SU TURNO</div>
+      <div class="numero">${numeroTexto}</div>
+      <div>Espere a ser llamado</div>
+      <script>window.onload = () => window.print();<\/script>
+    </body>
+    </html>
+  `;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+}
 
 // Comandos ESC/POS para negritas y tamaño de letra. Se usan para envolver
 // líneas específicas (ej. el nombre del negocio, o el TOTAL) sin afectar el

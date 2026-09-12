@@ -33,7 +33,7 @@
 
   <div class="contenido">
     <div class="card form-producto">
-      <h3>Nuevo producto</h3>
+      <h3 id="tituloFormulario">Nuevo producto</h3>
 
       <input type="text" id="codigoBarras" placeholder="Código de barras (escanéalo o escríbelo)" onblur="buscarCodigoExterno()">
       <div id="estadoBusquedaExterna" class="buscando-externo"></div>
@@ -69,7 +69,8 @@
         <input type="file" id="imagenInput" accept="image/*">
       </div>
       <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero en Mostrador)</label>
-      <button class="btn btn-primary" onclick="guardarProducto()">Guardar Producto</button>
+      <button class="btn btn-primary" id="btnGuardarProducto" onclick="guardarProducto()">Guardar Producto</button>
+      <button class="btn btn-secondary" id="btnCancelarEdicion" style="display:none;" onclick="cancelarEdicion()">Cancelar Edición</button>
     </div>
 
     <h3>Catálogo actual</h3>
@@ -102,6 +103,58 @@
 <script>
 requiereLogin();
 let imagenBase64 = '';
+let productoEditandoId = null;
+
+function abrirEdicion(p) {
+  productoEditandoId = p.id;
+  document.getElementById('tituloFormulario').textContent = `Editando: ${p.nombre}`;
+  document.getElementById('btnGuardarProducto').textContent = 'Guardar Cambios';
+  document.getElementById('btnCancelarEdicion').style.display = 'inline-block';
+
+  document.getElementById('codigoBarras').value = p.codigo_barras || '';
+  document.getElementById('nombre').value = p.nombre || '';
+  document.getElementById('tipoVenta').value = p.tipo_venta || 'peso';
+  document.getElementById('categoriaId').value = p.categoria_id || '';
+  document.getElementById('precioCosto').value = p.precio_costo || '';
+  document.getElementById('gananciaPorcentaje').value = p.ganancia_porcentaje || '';
+  document.getElementById('precio').value = p.precio || '';
+  document.getElementById('precioMayoreo').value = p.precio_mayoreo || '';
+  document.getElementById('usaInventario').checked = p.usa_inventario !== false;
+  toggleCamposInventario();
+  document.getElementById('favorito').checked = !!p.favorito;
+  imagenBase64 = p.imagen_url || '';
+  document.getElementById('previewImg').src = p.imagen_url || '';
+  document.getElementById('estadoBusquedaExterna').textContent = '';
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelarEdicion() {
+  productoEditandoId = null;
+  document.getElementById('tituloFormulario').textContent = 'Nuevo producto';
+  document.getElementById('btnGuardarProducto').textContent = 'Guardar Producto';
+  document.getElementById('btnCancelarEdicion').style.display = 'none';
+  limpiarFormulario();
+}
+
+function limpiarFormulario() {
+  document.getElementById('nombre').value = '';
+  document.getElementById('precio').value = '';
+  document.getElementById('precioCosto').value = '';
+  document.getElementById('gananciaPorcentaje').value = '';
+  document.getElementById('precioMayoreo').value = '';
+  document.getElementById('codigoBarras').value = '';
+  document.getElementById('categoriaId').value = '';
+  document.getElementById('existenciaInicial').value = '';
+  document.getElementById('stockMinimo').value = '';
+  document.getElementById('stockMaximo').value = '';
+  document.getElementById('favorito').checked = false;
+  document.getElementById('usaInventario').checked = true;
+  toggleCamposInventario();
+  document.getElementById('estadoBusquedaExterna').textContent = '';
+  document.getElementById('previewImg').src = '';
+  imagenBase64 = '';
+}
 
 function toggleCamposInventario() {
   document.getElementById('camposInventario').style.display = document.getElementById('usaInventario').checked ? 'flex' : 'none';
@@ -189,6 +242,7 @@ async function cargarProductos(reiniciar = true) {
       <td>${precioLabel}</td>
       <td>${p.codigo_barras || '—'}</td>
       <td>
+        <button class="btn btn-secondary" onclick='abrirEdicion(${JSON.stringify(p).replace(/'/g, "&#39;")})'>✏️ Editar</button>
         <button class="btn btn-secondary" onclick="abrirPromociones(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, ${p.precio_costo || 'null'})">🏷️ Promos</button>
         <button class="btn btn-secondary" onclick="eliminarProducto(${p.id})">Eliminar</button>
       </td>
@@ -224,34 +278,36 @@ async function guardarProducto() {
   const ganancia_porcentaje = parseFloat(document.getElementById('gananciaPorcentaje').value || 0) || null;
   const precio_mayoreo = parseFloat(document.getElementById('precioMayoreo').value || 0) || null;
   const usa_inventario = document.getElementById('usaInventario').checked;
-  const existencia_inicial = parseFloat(document.getElementById('existenciaInicial').value || 0) || 0;
-  const stock_minimo = parseFloat(document.getElementById('stockMinimo').value || 0) || 0;
-  const stock_maximo = parseFloat(document.getElementById('stockMaximo').value || 0) || null;
 
   if (!nombre || precio <= 0) { mostrarToast('Descripción y precio de venta son obligatorios', 'error'); return; }
 
   try {
-    await apiFetch('/productos', {
-      method: 'POST',
-      body: JSON.stringify({
-        nombre, precio, categoria_id, imagen_url: imagenBase64, favorito, tipo_venta, codigo_barras,
-        precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario,
-        existencia_inicial, stock_minimo, stock_maximo
-      })
-    });
-    mostrarToast('Producto guardado', 'exito');
-    document.getElementById('nombre').value = '';
-    document.getElementById('precio').value = '';
-    document.getElementById('precioCosto').value = '';
-    document.getElementById('gananciaPorcentaje').value = '';
-    document.getElementById('precioMayoreo').value = '';
-    document.getElementById('codigoBarras').value = '';
-    document.getElementById('existenciaInicial').value = '';
-    document.getElementById('stockMinimo').value = '';
-    document.getElementById('stockMaximo').value = '';
-    document.getElementById('estadoBusquedaExterna').textContent = '';
-    document.getElementById('previewImg').src = '';
-    imagenBase64 = '';
+    if (productoEditandoId) {
+      await apiFetch(`/productos/${productoEditandoId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          nombre, precio, categoria_id, imagen_url: imagenBase64 || null, favorito, tipo_venta, codigo_barras,
+          precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario
+        })
+      });
+      mostrarToast('Producto actualizado', 'exito');
+      cancelarEdicion();
+    } else {
+      const existencia_inicial = parseFloat(document.getElementById('existenciaInicial').value || 0) || 0;
+      const stock_minimo = parseFloat(document.getElementById('stockMinimo').value || 0) || 0;
+      const stock_maximo = parseFloat(document.getElementById('stockMaximo').value || 0) || null;
+
+      await apiFetch('/productos', {
+        method: 'POST',
+        body: JSON.stringify({
+          nombre, precio, categoria_id, imagen_url: imagenBase64, favorito, tipo_venta, codigo_barras,
+          precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario,
+          existencia_inicial, stock_minimo, stock_maximo
+        })
+      });
+      mostrarToast('Producto guardado', 'exito');
+      limpiarFormulario();
+    }
     cargarProductos();
   } catch (err) {
     mostrarToast(err.message, 'error');

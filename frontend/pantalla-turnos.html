@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pantalla de Turnos - Cremería POS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #1B1C1E;
+    color: white;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .etiqueta { font-size: 28px; color: #A0A3A8; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px; }
+  .numero-turno { font-size: 220px; font-weight: 800; line-height: 1; color: #4CAF50; }
+  .mostrador-destino { font-size: 60px; font-weight: 700; margin-top: 10px; }
+  .flecha { font-size: 60px; margin: 0 20px; color: #F9A825; }
+  .fila-actual { display: flex; align-items: center; justify-content: center; margin-top: 20px; }
+  .historial { position: fixed; bottom: 0; left: 0; right: 0; background: #2A2B2E; padding: 16px; display: flex; gap: 30px; justify-content: center; overflow-x: auto; }
+  .historial-item { text-align: center; opacity: 0.6; }
+  .historial-item .num { font-size: 28px; font-weight: 700; }
+  .historial-item .mostrador { font-size: 14px; color: #A0A3A8; }
+  .sin-turnos { font-size: 40px; color: #A0A3A8; }
+  .pantalla-completa-btn {
+    position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.1);
+    border: none; color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <button class="pantalla-completa-btn" onclick="document.documentElement.requestFullscreen()">⛶ Pantalla completa</button>
+
+  <div id="turnoActual">
+    <div class="sin-turnos">Esperando el primer turno del día...</div>
+  </div>
+
+  <div class="historial" id="historial"></div>
+
+<script src="js/api.js"></script>
+<script>
+requiereLogin();
+const usuario = getUsuario();
+
+const socket = io(API_URL.replace('/api', ''));
+socket.emit('unirse_sucursal', usuario.sucursal_id);
+socket.on('ficha_llamada', (ficha) => {
+  mostrarTurnoActual(ficha);
+  reproducirSonido();
+  cargarHistorial();
+});
+
+function mostrarTurnoActual(ficha) {
+  document.getElementById('turnoActual').innerHTML = `
+    <div class="etiqueta">Turno</div>
+    <div class="fila-actual">
+      <div class="numero-turno">${String(ficha.numero).padStart(3,'0')}</div>
+    </div>
+    <div class="mostrador-destino">➡️ ${ficha.mostrador_asignado}</div>
+  `;
+}
+
+function reproducirSonido() {
+  // Un "ding" simple generado con la API de audio del navegador, sin
+  // depender de un archivo de sonido externo.
+  try {
+    const contexto = new (window.AudioContext || window.webkitAudioContext)();
+    const oscilador = contexto.createOscillator();
+    const ganancia = contexto.createGain();
+    oscilador.connect(ganancia);
+    ganancia.connect(contexto.destination);
+    oscilador.frequency.value = 880;
+    ganancia.gain.setValueAtTime(0.3, contexto.currentTime);
+    ganancia.gain.exponentialRampToValueAtTime(0.001, contexto.currentTime + 0.6);
+    oscilador.start();
+    oscilador.stop(contexto.currentTime + 0.6);
+  } catch (err) {
+    console.error('No se pudo reproducir el sonido de aviso:', err.message);
+  }
+}
+
+async function cargarTurnoActual() {
+  try {
+    const ficha = await apiFetch('/fichas/actual');
+    if (ficha) mostrarTurnoActual(ficha);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function cargarHistorial() {
+  try {
+    const fichas = await apiFetch('/fichas/recientes');
+    document.getElementById('historial').innerHTML = fichas.slice(1).map(f => `
+      <div class="historial-item">
+        <div class="num">${String(f.numero).padStart(3,'0')}</div>
+        <div class="mostrador">${f.mostrador_asignado || ''}</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+cargarTurnoActual();
+cargarHistorial();
+</script>
+</body>
+</html>

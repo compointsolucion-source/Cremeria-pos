@@ -77,6 +77,12 @@
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
+  <div style="background:#F4F5F6; padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #DDD;">
+    <button class="btn btn-secondary" onclick="generarFicha()">🎫 Generar Ficha</button>
+    <button class="btn btn-primary" onclick="llamarSiguienteTurno()">▶️ Llamar Siguiente</button>
+    <span id="contadorFichasPendientes" style="font-size:13px; color:#666;"></span>
+  </div>
+
   <div id="bannerImpresora" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
     🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraMostrador(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraMostradorUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
   </div>
@@ -593,6 +599,57 @@ function filtrarProductosPorTexto() {
 // Lector de código de barras físico: escanea y agrega el producto/kit
 // automáticamente, igual que si se hubiera escaneado con la cámara.
 activarLectorFisico(buscarPorCodigo);
+
+// ---------- Fichas / Turnos ----------
+async function generarFicha() {
+  try {
+    const ficha = await apiFetch('/fichas', { method: 'POST' });
+    const anchoTicket = (configuracionNegocio && configuracionNegocio.ancho_ticket) || '80mm';
+    const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+
+    if (modoImpresion === 'sistema') {
+      imprimirFichaConDialogoDelSistema(ficha.numero, anchoTicket);
+    } else {
+      try {
+        await imprimirFicha(ficha.numero, anchoTicket);
+      } catch (err) {
+        mostrarToast(`Ficha #${String(ficha.numero).padStart(3,'0')} generada, pero no se pudo imprimir: ${err.message}`, 'error');
+        actualizarContadorFichas();
+        return;
+      }
+    }
+    mostrarToast(`Ficha #${String(ficha.numero).padStart(3,'0')} generada`, 'exito');
+    actualizarContadorFichas();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function llamarSiguienteTurno() {
+  const nombreMostrador = localStorage.getItem('nombre_mostrador') || 'Mostrador';
+  try {
+    const ficha = await apiFetch('/fichas/llamar-siguiente', {
+      method: 'POST',
+      body: JSON.stringify({ mostrador: nombreMostrador })
+    });
+    mostrarToast(`Llamando turno #${String(ficha.numero).padStart(3,'0')} → ${nombreMostrador}`, 'exito');
+    actualizarContadorFichas();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function actualizarContadorFichas() {
+  try {
+    const data = await apiFetch('/fichas/pendientes-count');
+    document.getElementById('contadorFichasPendientes').textContent = `${data.total} en espera`;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+actualizarContadorFichas();
+setInterval(actualizarContadorFichas, 15000);
 
 cargarDatos();
 </script>

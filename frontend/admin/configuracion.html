@@ -47,6 +47,10 @@
         <option value="directo">Directo (Bluetooth/USB) — imprime solo, corta el papel</option>
         <option value="sistema">Impresora ya instalada en esta computadora (Windows/Mac) — más simple, abre un diálogo de impresión</option>
       </select>
+
+      <p class="subtitulo-seccion">Nombre de este Mostrador (para el sistema de turnos)</p>
+      <input type="text" id="nombreMostrador" placeholder="Ej. Mostrador 1" onblur="guardarNombreMostrador()">
+      <p class="nota-pequena">Así se identifica en la pantalla de turnos a dónde debe dirigirse el cliente. Configúralo una vez por dispositivo.</p>
     </div>
 
     <!-- ============ DATOS DEL NEGOCIO ============ -->
@@ -252,11 +256,19 @@ async function guardarConfiguracion() {
 
 function cargarModoImpresion() {
   document.getElementById('modoImpresion').value = localStorage.getItem('modo_impresion') || 'directo';
+  document.getElementById('nombreMostrador').value = localStorage.getItem('nombre_mostrador') || '';
 }
 
 function guardarModoImpresion() {
   localStorage.setItem('modo_impresion', document.getElementById('modoImpresion').value);
   mostrarToast('Método de impresión guardado para este dispositivo', 'exito');
+}
+
+function guardarNombreMostrador() {
+  const nombre = document.getElementById('nombreMostrador').value.trim();
+  if (!nombre) return;
+  localStorage.setItem('nombre_mostrador', nombre);
+  mostrarToast(`Este dispositivo se identificará como "${nombre}"`, 'exito');
 }
 
 // Nota: "líneas en blanco" y varios ajustes hoy son compartidos entre ambos
