@@ -19,7 +19,8 @@ const VALORES_POR_DEFECTO = {
   tipo_codigo_escaneo: 'qr',
   negocio_negritas: true,
   total_negritas: true,
-  tamano_letra: 'normal'
+  tamano_letra: 'normal',
+  tipo_fuente: 'monospace'
 };
 
 // Obtener la configuración de la sucursal (valores por defecto si no existe)
@@ -43,7 +44,7 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
       logo_url, direccion, telefono, rfc, ancho_ticket, terminos,
       lineas_superiores, lineas_inferiores, incluir_precio_unitario,
       descripcion_completa, imprimir_datos_cliente, tipo_codigo_escaneo,
-      negocio_negritas, total_negritas, tamano_letra
+      negocio_negritas, total_negritas, tamano_letra, tipo_fuente
     } = req.body;
 
     if (ancho_ticket && !['58mm', '80mm'].includes(ancho_ticket)) {
@@ -55,15 +56,18 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
     if (tamano_letra && !['normal', 'grande'].includes(tamano_letra)) {
       return res.status(400).json({ error: 'Tamaño de letra inválido' });
     }
+    if (tipo_fuente && !['monospace', 'sans-serif'].includes(tipo_fuente)) {
+      return res.status(400).json({ error: 'Tipo de fuente inválido' });
+    }
 
     const result = await pool.query(
       `INSERT INTO configuracion (
          sucursal_id, logo_url, direccion, telefono, rfc, ancho_ticket, terminos,
          lineas_superiores, lineas_inferiores, incluir_precio_unitario,
          descripcion_completa, imprimir_datos_cliente, tipo_codigo_escaneo,
-         negocio_negritas, total_negritas, tamano_letra
+         negocio_negritas, total_negritas, tamano_letra, tipo_fuente
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        ON CONFLICT (sucursal_id) DO UPDATE SET
          logo_url = COALESCE($2, configuracion.logo_url),
          direccion = COALESCE($3, configuracion.direccion),
@@ -79,7 +83,8 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
          tipo_codigo_escaneo = COALESCE($13, configuracion.tipo_codigo_escaneo),
          negocio_negritas = COALESCE($14, configuracion.negocio_negritas),
          total_negritas = COALESCE($15, configuracion.total_negritas),
-         tamano_letra = COALESCE($16, configuracion.tamano_letra)
+         tamano_letra = COALESCE($16, configuracion.tamano_letra),
+         tipo_fuente = COALESCE($17, configuracion.tipo_fuente)
        RETURNING *`,
       [
         req.usuario.sucursal_id, logo_url || null, direccion || null, telefono || null, rfc || null,
@@ -92,7 +97,8 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
         tipo_codigo_escaneo || null,
         negocio_negritas !== undefined ? negocio_negritas : null,
         total_negritas !== undefined ? total_negritas : null,
-        tamano_letra || null
+        tamano_letra || null,
+        tipo_fuente || null
       ]
     );
 

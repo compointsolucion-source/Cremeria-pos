@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-  .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
+  .contenido { max-width: 550px; margin: 20px auto; padding: 0 14px; }
   .form-config { display: grid; gap: 10px; }
   .estado-impresora { padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
   .conectada { background: #E8F5E9; color: #2E7D32; }
@@ -17,6 +17,10 @@
   .fila-lineas { display: flex; align-items: center; gap: 10px; }
   .fila-lineas input[type="number"] { width: 70px; }
   .opcion-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .subtitulo-seccion { font-weight: 600; font-size: 14px; margin: 10px 0 2px; color: #444; }
+  .nota-pequena { font-size: 12px; color: #888; margin: -4px 0 4px; }
+  .card-titulo-grande { font-size: 17px; margin-bottom: 4px; }
+  .card-subtexto { font-size: 13px; color: #666; margin: 0 0 10px; }
 </style>
 </head>
 <body>
@@ -26,25 +30,29 @@
   </div>
 
   <div class="contenido">
+
+    <!-- ============ IMPRESORA ============ -->
     <div class="card form-config" style="margin-bottom:16px;">
-      <h3>Impresora Térmica</h3>
+      <h3 class="card-titulo-grande">🖨️ Impresora Térmica</h3>
       <div class="estado-impresora desconectada" id="estadoImpresora">Sin conectar en este dispositivo</div>
       <button class="btn btn-primary" onclick="conectar()">🔵 Conectar Impresora Bluetooth</button>
       <button class="btn btn-secondary" onclick="conectarUSB()" style="margin-top:8px;">🔌 Conectar Impresora USB</button>
-      <p style="font-size:13px; color:#888;">Debes conectarla una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
+      <p class="nota-pequena">Debes conectarla una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
     </div>
 
     <div class="card form-config" style="margin-bottom:16px;">
-      <h3>Método de impresión en ESTE dispositivo</h3>
-      <p style="font-size:13px; color:#888;">Esta opción es por dispositivo (computadora/tablet), no se comparte con el resto del negocio.</p>
+      <h3 class="card-titulo-grande">Método de impresión en ESTE dispositivo</h3>
+      <p class="card-subtexto">Esta opción es por dispositivo (computadora/tablet), no se comparte con el resto del negocio.</p>
       <select id="modoImpresion" onchange="guardarModoImpresion()">
         <option value="directo">Directo (Bluetooth/USB) — imprime solo, corta el papel</option>
         <option value="sistema">Impresora ya instalada en esta computadora (Windows/Mac) — más simple, abre un diálogo de impresión</option>
       </select>
     </div>
 
+    <!-- ============ DATOS DEL NEGOCIO ============ -->
     <div class="card form-config" style="margin-bottom:16px;">
-      <h3>Datos del negocio (aparecen en el ticket)</h3>
+      <h3 class="card-titulo-grande">🏪 Datos del negocio</h3>
+      <p class="card-subtexto">Aparecen en ambos tickets (Mostrador y comprobante final de Caja).</p>
       <input type="text" id="direccion" placeholder="Dirección">
       <input type="text" id="telefono" placeholder="Teléfono">
       <input type="text" id="rfc" placeholder="RFC (opcional)">
@@ -53,52 +61,25 @@
         <option value="58mm">Papel de 58mm</option>
       </select>
       <textarea id="terminos" placeholder="Texto al pie del ticket (ej. políticas de devolución)" rows="3" style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
-      <button class="btn btn-primary" onclick="guardarConfiguracion()">Guardar Configuración</button>
+      <button class="btn btn-primary" onclick="guardarConfiguracion()">Guardar Datos del Negocio</button>
     </div>
 
-    <div class="card form-config">
-      <h3>Personalización del Ticket de Venta</h3>
+    <!-- ============ APARIENCIA GENERAL (ambos tickets) ============ -->
+    <div class="card form-config" style="margin-bottom:16px;">
+      <h3 class="card-titulo-grande">🎨 Apariencia (aplica a ambos tickets)</h3>
 
-      <div class="fila-lineas">
-        <span>Líneas en blanco arriba:</span>
-        <input type="number" id="lineasSuperiores" min="0" max="10">
-      </div>
-      <div class="fila-lineas">
-        <span>Líneas en blanco abajo:</span>
-        <input type="number" id="lineasInferiores" min="0" max="10">
-      </div>
-
-      <label class="opcion-check">
-        <input type="checkbox" id="incluirPrecioUnitario">
-        Incluir precio unitario en la impresión del ticket
-      </label>
-      <label class="opcion-check">
-        <input type="checkbox" id="descripcionCompleta">
-        Imprimir descripción completa (usar varios renglones si el nombre es largo)
-      </label>
-      <label class="opcion-check">
-        <input type="checkbox" id="imprimirDatosCliente">
-        Imprimir datos del cliente en el ticket (solo aplica en ventas a crédito/fiado)
-      </label>
-
-      <p style="margin:8px 0 2px; font-weight:600; font-size:14px;">Código para escanear en el ticket:</p>
-      <select id="tipoCodigoEscaneo">
-        <option value="qr">Código QR</option>
-        <option value="barras">Código de barras (para lectores físicos básicos)</option>
-        <option value="ambos">Ambos (QR y código de barras)</option>
-      </select>
-
-      <p style="margin:8px 0 2px; font-weight:600; font-size:14px;">Logotipo del negocio (aparece arriba del ticket)</p>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <img id="previewLogo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;" src="">
-        <input type="file" id="logoInput" accept="image/*">
-      </div>
-
-      <p style="margin:8px 0 2px; font-weight:600; font-size:14px;">Tamaño de letra del ticket</p>
+      <p class="subtitulo-seccion">Tamaño de letra</p>
       <select id="tamanoLetra">
         <option value="normal">Normal</option>
         <option value="grande">Grande</option>
       </select>
+
+      <p class="subtitulo-seccion">Tipo de fuente</p>
+      <select id="tipoFuente">
+        <option value="monospace">Clásica (Monospace — recomendada, alinea mejor las columnas)</option>
+        <option value="sans-serif">Moderna (Sans-serif)</option>
+      </select>
+      <p class="nota-pequena">⚠️ El tipo de fuente solo aplica cuando imprimes con "Impresora ya instalada" (diálogo de Windows). Si imprimes directo por Bluetooth/USB, la impresora térmica usa su propia fuente incorporada — no se puede cambiar desde aquí. Con "Moderna" las columnas de precio pueden no alinear perfecto (las fuentes modernas no tienen ancho fijo por letra).</p>
 
       <label class="opcion-check">
         <input type="checkbox" id="negocioNegritas">
@@ -108,10 +89,72 @@
         <input type="checkbox" id="totalNegritas">
         Total en negritas
       </label>
+      <label class="opcion-check">
+        <input type="checkbox" id="incluirPrecioUnitario">
+        Incluir precio unitario por producto
+      </label>
+      <label class="opcion-check">
+        <input type="checkbox" id="descripcionCompleta">
+        Descripción completa (varios renglones si el nombre es largo)
+      </label>
 
-      <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Personalización</button>
-      <button class="btn btn-secondary" onclick="probarImpresion()">🖨️ Probar impresión con ticket de prueba</button>
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Apariencia</button>
     </div>
+
+    <!-- ============ TICKET DE MOSTRADOR (preventa) ============ -->
+    <div class="card form-config" style="margin-bottom:16px;">
+      <h3 class="card-titulo-grande">🥩 Ticket de Mostrador (preventa)</h3>
+      <p class="card-subtexto">El que se imprime ANTES de pagar, para que Caja lo escanee. Sin logotipo a propósito — ahorra papel en un ticket que es solo de referencia interna.</p>
+
+      <p class="subtitulo-seccion">Código para escanear</p>
+      <select id="tipoCodigoEscaneo">
+        <option value="qr">Código QR</option>
+        <option value="barras">Código de barras (para lectores físicos básicos)</option>
+        <option value="ambos">Ambos (QR y código de barras)</option>
+      </select>
+
+      <div class="fila-lineas">
+        <span>Líneas en blanco arriba:</span>
+        <input type="number" id="lineasSuperioresMostrador" min="0" max="10">
+      </div>
+      <div class="fila-lineas">
+        <span>Líneas en blanco abajo:</span>
+        <input type="number" id="lineasInferioresMostrador" min="0" max="10">
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Ticket de Mostrador</button>
+      <button class="btn btn-secondary" onclick="probarImpresionMostrador()">🖨️ Probar impresión (Mostrador)</button>
+    </div>
+
+    <!-- ============ COMPROBANTE FINAL (Caja) ============ -->
+    <div class="card form-config">
+      <h3 class="card-titulo-grande">💰 Comprobante Final (Caja)</h3>
+      <p class="card-subtexto">El que se imprime DESPUÉS de cobrar, para el cliente. Ya no lleva código escaneable (ya se cobró, no hay nada que buscar).</p>
+
+      <p class="subtitulo-seccion">Logotipo del negocio</p>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img id="previewLogo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;" src="">
+        <input type="file" id="logoInput" accept="image/*">
+      </div>
+
+      <label class="opcion-check">
+        <input type="checkbox" id="imprimirDatosCliente">
+        Imprimir datos del cliente (solo aplica en ventas a crédito/fiado)
+      </label>
+
+      <div class="fila-lineas">
+        <span>Líneas en blanco arriba:</span>
+        <input type="number" id="lineasSuperioresCaja" min="0" max="10">
+      </div>
+      <div class="fila-lineas">
+        <span>Líneas en blanco abajo:</span>
+        <input type="number" id="lineasInferioresCaja" min="0" max="10">
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Comprobante Final</button>
+      <button class="btn btn-secondary" onclick="probarImpresionCaja()">🖨️ Probar impresión (Comprobante Final)</button>
+    </div>
+
   </div>
 
 <script src="../js/api.js"></script>
@@ -163,15 +206,21 @@ async function cargarConfiguracion() {
     document.getElementById('anchoTicket').value = config.ancho_ticket || '80mm';
     document.getElementById('terminos').value = config.terminos || '';
 
-    document.getElementById('lineasSuperiores').value = config.lineas_superiores !== undefined ? config.lineas_superiores : 0;
-    document.getElementById('lineasInferiores').value = config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3;
-    document.getElementById('incluirPrecioUnitario').checked = config.incluir_precio_unitario !== false;
-    document.getElementById('descripcionCompleta').checked = config.descripcion_completa !== false;
-    document.getElementById('imprimirDatosCliente').checked = !!config.imprimir_datos_cliente;
-    document.getElementById('tipoCodigoEscaneo').value = config.tipo_codigo_escaneo || 'qr';
     document.getElementById('tamanoLetra').value = config.tamano_letra || 'normal';
+    document.getElementById('tipoFuente').value = config.tipo_fuente || 'monospace';
     document.getElementById('negocioNegritas').checked = config.negocio_negritas !== false;
     document.getElementById('totalNegritas').checked = config.total_negritas !== false;
+    document.getElementById('incluirPrecioUnitario').checked = config.incluir_precio_unitario !== false;
+    document.getElementById('descripcionCompleta').checked = config.descripcion_completa !== false;
+
+    document.getElementById('tipoCodigoEscaneo').value = config.tipo_codigo_escaneo || 'qr';
+    document.getElementById('lineasSuperioresMostrador').value = config.lineas_superiores !== undefined ? config.lineas_superiores : 0;
+    document.getElementById('lineasInferioresMostrador').value = config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3;
+
+    document.getElementById('imprimirDatosCliente').checked = !!config.imprimir_datos_cliente;
+    document.getElementById('lineasSuperioresCaja').value = config.lineas_superiores !== undefined ? config.lineas_superiores : 0;
+    document.getElementById('lineasInferioresCaja').value = config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3;
+
     if (config.logo_url) {
       logoBase64 = config.logo_url;
       document.getElementById('previewLogo').src = config.logo_url;
@@ -193,7 +242,7 @@ async function guardarConfiguracion() {
         terminos: document.getElementById('terminos').value.trim()
       })
     });
-    mostrarToast('Configuración guardada', 'exito');
+    mostrarToast('Datos del negocio guardados', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
@@ -208,31 +257,38 @@ function guardarModoImpresion() {
   mostrarToast('Método de impresión guardado para este dispositivo', 'exito');
 }
 
+// Nota: "líneas en blanco" y varios ajustes hoy son compartidos entre ambos
+// tickets en la base de datos (un solo valor guardado) — se muestran en las
+// dos tarjetas para que sea claro qué controla cada una, pero al guardar
+// desde cualquiera de las dos, se usa el mismo campo. Si más adelante quieres
+// que sean completamente independientes, es una fase aparte.
 async function guardarPersonalizacionTicket() {
   try {
     await apiFetch('/configuracion', {
       method: 'PUT',
       body: JSON.stringify({
-        lineas_superiores: parseInt(document.getElementById('lineasSuperiores').value || 0),
-        lineas_inferiores: parseInt(document.getElementById('lineasInferiores').value || 3),
+        tamano_letra: document.getElementById('tamanoLetra').value,
+        tipo_fuente: document.getElementById('tipoFuente').value,
+        negocio_negritas: document.getElementById('negocioNegritas').checked,
+        total_negritas: document.getElementById('totalNegritas').checked,
         incluir_precio_unitario: document.getElementById('incluirPrecioUnitario').checked,
         descripcion_completa: document.getElementById('descripcionCompleta').checked,
-        imprimir_datos_cliente: document.getElementById('imprimirDatosCliente').checked,
         tipo_codigo_escaneo: document.getElementById('tipoCodigoEscaneo').value,
-        logo_url: logoBase64 || null,
-        tamano_letra: document.getElementById('tamanoLetra').value,
-        negocio_negritas: document.getElementById('negocioNegritas').checked,
-        total_negritas: document.getElementById('totalNegritas').checked
+        imprimir_datos_cliente: document.getElementById('imprimirDatosCliente').checked,
+        lineas_superiores: parseInt(document.getElementById('lineasSuperioresMostrador').value || 0),
+        lineas_inferiores: parseInt(document.getElementById('lineasInferioresMostrador').value || 3),
+        logo_url: logoBase64 || null
       })
     });
-    mostrarToast('Personalización del ticket guardada', 'exito');
+    mostrarToast('Guardado correctamente', 'exito');
+    cargarConfiguracion();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-async function probarImpresion() {
-  const datosTicketPrueba = {
+function datosBaseTicketPrueba() {
+  return {
     ancho_ticket: document.getElementById('anchoTicket').value,
     negocio: {
       nombre: 'Compoint Punto de Soluciones',
@@ -246,32 +302,52 @@ async function probarImpresion() {
       { nombre_producto: 'Queso panela', detalle: '1 x $85.00', subtotal: '85.00' }
     ],
     total: '175.00',
-    piePagina: document.getElementById('terminos').value || 'Ticket de prueba',
-    lineasSuperiores: parseInt(document.getElementById('lineasSuperiores').value || 0),
-    lineasInferiores: parseInt(document.getElementById('lineasInferiores').value || 3),
-    incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
-    descripcionCompleta: document.getElementById('descripcionCompleta').checked,
-    tipoCodigoEscaneo: document.getElementById('tipoCodigoEscaneo').value,
-    imprimirDatosCliente: document.getElementById('imprimirDatosCliente').checked,
-    cliente: { nombre: 'Cliente de Prueba', telefono: '3312345678' },
-    logoUrl: logoBase64 || null,
     tamanoLetra: document.getElementById('tamanoLetra').value,
     negocioNegritas: document.getElementById('negocioNegritas').checked,
-    totalNegritas: document.getElementById('totalNegritas').checked
+    totalNegritas: document.getElementById('totalNegritas').checked,
+    incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
+    descripcionCompleta: document.getElementById('descripcionCompleta').checked
   };
+}
 
+async function imprimirSegunModo(datos) {
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
   if (modoImpresion === 'sistema') {
-    await imprimirConDialogoDelSistema(datosTicketPrueba);
+    await imprimirConDialogoDelSistema(datos);
     return;
   }
-
   try {
-    await imprimirTicketBLE(datosTicketPrueba);
+    await imprimirTicketBLE(datos);
     mostrarToast('Ticket de prueba impreso', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+}
+
+async function probarImpresionMostrador() {
+  const datos = {
+    ...datosBaseTicketPrueba(),
+    piePagina: 'Presenta este ticket en caja para pagar',
+    lineasSuperiores: parseInt(document.getElementById('lineasSuperioresMostrador').value || 0),
+    lineasInferiores: parseInt(document.getElementById('lineasInferioresMostrador').value || 3),
+    tipoCodigoEscaneo: document.getElementById('tipoCodigoEscaneo').value
+    // Sin logo a propósito, igual que el ticket real de Mostrador.
+  };
+  await imprimirSegunModo(datos);
+}
+
+async function probarImpresionCaja() {
+  const datos = {
+    ...datosBaseTicketPrueba(),
+    piePagina: '¡Gracias por su compra!',
+    lineasSuperiores: parseInt(document.getElementById('lineasSuperioresCaja').value || 0),
+    lineasInferiores: parseInt(document.getElementById('lineasInferioresCaja').value || 3),
+    imprimirDatosCliente: document.getElementById('imprimirDatosCliente').checked,
+    cliente: { nombre: 'Cliente de Prueba', telefono: '3312345678' },
+    logoUrl: logoBase64 || null
+    // Sin tipoCodigoEscaneo a propósito, igual que el comprobante real de Caja.
+  };
+  await imprimirSegunModo(datos);
 }
 
 cargarModoImpresion();

@@ -406,6 +406,7 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     negocioNegritas: config.negocio_negritas !== false,
     totalNegritas: config.total_negritas !== false,
     tamanoLetra: config.tamano_letra || 'normal',
+    tipoFuente: config.tipo_fuente || 'monospace',
     imprimirDatosCliente: !!config.imprimir_datos_cliente,
     cliente: clienteSeleccionado ? { nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null
   };

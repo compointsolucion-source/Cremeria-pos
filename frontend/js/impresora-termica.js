@@ -544,6 +544,8 @@ async function imprimirConDialogoDelSistema(datosTicket) {
     htmlLogo = `<img src="${datosTicket.logoUrl}" style="display:block; margin:0 auto 6px; max-width:80%;">`;
   }
 
+  const familiaFuente = datosTicket.tipoFuente === 'sans-serif' ? "'Segoe UI', Arial, sans-serif" : "'Courier New', monospace";
+
   const html = `
     <!DOCTYPE html>
     <html lang="es">
@@ -552,7 +554,7 @@ async function imprimirConDialogoDelSistema(datosTicket) {
     <title>Ticket ${datosTicket.folio}</title>
     <style>
       @page { size: ${anchoMM} auto; margin: 2mm; }
-      body { font-family: 'Courier New', monospace; font-size: ${tamanoFuente}; margin: 0; }
+      body { font-family: ${familiaFuente}; font-size: ${tamanoFuente}; margin: 0; }
     </style>
     </head>
     <body>${htmlLogo}${htmlCodigo}${lineasHtml}<script>window.onload = () => window.print();<\/script></body>
