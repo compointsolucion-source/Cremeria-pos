@@ -14,6 +14,9 @@
   .form-ajuste { display: grid; gap: 10px; margin-bottom: 20px; }
   .fila-doble { display: flex; gap: 10px; }
   .fila-doble > * { flex: 1; }
+  .subtitulo-seccion { font-weight: 600; font-size: 13px; color: #555; }
+  .sugerencia-item { padding: 8px 14px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #F0F0F0; }
+  .sugerencia-item:hover { background: #F4F5F6; }
 </style>
 </head>
 <body>
@@ -27,11 +30,26 @@
     <div class="card form-ajuste" style="border-left: 4px solid #2E7D32;">
       <h3>➕ Agregar Inventario</h3>
       <p style="font-size:13px; color:#666; margin-top:-6px;">Usa esto cuando recibiste mercancía sin registrar una compra, o cuando el conteo físico dio MÁS de lo que el sistema tenía.</p>
-      <select id="productoEntrada"></select>
+
+      <input type="text" id="buscadorEntrada" placeholder="🔍 Buscar producto por nombre o código de barras..." oninput="buscarProductoEntrada()">
+      <div id="sugerenciasEntrada" style="display:none; background:white; border:1px solid #DDD; border-radius:10px; margin-top:-4px; max-height:160px; overflow-y:auto;"></div>
+      <div id="productoEntradaInfo" style="display:none; background:#F4F5F6; border-radius:10px; padding:10px 14px; font-size:14px;">
+        <b id="nombreProductoEntrada"></b><br>
+        <span style="color:#666;">Hay actualmente: <b id="existenciaProductoEntrada"></b></span>
+      </div>
+
       <div class="fila-doble">
         <input type="number" id="cantidadEntrada" placeholder="Cantidad a agregar" step="0.01">
         <input type="text" id="motivoEntrada" placeholder="Motivo (ej. Conteo físico, mercancía sin factura)">
       </div>
+
+      <p class="subtitulo-seccion" style="margin:4px 0 0;">Actualizar precios (opcional — déjalos en blanco si no cambiaron)</p>
+      <div class="fila-triple" style="display:flex; gap:10px;">
+        <input type="number" id="costoEntrada" placeholder="Precio costo" step="0.01">
+        <input type="number" id="ventaEntrada" placeholder="Precio venta" step="0.01">
+        <input type="number" id="mayoreoEntrada" placeholder="Precio mayoreo" step="0.01">
+      </div>
+
       <button class="btn btn-primary" onclick="registrarEntradaManual()">Agregar al inventario</button>
     </div>
 
@@ -84,25 +102,90 @@ async function cargarInventario() {
     tbody.appendChild(tr);
   });
 
-  // Selectores de los formularios de entrada y ajuste
-  const selectEntrada = document.getElementById('productoEntrada');
-  selectEntrada.innerHTML = inventario.map(i => `<option value="${i.producto_id}">${i.nombre}</option>`).join('');
+  // Catálogo completo en memoria para el buscador de "Agregar Inventario"
+  catalogoInventarioCompleto = inventario;
+
   const select = document.getElementById('productoAjuste');
   select.innerHTML = inventario.map(i => `<option value="${i.producto_id}">${i.nombre}</option>`).join('');
 }
 
+let catalogoInventarioCompleto = [];
+let productoEntradaSeleccionado = null;
+
+function buscarProductoEntrada() {
+  const texto = document.getElementById('buscadorEntrada').value.trim().toLowerCase();
+  const sugerencias = document.getElementById('sugerenciasEntrada');
+  productoEntradaSeleccionado = null;
+  document.getElementById('productoEntradaInfo').style.display = 'none';
+
+  if (!texto) { sugerencias.style.display = 'none'; return; }
+
+  const coincidencias = catalogoInventarioCompleto.filter(p =>
+    p.nombre.toLowerCase().includes(texto) ||
+    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
+  ).slice(0, 8);
+
+  // Si el texto coincide exacto con un código de barras, selecciona directo
+  // (así al escanear con el lector físico no hace falta tocar nada más).
+  const coincidenciaExacta = catalogoInventarioCompleto.find(p => p.codigo_barras && p.codigo_barras.toLowerCase() === texto);
+  if (coincidenciaExacta) {
+    seleccionarProductoEntrada(coincidenciaExacta);
+    sugerencias.style.display = 'none';
+    return;
+  }
+
+  if (coincidencias.length === 0) {
+    sugerencias.innerHTML = '<div class="sugerencia-item" style="color:#888;">Sin coincidencias</div>';
+    sugerencias.style.display = 'block';
+    return;
+  }
+
+  sugerencias.innerHTML = coincidencias.map(p => `
+    <div class="sugerencia-item" onclick='seleccionarProductoEntradaPorId(${p.producto_id})'>${p.nombre}</div>
+  `).join('');
+  sugerencias.style.display = 'block';
+}
+
+function seleccionarProductoEntradaPorId(producto_id) {
+  const producto = catalogoInventarioCompleto.find(p => p.producto_id === producto_id);
+  if (producto) seleccionarProductoEntrada(producto);
+}
+
+function seleccionarProductoEntrada(producto) {
+  productoEntradaSeleccionado = producto;
+  document.getElementById('buscadorEntrada').value = producto.nombre;
+  document.getElementById('sugerenciasEntrada').style.display = 'none';
+  document.getElementById('productoEntradaInfo').style.display = 'block';
+  document.getElementById('nombreProductoEntrada').textContent = producto.nombre;
+  const unidad = producto.tipo_venta === 'unidad' ? 'pzas' : 'kg';
+  document.getElementById('existenciaProductoEntrada').textContent = `${parseFloat(producto.existencia_actual).toFixed(2)} ${unidad}`;
+}
+
 async function registrarEntradaManual() {
-  const producto_id = document.getElementById('productoEntrada').value;
+  if (!productoEntradaSeleccionado) { mostrarToast('Busca y selecciona un producto primero', 'error'); return; }
+  const producto_id = productoEntradaSeleccionado.producto_id;
   const cantidad = parseFloat(document.getElementById('cantidadEntrada').value || 0);
   const motivo = document.getElementById('motivoEntrada').value.trim();
+  const precio_costo = parseFloat(document.getElementById('costoEntrada').value || 0) || null;
+  const precio = parseFloat(document.getElementById('ventaEntrada').value || 0) || null;
+  const precio_mayoreo = parseFloat(document.getElementById('mayoreoEntrada').value || 0) || null;
 
-  if (!producto_id || cantidad <= 0) { mostrarToast('Selecciona un producto y una cantidad válida', 'error'); return; }
+  if (cantidad <= 0) { mostrarToast('Ingresa una cantidad válida', 'error'); return; }
 
   try {
-    await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo: 'entrada_manual', motivo }) });
+    await apiFetch('/inventario/ajuste', {
+      method: 'POST',
+      body: JSON.stringify({ producto_id, cantidad, tipo: 'entrada_manual', motivo, precio_costo, precio, precio_mayoreo })
+    });
     mostrarToast('Inventario agregado correctamente', 'exito');
+    document.getElementById('buscadorEntrada').value = '';
     document.getElementById('cantidadEntrada').value = '';
     document.getElementById('motivoEntrada').value = '';
+    document.getElementById('costoEntrada').value = '';
+    document.getElementById('ventaEntrada').value = '';
+    document.getElementById('mayoreoEntrada').value = '';
+    document.getElementById('productoEntradaInfo').style.display = 'none';
+    productoEntradaSeleccionado = null;
     cargarInventario();
   } catch (err) {
     mostrarToast(err.message, 'error');

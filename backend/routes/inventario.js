@@ -54,7 +54,7 @@ router.get('/valorizado', verificarToken, requierePermiso('INVENTARIO_VER'), asy
 router.get('/', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT p.id AS producto_id, p.nombre, p.tipo_venta, p.imagen_url,
+      `SELECT p.id AS producto_id, p.nombre, p.tipo_venta, p.imagen_url, p.codigo_barras,
               COALESCE(i.existencia_actual, 0) AS existencia_actual,
               COALESCE(i.stock_minimo, 0) AS stock_minimo
        FROM productos p
@@ -108,7 +108,7 @@ router.put('/:producto_id/minimo', verificarToken, requiereRol('dueno', 'gerente
 router.post('/ajuste', verificarToken, async (req, res) => {
   const conexion = await pool.connect();
   try {
-    const { producto_id, cantidad, tipo, motivo } = req.body;
+    const { producto_id, cantidad, tipo, motivo, precio_costo, precio, precio_mayoreo } = req.body;
     // tipo: 'entrada_manual' (SUMA — encontraste más de lo que decía el sistema,
     //        o recibiste mercancía sin pasar por Compras),
     //       'merma' (SIEMPRE RESTA — caducidad/desperdicio),
@@ -143,12 +143,25 @@ router.post('/ajuste', verificarToken, async (req, res) => {
       [producto_id, tipo, cantidadConSigno, motivo || null, req.usuario.id]
     );
 
+    // Si se recibió mercancía con costo/precio nuevo, actualizar el producto
+    // de una vez (solo tiene sentido en entrada manual, no al restar por merma).
+    if (tipo === 'entrada_manual' && (precio_costo || precio || precio_mayoreo)) {
+      await conexion.query(
+        `UPDATE productos SET
+          precio_costo = COALESCE($1, precio_costo),
+          precio = COALESCE($2, precio),
+          precio_mayoreo = COALESCE($3, precio_mayoreo)
+         WHERE id = $4`,
+        [precio_costo || null, precio || null, precio_mayoreo || null, producto_id]
+      );
+    }
+
     await registrarBitacora(conexion, {
       usuario_id: req.usuario.id,
       accion: tipo === 'merma' ? 'registrar_merma' : (tipo === 'entrada_manual' ? 'entrada_manual_inventario' : 'ajustar_inventario'),
       modulo: 'inventario',
       referencia_id: producto_id,
-      valor_nuevo: { cantidad, motivo }
+      valor_nuevo: { cantidad, motivo, precio_costo, precio, precio_mayoreo }
     });
 
     await conexion.query('COMMIT');
