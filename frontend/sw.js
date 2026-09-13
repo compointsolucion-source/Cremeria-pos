@@ -3,11 +3,11 @@
 // NUNCA se interceptan aquí (siempre van a la red) — la sincronización de
 // datos offline se maneja en las tandas siguientes, no en este archivo.
 //
-// IMPORTANTE PARA MANTENIMIENTO: cada vez que se modifique alguno de los
-// archivos listados en ARCHIVOS_A_GUARDAR, hay que subir el número de
-// CACHE_VERSION — si no, los navegadores pueden seguir sirviendo la
-// versión vieja desde la copia guardada por un rato.
-const CACHE_VERSION = 'cremeria-pos-v2';
+// Estrategia "red primero": mientras haya internet, siempre se sirve la
+// versión más nueva (y se actualiza la copia de respaldo de paso) — la
+// copia guardada solo se usa cuando de verdad no hay conexión. Esto evita
+// quedarse con una versión vieja por olvidar subir CACHE_VERSION.
+const CACHE_VERSION = 'cremeria-pos-v3';
 
 const ARCHIVOS_A_GUARDAR = [
   '/mostrador.html',
@@ -58,7 +58,18 @@ self.addEventListener('fetch', (evento) => {
   // externos como jsQR o JsBarcode — esos se piden normal a la red).
   if (url.origin !== self.location.origin) return;
 
+  // "Red primero, copia guardada como respaldo": mientras haya internet,
+  // SIEMPRE se usa la versión más nueva del servidor (y de paso se
+  // actualiza la copia guardada) — la copia solo se usa cuando de verdad
+  // no hay conexión. Esto evita quedarse pegado en una versión vieja por
+  // olvidar subir CACHE_VERSION en alguna actualización futura.
   evento.respondWith(
-    caches.match(evento.request).then((respuestaGuardada) => respuestaGuardada || fetch(evento.request))
+    fetch(evento.request)
+      .then((respuestaDeRed) => {
+        const copia = respuestaDeRed.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(evento.request, copia));
+        return respuestaDeRed;
+      })
+      .catch(() => caches.match(evento.request))
   );
 });
