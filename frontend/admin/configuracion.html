@@ -160,6 +160,71 @@
       </div>
     </div>
 
+    <!-- ============ FORMAS DE PAGO ============ -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="header-plegable" onclick="toggleSeccionConfig('secFormasPago')">
+        <h3 class="card-titulo-grande">💳 Formas de Pago</h3>
+        <span class="flecha-plegable colapsada" id="flecha-secFormasPago">▾</span>
+      </div>
+      <div class="form-config seccion-plegable colapsada" id="secFormasPago">
+
+        <p class="subtitulo-seccion">💵 Efectivo</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="efectivoBloquear">
+          No permitir cobrar si el efectivo ingresado es menor que el total
+        </label>
+
+        <p class="subtitulo-seccion">💵 Dólares Americanos</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="dolaresHabilitado" onchange="toggleCampoDolar()">
+          Deseo habilitar el cobro en Dólares Americanos
+        </label>
+        <p class="nota-pequena">Al habilitarlo, Caja convierte el total a dólares usando este tipo de cambio.</p>
+        <input type="number" id="tipoCambioDolar" placeholder="Tipo de cambio (pesos por dólar)" step="0.0001">
+
+        <p class="subtitulo-seccion">💳 Tarjeta de Crédito/Débito</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="tarjetaHabilitado">
+          Deseo habilitar cobro con Tarjeta de Crédito/Débito
+        </label>
+        <input type="number" id="tarjetaComision" placeholder="Comisión por cobro con tarjeta (%, opcional)" step="0.01">
+        <p class="nota-pequena">La comisión es solo informativa (para tus reportes) — no se le cobra de más al cliente.</p>
+
+        <p class="subtitulo-seccion">🏦 Transferencias Bancarias</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="transferenciaHabilitado">
+          Deseo habilitar cobro con Transferencias
+        </label>
+        <input type="text" id="transferenciaEtiqueta" placeholder="Nombre a mostrar en el botón (ej. Transferencia)">
+
+        <p class="subtitulo-seccion">🖋️ Cheque</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="chequeHabilitado">
+          Deseo habilitar cobro con Cheque
+        </label>
+
+        <p class="subtitulo-seccion">🎟️ Vales de Despensa</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="valesHabilitado">
+          Deseo habilitar cobro con Vales de Despensa
+        </label>
+
+        <p class="subtitulo-seccion">🔀 Pagos Mixtos</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="mixtoHabilitado">
+          Deseo habilitar el cobro con varias formas de pago (mixto)
+        </label>
+
+        <p class="subtitulo-seccion">📒 Crédito / Fiado</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="creditoHabilitado">
+          Deseo habilitar la venta a crédito (fiado)
+        </label>
+
+        <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarFormasPago()">Guardar Formas de Pago</button>
+      </div>
+    </div>
+
     <!-- ============ COMPROBANTE FINAL (Caja) ============ -->
     <div class="card">
       <div class="header-plegable" onclick="toggleSeccionConfig('secComprobante')">
@@ -256,6 +321,19 @@ async function cargarConfiguracion() {
     document.getElementById('tipoFuente').value = config.tipo_fuente || 'monospace';
     document.getElementById('negocioNegritas').checked = config.negocio_negritas !== false;
     document.getElementById('totalNegritas').checked = config.total_negritas !== false;
+
+    document.getElementById('efectivoBloquear').checked = config.efectivo_bloquear_insuficiente !== false;
+    document.getElementById('dolaresHabilitado').checked = !!config.dolares_habilitado;
+    document.getElementById('tipoCambioDolar').value = config.tipo_cambio_dolar || '';
+    document.getElementById('tarjetaHabilitado').checked = config.tarjeta_habilitado !== false;
+    document.getElementById('tarjetaComision').value = config.tarjeta_comision_porcentaje || '';
+    document.getElementById('transferenciaHabilitado').checked = config.transferencia_habilitado !== false;
+    document.getElementById('transferenciaEtiqueta').value = config.transferencia_etiqueta || 'Transferencia';
+    document.getElementById('chequeHabilitado').checked = !!config.cheque_habilitado;
+    document.getElementById('valesHabilitado').checked = !!config.vales_habilitado;
+    document.getElementById('mixtoHabilitado').checked = config.mixto_habilitado !== false;
+    document.getElementById('creditoHabilitado').checked = config.credito_habilitado !== false;
+    toggleCampoDolar();
     document.getElementById('incluirPrecioUnitario').checked = config.incluir_precio_unitario !== false;
     document.getElementById('descripcionCompleta').checked = config.descripcion_completa !== false;
 
@@ -289,6 +367,34 @@ async function guardarConfiguracion() {
       })
     });
     mostrarToast('Datos del negocio guardados', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+function toggleCampoDolar() {
+  document.getElementById('tipoCambioDolar').style.display = document.getElementById('dolaresHabilitado').checked ? 'block' : 'none';
+}
+
+async function guardarFormasPago() {
+  try {
+    await apiFetch('/configuracion', {
+      method: 'PUT',
+      body: JSON.stringify({
+        efectivo_bloquear_insuficiente: document.getElementById('efectivoBloquear').checked,
+        dolares_habilitado: document.getElementById('dolaresHabilitado').checked,
+        tipo_cambio_dolar: parseFloat(document.getElementById('tipoCambioDolar').value || 0),
+        tarjeta_habilitado: document.getElementById('tarjetaHabilitado').checked,
+        tarjeta_comision_porcentaje: parseFloat(document.getElementById('tarjetaComision').value || 0),
+        transferencia_habilitado: document.getElementById('transferenciaHabilitado').checked,
+        transferencia_etiqueta: document.getElementById('transferenciaEtiqueta').value.trim() || 'Transferencia',
+        cheque_habilitado: document.getElementById('chequeHabilitado').checked,
+        vales_habilitado: document.getElementById('valesHabilitado').checked,
+        mixto_habilitado: document.getElementById('mixtoHabilitado').checked,
+        credito_habilitado: document.getElementById('creditoHabilitado').checked
+      })
+    });
+    mostrarToast('Formas de pago guardadas', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }

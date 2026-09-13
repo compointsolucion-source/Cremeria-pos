@@ -25,6 +25,7 @@
 <body>
   <div class="top-bar">
     <h1>📈 Reportes</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -245,7 +246,7 @@ function renderResumen(data) {
     </div>
   `;
 
-  const metodosNombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mixto: 'Mixto', credito: 'Fiado' };
+  const metodosNombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mixto: 'Mixto', credito: 'Fiado', dolares: 'Dólares', cheque: 'Cheque', vale_despensa: 'Vale de Despensa' };
   document.getElementById('tablaMetodos').innerHTML = data.por_metodo_pago.map(m => `
     <tr><td>${metodosNombres[m.metodo_pago] || m.metodo_pago || 'Sin especificar'}</td><td>${m.num_tickets}</td><td>$${parseFloat(m.total).toFixed(2)}</td></tr>
   `).join('') || '<tr><td colspan="3">Sin ventas en este rango</td></tr>';

@@ -156,19 +156,44 @@ function renderPanelCobro() {
 
     <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="abrirDescuento()">🏷️ Aplicar descuento</button>
 
-    <div class="metodo-pago-btns">
-      <button class="btn btn-secondary" id="btnEfectivo" onclick="setMetodo('efectivo')">Efectivo</button>
-      <button class="btn btn-secondary" id="btnTarjeta" onclick="setMetodo('tarjeta')">Tarjeta</button>
-      <button class="btn btn-secondary" id="btnTransferencia" onclick="setMetodo('transferencia')">Transferencia</button>
-      <button class="btn btn-secondary" id="btnMixto" onclick="setMetodo('mixto')">Mixto</button>
-      <button class="btn btn-secondary" id="btnCredito" onclick="setMetodo('credito')">💳 Fiado</button>
-    </div>
+    <div class="metodo-pago-btns" id="metodoPagoBtns"></div>
 
     <div id="camposPago"></div>
 
     <button class="btn btn-primary" id="btnConfirmarPago" style="width:100%; margin-top:14px;" onclick="cobrar()">✅ Confirmar Pago</button>
   `;
-  setMetodo('efectivo');
+  renderBotonesMetodoPago();
+}
+
+// Construye los botones de método de pago solo con los que estén activados
+// en Configuración → Formas de Pago. Si el negocio nunca configuró nada,
+// se usan los 4 métodos clásicos que siempre existieron (comportamiento
+// igual al de antes de esta función, para no romper nada por defecto).
+function renderBotonesMetodoPago() {
+  const config = configuracionNegocioCaja || {};
+  const etiquetaTransferencia = config.transferencia_etiqueta || 'Transferencia';
+
+  const metodosDisponibles = [
+    { id: 'efectivo', label: 'Efectivo', activo: true },
+    { id: 'tarjeta', label: 'Tarjeta', activo: config.tarjeta_habilitado !== false },
+    { id: 'transferencia', label: etiquetaTransferencia, activo: config.transferencia_habilitado !== false },
+    { id: 'dolares', label: '💵 Dólares', activo: !!config.dolares_habilitado },
+    { id: 'cheque', label: '🖋️ Cheque', activo: !!config.cheque_habilitado },
+    { id: 'vale_despensa', label: '🎟️ Vale', activo: !!config.vales_habilitado },
+    { id: 'mixto', label: 'Mixto', activo: config.mixto_habilitado !== false },
+    { id: 'credito', label: '💳 Fiado', activo: config.credito_habilitado !== false }
+  ];
+
+  const idsBoton = { efectivo: 'btnEfectivo', tarjeta: 'btnTarjeta', transferencia: 'btnTransferencia', dolares: 'btnDolares', cheque: 'btnCheque', vale_despensa: 'btnVale', mixto: 'btnMixto', credito: 'btnCredito' };
+
+  document.getElementById('metodoPagoBtns').innerHTML = metodosDisponibles
+    .filter(m => m.activo)
+    .map(m => `<button class="btn btn-secondary" id="${idsBoton[m.id]}" onclick="setMetodo('${m.id}')">${m.label}</button>`)
+    .join('');
+
+  // El primer método activo disponible es el que queda seleccionado al abrir el ticket.
+  const primerDisponible = metodosDisponibles.find(m => m.activo);
+  if (primerDisponible) setMetodo(primerDisponible.id);
 }
 
 async function editarCantidad(itemId, cantidadActual) {
@@ -198,9 +223,9 @@ async function quitarItem(itemId) {
 
 function setMetodo(m) {
   metodoPago = m;
-  ['Efectivo','Tarjeta','Transferencia','Mixto','Credito'].forEach(nombre => {
+  ['Efectivo','Tarjeta','Transferencia','Mixto','Credito','Dolares','Cheque','Vale'].forEach(nombre => {
     const btn = document.getElementById('btn' + nombre);
-    if (btn) btn.classList.toggle('activo', nombre.toLowerCase() === m);
+    if (btn) btn.classList.toggle('activo', (nombre === 'Vale' ? 'vale_despensa' : nombre.toLowerCase()) === m);
   });
 
   const camposDiv = document.getElementById('camposPago');
@@ -220,9 +245,32 @@ function setMetodo(m) {
       <div id="resultadosCliente"></div>
       <div id="clienteElegido" style="margin-top:8px; font-weight:600;"></div>
     `;
+  } else if (m === 'dolares') {
+    const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
+    const totalDolares = tipoCambio > 0 ? (totalNetoActual() / tipoCambio) : 0;
+    camposDiv.innerHTML = `
+      <p style="font-size:14px; color:#666;">Tipo de cambio: $${tipoCambio.toFixed(4)} MXN/USD — Total a cobrar: <b>$${totalDolares.toFixed(2)} USD</b></p>
+      <input type="number" id="dolaresRecibidos" placeholder="Dólares recibidos" step="0.01" oninput="calcularCambioDolares()">
+      <p id="cambioDolaresTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+    `;
+  } else if (m === 'tarjeta') {
+    const comision = parseFloat((configuracionNegocioCaja || {}).tarjeta_comision_porcentaje || 0);
+    camposDiv.innerHTML = comision > 0
+      ? `<p style="font-size:13px; color:#888;">Comisión estimada de la terminal: $${(totalNetoActual() * comision / 100).toFixed(2)} (${comision}%) — informativo, no se le cobra de más al cliente.</p>`
+      : '';
   } else {
     camposDiv.innerHTML = '';
   }
+}
+
+// Calcula el cambio cuando se cobra en dólares — el cambio se da en dólares
+// (lo más común en la práctica cuando el cliente paga en efectivo dólar).
+function calcularCambioDolares() {
+  const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
+  const totalDolares = tipoCambio > 0 ? (totalNetoActual() / tipoCambio) : 0;
+  const recibido = parseFloat(document.getElementById('dolaresRecibidos').value || 0);
+  const cambio = recibido - totalDolares;
+  document.getElementById('cambioDolaresTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)} USD` : `Falta: $${Math.abs(cambio).toFixed(2)} USD`;
 }
 
 async function abrirDescuentoItem(itemId) {
@@ -336,8 +384,25 @@ async function cobrar() {
 
     if (metodoPago === 'efectivo') {
       montoEfectivo = totalAPagar;
-    } else if (metodoPago === 'tarjeta' || metodoPago === 'transferencia') {
+      const bloquearInsuficiente = (configuracionNegocioCaja || {}).efectivo_bloquear_insuficiente !== false;
+      if (bloquearInsuficiente) {
+        const recibido = parseFloat(document.getElementById('montoRecibido').value || 0);
+        if (recibido < totalAPagar) {
+          mostrarToast('El efectivo ingresado es menor que el total — este negocio no permite cobrar así', 'error');
+          return;
+        }
+      }
+    } else if (metodoPago === 'tarjeta' || metodoPago === 'transferencia' || metodoPago === 'dolares' || metodoPago === 'cheque' || metodoPago === 'vale_despensa') {
       montoTarjeta = totalAPagar;
+      if (metodoPago === 'dolares') {
+        const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
+        const totalDolares = tipoCambio > 0 ? (totalAPagar / tipoCambio) : 0;
+        const recibidoDolares = parseFloat(document.getElementById('dolaresRecibidos').value || 0);
+        if (recibidoDolares < totalDolares) {
+          mostrarToast('Los dólares recibidos no alcanzan el total', 'error');
+          return;
+        }
+      }
     } else if (metodoPago === 'mixto') {
       montoEfectivo = parseFloat(document.getElementById('montoEfectivo').value || 0);
       montoTarjeta = parseFloat(document.getElementById('montoTarjeta').value || 0);
