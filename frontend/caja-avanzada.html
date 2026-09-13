@@ -379,7 +379,10 @@ function abrirModalPesoAvanzada(producto) {
   document.getElementById('cantidadPesoAvanzada').value = '';
   document.getElementById('importePesoAvanzada').value = '';
   document.getElementById('modalPesoAvanzada').style.display = 'flex';
-  document.getElementById('cantidadPesoAvanzada').focus();
+  // setTimeout(0) le da tiempo al navegador de terminar de mostrar la
+  // ventana antes de intentar enfocar — sin esto, el foco a veces no
+  // "pega" porque el campo todavía no es visible en ese instante exacto.
+  setTimeout(() => document.getElementById('cantidadPesoAvanzada').focus(), 0);
 }
 
 function cerrarModalPesoAvanzada() {
@@ -694,7 +697,7 @@ function abrirVerificadorPrecios() {
   document.getElementById('modalVerificador').style.display = 'flex';
   document.getElementById('campoVerificador').value = '';
   document.getElementById('resultadoVerificador').innerHTML = '<p style="color:#888;">Escribe un código o nombre...</p>';
-  document.getElementById('campoVerificador').focus();
+  setTimeout(() => document.getElementById('campoVerificador').focus(), 0);
 }
 
 function cerrarVerificador() {
@@ -767,6 +770,7 @@ async function abrirHistorialVentas() {
   document.getElementById('fechaHistorial').value = new Date().toISOString().split('T')[0];
   await cargarCajerosFiltroHistorial();
   await cargarHistorialVentas();
+  setTimeout(() => document.getElementById('fechaHistorial').focus(), 0);
 }
 
 function cerrarHistorial() {
@@ -1036,6 +1040,17 @@ function setMetodoCobrarAvanzada(m) {
     ` : '';
   } else {
     campos.innerHTML = '';
+  }
+
+  // Enfoca el campo principal de cada método, para poder escribir de una
+  // vez sin tener que darle clic primero — igual al abrir el modal, como
+  // al cambiar de método con el teclado.
+  const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv' }[m];
+  if (idCampoPrincipal) {
+    setTimeout(() => {
+      const campo = document.getElementById(idCampoPrincipal);
+      if (campo) campo.focus();
+    }, 0);
   }
 }
 

@@ -369,6 +369,7 @@ async function abrirPromociones(id, nombre, precio, costo) {
   document.getElementById('costoPromo').textContent = costo ? parseFloat(costo).toFixed(2) : 'N/D';
   document.getElementById('modalPromociones').style.display = 'flex';
   await cargarEscalones();
+  setTimeout(() => document.getElementById('cantidadMinimaNueva').focus(), 0);
 }
 
 function cerrarModalPromociones() {
