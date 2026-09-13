@@ -26,6 +26,7 @@
   }
   .sugerencia-avanzada-item { padding: 10px 14px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #F0F0F0; }
   .sugerencia-avanzada-item:hover { background: #F4F5F6; }
+  .sugerencia-avanzada-item.sugerencia-resaltada { background: #E8F5E9; }
   .barra-atajos { background: white; border-radius: 12px; padding: 8px; margin-bottom: 10px; box-shadow: var(--shadow); display: flex; gap: 6px; flex-wrap: wrap; }
   .barra-atajos button { font-size: 13px; padding: 8px 12px; }
   .tabla-venta { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
@@ -68,7 +69,7 @@
       <div style="position:relative; flex:1;">
         <input type="text" id="campoCodigoProducto" placeholder="Código del producto o nombre... (Enter para agregar)" autofocus
                style="width:100%;"
-               oninput="buscarProductoAvanzada()" onkeydown="if(event.key==='Enter') manejarEnterCampoCodigo()">
+               oninput="buscarProductoAvanzada()" onkeydown="manejarTecladoCampoCodigo(event)">
         <div id="sugerenciasAvanzada" class="sugerencias-avanzada"></div>
       </div>
       <button class="btn btn-primary" onclick="manejarEnterCampoCodigo()">ENTER - Agregar Producto</button>
@@ -310,10 +311,14 @@ async function cargarCatalogoAvanzada() {
   }
 }
 
+let listaSugerenciasActual = []; // [{id, tipo}] en el mismo orden que se muestran
+let indiceSugerenciaSeleccionada = -1;
+
 function buscarProductoAvanzada() {
   const texto = document.getElementById('campoCodigoProducto').value.trim().toLowerCase();
   const sugerencias = document.getElementById('sugerenciasAvanzada');
-  if (!texto) { sugerencias.style.display = 'none'; return; }
+  indiceSugerenciaSeleccionada = -1;
+  if (!texto) { sugerencias.style.display = 'none'; listaSugerenciasActual = []; return; }
 
   const coincidenciasProductos = catalogoAvanzada.filter(p =>
     p.nombre.toLowerCase().includes(texto) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
@@ -323,21 +328,44 @@ function buscarProductoAvanzada() {
   if (coincidenciasProductos.length === 0 && coincidenciasKits.length === 0) {
     sugerencias.innerHTML = '<div class="sugerencia-avanzada-item" style="color:#888;">Sin coincidencias</div>';
     sugerencias.style.display = 'block';
+    listaSugerenciasActual = [];
     return;
   }
 
+  // Se guarda en el mismo orden en que se dibuja, para que las flechas del
+  // teclado y el mouse siempre apunten al mismo renglón.
+  listaSugerenciasActual = [
+    ...coincidenciasKits.map(k => ({ id: k.id, tipo: 'kit' })),
+    ...coincidenciasProductos.map(p => ({ id: p.id, tipo: 'producto' }))
+  ];
+
   sugerencias.innerHTML =
-    coincidenciasKits.map(k => `
-      <div class="sugerencia-avanzada-item" onclick='seleccionarSugerenciaAvanzada(${k.id}, "kit")'>
+    coincidenciasKits.map((k, idx) => `
+      <div class="sugerencia-avanzada-item" data-idx="${idx}" onclick='seleccionarSugerenciaAvanzada(${k.id}, "kit")'>
         <span>📦 ${k.nombre}</span><span>$${parseFloat(k.precio_kit).toFixed(2)}</span>
       </div>
     `).join('') +
-    coincidenciasProductos.map(p => `
-      <div class="sugerencia-avanzada-item" onclick='seleccionarSugerenciaAvanzada(${p.id}, "producto")'>
+    coincidenciasProductos.map((p, idx) => `
+      <div class="sugerencia-avanzada-item" data-idx="${coincidenciasKits.length + idx}" onclick='seleccionarSugerenciaAvanzada(${p.id}, "producto")'>
         <span>${p.nombre}</span><span>$${parseFloat(p.precio).toFixed(2)}</span>
       </div>
     `).join('');
   sugerencias.style.display = 'block';
+}
+
+// Mueve la selección resaltada entre las sugerencias con las flechas del
+// teclado (sin soltar las manos del teclado para nada).
+function moverSeleccionSugerencia(direccion) {
+  if (listaSugerenciasActual.length === 0) return;
+  indiceSugerenciaSeleccionada += direccion;
+  if (indiceSugerenciaSeleccionada < 0) indiceSugerenciaSeleccionada = listaSugerenciasActual.length - 1;
+  if (indiceSugerenciaSeleccionada >= listaSugerenciasActual.length) indiceSugerenciaSeleccionada = 0;
+
+  document.querySelectorAll('.sugerencia-avanzada-item[data-idx]').forEach(el => {
+    el.classList.toggle('sugerencia-resaltada', parseInt(el.dataset.idx) === indiceSugerenciaSeleccionada);
+  });
+  const elementoResaltado = document.querySelector(`.sugerencia-avanzada-item[data-idx="${indiceSugerenciaSeleccionada}"]`);
+  if (elementoResaltado) elementoResaltado.scrollIntoView({ block: 'nearest' });
 }
 
 // Para productos "a granel" (por peso), pide la cantidad antes de agregar
@@ -404,6 +432,30 @@ function seleccionarSugerenciaAvanzada(id, tipo) {
 // Enter en el campo: si el texto es un código de barras exacto, agrega
 // directo (para lectores físicos y escaneo rápido). Si no, intenta
 // interpretarlo como nombre y agrega la primera coincidencia.
+// Flechas arriba/abajo mueven la selección entre sugerencias; Enter elige
+// la resaltada (si hay una) o sigue el comportamiento normal si no.
+function manejarTecladoCampoCodigo(event) {
+  const sugerenciasVisibles = document.getElementById('sugerenciasAvanzada').style.display === 'block';
+
+  if (event.key === 'ArrowDown' && sugerenciasVisibles) {
+    event.preventDefault();
+    moverSeleccionSugerencia(1);
+  } else if (event.key === 'ArrowUp' && sugerenciasVisibles) {
+    event.preventDefault();
+    moverSeleccionSugerencia(-1);
+  } else if (event.key === 'Enter') {
+    if (sugerenciasVisibles && indiceSugerenciaSeleccionada >= 0 && listaSugerenciasActual[indiceSugerenciaSeleccionada]) {
+      const elegida = listaSugerenciasActual[indiceSugerenciaSeleccionada];
+      seleccionarSugerenciaAvanzada(elegida.id, elegida.tipo);
+    } else {
+      manejarEnterCampoCodigo();
+    }
+  } else if (event.key === 'Escape') {
+    document.getElementById('sugerenciasAvanzada').style.display = 'none';
+    indiceSugerenciaSeleccionada = -1;
+  }
+}
+
 function manejarEnterCampoCodigo() {
   const texto = document.getElementById('campoCodigoProducto').value.trim();
   if (!texto) return;
