@@ -636,8 +636,62 @@ async function seleccionarTicketHistorial(id) {
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="imprimirCopiaHistorial()">🖨️ Imprimir copia</button>
         <button class="btn btn-secondary" onclick="devolverDesdeHistorial()">↩️ Devolver producto (clic en el renglón primero)</button>
+        ${ticketCompleto.estado === 'pagado' ? '<button class="btn btn-danger" onclick="cancelarVentaCompleta()">✕ Cancelar Venta Completa</button>' : ''}
       </div>
     `;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Cancela TODO el ticket de un solo clic: arma la devolución con el 100% de
+// cada renglón (sin tener que seleccionarlos uno por uno), reutilizando el
+// mismo backend de Devoluciones que ya está probado — no se reinventa la
+// lógica de reversar inventario/crédito por segunda vez.
+async function cancelarVentaCompleta() {
+  if (!ticketSeleccionadoHistorial) return;
+  const ticket = ticketSeleccionadoHistorial;
+
+  const confirmado = await confirmarAccion(`¿Cancelar TODO el ticket ${ticket.folio}? Esto devuelve el 100% de los productos y ${ticket.metodo_pago === 'credito' ? 'ajusta el saldo del cliente' : 'reembolsa el total'}. No se puede deshacer.`);
+  if (!confirmado) return;
+
+  const esCredito = ticket.metodo_pago === 'credito';
+  let metodo_reembolso;
+  if (esCredito) {
+    metodo_reembolso = 'ajuste_credito';
+  } else {
+    const respuesta = await solicitarTexto('¿Cómo se reembolsa? Escribe: efectivo, o "sin" para no reembolsar dinero (solo ajustar inventario):', 'efectivo');
+    if (!respuesta) return;
+    metodo_reembolso = respuesta.trim().toLowerCase().startsWith('sin') ? 'sin_reembolso' : 'efectivo';
+  }
+
+  const motivo = await solicitarTexto('Motivo de la cancelación completa:');
+  if (!motivo) return;
+
+  const items = ticket.items.map(i => ({
+    ticket_detalle_id: i.id,
+    cantidad_devuelta: parseFloat(i.cantidad) - parseFloat(i.cantidad_devuelta || 0),
+    regresa_inventario: true
+  })).filter(i => i.cantidad_devuelta > 0);
+
+  if (items.length === 0) { mostrarToast('Este ticket ya no tiene nada pendiente de devolver', 'error'); return; }
+
+  try {
+    let turno_id = null;
+    if (metodo_reembolso === 'efectivo') {
+      const turno = await apiFetch('/turnos/actual');
+      if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo antes de reembolsar en efectivo.', 'error'); return; }
+      turno_id = turno.id;
+    }
+
+    await apiFetch('/devoluciones', {
+      method: 'POST',
+      body: JSON.stringify({ ticket_id: ticket.id, items, metodo_reembolso, motivo, turno_id })
+    });
+
+    mostrarToast(`Ticket ${ticket.folio} cancelado por completo`, 'exito');
+    cerrarHistorial();
+    abrirHistorialVentas();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
