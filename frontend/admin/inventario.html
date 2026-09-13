@@ -19,22 +19,35 @@
 <body>
   <div class="top-bar">
     <h1>📊 Inventario</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <div class="card form-ajuste">
-      <h3>Registrar merma o ajuste</h3>
+    <div class="card form-ajuste" style="border-left: 4px solid #2E7D32;">
+      <h3>➕ Agregar Inventario</h3>
+      <p style="font-size:13px; color:#666; margin-top:-6px;">Usa esto cuando recibiste mercancía sin registrar una compra, o cuando el conteo físico dio MÁS de lo que el sistema tenía.</p>
+      <select id="productoEntrada"></select>
+      <div class="fila-doble">
+        <input type="number" id="cantidadEntrada" placeholder="Cantidad a agregar" step="0.01">
+        <input type="text" id="motivoEntrada" placeholder="Motivo (ej. Conteo físico, mercancía sin factura)">
+      </div>
+      <button class="btn btn-primary" onclick="registrarEntradaManual()">Agregar al inventario</button>
+    </div>
+
+    <div class="card form-ajuste" style="border-left: 4px solid #C62828;">
+      <h3>➖ Registrar Merma o Ajuste (resta)</h3>
+      <p style="font-size:13px; color:#666; margin-top:-6px;">Usa esto para descontar por caducidad, desperdicio, o cuando el conteo físico dio MENOS de lo esperado.</p>
       <select id="productoAjuste"></select>
       <div class="fila-doble">
         <select id="tipoAjuste">
           <option value="merma">Merma (caducidad/desperdicio)</option>
-          <option value="ajuste_manual">Ajuste manual (conteo físico)</option>
+          <option value="ajuste_manual">Ajuste manual (conteo físico dio menos)</option>
         </select>
         <input type="number" id="cantidadAjuste" placeholder="Cantidad a descontar" step="0.01">
       </div>
       <input type="text" id="motivoAjuste" placeholder="Motivo (ej. Caducó, se cayó al piso)">
-      <button class="btn btn-danger" onclick="registrarAjuste()">Registrar</button>
+      <button class="btn btn-danger" onclick="registrarAjuste()">Registrar resta</button>
     </div>
 
     <h3>Inventario Valorizado</h3>
@@ -71,9 +84,29 @@ async function cargarInventario() {
     tbody.appendChild(tr);
   });
 
-  // Selector del formulario de ajuste
+  // Selectores de los formularios de entrada y ajuste
+  const selectEntrada = document.getElementById('productoEntrada');
+  selectEntrada.innerHTML = inventario.map(i => `<option value="${i.producto_id}">${i.nombre}</option>`).join('');
   const select = document.getElementById('productoAjuste');
   select.innerHTML = inventario.map(i => `<option value="${i.producto_id}">${i.nombre}</option>`).join('');
+}
+
+async function registrarEntradaManual() {
+  const producto_id = document.getElementById('productoEntrada').value;
+  const cantidad = parseFloat(document.getElementById('cantidadEntrada').value || 0);
+  const motivo = document.getElementById('motivoEntrada').value.trim();
+
+  if (!producto_id || cantidad <= 0) { mostrarToast('Selecciona un producto y una cantidad válida', 'error'); return; }
+
+  try {
+    await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo: 'entrada_manual', motivo }) });
+    mostrarToast('Inventario agregado correctamente', 'exito');
+    document.getElementById('cantidadEntrada').value = '';
+    document.getElementById('motivoEntrada').value = '';
+    cargarInventario();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
 }
 
 async function actualizarMinimo(producto_id, valor) {
@@ -95,6 +128,7 @@ async function registrarAjuste() {
 
   try {
     await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo, motivo }) });
+    mostrarToast('Movimiento registrado correctamente', 'exito');
     document.getElementById('cantidadAjuste').value = '';
     document.getElementById('motivoAjuste').value = '';
     cargarInventario();

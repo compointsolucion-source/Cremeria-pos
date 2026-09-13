@@ -108,11 +108,15 @@ router.put('/:producto_id/minimo', verificarToken, requiereRol('dueno', 'gerente
 router.post('/ajuste', verificarToken, async (req, res) => {
   const conexion = await pool.connect();
   try {
-    const { producto_id, cantidad, tipo, motivo } = req.body; // tipo: 'merma' o 'ajuste_manual'; cantidad siempre positiva, se resta
+    const { producto_id, cantidad, tipo, motivo } = req.body;
+    // tipo: 'entrada_manual' (SUMA — encontraste más de lo que decía el sistema,
+    //        o recibiste mercancía sin pasar por Compras),
+    //       'merma' (SIEMPRE RESTA — caducidad/desperdicio),
+    //       'ajuste_manual' (SIEMPRE RESTA — conteo físico que dio menos de lo esperado)
     if (!producto_id || !cantidad || cantidad <= 0) {
       return res.status(400).json({ error: 'Producto y cantidad son requeridos' });
     }
-    if (!['merma', 'ajuste_manual'].includes(tipo)) {
+    if (!['merma', 'ajuste_manual', 'entrada_manual'].includes(tipo)) {
       return res.status(400).json({ error: 'Tipo de ajuste inválido' });
     }
 
@@ -121,6 +125,8 @@ router.post('/ajuste', verificarToken, async (req, res) => {
       return res.status(403).json({ error: `No tienes el permiso "${permisoRequerido}" para esta acción. Pide a tu gerente que te lo asigne en Equipo.` });
     }
 
+    const cantidadConSigno = tipo === 'entrada_manual' ? cantidad : -cantidad;
+
     await conexion.query('BEGIN');
 
     await conexion.query(
@@ -128,18 +134,18 @@ router.post('/ajuste', verificarToken, async (req, res) => {
       [producto_id]
     );
     await conexion.query(
-      'UPDATE inventario SET existencia_actual = existencia_actual - $1 WHERE producto_id = $2',
-      [cantidad, producto_id]
+      'UPDATE inventario SET existencia_actual = existencia_actual + $1 WHERE producto_id = $2',
+      [cantidadConSigno, producto_id]
     );
     await conexion.query(
       `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, motivo, usuario_id)
        VALUES ($1, $2, $3, $4, $5)`,
-      [producto_id, tipo, -cantidad, motivo || null, req.usuario.id]
+      [producto_id, tipo, cantidadConSigno, motivo || null, req.usuario.id]
     );
 
     await registrarBitacora(conexion, {
       usuario_id: req.usuario.id,
-      accion: tipo === 'merma' ? 'registrar_merma' : 'ajustar_inventario',
+      accion: tipo === 'merma' ? 'registrar_merma' : (tipo === 'entrada_manual' ? 'entrada_manual_inventario' : 'ajustar_inventario'),
       modulo: 'inventario',
       referencia_id: producto_id,
       valor_nuevo: { cantidad, motivo }
