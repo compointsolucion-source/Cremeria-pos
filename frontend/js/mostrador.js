@@ -375,7 +375,7 @@ async function generarTicket() {
 async function imprimirTicket(ticket) {
   const config = configuracionNegocio || {};
   const datosTicket = {
-    ancho_ticket: config.ancho_ticket || '80mm',
+    ancho_ticket: obtenerAnchoTicketDispositivo(config),
     negocio: {
       nombre: 'Compoint Punto de Soluciones',
       direccion: config.direccion,
@@ -471,7 +471,7 @@ function obtenerNombreMostrador() {
 async function generarFicha() {
   try {
     const ficha = await apiFetch('/fichas', { method: 'POST' });
-    const anchoTicket = (configuracionNegocio && configuracionNegocio.ancho_ticket) || '80mm';
+    const anchoTicket = obtenerAnchoTicketDispositivo(configuracionNegocio);
     const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
 
     if (modoImpresion === 'sistema') {
@@ -551,7 +551,7 @@ function sonarCampanitaFicha() {
 async function reimprimirUltimaFicha() {
   try {
     const ficha = await apiFetch('/fichas/ultima');
-    const anchoTicket = (configuracionNegocio && configuracionNegocio.ancho_ticket) || '80mm';
+    const anchoTicket = obtenerAnchoTicketDispositivo(configuracionNegocio);
     const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
 
     if (modoImpresion === 'sistema') {

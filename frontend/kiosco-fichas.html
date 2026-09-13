@@ -105,7 +105,7 @@ async function sacarFicha() {
     const ficha = await apiFetch('/fichas', { method: 'POST' });
     mostrarNumeroFicha(ficha.numero);
 
-    const anchoTicket = (configuracionKiosco && configuracionKiosco.ancho_ticket) || '80mm';
+    const anchoTicket = obtenerAnchoTicketDispositivo(configuracionKiosco);
     const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
     try {
       if (modoImpresion === 'sistema') {

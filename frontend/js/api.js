@@ -9,6 +9,17 @@ function getUsuario() {
   return u ? JSON.parse(u) : null;
 }
 
+// El ancho del papel es una preferencia de ESTE dispositivo específico
+// (cada terminal puede tener conectada una impresora distinta) — se
+// guarda en localStorage, no en la configuración compartida de la tienda.
+// Si el dispositivo nunca se configuró, se usa el valor general de la
+// tienda como sugerencia inicial (config.ancho_ticket), y de ahí en
+// adelante lo que se guarde aquí manda, sin importar qué se cambie en
+// otro dispositivo.
+function obtenerAnchoTicketDispositivo(config) {
+  return localStorage.getItem('ancho_ticket_dispositivo') || (config && config.ancho_ticket) || '80mm';
+}
+
 function cerrarSesion() {
   const token = getToken();
   if (token) {

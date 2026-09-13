@@ -797,7 +797,7 @@ async function reimprimirUltimoTicketAvanzada() {
     const config = await apiFetch('/configuracion');
 
     const datosTicket = {
-      ancho_ticket: config.ancho_ticket || '80mm',
+      ancho_ticket: obtenerAnchoTicketDispositivo(config),
       negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
       folio: ticket.folio,
       fecha: new Date(ticket.fecha_pago).toLocaleString(),
@@ -965,7 +965,7 @@ async function imprimirCopiaHistorial() {
   if (!ticketSeleccionadoHistorial) return;
   const config = await apiFetch('/configuracion');
   const datosTicket = {
-    ancho_ticket: config.ancho_ticket || '80mm',
+    ancho_ticket: obtenerAnchoTicketDispositivo(config),
     negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
     folio: ticketSeleccionadoHistorial.folio,
     fecha: new Date(ticketSeleccionadoHistorial.fecha_pago || ticketSeleccionadoHistorial.fecha_creacion).toLocaleString(),
@@ -1259,7 +1259,7 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado) {
   }
 
   const datosTicket = {
-    ancho_ticket: config.ancho_ticket || '80mm',
+    ancho_ticket: obtenerAnchoTicketDispositivo(config),
     negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
     folio: ticket.folio,
     fecha: new Date().toLocaleString(),

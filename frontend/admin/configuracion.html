@@ -66,6 +66,13 @@
         <p class="subtitulo-seccion">Nombre de este Mostrador (para el sistema de turnos)</p>
         <input type="text" id="nombreMostrador" placeholder="Ej. Mostrador 1" onblur="guardarNombreMostrador()">
         <p class="nota-pequena">Así se identifica en la pantalla de turnos a dónde debe dirigirse el cliente. Configúralo una vez por dispositivo.</p>
+
+        <p class="subtitulo-seccion">Ancho de papel de la impresora de ESTE dispositivo</p>
+        <select id="anchoTicketDispositivo" onchange="guardarAnchoTicketDispositivo()">
+          <option value="80mm">Papel de 80mm</option>
+          <option value="58mm">Papel de 58mm</option>
+        </select>
+        <p class="nota-pequena">Esto es solo para esta computadora/tablet — si tienes otro dispositivo con una impresora de otro tamaño (ej. tu celular), configúralo ahí por separado sin que se afecten entre sí.</p>
       </div>
     </div>
 
@@ -84,6 +91,7 @@
           <option value="80mm">Papel de 80mm</option>
           <option value="58mm">Papel de 58mm</option>
         </select>
+        <p class="nota-pequena">⚠️ Esto es solo la sugerencia inicial para dispositivos nuevos que nunca se han configurado — cada computadora/tablet tiene su propio ajuste real en "Método de impresión en este dispositivo", arriba.</p>
         <textarea id="terminos" placeholder="Texto al pie del ticket (ej. políticas de devolución)" rows="3" style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
         <button class="btn btn-primary" onclick="guardarConfiguracion()">Guardar Datos del Negocio</button>
       </div>
@@ -411,6 +419,7 @@ async function guardarFormasPago() {
 function cargarModoImpresion() {
   document.getElementById('modoImpresion').value = localStorage.getItem('modo_impresion') || 'directo';
   document.getElementById('nombreMostrador').value = localStorage.getItem('nombre_mostrador') || '';
+  document.getElementById('anchoTicketDispositivo').value = localStorage.getItem('ancho_ticket_dispositivo') || '80mm';
 }
 
 function guardarModoImpresion() {
@@ -423,6 +432,11 @@ function guardarNombreMostrador() {
   if (!nombre) return;
   localStorage.setItem('nombre_mostrador', nombre);
   mostrarToast(`Este dispositivo se identificará como "${nombre}"`, 'exito');
+}
+
+function guardarAnchoTicketDispositivo() {
+  localStorage.setItem('ancho_ticket_dispositivo', document.getElementById('anchoTicketDispositivo').value);
+  mostrarToast('Ancho de papel guardado para este dispositivo', 'exito');
 }
 
 // Nota: "líneas en blanco" y varios ajustes hoy son compartidos entre ambos

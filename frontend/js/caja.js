@@ -436,7 +436,7 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
   }
 
   const datosTicket = {
-    ancho_ticket: config.ancho_ticket || '80mm',
+    ancho_ticket: obtenerAnchoTicketDispositivo(config),
     negocio: {
       nombre: 'Compoint Punto de Soluciones',
       direccion: config.direccion,
