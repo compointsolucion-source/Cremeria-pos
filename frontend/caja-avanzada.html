@@ -56,6 +56,12 @@
       <button class="btn btn-primary" onclick="manejarEnterCampoCodigo()">ENTER - Agregar Producto</button>
     </div>
 
+    <div class="barra-atajos">
+      <button class="btn btn-secondary" onclick="abrirVarios()">🔢 INS - Varios</button>
+      <button class="btn btn-secondary" onclick="abrirArticuloComun()">📝 Artículo en Común</button>
+      <button class="btn btn-secondary" onclick="borrarFilaSeleccionadaAvanzada()">🗑️ DEL - Borrar Art.</button>
+    </div>
+
     <table class="tabla-venta">
       <thead>
         <tr>
@@ -226,6 +232,56 @@ function seleccionarFilaAvanzada(idx) {
   renderTablaVentaAvanzada();
 }
 
+function borrarFilaSeleccionadaAvanzada() {
+  if (filaSeleccionadaIndex === null) { mostrarToast('Selecciona primero un renglón de la tabla para borrarlo', 'error'); return; }
+  carritoAvanzada.splice(filaSeleccionadaIndex, 1);
+  filaSeleccionadaIndex = null;
+  renderTablaVentaAvanzada();
+}
+
+// "Varios": para cuando llevas varias piezas del mismo producto y no quieres
+// escanear una por una — escribes el código una vez y la cantidad.
+async function abrirVarios() {
+  const codigo = await solicitarTexto('Código de barras del producto:');
+  if (!codigo) return;
+
+  const producto = catalogoAvanzada.find(p => p.codigo_barras === codigo.trim());
+  if (!producto) { mostrarToast('No se encontró ningún producto con ese código', 'error'); return; }
+
+  const cantidadTexto = await solicitarTexto(`Cantidad de "${producto.nombre}" a agregar:`, '1');
+  if (!cantidadTexto) return;
+  const cantidad = parseFloat(cantidadTexto);
+  if (isNaN(cantidad) || cantidad <= 0) { mostrarToast('Cantidad inválida', 'error'); return; }
+
+  agregarProductoAvanzada(producto, cantidad);
+  mostrarToast(`${cantidad} x ${producto.nombre} agregado`, 'exito');
+}
+
+// "Artículo en Común": para vender algo que no está dado de alta en el
+// catálogo — se captura libre (descripción y precio) y no afecta inventario
+// porque no está ligado a ningún producto real.
+async function abrirArticuloComun() {
+  const descripcion = await solicitarTexto('¿Qué vas a vender? (descripción libre)');
+  if (!descripcion) return;
+
+  const precioTexto = await solicitarTexto(`Precio de "${descripcion}":`);
+  if (!precioTexto) return;
+  const precio = parseFloat(precioTexto);
+  if (isNaN(precio) || precio <= 0) { mostrarToast('Precio inválido', 'error'); return; }
+
+  carritoAvanzada.push({
+    tipo: 'producto',
+    producto_id: null, // sin producto real: no descuenta inventario
+    codigo_barras: '0',
+    nombre_producto: descripcion,
+    cantidad: 1,
+    precio_unitario: precio,
+    existencia_referencia: null
+  });
+  renderTablaVentaAvanzada();
+  mostrarToast('Artículo agregado', 'exito');
+}
+
 // Genera el ticket (igual que Mostrador) y de inmediato lo carga en Caja
 // para cobrarlo — mismo flujo de siempre, solo que capturado desde aquí.
 async function irACobrarAvanzada() {
@@ -254,6 +310,17 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.barra-superior-avanzada')) {
     document.getElementById('sugerenciasAvanzada').style.display = 'none';
   }
+});
+
+// Atajos de teclado: INS abre "Varios", DEL borra el renglón seleccionado.
+// Se ignoran si el foco está en un campo de texto (para no interferir con
+// escribir normal, ej. borrar texto con la tecla Delete).
+document.addEventListener('keydown', (e) => {
+  const enCampoDeTexto = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+  if (enCampoDeTexto) return;
+
+  if (e.key === 'Insert') { e.preventDefault(); abrirVarios(); }
+  else if (e.key === 'Delete') { e.preventDefault(); borrarFilaSeleccionadaAvanzada(); }
 });
 
 cargarCatalogoAvanzada();
