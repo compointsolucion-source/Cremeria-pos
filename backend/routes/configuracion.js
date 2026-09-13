@@ -31,7 +31,8 @@ const VALORES_POR_DEFECTO = {
   cheque_habilitado: false,
   vales_habilitado: false,
   mixto_habilitado: true,
-  credito_habilitado: true
+  credito_habilitado: true,
+  cajon_abrir_automatico: false
 };
 
 // Lista blanca de campos editables desde el PUT — evita construir la

@@ -145,4 +145,23 @@ router.get('/historial', verificarToken, async (req, res) => {
   }
 });
 
+// Solo registra en bitácora que alguien abrió el cajón sin que fuera parte
+// de un cobro (ej. para sacar/meter dinero) — la apertura física la hace el
+// navegador directo a la impresora; esto es nada más el rastro de auditoría.
+router.post('/registrar-apertura-cajon', verificarToken, requierePermiso('CAJA_MOVIMIENTO'), async (req, res) => {
+  try {
+    const { motivo } = req.body;
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'abrir_cajon_manual',
+      modulo: 'turnos',
+      valor_nuevo: { motivo: motivo || null }
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al registrar la apertura del cajón' });
+  }
+});
+
 module.exports = router;

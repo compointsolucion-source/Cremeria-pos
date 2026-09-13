@@ -163,8 +163,29 @@ async function enviarBytes(bytes) {
 
 // Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
 // detalle de productos — es un boleto de espera, no un ticket de venta.
+// Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
+// el comando ESC/POS estándar. Solo funciona con impresión directa
+// (Bluetooth/USB) — el método "diálogo del sistema" pasa por el driver de
+// Windows y no manda comandos crudos, así que ahí no hay forma de abrirlo.
 // Intenta reconectar en automático apenas se carga la página.
 intentarReconexionAutomatica();
+
+// Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
+// el comando ESC/POS estándar. Solo funciona con impresión directa
+// (Bluetooth/USB) — el método "diálogo del sistema" pasa por el driver de
+// Windows y no manda comandos crudos, así que ahí no hay forma de abrirlo.
+async function abrirCajonDinero() {
+  if (!impresoraConectada()) {
+    await reconectarSiEsPosible();
+  }
+  if (!impresoraConectada()) {
+    throw new Error('No hay impresora conectada — el cajón se abre a través de ella. Conéctala primero.');
+  }
+  // ESC p m t1 t2 — comando estándar "kick out drawer" que reconocen casi
+  // todas las impresoras térmicas con conector de cajón.
+  const comando = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+  await enviarBytes(comando);
+}
 
 // Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
 // detalle de productos — es un boleto de espera, no un ticket de venta.

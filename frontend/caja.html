@@ -38,6 +38,7 @@
 <body>
   <div class="top-bar">
     <h1>💰 Caja</h1>
+    <button class="btn btn-secondary" onclick="abrirCajonManual()">🗄️ Abrir Cajón</button>
     <a class="btn btn-secondary" href="index.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
@@ -381,6 +382,18 @@ function elegirCliente(cliente) {
   document.getElementById('clienteElegido').textContent = `Cliente seleccionado: ${cliente.nombre}`;
 }
 
+async function abrirCajonManual() {
+  const motivo = await solicitarTexto('Motivo (ej. Sacar cambio, meter fondo):');
+  if (!motivo) return;
+  try {
+    await abrirCajonDinero();
+    await apiFetch('/turnos/registrar-apertura-cajon', { method: 'POST', body: JSON.stringify({ motivo }) });
+    mostrarToast('Cajón abierto', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
 async function cobrar() {
   const boton = document.getElementById('btnConfirmarPago');
   if (boton) { boton.disabled = true; boton.textContent = 'Procesando...'; }
@@ -442,6 +455,9 @@ async function cobrar() {
     mostrarToast('Pago procesado correctamente', 'exito');
     if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
       mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')} — registra reabastecimiento en Inventario`, 'error');
+    }
+    if ((configuracionNegocioCaja || {}).cajon_abrir_automatico) {
+      try { await abrirCajonDinero(); } catch (err) { console.error('No se pudo abrir el cajón automáticamente:', err.message); }
     }
     await imprimirComprobante(ticketActual, metodoPago);
     ticketActual = null;

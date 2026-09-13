@@ -221,6 +221,12 @@
           Deseo habilitar la venta a crédito (fiado)
         </label>
 
+        <p class="subtitulo-seccion">🗄️ Cajón de Dinero</p>
+        <label class="opcion-check">
+          <input type="checkbox" id="cajonAutomatico">
+          Abrir el cajón de dinero automáticamente al cobrar (solo funciona con impresión directa Bluetooth/USB, conectada al mismo puerto que la impresora)
+        </label>
+
         <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarFormasPago()">Guardar Formas de Pago</button>
       </div>
     </div>
@@ -333,6 +339,7 @@ async function cargarConfiguracion() {
     document.getElementById('valesHabilitado').checked = !!config.vales_habilitado;
     document.getElementById('mixtoHabilitado').checked = config.mixto_habilitado !== false;
     document.getElementById('creditoHabilitado').checked = config.credito_habilitado !== false;
+    document.getElementById('cajonAutomatico').checked = !!config.cajon_abrir_automatico;
     toggleCampoDolar();
     document.getElementById('incluirPrecioUnitario').checked = config.incluir_precio_unitario !== false;
     document.getElementById('descripcionCompleta').checked = config.descripcion_completa !== false;
@@ -391,7 +398,8 @@ async function guardarFormasPago() {
         cheque_habilitado: document.getElementById('chequeHabilitado').checked,
         vales_habilitado: document.getElementById('valesHabilitado').checked,
         mixto_habilitado: document.getElementById('mixtoHabilitado').checked,
-        credito_habilitado: document.getElementById('creditoHabilitado').checked
+        credito_habilitado: document.getElementById('creditoHabilitado').checked,
+        cajon_abrir_automatico: document.getElementById('cajonAutomatico').checked
       })
     });
     mostrarToast('Formas de pago guardadas', 'exito');
