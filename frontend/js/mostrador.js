@@ -457,6 +457,17 @@ function filtrarProductosPorTexto() {
 activarLectorFisico(buscarPorCodigo);
 
 // ---------- Fichas / Turnos ----------
+// El mostrador se identifica primero por el EMPLEADO que inició sesión
+// (asignado por el dueño/gerente en Equipo) — así no importa en qué
+// computadora entre, el sistema ya sabe cuál es. Si el empleado no tiene
+// uno asignado todavía, se usa el configurado por dispositivo (el método
+// anterior), como respaldo mientras se hace la asignación por usuario.
+function obtenerNombreMostrador() {
+  const usuario = getUsuario();
+  if (usuario && usuario.nombre_mostrador) return usuario.nombre_mostrador;
+  return localStorage.getItem('nombre_mostrador') || 'Mostrador';
+}
+
 async function generarFicha() {
   try {
     const ficha = await apiFetch('/fichas', { method: 'POST' });
@@ -482,7 +493,7 @@ async function generarFicha() {
 }
 
 async function llamarSiguienteTurno() {
-  const nombreMostrador = localStorage.getItem('nombre_mostrador') || 'Mostrador';
+  const nombreMostrador = obtenerNombreMostrador();
   try {
     const ficha = await apiFetch('/fichas/llamar-siguiente', {
       method: 'POST',
@@ -500,7 +511,7 @@ async function llamarSiguienteTurno() {
 // mostrador específico (no la de otro mostrador, si hay varios activos).
 async function actualizarFichaActual() {
   try {
-    const nombreMostrador = localStorage.getItem('nombre_mostrador') || 'Mostrador';
+    const nombreMostrador = obtenerNombreMostrador();
     const ficha = await apiFetch(`/fichas/actual?mostrador=${encodeURIComponent(nombreMostrador)}`);
     const panel = document.getElementById('panelFichaActual');
     if (ficha) {
@@ -528,7 +539,7 @@ function sonarCampanitaFicha() {
   if (!('speechSynthesis' in window)) { mostrarToast('Este navegador no soporta el anuncio por voz', 'error'); return; }
 
   const numeroTexto = String(fichaActualParaCampanita);
-  const nombreMostrador = localStorage.getItem('nombre_mostrador') || 'Mostrador';
+  const nombreMostrador = obtenerNombreMostrador();
   const frase = `Ficha número ${numeroTexto}, pasar a ${nombreMostrador}. Ficha número ${numeroTexto}, pasar a ${nombreMostrador}. Ficha número ${numeroTexto}, pasar a ${nombreMostrador}.`;
   const anuncio = new SpeechSynthesisUtterance(frase);
   anuncio.lang = 'es-MX';

@@ -13,7 +13,7 @@ const { registrarBitacora } = require('../utils/bitacora');
 router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, nombre, usuario, rol, permisos, activo, creado_en
+      `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador
        FROM usuarios WHERE sucursal_id = $1 ORDER BY creado_en ASC`,
       [req.usuario.sucursal_id]
     );
@@ -72,7 +72,7 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
 // Editar nombre/rol/activo/permisos de un empleado (dueño/gerente)
 router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
   try {
-    const { nombre, rol, activo, permisos } = req.body;
+    const { nombre, rol, activo, permisos, nombre_mostrador } = req.body;
     if (rol && !['gerente', 'cajero', 'mostrador'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
@@ -88,10 +88,11 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
         nombre = COALESCE($1, nombre),
         rol = COALESCE($2, rol),
         activo = COALESCE($3, activo),
-        permisos = COALESCE(permisos, '{}'::jsonb) || COALESCE($4::jsonb, '{}'::jsonb)
+        permisos = COALESCE(permisos, '{}'::jsonb) || COALESCE($4::jsonb, '{}'::jsonb),
+        nombre_mostrador = CASE WHEN $7::boolean THEN $8 ELSE nombre_mostrador END
        WHERE id = $5 AND sucursal_id = $6
-       RETURNING id, nombre, usuario, rol, activo, permisos`,
-      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.usuario.sucursal_id]
+       RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador`,
+      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.usuario.sucursal_id, nombre_mostrador !== undefined, nombre_mostrador || null]
     );
 
     await registrarBitacora(pool, {

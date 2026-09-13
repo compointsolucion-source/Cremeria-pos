@@ -67,7 +67,8 @@ router.post('/login', limitadorLogin, async (req, res) => {
         id: user.id,
         nombre: user.nombre,
         rol: user.rol,
-        sucursal_id: user.sucursal_id
+        sucursal_id: user.sucursal_id,
+        nombre_mostrador: user.nombre_mostrador || null
       }
     });
   } catch (err) {

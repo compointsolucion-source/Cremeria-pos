@@ -26,6 +26,7 @@
 <body>
   <div class="top-bar">
     <h1>👥 Equipo</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -90,11 +91,13 @@ async function cargarEquipo() {
           <span>${u.nombre} <span class="rol-tag rol-${u.rol}">${rolNombres[u.rol]}</span></span>
           <span style="font-size:13px; color:#888;">${u.usuario}</span>
         </div>
+        ${u.nombre_mostrador ? `<div style="font-size:13px; color:#2E7D32; margin-top:2px;">🏪 Asignado a: <b>${u.nombre_mostrador}</b></div>` : ''}
         ${u.rol !== 'dueno' ? `
           <div class="acciones-empleado">
             <button class="btn btn-secondary" onclick="toggleActivo(${u.id}, ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>
             <button class="btn btn-secondary" onclick="cambiarRol(${u.id})">Cambiar rol</button>
             <button class="btn btn-secondary" onclick="restablecerPassword(${u.id})">Restablecer contraseña</button>
+            <button class="btn btn-secondary" onclick="asignarMostrador(${u.id}, '${(u.nombre_mostrador || '').replace(/'/g, "\\'")}')">🏪 Asignar Mostrador</button>
             <button class="btn btn-secondary" onclick="togglePermisosVisibles(${u.id})">Permisos ▾</button>
           </div>
           <div class="panel-permisos" id="permisos-${u.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #EEE;">
@@ -172,6 +175,21 @@ async function cambiarRol(id) {
   if (!nuevoRol) return;
   try {
     await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ rol: nuevoRol.trim() }) });
+    cargarEquipo();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Al asignarle un mostrador a un empleado, cuando esa persona inicie
+// sesión en cualquier computadora, el sistema ya sabe automáticamente
+// cuál mostrador es — sin tener que configurarlo a mano por dispositivo.
+async function asignarMostrador(id, actual) {
+  const nuevoNombre = await solicitarTexto('Nombre del mostrador para este empleado (ej. Mostrador 1) — déjalo en blanco para quitarle la asignación:', actual);
+  if (nuevoNombre === null) return; // canceló, no dio Enter con texto vacío a propósito
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ nombre_mostrador: nuevoNombre.trim() }) });
+    mostrarToast(nuevoNombre.trim() ? `Asignado a ${nuevoNombre.trim()}` : 'Asignación de mostrador quitada', 'exito');
     cargarEquipo();
   } catch (err) {
     mostrarToast(err.message, 'error');
