@@ -245,7 +245,10 @@ function imprimirFichaConDialogoDelSistema(numero, ancho_ticket) {
       <div>SU TURNO</div>
       <div class="numero">${numeroTexto}</div>
       <div>Espere a ser llamado</div>
-      <script>window.onload = () => window.print();<\/script>
+      <script>
+        window.onload = () => window.print();
+        window.onafterprint = () => window.close();
+      <\/script>
     </body>
     </html>
   `;
@@ -648,7 +651,7 @@ async function imprimirConDialogoDelSistema(datosTicket) {
       body { font-family: ${familiaFuente}; font-size: ${tamanoFuente}; margin: 0; }
     </style>
     </head>
-    <body>${htmlLogo}${htmlCodigo}${lineasHtml}<script>window.onload = () => window.print();<\/script></body>
+    <body>${htmlLogo}${htmlCodigo}${lineasHtml}<script>window.onload = () => window.print(); window.onafterprint = () => window.close();<\/script></body>
     </html>
   `;
 

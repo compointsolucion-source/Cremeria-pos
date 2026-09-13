@@ -24,6 +24,7 @@
 <body>
   <div class="top-bar">
     <h1>👤 Clientes y Créditos</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -191,7 +192,10 @@ function generarComprobante() {
 
       <p style="margin-top:30px; font-size:12px; color:#888;">Este documento es un estado de cuenta informativo, generado por el sistema Cremería POS.</p>
 
-      <script>window.onload = () => window.print();<\/script>
+      <script>
+        window.onload = () => window.print();
+        window.onafterprint = () => window.close();
+      <\/script>
     </body>
     </html>
   `;
