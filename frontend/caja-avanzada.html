@@ -115,6 +115,27 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="modalPesoAvanzada" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100;">
+    <div class="card" style="width:90%; max-width:400px; text-align:center;">
+      <h3 id="nombreProductoPesoAvanzada" style="margin-bottom:14px;"></h3>
+      <div style="display:flex; gap:14px;">
+        <div style="flex:1;">
+          <label style="font-size:13px; color:#666;">Cantidad del Producto (kg)</label>
+          <input type="number" id="cantidadPesoAvanzada" step="0.001" style="font-size:20px; text-align:center;" oninput="calcularDesdeCantidadAvanzada()">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:13px; color:#666;">Importe Actual</label>
+          <input type="number" id="importePesoAvanzada" step="0.01" style="font-size:20px; text-align:center;" oninput="calcularDesdeImporteAvanzada()">
+        </div>
+      </div>
+      <p style="font-size:18px; font-weight:700; margin:16px 0;">Precio Unitario = $<span id="precioUnitarioPesoAvanzada"></span></p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="confirmarPesoAvanzada()">✔ Aceptar</button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalPesoAvanzada()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modalVerificador" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100;">
     <div class="card" style="width:90%; max-width:380px; text-align:center;">
       <h3>🔍 Verificador de Precios</h3>
@@ -300,6 +321,54 @@ function buscarProductoAvanzada() {
   sugerencias.style.display = 'block';
 }
 
+// Para productos "a granel" (por peso), pide la cantidad antes de agregar
+// — igual que en Mostrador. Cantidad e Importe se recalculan entre sí.
+let productoPesoActualAvanzada = null;
+
+function abrirModalPesoAvanzada(producto) {
+  productoPesoActualAvanzada = producto;
+  document.getElementById('nombreProductoPesoAvanzada').textContent = producto.nombre;
+  document.getElementById('precioUnitarioPesoAvanzada').textContent = parseFloat(producto.precio).toFixed(2);
+  document.getElementById('cantidadPesoAvanzada').value = '';
+  document.getElementById('importePesoAvanzada').value = '';
+  document.getElementById('modalPesoAvanzada').style.display = 'flex';
+  document.getElementById('cantidadPesoAvanzada').focus();
+}
+
+function cerrarModalPesoAvanzada() {
+  document.getElementById('modalPesoAvanzada').style.display = 'none';
+  document.getElementById('campoCodigoProducto').focus();
+}
+
+function calcularDesdeCantidadAvanzada() {
+  const cantidad = parseFloat(document.getElementById('cantidadPesoAvanzada').value || 0);
+  const precio = parseFloat(productoPesoActualAvanzada.precio);
+  document.getElementById('importePesoAvanzada').value = (cantidad * precio).toFixed(2);
+}
+
+function calcularDesdeImporteAvanzada() {
+  const importe = parseFloat(document.getElementById('importePesoAvanzada').value || 0);
+  const precio = parseFloat(productoPesoActualAvanzada.precio);
+  if (precio > 0) document.getElementById('cantidadPesoAvanzada').value = (importe / precio).toFixed(3);
+}
+
+function confirmarPesoAvanzada() {
+  const cantidad = parseFloat(document.getElementById('cantidadPesoAvanzada').value || 0);
+  if (cantidad <= 0) { mostrarToast('Ingresa una cantidad válida', 'error'); return; }
+  agregarProductoAvanzada(productoPesoActualAvanzada, cantidad);
+  cerrarModalPesoAvanzada();
+}
+
+// Decide si el producto necesita el modal de peso (a granel) o se agrega
+// directo (por pieza) — usado en los 3 lugares donde se puede agregar un producto.
+function agregarConDecisionDeTipo(producto) {
+  if (producto.tipo_venta === 'peso') {
+    abrirModalPesoAvanzada(producto);
+  } else {
+    agregarProductoAvanzada(producto, 1);
+  }
+}
+
 function seleccionarSugerenciaAvanzada(id, tipo) {
   document.getElementById('sugerenciasAvanzada').style.display = 'none';
   if (tipo === 'kit') {
@@ -307,7 +376,7 @@ function seleccionarSugerenciaAvanzada(id, tipo) {
     agregarKitAvanzada(kit);
   } else {
     const producto = catalogoAvanzada.find(p => p.id === id);
-    agregarProductoAvanzada(producto, 1);
+    agregarConDecisionDeTipo(producto);
   }
   document.getElementById('campoCodigoProducto').value = '';
   document.getElementById('campoCodigoProducto').focus();
@@ -322,7 +391,7 @@ function manejarEnterCampoCodigo() {
 
   const porCodigoExacto = catalogoAvanzada.find(p => p.codigo_barras && p.codigo_barras === texto);
   if (porCodigoExacto) {
-    agregarProductoAvanzada(porCodigoExacto, 1);
+    agregarConDecisionDeTipo(porCodigoExacto);
     document.getElementById('campoCodigoProducto').value = '';
     document.getElementById('sugerenciasAvanzada').style.display = 'none';
     return;
@@ -331,7 +400,7 @@ function manejarEnterCampoCodigo() {
   const textoLower = texto.toLowerCase();
   const primeraCoincidencia = catalogoAvanzada.find(p => p.nombre.toLowerCase().includes(textoLower));
   if (primeraCoincidencia) {
-    agregarProductoAvanzada(primeraCoincidencia, 1);
+    agregarConDecisionDeTipo(primeraCoincidencia);
     document.getElementById('campoCodigoProducto').value = '';
     document.getElementById('sugerenciasAvanzada').style.display = 'none';
   } else {
