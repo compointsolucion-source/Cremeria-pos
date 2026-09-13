@@ -16,9 +16,23 @@ async function cargarDatos() {
     productos = await apiFetch('/productos');
     kits = await apiFetch('/kits');
     categorias = await apiFetch('/productos/categorias');
+    guardarCatalogoLocal(productos, kits, categorias); // respaldo para cuando no haya internet
     renderCategorias();
     renderProductos();
   } catch (err) {
+    if (esErrorDeConexion(err)) {
+      const local = await obtenerCatalogoLocal();
+      if (local.productos.length > 0) {
+        productos = local.productos;
+        kits = local.kits;
+        categorias = local.categorias;
+        renderCategorias();
+        renderProductos();
+        const fecha = local.fecha_guardado ? new Date(local.fecha_guardado).toLocaleString() : 'fecha desconocida';
+        mostrarToast(`Sin conexión — usando el catálogo guardado del ${fecha}`, 'error');
+        return;
+      }
+    }
     mostrarToast('Error al cargar productos: ' + err.message, 'error');
   }
 }

@@ -197,6 +197,7 @@
 <script src="js/estado-conexion.js"></script>
 <script src="js/ui-components.js"></script>
 <script src="js/impresora-termica.js"></script>
+<script src="js/offline-db.js"></script>
 <script>
 requiereLogin();
 
@@ -306,7 +307,18 @@ async function cargarCatalogoAvanzada() {
   try {
     catalogoAvanzada = await apiFetch('/productos');
     kitsAvanzada = await apiFetch('/kits');
+    guardarCatalogoLocal(catalogoAvanzada, kitsAvanzada); // respaldo para cuando no haya internet (sin tocar categorías)
   } catch (err) {
+    if (esErrorDeConexion(err)) {
+      const local = await obtenerCatalogoLocal();
+      if (local.productos.length > 0) {
+        catalogoAvanzada = local.productos;
+        kitsAvanzada = local.kits;
+        const fecha = local.fecha_guardado ? new Date(local.fecha_guardado).toLocaleString() : 'fecha desconocida';
+        mostrarToast(`Sin conexión — usando el catálogo guardado del ${fecha}`, 'error');
+        return;
+      }
+    }
     mostrarToast(err.message, 'error');
   }
 }

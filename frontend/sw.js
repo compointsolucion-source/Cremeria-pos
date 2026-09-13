@@ -7,7 +7,7 @@
 // archivos listados en ARCHIVOS_A_GUARDAR, hay que subir el número de
 // CACHE_VERSION — si no, los navegadores pueden seguir sirviendo la
 // versión vieja desde la copia guardada por un rato.
-const CACHE_VERSION = 'cremeria-pos-v1';
+const CACHE_VERSION = 'cremeria-pos-v2';
 
 const ARCHIVOS_A_GUARDAR = [
   '/mostrador.html',
@@ -20,6 +20,7 @@ const ARCHIVOS_A_GUARDAR = [
   '/js/tema.js',
   '/js/lector-fisico.js',
   '/js/impresora-termica.js',
+  '/js/offline-db.js',
   '/js/mostrador.js',
   '/js/caja.js'
 ];
