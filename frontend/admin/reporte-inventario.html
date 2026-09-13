@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte de Inventario - Cremería POS</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 1000px; margin: 20px auto; padding: 0 14px; }
+  .tarjetas-resumen-reporte { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tarjeta-resumen-reporte { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: var(--shadow); }
+  .tarjeta-resumen-reporte .valor { font-size: 24px; font-weight: 700; }
+  .tarjeta-resumen-reporte .etiqueta { font-size: 13px; color: #666; margin-top: 4px; }
+  .filtros-reporte { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .filtros-reporte select { flex: 1; min-width: 180px; }
+  .tabla-reporte-inv { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; font-size: 13px; }
+  .tabla-reporte-inv th, .tabla-reporte-inv td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #EEE; white-space: nowrap; }
+  .tabla-reporte-inv th { background: #F4F5F6; position: sticky; top: 0; }
+  .tabla-reporte-inv td.numero { text-align: right; }
+  .contenedor-tabla { max-height: 65vh; overflow: auto; border-radius: 12px; }
+  .valor-bajo { color: #C62828; font-weight: 700; }
+  .valor-alerta { color: #F9A825; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>📋 Reporte de Inventario</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div class="tarjetas-resumen-reporte">
+      <div class="tarjeta-resumen-reporte">
+        <div class="valor" id="costoTotalReporte">$0.00</div>
+        <div class="etiqueta">Costo del inventario</div>
+      </div>
+      <div class="tarjeta-resumen-reporte">
+        <div class="valor" id="cantidadTotalReporte">0</div>
+        <div class="etiqueta">Cantidad total en existencia</div>
+      </div>
+    </div>
+
+    <div class="filtros-reporte">
+      <select id="filtroCategoria" onchange="cargarReporteInventario()">
+        <option value="">Departamento: Todos</option>
+      </select>
+      <button class="btn btn-secondary" onclick="exportarReporteCSV()">⬇️ Exportar CSV</button>
+    </div>
+
+    <div class="contenedor-tabla">
+      <table class="tabla-reporte-inv">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descripción del Producto</th>
+            <th class="numero">Costo</th>
+            <th class="numero">Precio Venta</th>
+            <th class="numero">Existencia</th>
+            <th class="numero">Inv. Mínimo</th>
+            <th class="numero">Inv. Máximo</th>
+          </tr>
+        </thead>
+        <tbody id="tablaReporteInventario"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+let filasReporteActual = [];
+
+async function cargarDepartamentosFiltro() {
+  try {
+    const deptos = await apiFetch('/departamentos');
+    const select = document.getElementById('filtroCategoria');
+    select.innerHTML = '<option value="">Departamento: Todos</option>' + deptos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function cargarReporteInventario() {
+  try {
+    const categoriaId = document.getElementById('filtroCategoria').value;
+    const query = categoriaId ? `?categoria_id=${categoriaId}` : '';
+    const data = await apiFetch(`/inventario/reporte${query}`);
+    filasReporteActual = data.productos;
+
+    document.getElementById('costoTotalReporte').textContent = `$${data.totales.costo_total.toFixed(2)}`;
+    document.getElementById('cantidadTotalReporte').textContent = data.totales.cantidad_total.toFixed(2);
+
+    document.getElementById('tablaReporteInventario').innerHTML = data.productos.map(p => {
+      const existencia = parseFloat(p.existencia);
+      const minimo = parseFloat(p.stock_minimo);
+      let claseExistencia = '';
+      if (existencia <= 0) claseExistencia = 'valor-bajo';
+      else if (existencia <= minimo) claseExistencia = 'valor-alerta';
+
+      return `
+        <tr>
+          <td>${p.codigo_barras || '—'}</td>
+          <td>${p.nombre}</td>
+          <td class="numero">${p.precio_costo ? '$' + parseFloat(p.precio_costo).toFixed(2) : 'N/D'}</td>
+          <td class="numero">$${parseFloat(p.precio).toFixed(2)}</td>
+          <td class="numero ${claseExistencia}">${existencia.toFixed(2)}</td>
+          <td class="numero">${minimo.toFixed(2)}</td>
+          <td class="numero">${parseFloat(p.stock_maximo).toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('') || '<tr><td colspan="7" style="text-align:center; color:#888;">Sin productos en este departamento</td></tr>';
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+function exportarReporteCSV() {
+  if (filasReporteActual.length === 0) { mostrarToast('No hay datos para exportar', 'error'); return; }
+
+  const encabezado = 'Codigo,Descripcion,Costo,Precio Venta,Existencia,Inv Minimo,Inv Maximo\n';
+  const filas = filasReporteActual.map(p =>
+    `${p.codigo_barras || ''},"${p.nombre}",${p.precio_costo || 0},${p.precio},${p.existencia},${p.stock_minimo},${p.stock_maximo}`
+  ).join('\n');
+
+  const blob = new Blob([encabezado + filas], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reporte-inventario-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+cargarDepartamentosFiltro();
+cargarReporteInventario();
+</script>
+</body>
+</html>

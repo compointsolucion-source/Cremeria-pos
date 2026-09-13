@@ -22,6 +22,7 @@
 <body>
   <div class="top-bar">
     <h1>📊 Inventario</h1>
+    <a class="btn btn-secondary" href="reporte-inventario.html">📋 Reporte Completo</a>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
@@ -70,7 +71,13 @@
     <div class="card form-ajuste" style="border-left: 4px solid #C62828;">
       <h3>➖ Registrar Merma o Ajuste (resta)</h3>
       <p style="font-size:13px; color:#666; margin-top:-6px;">Usa esto para descontar por caducidad, desperdicio, o cuando el conteo físico dio MENOS de lo esperado.</p>
-      <select id="productoAjuste"></select>
+
+      <input type="text" id="buscadorAjuste" placeholder="🔍 Buscar producto por nombre o código de barras..." oninput="buscarProductoAjuste()">
+      <div id="sugerenciasAjuste" style="display:none; background:white; border:1px solid #DDD; border-radius:10px; margin-top:-4px; max-height:160px; overflow-y:auto;"></div>
+      <div id="productoAjusteInfo" style="display:none; background:#F4F5F6; border-radius:10px; padding:10px 14px; font-size:14px;">
+        <b id="nombreProductoAjuste"></b> — Hay actualmente: <b id="existenciaProductoAjuste"></b>
+      </div>
+
       <div class="fila-doble">
         <select id="tipoAjuste">
           <option value="merma">Merma (caducidad/desperdicio)</option>
@@ -118,9 +125,6 @@ async function cargarInventario() {
 
   // Catálogo completo en memoria para el buscador de "Agregar Inventario"
   catalogoInventarioCompleto = inventario;
-
-  const select = document.getElementById('productoAjuste');
-  select.innerHTML = inventario.map(i => `<option value="${i.producto_id}">${i.nombre}</option>`).join('');
 }
 
 let catalogoInventarioCompleto = [];
@@ -252,19 +256,72 @@ async function actualizarMinimo(producto_id, valor) {
   }
 }
 
+let productoAjusteSeleccionado = null;
+
+function buscarProductoAjuste() {
+  const texto = document.getElementById('buscadorAjuste').value.trim().toLowerCase();
+  const sugerencias = document.getElementById('sugerenciasAjuste');
+  productoAjusteSeleccionado = null;
+  document.getElementById('productoAjusteInfo').style.display = 'none';
+
+  if (!texto) { sugerencias.style.display = 'none'; return; }
+
+  const coincidenciaExacta = catalogoInventarioCompleto.find(p => p.codigo_barras && p.codigo_barras.toLowerCase() === texto);
+  if (coincidenciaExacta) {
+    seleccionarProductoAjuste(coincidenciaExacta);
+    sugerencias.style.display = 'none';
+    return;
+  }
+
+  const coincidencias = catalogoInventarioCompleto.filter(p =>
+    p.nombre.toLowerCase().includes(texto) ||
+    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
+  ).slice(0, 8);
+
+  if (coincidencias.length === 0) {
+    sugerencias.innerHTML = '<div class="sugerencia-item" style="color:#888;">Sin coincidencias</div>';
+    sugerencias.style.display = 'block';
+    return;
+  }
+
+  sugerencias.innerHTML = coincidencias.map(p => `
+    <div class="sugerencia-item" onclick='seleccionarProductoAjustePorId(${p.producto_id})'>${p.nombre}</div>
+  `).join('');
+  sugerencias.style.display = 'block';
+}
+
+function seleccionarProductoAjustePorId(producto_id) {
+  const producto = catalogoInventarioCompleto.find(p => p.producto_id === producto_id);
+  if (producto) seleccionarProductoAjuste(producto);
+}
+
+function seleccionarProductoAjuste(producto) {
+  productoAjusteSeleccionado = producto;
+  document.getElementById('buscadorAjuste').value = producto.nombre;
+  document.getElementById('sugerenciasAjuste').style.display = 'none';
+  document.getElementById('productoAjusteInfo').style.display = 'block';
+  document.getElementById('nombreProductoAjuste').textContent = producto.nombre;
+  const unidad = producto.tipo_venta === 'unidad' ? 'pzas' : 'kg';
+  document.getElementById('existenciaProductoAjuste').textContent = `${parseFloat(producto.existencia_actual).toFixed(2)} ${unidad}`;
+}
+
 async function registrarAjuste() {
-  const producto_id = document.getElementById('productoAjuste').value;
+  if (!productoAjusteSeleccionado) { mostrarToast('Busca y selecciona un producto primero', 'error'); return; }
+  const producto_id = productoAjusteSeleccionado.producto_id;
   const tipo = document.getElementById('tipoAjuste').value;
   const cantidad = parseFloat(document.getElementById('cantidadAjuste').value || 0);
   const motivo = document.getElementById('motivoAjuste').value.trim();
 
-  if (!producto_id || cantidad <= 0) { mostrarToast('Selecciona un producto y una cantidad válida', 'error'); return; }
+  if (cantidad <= 0) { mostrarToast('Ingresa una cantidad válida', 'error'); return; }
 
   try {
     await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo, motivo }) });
     mostrarToast('Movimiento registrado correctamente', 'exito');
+    document.getElementById('buscadorAjuste').value = '';
     document.getElementById('cantidadAjuste').value = '';
     document.getElementById('motivoAjuste').value = '';
+    document.getElementById('productoAjusteInfo').style.display = 'none';
+    productoAjusteSeleccionado = null;
     cargarInventario();
   } catch (err) {
     mostrarToast(err.message, 'error');

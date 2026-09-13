@@ -50,6 +50,38 @@ router.get('/valorizado', verificarToken, requierePermiso('INVENTARIO_VER'), asy
   }
 });
 
+// Reporte de inventario estilo tabla completa: código, descripción, costo,
+// precio venta, existencia, mínimo, máximo — con filtro opcional por
+// departamento y totales generales. Solo incluye productos que SÍ usan
+// inventario (los que no, no tienen nada que reportar aquí).
+router.get('/reporte', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, res) => {
+  try {
+    const { categoria_id } = req.query;
+    const result = await pool.query(
+      `SELECT p.id, p.codigo_barras, p.nombre, p.precio_costo, p.precio, p.categoria_id,
+              c.nombre AS categoria_nombre,
+              COALESCE(i.existencia_actual, 0) AS existencia,
+              COALESCE(i.stock_minimo, 0) AS stock_minimo,
+              COALESCE(i.stock_maximo, 0) AS stock_maximo
+       FROM productos p
+       LEFT JOIN inventario i ON p.id = i.producto_id
+       LEFT JOIN categorias c ON p.categoria_id = c.id
+       WHERE p.sucursal_id = $1 AND p.activo = true AND p.usa_inventario = true
+         AND ($2::int IS NULL OR p.categoria_id = $2)
+       ORDER BY p.nombre ASC`,
+      [req.usuario.sucursal_id, categoria_id || null]
+    );
+
+    const costoTotal = result.rows.reduce((sum, r) => sum + (r.precio_costo ? parseFloat(r.precio_costo) * parseFloat(r.existencia) : 0), 0);
+    const cantidadTotal = result.rows.reduce((sum, r) => sum + parseFloat(r.existencia), 0);
+
+    res.json({ productos: result.rows, totales: { costo_total: costoTotal, cantidad_total: cantidadTotal } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al generar el reporte de inventario' });
+  }
+});
+
 // Listado de existencias con datos del producto
 router.get('/', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, res) => {
   try {
