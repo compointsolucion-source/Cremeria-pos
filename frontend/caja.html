@@ -350,7 +350,7 @@ async function cobrar() {
       cliente_id = clienteSeleccionado.id;
     }
 
-    await apiFetch(`/tickets/${ticketActual.id}/pagar`, {
+    const resultadoPago = await apiFetch(`/tickets/${ticketActual.id}/pagar`, {
       method: 'POST',
       body: JSON.stringify({
         metodo_pago: metodoPago,
@@ -362,6 +362,9 @@ async function cobrar() {
     });
 
     mostrarToast('Pago procesado correctamente', 'exito');
+    if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
+      mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')} — registra reabastecimiento en Inventario`, 'error');
+    }
     await imprimirComprobante(ticketActual, metodoPago);
     ticketActual = null;
     clienteSeleccionado = null;

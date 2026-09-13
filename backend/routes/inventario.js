@@ -134,8 +134,10 @@ router.post('/ajuste', verificarToken, async (req, res) => {
       `INSERT INTO inventario (producto_id, existencia_actual) VALUES ($1, 0) ON CONFLICT (producto_id) DO NOTHING`,
       [producto_id]
     );
+    // GREATEST evita que una merma/ajuste deje la existencia en negativo — si
+    // la cantidad a restar es mayor a lo que hay, se queda en 0 (no en -X).
     await conexion.query(
-      'UPDATE inventario SET existencia_actual = existencia_actual + $1 WHERE producto_id = $2',
+      'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual + $1, 0) WHERE producto_id = $2',
       [cantidadConSigno, producto_id]
     );
     await conexion.query(

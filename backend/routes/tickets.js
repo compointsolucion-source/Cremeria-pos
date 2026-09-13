@@ -323,7 +323,10 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
       await conexion.query('UPDATE clientes SET saldo_actual = saldo_actual + $1 WHERE id = $2', [totalNeto, cliente_id]);
     }
 
-    // Descontar inventario automáticamente por cada producto vendido (no aplica a kits, que descuentan sus componentes)
+    // Descontar inventario automáticamente por cada producto vendido (no aplica a kits, que descuentan sus componentes).
+    // La existencia NUNCA baja de 0 (GREATEST), pero la venta se permite de
+    // todas formas — solo se avisa al final si algún producto quedó agotado.
+    const productosAgotados = [];
     const items = await conexion.query('SELECT * FROM ticket_detalle WHERE ticket_id = $1', [ticketPagado.id]);
     for (const item of items.rows) {
       if (item.tipo === 'producto' && item.producto_id) {
@@ -332,8 +335,13 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
            ON CONFLICT (producto_id) DO NOTHING`,
           [item.producto_id]
         );
+        const antesResult = await conexion.query('SELECT existencia_actual FROM inventario WHERE producto_id = $1', [item.producto_id]);
+        const existenciaAntes = parseFloat(antesResult.rows[0].existencia_actual);
+        if (existenciaAntes - parseFloat(item.cantidad) < 0) {
+          productosAgotados.push(item.nombre_producto);
+        }
         await conexion.query(
-          'UPDATE inventario SET existencia_actual = existencia_actual - $1 WHERE producto_id = $2',
+          'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual - $1, 0) WHERE producto_id = $2',
           [item.cantidad, item.producto_id]
         );
         await conexion.query(
@@ -349,8 +357,14 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
             `INSERT INTO inventario (producto_id, existencia_actual) VALUES ($1, 0) ON CONFLICT (producto_id) DO NOTHING`,
             [comp.producto_id]
           );
+          const antesResult = await conexion.query('SELECT existencia_actual FROM inventario WHERE producto_id = $1', [comp.producto_id]);
+          const existenciaAntes = parseFloat(antesResult.rows[0].existencia_actual);
+          if (existenciaAntes - cantidadTotal < 0) {
+            const nombreProdResult = await conexion.query('SELECT nombre FROM productos WHERE id = $1', [comp.producto_id]);
+            productosAgotados.push(nombreProdResult.rows[0].nombre);
+          }
           await conexion.query(
-            'UPDATE inventario SET existencia_actual = existencia_actual - $1 WHERE producto_id = $2',
+            'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual - $1, 0) WHERE producto_id = $2',
             [cantidadTotal, comp.producto_id]
           );
           await conexion.query(
@@ -375,7 +389,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     const io = req.app.get('io');
     if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ticket_pagado', { id: req.params.id });
 
-    res.json({ ...ticketPagado, total_neto: totalNeto });
+    res.json({ ...ticketPagado, total_neto: totalNeto, productos_agotados: [...new Set(productosAgotados)] });
   } catch (err) {
     await conexion.query('ROLLBACK');
     console.error(err);
