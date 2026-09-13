@@ -254,6 +254,9 @@ function imprimirFichaConDialogoDelSistema(numero, ancho_ticket) {
   `;
 
   const ventana = window.open('', '_blank');
+  if (!ventana) {
+    throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
+  }
   ventana.document.write(html);
   ventana.document.close();
 }
@@ -656,6 +659,9 @@ async function imprimirConDialogoDelSistema(datosTicket) {
   `;
 
   const ventana = window.open('', '_blank');
+  if (!ventana) {
+    throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
+  }
   ventana.document.write(html);
   ventana.document.close();
 }

@@ -201,6 +201,10 @@ function generarComprobante() {
   `;
 
   const ventana = window.open('', '_blank');
+  if (!ventana) {
+    mostrarToast('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.', 'error');
+    return;
+  }
   ventana.document.write(html);
   ventana.document.close();
 }
