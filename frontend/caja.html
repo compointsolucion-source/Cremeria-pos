@@ -577,6 +577,14 @@ activarLectorFisico(cargarTicket);
 cargarBandeja();
 setInterval(cargarBandeja, 15000);
 
+// Si se llegó desde Caja Avanzada con un folio en la URL, cargarlo directo
+// para continuar el cobro sin tener que buscarlo en la bandeja.
+const folioDesdeUrl = new URLSearchParams(window.location.search).get('folio');
+if (folioDesdeUrl) {
+  cargarTicket(folioDesdeUrl);
+  window.history.replaceState({}, '', 'caja.html');
+}
+
 // Atajos de teclado: F2 escanear, F4 cobrar (si hay ticket seleccionado),
 // ESC cierra el panel de cobro. F1 y F3 no aplican en Caja (no hay buscador
 // de texto ni concepto de "nueva venta" aquí) — no se simulan.

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caja Avanzada - Cremería POS</title>
+<link rel="stylesheet" href="css/app-theme.css">
+<script src="js/tema.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  body { background: #F4F5F6; }
+  .contenido-avanzada { max-width: 1200px; margin: 12px auto; padding: 0 12px; }
+  .barra-superior-avanzada {
+    background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px;
+    box-shadow: var(--shadow); display: flex; gap: 10px; align-items: center;
+  }
+  .barra-superior-avanzada input { flex: 1; font-size: 16px; }
+  .sugerencias-avanzada {
+    position: absolute; background: white; border: 1px solid #DDD; border-radius: 10px;
+    max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: 100%; max-width: 500px; display: none;
+  }
+  .sugerencia-avanzada-item { padding: 10px 14px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #F0F0F0; }
+  .sugerencia-avanzada-item:hover { background: #F4F5F6; }
+  .barra-atajos { background: white; border-radius: 12px; padding: 8px; margin-bottom: 10px; box-shadow: var(--shadow); display: flex; gap: 6px; flex-wrap: wrap; }
+  .barra-atajos button { font-size: 13px; padding: 8px 12px; }
+  .tabla-venta { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  .tabla-venta th, .tabla-venta td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
+  .tabla-venta th { background: #F4F5F6; }
+  .tabla-venta td.numero { text-align: right; }
+  .tabla-venta tbody tr:hover { background: #FAFAFA; }
+  .fila-seleccionada { background: #E3F2FD !important; }
+  .zona-total { background: white; border-radius: 12px; padding: 16px; margin-top: 10px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; }
+  .zona-total .total-grande { font-size: 40px; font-weight: 800; color: var(--primary, #2E7D32); }
+  .contador-articulos { font-size: 13px; color: #666; margin-top: 6px; }
+  .zona-inferior-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1>🖥️ Caja Avanzada</h1>
+    <a class="btn btn-secondary" href="index.html">🏠 Inicio</a>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido-avanzada">
+
+    <div class="barra-superior-avanzada" style="position:relative;">
+      <span>🔍</span>
+      <input type="text" id="campoCodigoProducto" placeholder="Código del producto o nombre... (Enter para agregar)" autofocus
+             oninput="buscarProductoAvanzada()" onkeydown="if(event.key==='Enter') manejarEnterCampoCodigo()">
+      <div id="sugerenciasAvanzada" class="sugerencias-avanzada"></div>
+      <button class="btn btn-primary" onclick="manejarEnterCampoCodigo()">ENTER - Agregar Producto</button>
+    </div>
+
+    <table class="tabla-venta">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descripción del Producto</th>
+          <th class="numero">Precio Venta</th>
+          <th class="numero">Cant.</th>
+          <th class="numero">Importe</th>
+          <th class="numero">Existencia</th>
+        </tr>
+      </thead>
+      <tbody id="tablaVentaAvanzada"></tbody>
+    </table>
+
+    <div class="zona-total">
+      <div>
+        <div class="contador-articulos"><b id="contadorArticulosAvanzada">0</b> productos en la venta actual</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="total-grande" id="totalVentaAvanzada">$0.00</div>
+        <button class="btn btn-primary" style="margin-top:6px; width:100%;" onclick="irACobrarAvanzada()">💰 Cobrar</button>
+      </div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/estado-conexion.js"></script>
+<script src="js/ui-components.js"></script>
+<script src="js/impresora-termica.js"></script>
+<script>
+requiereLogin();
+
+let carritoAvanzada = [];
+let catalogoAvanzada = [];
+let kitsAvanzada = [];
+let filaSeleccionadaIndex = null;
+
+async function cargarCatalogoAvanzada() {
+  try {
+    catalogoAvanzada = await apiFetch('/productos');
+    kitsAvanzada = await apiFetch('/kits');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+function buscarProductoAvanzada() {
+  const texto = document.getElementById('campoCodigoProducto').value.trim().toLowerCase();
+  const sugerencias = document.getElementById('sugerenciasAvanzada');
+  if (!texto) { sugerencias.style.display = 'none'; return; }
+
+  const coincidenciasProductos = catalogoAvanzada.filter(p =>
+    p.nombre.toLowerCase().includes(texto) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
+  ).slice(0, 6);
+  const coincidenciasKits = kitsAvanzada.filter(k => k.nombre.toLowerCase().includes(texto)).slice(0, 3);
+
+  if (coincidenciasProductos.length === 0 && coincidenciasKits.length === 0) {
+    sugerencias.innerHTML = '<div class="sugerencia-avanzada-item" style="color:#888;">Sin coincidencias</div>';
+    sugerencias.style.display = 'block';
+    return;
+  }
+
+  sugerencias.innerHTML =
+    coincidenciasKits.map(k => `
+      <div class="sugerencia-avanzada-item" onclick='seleccionarSugerenciaAvanzada(${k.id}, "kit")'>
+        <span>📦 ${k.nombre}</span><span>$${parseFloat(k.precio_kit).toFixed(2)}</span>
+      </div>
+    `).join('') +
+    coincidenciasProductos.map(p => `
+      <div class="sugerencia-avanzada-item" onclick='seleccionarSugerenciaAvanzada(${p.id}, "producto")'>
+        <span>${p.nombre}</span><span>$${parseFloat(p.precio).toFixed(2)}</span>
+      </div>
+    `).join('');
+  sugerencias.style.display = 'block';
+}
+
+function seleccionarSugerenciaAvanzada(id, tipo) {
+  document.getElementById('sugerenciasAvanzada').style.display = 'none';
+  if (tipo === 'kit') {
+    const kit = kitsAvanzada.find(k => k.id === id);
+    agregarKitAvanzada(kit);
+  } else {
+    const producto = catalogoAvanzada.find(p => p.id === id);
+    agregarProductoAvanzada(producto, 1);
+  }
+  document.getElementById('campoCodigoProducto').value = '';
+  document.getElementById('campoCodigoProducto').focus();
+}
+
+// Enter en el campo: si el texto es un código de barras exacto, agrega
+// directo (para lectores físicos y escaneo rápido). Si no, intenta
+// interpretarlo como nombre y agrega la primera coincidencia.
+function manejarEnterCampoCodigo() {
+  const texto = document.getElementById('campoCodigoProducto').value.trim();
+  if (!texto) return;
+
+  const porCodigoExacto = catalogoAvanzada.find(p => p.codigo_barras && p.codigo_barras === texto);
+  if (porCodigoExacto) {
+    agregarProductoAvanzada(porCodigoExacto, 1);
+    document.getElementById('campoCodigoProducto').value = '';
+    document.getElementById('sugerenciasAvanzada').style.display = 'none';
+    return;
+  }
+
+  const textoLower = texto.toLowerCase();
+  const primeraCoincidencia = catalogoAvanzada.find(p => p.nombre.toLowerCase().includes(textoLower));
+  if (primeraCoincidencia) {
+    agregarProductoAvanzada(primeraCoincidencia, 1);
+    document.getElementById('campoCodigoProducto').value = '';
+    document.getElementById('sugerenciasAvanzada').style.display = 'none';
+  } else {
+    mostrarToast('No se encontró ningún producto con ese código o nombre', 'error');
+  }
+}
+
+function agregarProductoAvanzada(producto, cantidad) {
+  carritoAvanzada.push({
+    tipo: 'producto',
+    producto_id: producto.id,
+    codigo_barras: producto.codigo_barras || '',
+    nombre_producto: producto.nombre,
+    cantidad: cantidad,
+    precio_unitario: parseFloat(producto.precio),
+    existencia_referencia: producto.existencia_actual !== undefined ? producto.existencia_actual : null
+  });
+  renderTablaVentaAvanzada();
+}
+
+function agregarKitAvanzada(kit) {
+  carritoAvanzada.push({
+    tipo: 'kit',
+    kit_id: kit.id,
+    codigo_barras: '',
+    nombre_producto: kit.nombre,
+    cantidad: 1,
+    precio_unitario: parseFloat(kit.precio_kit),
+    existencia_referencia: null
+  });
+  renderTablaVentaAvanzada();
+}
+
+function renderTablaVentaAvanzada() {
+  const tbody = document.getElementById('tablaVentaAvanzada');
+  let total = 0;
+
+  tbody.innerHTML = carritoAvanzada.map((item, idx) => {
+    const importe = item.cantidad * item.precio_unitario;
+    total += importe;
+    const existenciaTexto = item.existencia_referencia !== null ? parseFloat(item.existencia_referencia).toFixed(2) : (item.tipo === 'kit' ? 'Kit' : '—');
+    return `
+      <tr class="${idx === filaSeleccionadaIndex ? 'fila-seleccionada' : ''}" onclick="seleccionarFilaAvanzada(${idx})">
+        <td>${item.codigo_barras || '—'}</td>
+        <td>${item.nombre_producto}</td>
+        <td class="numero">$${item.precio_unitario.toFixed(2)}</td>
+        <td class="numero">${item.cantidad}</td>
+        <td class="numero">$${importe.toFixed(2)}</td>
+        <td class="numero">${existenciaTexto}</td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="6" style="text-align:center; color:#888;">Sin productos en la venta actual</td></tr>';
+
+  document.getElementById('totalVentaAvanzada').textContent = `$${total.toFixed(2)}`;
+  document.getElementById('contadorArticulosAvanzada').textContent = carritoAvanzada.length;
+}
+
+function seleccionarFilaAvanzada(idx) {
+  filaSeleccionadaIndex = filaSeleccionadaIndex === idx ? null : idx;
+  renderTablaVentaAvanzada();
+}
+
+// Genera el ticket (igual que Mostrador) y de inmediato lo carga en Caja
+// para cobrarlo — mismo flujo de siempre, solo que capturado desde aquí.
+async function irACobrarAvanzada() {
+  if (carritoAvanzada.length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
+
+  try {
+    const ticket = await apiFetch('/tickets', {
+      method: 'POST',
+      body: JSON.stringify({ items: carritoAvanzada })
+    });
+    mostrarToast(`Ticket ${ticket.folio} generado — continúa el cobro`, 'exito');
+    carritoAvanzada = [];
+    filaSeleccionadaIndex = null;
+    renderTablaVentaAvanzada();
+
+    // Redirige a Caja ya con este ticket a la mano — reutiliza el cobro
+    // completo (efectivo/tarjeta/mixto/fiado) que ya existe y funciona.
+    window.location.href = `caja.html?folio=${ticket.folio}`;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Cerrar sugerencias si se hace clic fuera del buscador
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.barra-superior-avanzada')) {
+    document.getElementById('sugerenciasAvanzada').style.display = 'none';
+  }
+});
+
+cargarCatalogoAvanzada();
+</script>
+</body>
+</html>
