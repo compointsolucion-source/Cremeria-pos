@@ -38,6 +38,7 @@
 <body>
   <div class="top-bar">
     <h1>💰 Caja</h1>
+    <a class="btn btn-secondary" href="index.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -165,7 +166,7 @@ function renderPanelCobro() {
 
     <div id="camposPago"></div>
 
-    <button class="btn btn-primary" style="width:100%; margin-top:14px;" onclick="cobrar()">✅ Confirmar Pago</button>
+    <button class="btn btn-primary" id="btnConfirmarPago" style="width:100%; margin-top:14px;" onclick="cobrar()">✅ Confirmar Pago</button>
   `;
   setMetodo('efectivo');
 }
@@ -323,6 +324,9 @@ function elegirCliente(cliente) {
 }
 
 async function cobrar() {
+  const boton = document.getElementById('btnConfirmarPago');
+  if (boton) { boton.disabled = true; boton.textContent = 'Procesando...'; }
+
   try {
     const turno = await apiFetch('/turnos/actual');
     if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo desde el panel de administración.', 'error'); return; }
@@ -365,6 +369,11 @@ async function cobrar() {
     cargarBandeja();
   } catch (err) {
     mostrarToast('Error al cobrar: ' + err.message, 'error');
+  } finally {
+    // Si el panel ya se reemplazó (pago exitoso), este botón ya no existe en
+    // el DOM y esto simplemente no hace nada — está bien.
+    const botonActual = document.getElementById('btnConfirmarPago');
+    if (botonActual) { botonActual.disabled = false; botonActual.textContent = '✅ Confirmar Pago'; }
   }
 }
 

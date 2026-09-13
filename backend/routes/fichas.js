@@ -110,37 +110,50 @@ router.get('/pendientes-count', verificarToken, async (req, res) => {
 
 // Llama a la siguiente ficha en espera (la más antigua), y la asigna al
 // mostrador que la llamó. Avisa en tiempo real a la pantalla de visualización.
+// El SELECT ... FOR UPDATE necesita correr dentro de una transacción real
+// (un solo cliente con BEGIN/COMMIT) para que el bloqueo de fila sirva de
+// algo — antes corría con pool.query() suelto, donde el bloqueo se liberaba
+// de inmediato y dos empleados podían llamar la misma ficha a la vez.
 router.post('/llamar-siguiente', verificarToken, async (req, res) => {
+  const cliente = await pool.connect();
   try {
     const { mostrador } = req.body;
     if (!mostrador) return res.status(400).json({ error: 'Especifica qué mostrador está llamando' });
 
     await limpiarFichasDeDiasAnteriores(req.usuario.sucursal_id);
 
-    const siguienteResult = await pool.query(
+    await cliente.query('BEGIN');
+
+    const siguienteResult = await cliente.query(
       `SELECT * FROM fichas WHERE sucursal_id = $1 AND estado = 'esperando'
        ORDER BY fecha_creacion ASC LIMIT 1 FOR UPDATE`,
       [req.usuario.sucursal_id]
     );
     if (siguienteResult.rows.length === 0) {
+      await cliente.query('ROLLBACK');
       return res.status(404).json({ error: 'No hay turnos esperando en este momento' });
     }
     const ficha = siguienteResult.rows[0];
 
-    const result = await pool.query(
+    const result = await cliente.query(
       `UPDATE fichas SET estado = 'llamado', mostrador_asignado = $1, fecha_llamado = NOW()
        WHERE id = $2 RETURNING *`,
       [mostrador, ficha.id]
     );
     const fichaLlamada = result.rows[0];
 
+    await cliente.query('COMMIT');
+
     const io = req.app.get('io');
     if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ficha_llamada', fichaLlamada);
 
     res.json(fichaLlamada);
   } catch (err) {
+    await cliente.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al llamar el siguiente turno' });
+  } finally {
+    cliente.release();
   }
 });
 

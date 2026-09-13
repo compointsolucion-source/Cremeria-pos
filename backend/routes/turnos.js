@@ -53,16 +53,31 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
 
 // Cerrar turno (corte de caja)
 router.post('/:id/cerrar', verificarToken, requierePermiso('CAJA_CERRAR'), async (req, res) => {
+  const cliente = await pool.connect();
   try {
     const { saldo_contado } = req.body;
     const turnoId = req.params.id;
 
-    const ventasResult = await pool.query(
+    await cliente.query('BEGIN');
+
+    // Bloquea la fila del turno para evitar que se cierre dos veces a la vez
+    // (ej. dos clics, o dos pestañas abiertas del mismo dispositivo).
+    const turnoActual = await cliente.query('SELECT * FROM turnos WHERE id = $1 FOR UPDATE', [turnoId]);
+    if (turnoActual.rows.length === 0) {
+      await cliente.query('ROLLBACK');
+      return res.status(404).json({ error: 'Turno no encontrado' });
+    }
+    if (turnoActual.rows[0].estado !== 'abierto') {
+      await cliente.query('ROLLBACK');
+      return res.status(400).json({ error: 'Este turno ya fue cerrado anteriormente' });
+    }
+
+    const ventasResult = await cliente.query(
       `SELECT COALESCE(SUM(monto_efectivo),0) AS efectivo, COALESCE(SUM(monto_tarjeta),0) AS tarjeta
        FROM tickets WHERE turno_id = $1 AND estado = 'pagado'`,
       [turnoId]
     );
-    const movResult = await pool.query(
+    const movResult = await cliente.query(
       `SELECT
         COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END),0) AS ingresos,
         COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto ELSE 0 END),0) AS egresos
@@ -70,7 +85,6 @@ router.post('/:id/cerrar', verificarToken, requierePermiso('CAJA_CERRAR'), async
       [turnoId]
     );
 
-    const turnoActual = await pool.query('SELECT fondo_inicial FROM turnos WHERE id = $1', [turnoId]);
     const fondoInicial = parseFloat(turnoActual.rows[0].fondo_inicial);
     const efectivoVentas = parseFloat(ventasResult.rows[0].efectivo);
     const ingresos = parseFloat(movResult.rows[0].ingresos);
@@ -78,20 +92,22 @@ router.post('/:id/cerrar', verificarToken, requierePermiso('CAJA_CERRAR'), async
 
     const saldoTeorico = fondoInicial + efectivoVentas + ingresos - egresos;
 
-    const result = await pool.query(
+    const result = await cliente.query(
       `UPDATE turnos SET estado = 'cerrado', saldo_teorico = $1, saldo_contado = $2, fecha_cierre = NOW()
-       WHERE id = $3 RETURNING *`,
+       WHERE id = $3 AND estado = 'abierto' RETURNING *`,
       [saldoTeorico, saldo_contado, turnoId]
     );
 
     const diferencia = saldo_contado - saldoTeorico;
-    await registrarBitacora(pool, {
+    await registrarBitacora(cliente, {
       usuario_id: req.usuario.id,
       accion: 'cerrar_turno',
       modulo: 'turnos',
       referencia_id: parseInt(turnoId),
       valor_nuevo: { saldo_teorico: saldoTeorico, saldo_contado, diferencia }
     });
+
+    await cliente.query('COMMIT');
 
     res.json({
       ...result.rows[0],
@@ -105,8 +121,11 @@ router.post('/:id/cerrar', verificarToken, requierePermiso('CAJA_CERRAR'), async
       }
     });
   } catch (err) {
+    await cliente.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al cerrar el turno' });
+  } finally {
+    cliente.release();
   }
 });
 
