@@ -490,9 +490,51 @@ async function llamarSiguienteTurno() {
     });
     mostrarToast(`Llamando turno #${String(ficha.numero).padStart(3,'0')} → ${nombreMostrador}`, 'exito');
     actualizarContadorFichas();
+    actualizarFichaActual();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+}
+
+// Muestra en el panel cuál ficha está siendo atendida ahora mismo en ESTE
+// mostrador específico (no la de otro mostrador, si hay varios activos).
+async function actualizarFichaActual() {
+  try {
+    const nombreMostrador = localStorage.getItem('nombre_mostrador') || 'Mostrador';
+    const ficha = await apiFetch(`/fichas/actual?mostrador=${encodeURIComponent(nombreMostrador)}`);
+    const panel = document.getElementById('panelFichaActual');
+    if (ficha) {
+      panel.style.display = 'flex';
+      document.getElementById('numeroFichaActual').textContent = `#${String(ficha.numero).padStart(3, '0')}`;
+      document.getElementById('nombreMostradorFichaActual').textContent = nombreMostrador;
+      fichaActualParaCampanita = ficha.numero;
+    } else {
+      panel.style.display = 'none';
+      fichaActualParaCampanita = null;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+let fichaActualParaCampanita = null;
+
+// Anuncia la ficha en voz alta 3 veces (para conectar bocinas en el
+// local) usando la síntesis de voz del propio navegador — no necesita
+// ningún archivo de audio ni servicio externo. Dice también a qué
+// mostrador ir, para que la persona sepa a dónde dirigirse.
+function sonarCampanitaFicha() {
+  if (!fichaActualParaCampanita) { mostrarToast('No hay ninguna ficha siendo atendida en este momento', 'error'); return; }
+  if (!('speechSynthesis' in window)) { mostrarToast('Este navegador no soporta el anuncio por voz', 'error'); return; }
+
+  const numeroTexto = String(fichaActualParaCampanita);
+  const nombreMostrador = localStorage.getItem('nombre_mostrador') || 'Mostrador';
+  const frase = `Ficha número ${numeroTexto}, pasar a ${nombreMostrador}. Ficha número ${numeroTexto}, pasar a ${nombreMostrador}. Ficha número ${numeroTexto}, pasar a ${nombreMostrador}.`;
+  const anuncio = new SpeechSynthesisUtterance(frase);
+  anuncio.lang = 'es-MX';
+  anuncio.rate = 0.9;
+  speechSynthesis.cancel(); // por si había un anuncio anterior a medias
+  speechSynthesis.speak(anuncio);
 }
 
 async function reimprimirUltimaFicha() {
@@ -522,6 +564,8 @@ async function actualizarContadorFichas() {
 }
 
 actualizarContadorFichas();
+actualizarFichaActual();
 setInterval(actualizarContadorFichas, 15000);
+setInterval(actualizarFichaActual, 15000);
 
 cargarDatos();
