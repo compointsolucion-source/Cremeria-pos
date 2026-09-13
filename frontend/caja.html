@@ -255,9 +255,19 @@ function setMetodo(m) {
     `;
   } else if (m === 'tarjeta') {
     const comision = parseFloat((configuracionNegocioCaja || {}).tarjeta_comision_porcentaje || 0);
-    camposDiv.innerHTML = comision > 0
-      ? `<p style="font-size:13px; color:#888;">Comisión estimada de la terminal: $${(totalNetoActual() * comision / 100).toFixed(2)} (${comision}%) — informativo, no se le cobra de más al cliente.</p>`
-      : '';
+    if (comision > 0) {
+      const subtotal = totalNetoActual();
+      const montoComision = subtotal * comision / 100;
+      camposDiv.innerHTML = `
+        <div style="font-size:14px; background:#F4F5F6; border-radius:10px; padding:10px 14px;">
+          <div style="display:flex; justify-content:space-between;"><span>Subtotal</span><span>$${subtotal.toFixed(2)}</span></div>
+          <div style="display:flex; justify-content:space-between; color:#C62828;"><span>Comisión tarjeta (${comision}%)</span><span>+$${montoComision.toFixed(2)}</span></div>
+          <div style="display:flex; justify-content:space-between; font-weight:700; border-top:1px solid #DDD; margin-top:6px; padding-top:6px;"><span>Total a cobrar</span><span>$${(subtotal + montoComision).toFixed(2)}</span></div>
+        </div>
+      `;
+    } else {
+      camposDiv.innerHTML = '';
+    }
   } else {
     camposDiv.innerHTML = '';
   }
@@ -392,7 +402,10 @@ async function cobrar() {
           return;
         }
       }
-    } else if (metodoPago === 'tarjeta' || metodoPago === 'transferencia' || metodoPago === 'dolares' || metodoPago === 'cheque' || metodoPago === 'vale_despensa') {
+    } else if (metodoPago === 'tarjeta') {
+      const comision = parseFloat((configuracionNegocioCaja || {}).tarjeta_comision_porcentaje || 0);
+      montoTarjeta = totalAPagar * (1 + comision / 100);
+    } else if (metodoPago === 'transferencia' || metodoPago === 'dolares' || metodoPago === 'cheque' || metodoPago === 'vale_despensa') {
       montoTarjeta = totalAPagar;
       if (metodoPago === 'dolares') {
         const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
@@ -456,6 +469,24 @@ async function cargarConfiguracionNegocioCaja() {
 
 async function imprimirComprobante(ticket, metodoPagoUsado) {
   const config = configuracionNegocioCaja || {};
+  const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
+  const aplicaComision = metodoPagoUsado === 'tarjeta' && comision > 0;
+  const subtotalTicket = totalNetoActual(); // ya incluye cualquier descuento aplicado
+  const montoComision = aplicaComision ? subtotalTicket * comision / 100 : 0;
+
+  const itemsComprobante = ticket.items.map(i => ({
+    nombre_producto: i.nombre_producto,
+    detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+    subtotal: parseFloat(i.subtotal).toFixed(2)
+  }));
+  if (aplicaComision) {
+    itemsComprobante.push({
+      nombre_producto: `Comisión tarjeta (${comision}%)`,
+      detalle: '',
+      subtotal: montoComision.toFixed(2)
+    });
+  }
+
   const datosTicket = {
     ancho_ticket: config.ancho_ticket || '80mm',
     negocio: {
@@ -465,12 +496,8 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     },
     folio: ticket.folio,
     fecha: new Date().toLocaleString(),
-    items: ticket.items.map(i => ({
-      nombre_producto: i.nombre_producto,
-      detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
-      subtotal: parseFloat(i.subtotal).toFixed(2)
-    })),
-    total: parseFloat(ticket.total).toFixed(2),
+    items: itemsComprobante,
+    total: (subtotalTicket + montoComision).toFixed(2),
     piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
     lineasSuperiores: config.lineas_superiores || 0,
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
