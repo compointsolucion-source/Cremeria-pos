@@ -38,6 +38,9 @@
   .zona-total .total-grande { font-size: 40px; font-weight: 800; color: var(--primary, #2E7D32); }
   .contador-articulos { font-size: 13px; color: #666; margin-top: 6px; }
   .zona-inferior-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  #metodosPagoModalCobrar button.activo { background: var(--primary, #2E7D32); color: white; }
+  .resultado-cliente { background: #F4F5F6; border-radius: 8px; padding: 8px 12px; margin-top: 4px; cursor: pointer; font-size: 13px; }
+  .resultado-cliente:hover { background: #E8F5E9; }
 
   .pestana-ticket {
     background: white; border: 2px solid #DDD; border-radius: 10px 10px 0 0;
@@ -142,6 +145,21 @@
       <div id="resultadoVerificador" style="margin:16px 0;"></div>
       <input type="text" id="campoVerificador" placeholder="Código o nombre..." oninput="consultarVerificador()" style="margin-bottom:10px;">
       <button class="btn btn-secondary" style="width:100%;" onclick="cerrarVerificador()">Cerrar</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalCobrarAvanzada" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:200;">
+    <div class="card" style="width:95%; max-width:700px;">
+      <h3>💰 COBRAR</h3>
+      <div class="total-grande" id="totalCobrarModal" style="text-align:center; margin:10px 0;"></div>
+
+      <div id="metodosPagoModalCobrar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
+      <div id="camposPagoModalCobrar"></div>
+
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="confirmarCobroAvanzada()">✅ Confirmar Pago</button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalCobrarAvanzada()">Cancelar</button>
+      </div>
     </div>
   </div>
 
@@ -861,34 +879,210 @@ async function irACobrarAvanzada() {
 
   const pestanaActual = pestanas[pestanaActivaIndex];
 
-  // Si esta pestaña ya es un ticket que se trajo de Mostrador, no se genera
-  // uno nuevo (se duplicaría la venta) — se manda directo a cobrar el que ya existe.
-  if (pestanaActual.ticketIdExistente) {
-    const folioExistente = pestanaActual.nombre.replace('📥 ', '');
-    if (pestanas.length === 1) {
-      pestanas[0] = { id: 1, nombre: 'Ticket 1', carrito: [], clienteAsignado: null, ticketIdExistente: null };
+  try {
+    let ticket;
+    if (pestanaActual.ticketIdExistente) {
+      // Ya es un ticket real guardado (vino de Mostrador) — se usa tal cual, sin duplicarlo.
+      ticket = await apiFetch(`/tickets/folio/${pestanaActual.nombre.replace('📥 ', '')}`);
     } else {
-      pestanas.splice(pestanaActivaIndex, 1);
-      pestanaActivaIndex = Math.max(0, pestanaActivaIndex - 1);
+      ticket = await apiFetch('/tickets', { method: 'POST', body: JSON.stringify({ items: carritoActivo() }) });
     }
-    renderPestanas();
-    renderTablaVentaAvanzada();
-    window.location.href = `caja.html?folio=${folioExistente}`;
-    return;
+    await abrirModalCobrar(ticket);
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ---------- Modal de Cobro (sin salir de Caja Avanzada) ----------
+let ticketParaCobrarAvanzada = null;
+let metodoPagoCobrarAvanzada = 'efectivo';
+let clienteCobrarAvanzada = null;
+let configuracionCobrarAvanzada = null;
+
+async function abrirModalCobrar(ticket) {
+  ticketParaCobrarAvanzada = ticket;
+  if (!configuracionCobrarAvanzada) {
+    configuracionCobrarAvanzada = await apiFetch('/configuracion');
   }
 
-  try {
-    const ticket = await apiFetch('/tickets', {
-      method: 'POST',
-      body: JSON.stringify({ items: carritoActivo() })
-    });
-    mostrarToast(`Ticket ${ticket.folio} generado — continúa el cobro`, 'exito');
+  document.getElementById('totalCobrarModal').textContent = `$${parseFloat(ticket.total).toFixed(2)}`;
+  renderMetodosPagoModalCobrar();
+  document.getElementById('modalCobrarAvanzada').style.display = 'flex';
+}
 
-    // Esta pestaña ya cumplió su función — se cierra sola (o se vacía, si
-    // era la única abierta) para no dejarla estorbando con una venta ya cobrada.
+function cerrarModalCobrarAvanzada() {
+  document.getElementById('modalCobrarAvanzada').style.display = 'none';
+  ticketParaCobrarAvanzada = null;
+  clienteCobrarAvanzada = null;
+}
+
+function renderMetodosPagoModalCobrar() {
+  const config = configuracionCobrarAvanzada || {};
+  const etiquetaTransferencia = config.transferencia_etiqueta || 'Transferencia';
+
+  const metodos = [
+    { id: 'efectivo', label: 'Efectivo', activo: true },
+    { id: 'tarjeta', label: 'Tarjeta', activo: config.tarjeta_habilitado !== false },
+    { id: 'transferencia', label: etiquetaTransferencia, activo: config.transferencia_habilitado !== false },
+    { id: 'dolares', label: '💵 Dólares', activo: !!config.dolares_habilitado },
+    { id: 'cheque', label: '🖋️ Cheque', activo: !!config.cheque_habilitado },
+    { id: 'vale_despensa', label: '🎟️ Vale', activo: !!config.vales_habilitado },
+    { id: 'mixto', label: 'Mixto', activo: config.mixto_habilitado !== false },
+    { id: 'credito', label: '💳 Fiado', activo: config.credito_habilitado !== false }
+  ];
+
+  document.getElementById('metodosPagoModalCobrar').innerHTML = metodos.filter(m => m.activo).map(m => `
+    <button class="btn btn-secondary" id="btnCobrarAv${m.id}" onclick="setMetodoCobrarAvanzada('${m.id}')">${m.label}</button>
+  `).join('');
+
+  setMetodoCobrarAvanzada('efectivo');
+}
+
+function setMetodoCobrarAvanzada(m) {
+  metodoPagoCobrarAvanzada = m;
+  document.querySelectorAll('#metodosPagoModalCobrar button').forEach(btn => {
+    btn.classList.toggle('activo', btn.id === 'btnCobrarAv' + m);
+  });
+
+  const total = parseFloat(ticketParaCobrarAvanzada.total);
+  const campos = document.getElementById('camposPagoModalCobrar');
+  const config = configuracionCobrarAvanzada || {};
+
+  if (m === 'efectivo') {
+    campos.innerHTML = `
+      <input type="number" id="montoRecibidoCobrarAv" placeholder="Efectivo recibido" oninput="calcularCambioCobrarAvanzada()">
+      <p id="cambioCobrarAvTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+    `;
+  } else if (m === 'mixto') {
+    campos.innerHTML = `
+      <input type="number" id="montoEfectivoCobrarAv" placeholder="Monto en efectivo" style="margin-bottom:8px;">
+      <input type="number" id="montoTarjetaCobrarAv" placeholder="Monto en tarjeta">
+    `;
+  } else if (m === 'credito') {
+    campos.innerHTML = `
+      <input type="text" id="buscarClienteCobrarAv" placeholder="Buscar cliente por nombre..." oninput="buscarClientesCobrarAvanzada()">
+      <div id="resultadosClienteCobrarAv"></div>
+      <div id="clienteElegidoCobrarAv" style="margin-top:8px; font-weight:600;"></div>
+    `;
+  } else if (m === 'dolares') {
+    const tipoCambio = parseFloat(config.tipo_cambio_dolar || 0);
+    const totalDolares = tipoCambio > 0 ? (total / tipoCambio) : 0;
+    campos.innerHTML = `
+      <p style="font-size:14px; color:#666;">Tipo de cambio: $${tipoCambio.toFixed(4)} MXN/USD — Total: <b>$${totalDolares.toFixed(2)} USD</b></p>
+      <input type="number" id="dolaresRecibidosCobrarAv" placeholder="Dólares recibidos" step="0.01" oninput="calcularCambioDolaresCobrarAvanzada()">
+      <p id="cambioDolaresCobrarAvTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+    `;
+  } else if (m === 'tarjeta') {
+    const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
+    campos.innerHTML = comision > 0 ? `
+      <div style="font-size:14px; background:#F4F5F6; border-radius:10px; padding:10px 14px;">
+        <div style="display:flex; justify-content:space-between;"><span>Subtotal</span><span>$${total.toFixed(2)}</span></div>
+        <div style="display:flex; justify-content:space-between; color:#C62828;"><span>Comisión (${comision}%)</span><span>+$${(total * comision / 100).toFixed(2)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:700; border-top:1px solid #DDD; margin-top:6px; padding-top:6px;"><span>Total a cobrar</span><span>$${(total * (1 + comision / 100)).toFixed(2)}</span></div>
+      </div>
+    ` : '';
+  } else {
+    campos.innerHTML = '';
+  }
+}
+
+function calcularCambioCobrarAvanzada() {
+  const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
+  const cambio = recibido - parseFloat(ticketParaCobrarAvanzada.total);
+  document.getElementById('cambioCobrarAvTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Falta: $${Math.abs(cambio).toFixed(2)}`;
+}
+
+function calcularCambioDolaresCobrarAvanzada() {
+  const config = configuracionCobrarAvanzada || {};
+  const tipoCambio = parseFloat(config.tipo_cambio_dolar || 0);
+  const totalDolares = tipoCambio > 0 ? (parseFloat(ticketParaCobrarAvanzada.total) / tipoCambio) : 0;
+  const recibido = parseFloat(document.getElementById('dolaresRecibidosCobrarAv').value || 0);
+  const cambio = recibido - totalDolares;
+  document.getElementById('cambioDolaresCobrarAvTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)} USD` : `Falta: $${Math.abs(cambio).toFixed(2)} USD`;
+}
+
+let debounceBusquedaCobrarAv;
+function buscarClientesCobrarAvanzada() {
+  clearTimeout(debounceBusquedaCobrarAv);
+  debounceBusquedaCobrarAv = setTimeout(async () => {
+    const texto = document.getElementById('buscarClienteCobrarAv').value.trim();
+    if (!texto) { document.getElementById('resultadosClienteCobrarAv').innerHTML = ''; return; }
+    try {
+      const resultados = await apiFetch(`/clientes/buscar/${encodeURIComponent(texto)}`);
+      document.getElementById('resultadosClienteCobrarAv').innerHTML = resultados.map(c => `
+        <div class="resultado-cliente" onclick='elegirClienteCobrarAvanzada(${c.id}, "${c.nombre.replace(/"/g, '&quot;')}")'>
+          ${c.nombre} — Debe: $${parseFloat(c.saldo_actual).toFixed(2)} / Límite: $${parseFloat(c.limite_credito).toFixed(2)}
+        </div>
+      `).join('') || '<p style="color:#888;">Sin resultados</p>';
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  }, 300);
+}
+
+function elegirClienteCobrarAvanzada(id, nombre) {
+  clienteCobrarAvanzada = { id, nombre };
+  document.getElementById('clienteElegidoCobrarAv').textContent = `Cliente: ${nombre}`;
+  document.getElementById('resultadosClienteCobrarAv').innerHTML = '';
+  document.getElementById('buscarClienteCobrarAv').value = '';
+}
+
+async function confirmarCobroAvanzada() {
+  const boton = document.querySelector('#modalCobrarAvanzada .btn-primary');
+  if (boton) { boton.disabled = true; boton.textContent = 'Procesando...'; }
+
+  try {
+    const turno = await apiFetch('/turnos/actual');
+    if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo desde el panel de administración.', 'error'); return; }
+
+    const total = parseFloat(ticketParaCobrarAvanzada.total);
+    let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
+
+    if (metodoPagoCobrarAvanzada === 'efectivo') {
+      montoEfectivo = total;
+      const config = configuracionCobrarAvanzada || {};
+      if (config.efectivo_bloquear_insuficiente !== false) {
+        const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
+        if (recibido < total) { mostrarToast('El efectivo ingresado es menor que el total', 'error'); return; }
+      }
+    } else if (metodoPagoCobrarAvanzada === 'tarjeta') {
+      const comision = parseFloat((configuracionCobrarAvanzada || {}).tarjeta_comision_porcentaje || 0);
+      montoTarjeta = total * (1 + comision / 100);
+    } else if (['transferencia', 'dolares', 'cheque', 'vale_despensa'].includes(metodoPagoCobrarAvanzada)) {
+      montoTarjeta = total;
+      if (metodoPagoCobrarAvanzada === 'dolares') {
+        const tipoCambio = parseFloat((configuracionCobrarAvanzada || {}).tipo_cambio_dolar || 0);
+        const totalDolares = tipoCambio > 0 ? (total / tipoCambio) : 0;
+        const recibidoDolares = parseFloat(document.getElementById('dolaresRecibidosCobrarAv').value || 0);
+        if (recibidoDolares < totalDolares) { mostrarToast('Los dólares recibidos no alcanzan el total', 'error'); return; }
+      }
+    } else if (metodoPagoCobrarAvanzada === 'mixto') {
+      montoEfectivo = parseFloat(document.getElementById('montoEfectivoCobrarAv').value || 0);
+      montoTarjeta = parseFloat(document.getElementById('montoTarjetaCobrarAv').value || 0);
+      if (Math.abs((montoEfectivo + montoTarjeta) - total) > 0.01) {
+        mostrarToast('La suma de efectivo y tarjeta debe ser igual al total', 'error');
+        return;
+      }
+    } else if (metodoPagoCobrarAvanzada === 'credito') {
+      if (!clienteCobrarAvanzada) { mostrarToast('Selecciona un cliente para autorizar el fiado', 'error'); return; }
+      cliente_id = clienteCobrarAvanzada.id;
+    }
+
+    const resultadoPago = await apiFetch(`/tickets/${ticketParaCobrarAvanzada.id}/pagar`, {
+      method: 'POST',
+      body: JSON.stringify({ metodo_pago: metodoPagoCobrarAvanzada, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id })
+    });
+
+    mostrarToast('Pago procesado correctamente', 'exito');
+    if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
+      mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')}`, 'error');
+    }
+
+    await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada);
+
+    // Cerrar el ticket ya cobrado: quita esta pestaña (o la vacía si es la única)
     if (pestanas.length === 1) {
-      pestanas[0].carrito = [];
-      pestanas[0].clienteAsignado = null;
+      pestanas[0] = { id: 1, nombre: 'Ticket 1', carrito: [], clienteAsignado: null, ticketIdExistente: null };
     } else {
       pestanas.splice(pestanaActivaIndex, 1);
       pestanaActivaIndex = Math.max(0, pestanaActivaIndex - 1);
@@ -896,12 +1090,57 @@ async function irACobrarAvanzada() {
     filaSeleccionadaIndex = null;
     renderPestanas();
     renderTablaVentaAvanzada();
-
-    // Redirige a Caja ya con este ticket a la mano — reutiliza el cobro
-    // completo (efectivo/tarjeta/mixto/fiado) que ya existe y funciona.
-    window.location.href = `caja.html?folio=${ticket.folio}`;
+    cerrarModalCobrarAvanzada();
   } catch (err) {
-    mostrarToast(err.message, 'error');
+    mostrarToast('Error al cobrar: ' + err.message, 'error');
+  } finally {
+    const botonActual = document.querySelector('#modalCobrarAvanzada .btn-primary');
+    if (botonActual) { botonActual.disabled = false; botonActual.textContent = '✅ Confirmar Pago'; }
+  }
+}
+
+async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado) {
+  const config = configuracionCobrarAvanzada || {};
+  const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
+  const aplicaComision = metodoPagoUsado === 'tarjeta' && comision > 0;
+  const montoComision = aplicaComision ? parseFloat(ticket.total) * comision / 100 : 0;
+
+  const itemsComprobante = ticket.items.map(i => ({
+    nombre_producto: i.nombre_producto,
+    detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+    subtotal: parseFloat(i.subtotal).toFixed(2)
+  }));
+  if (aplicaComision) {
+    itemsComprobante.push({ nombre_producto: `Comisión tarjeta (${comision}%)`, detalle: '', subtotal: montoComision.toFixed(2) });
+  }
+
+  const datosTicket = {
+    ancho_ticket: config.ancho_ticket || '80mm',
+    negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
+    folio: ticket.folio,
+    fecha: new Date().toLocaleString(),
+    items: itemsComprobante,
+    total: (parseFloat(ticket.total) + montoComision).toFixed(2),
+    piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
+    lineasSuperiores: config.lineas_superiores || 0,
+    lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
+    incluirPrecioUnitario: config.incluir_precio_unitario !== false,
+    descripcionCompleta: config.descripcion_completa !== false,
+    logoUrl: config.logo_url || null,
+    tamanoLetra: config.tamano_letra || 'normal',
+    negocioNegritas: config.negocio_negritas !== false,
+    totalNegritas: config.total_negritas !== false
+  };
+
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  try {
+    if (modoImpresion === 'sistema') {
+      await imprimirConDialogoDelSistema(datosTicket);
+    } else {
+      await imprimirTicketBLE(datosTicket);
+    }
+  } catch (err) {
+    mostrarToast(`No se pudo imprimir: ${err.message}`, 'error');
   }
 }
 
