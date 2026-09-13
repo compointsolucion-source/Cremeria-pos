@@ -67,107 +67,125 @@ router.get('/categorias', verificarToken, async (req, res) => {
 // se crean solos. Filas sin nombre de producto se omiten (no hay nada que
 // dar de alta) y se reportan como omitidas, no se inventan datos.
 router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req, res) => {
-  const conexion = await pool.connect();
   try {
     const { productos } = req.body;
     if (!Array.isArray(productos) || productos.length === 0) {
       return res.status(400).json({ error: 'No se recibieron productos para importar' });
     }
 
-    await conexion.query('BEGIN');
+    // Precarga TODO lo que ya existe en memoria de una sola vez, en vez de
+    // consultar por cada fila (con 781 filas, la versión anterior hacía
+    // miles de consultas una por una dentro de una sola transacción gigante
+    // — muy lento, y si se cortaba a la mitad se perdía todo el progreso
+    // por ser todo-o-nada). Con esto son solo 2 consultas de precarga.
+    const categoriasExistentes = await pool.query('SELECT id, LOWER(nombre) AS nombre_lower FROM categorias');
+    const categoriasCache = {};
+    categoriasExistentes.rows.forEach(c => { categoriasCache[c.nombre_lower] = c.id; });
+
+    const productosExistentes = await pool.query('SELECT id, codigo_barras, LOWER(nombre) AS nombre_lower FROM productos WHERE sucursal_id = $1', [req.usuario.sucursal_id]);
+    const porCodigo = {}, porNombre = {};
+    productosExistentes.rows.forEach(p => {
+      if (p.codigo_barras) porCodigo[p.codigo_barras] = p.id;
+      porNombre[p.nombre_lower] = p.id;
+    });
 
     let creados = 0, actualizados = 0, omitidos = 0;
-    const categoriasCache = {};
+    const errores = [];
+    const TAMANO_LOTE = 100;
 
-    for (const fila of productos) {
-      const nombre = (fila.nombre || '').trim();
-      if (!nombre) { omitidos++; continue; }
+    // Se procesa por lotes de 100 filas, con su propio BEGIN/COMMIT cada
+    // uno — así, si algo falla o se corta a mitad del archivo, los lotes
+    // ya confirmados NO se pierden (solo se perdería el lote en curso).
+    for (let inicio = 0; inicio < productos.length; inicio += TAMANO_LOTE) {
+      const lote = productos.slice(inicio, inicio + TAMANO_LOTE);
+      const conexion = await pool.connect();
+      try {
+        await conexion.query('BEGIN');
 
-      const codigo_barras = (fila.codigo_barras || '').trim() || null;
-      const precio_costo = fila.precio_costo || null;
-      const precio = fila.precio || null;
-      const precio_mayoreo = fila.precio_mayoreo || null;
-      const existencia = fila.existencia !== undefined ? fila.existencia : 0;
-      const stock_minimo = fila.stock_minimo || 0;
-      const stock_maximo = fila.stock_maximo || null;
-      const departamentoNombre = (fila.departamento || '').trim();
+        for (const fila of lote) {
+          const nombre = (fila.nombre || '').trim();
+          if (!nombre) { omitidos++; continue; }
 
-      // Resolver (o crear) el departamento, cacheando para no repetir la
-      // misma consulta cientos de veces en un archivo grande.
-      let categoria_id = null;
-      if (departamentoNombre && departamentoNombre !== '- Sin Departamento -') {
-        const clave = departamentoNombre.toLowerCase();
-        if (categoriasCache[clave]) {
-          categoria_id = categoriasCache[clave];
-        } else {
-          const existente = await conexion.query('SELECT id FROM categorias WHERE LOWER(nombre) = $1', [clave]);
-          if (existente.rows.length > 0) {
-            categoria_id = existente.rows[0].id;
-          } else {
-            const nueva = await conexion.query('INSERT INTO categorias (nombre) VALUES ($1) RETURNING id', [departamentoNombre]);
-            categoria_id = nueva.rows[0].id;
+          const codigo_barras = (fila.codigo_barras || '').trim() || null;
+          const precio_costo = fila.precio_costo || null;
+          const precio = fila.precio || null;
+          const precio_mayoreo = fila.precio_mayoreo || null;
+          const existencia = fila.existencia !== undefined ? fila.existencia : 0;
+          const stock_minimo = fila.stock_minimo || 0;
+          const stock_maximo = fila.stock_maximo || null;
+          const departamentoNombre = (fila.departamento || '').trim();
+          const nombreLower = nombre.toLowerCase();
+
+          let categoria_id = null;
+          if (departamentoNombre && departamentoNombre !== '- Sin Departamento -') {
+            const claveDepto = departamentoNombre.toLowerCase();
+            if (categoriasCache[claveDepto]) {
+              categoria_id = categoriasCache[claveDepto];
+            } else {
+              const nueva = await conexion.query('INSERT INTO categorias (nombre) VALUES ($1) RETURNING id', [departamentoNombre]);
+              categoria_id = nueva.rows[0].id;
+              categoriasCache[claveDepto] = categoria_id;
+            }
           }
-          categoriasCache[clave] = categoria_id;
+
+          // Búsqueda en memoria (ya no en la base de datos) por código, y
+          // si no, por nombre exacto.
+          let productoId = (codigo_barras && porCodigo[codigo_barras]) || porNombre[nombreLower] || null;
+
+          if (productoId) {
+            await conexion.query(
+              `UPDATE productos SET
+                precio = COALESCE($1, precio), precio_costo = COALESCE($2, precio_costo),
+                precio_mayoreo = COALESCE($3, precio_mayoreo), categoria_id = COALESCE($4, categoria_id)
+               WHERE id = $5`,
+              [precio, precio_costo, precio_mayoreo, categoria_id, productoId]
+            );
+            actualizados++;
+          } else {
+            const nuevoProducto = await conexion.query(
+              `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true) RETURNING id`,
+              [req.usuario.sucursal_id, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras]
+            );
+            productoId = nuevoProducto.rows[0].id;
+            // Se registra en memoria de inmediato para que, si el archivo
+            // repite este mismo código/nombre más adelante, se actualice
+            // en vez de crear un duplicado dentro de la misma importación.
+            if (codigo_barras) porCodigo[codigo_barras] = productoId;
+            porNombre[nombreLower] = productoId;
+            creados++;
+          }
+
+          await conexion.query(
+            `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (producto_id) DO UPDATE SET
+               existencia_actual = $2, stock_minimo = $3, stock_maximo = COALESCE($4, inventario.stock_maximo)`,
+            [productoId, existencia, stock_minimo, stock_maximo]
+          );
         }
-      }
 
-      // Buscar producto existente: primero por código de barras (si viene),
-      // si no por nombre exacto (sin distinguir mayúsculas) en esta sucursal.
-      let productoExistente = null;
-      if (codigo_barras) {
-        const porCodigo = await conexion.query('SELECT id FROM productos WHERE codigo_barras = $1 AND sucursal_id = $2', [codigo_barras, req.usuario.sucursal_id]);
-        if (porCodigo.rows.length > 0) productoExistente = porCodigo.rows[0];
+        await conexion.query('COMMIT');
+      } catch (errLote) {
+        await conexion.query('ROLLBACK').catch(() => {});
+        console.error('Error en lote de importación:', errLote);
+        errores.push(`Filas ${inicio + 1}-${inicio + lote.length}: ${errLote.message}`);
+      } finally {
+        conexion.release();
       }
-      if (!productoExistente) {
-        const porNombre = await conexion.query('SELECT id FROM productos WHERE LOWER(nombre) = $1 AND sucursal_id = $2', [nombre.toLowerCase(), req.usuario.sucursal_id]);
-        if (porNombre.rows.length > 0) productoExistente = porNombre.rows[0];
-      }
-
-      let productoId;
-      if (productoExistente) {
-        productoId = productoExistente.id;
-        await conexion.query(
-          `UPDATE productos SET
-            precio = COALESCE($1, precio), precio_costo = COALESCE($2, precio_costo),
-            precio_mayoreo = COALESCE($3, precio_mayoreo), categoria_id = COALESCE($4, categoria_id)
-           WHERE id = $5`,
-          [precio, precio_costo, precio_mayoreo, categoria_id, productoId]
-        );
-        actualizados++;
-      } else {
-        const nuevoProducto = await conexion.query(
-          `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true) RETURNING id`,
-          [req.usuario.sucursal_id, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras]
-        );
-        productoId = nuevoProducto.rows[0].id;
-        creados++;
-      }
-
-      await conexion.query(
-        `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (producto_id) DO UPDATE SET
-           existencia_actual = $2, stock_minimo = $3, stock_maximo = COALESCE($4, inventario.stock_maximo)`,
-        [productoId, existencia, stock_minimo, stock_maximo]
-      );
     }
 
-    await registrarBitacora(conexion, {
+    await registrarBitacora(pool, {
       usuario_id: req.usuario.id,
       accion: 'importar_productos',
       modulo: 'productos',
-      valor_nuevo: { total: productos.length, creados, actualizados, omitidos }
+      valor_nuevo: { total: productos.length, creados, actualizados, omitidos, lotes_fallidos: errores.length }
     });
 
-    await conexion.query('COMMIT');
-    res.json({ creados, actualizados, omitidos });
+    res.json({ creados, actualizados, omitidos, errores });
   } catch (err) {
-    await conexion.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Error al importar el archivo: ' + err.message });
-  } finally {
-    conexion.release();
   }
 });
 
@@ -208,6 +226,86 @@ router.get('/buscar-externo/:codigo', verificarToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: 'No se pudo consultar la base de datos externa en este momento' });
+  }
+});
+
+// Cambia el tipo de venta (a granel/por pieza) de varios productos a la
+// vez — pensado para corregir importaciones masivas donde todo se dio de
+// alta igual por defecto y hay que repartir cuáles son cuáles.
+router.post('/cambiar-tipo-venta-lote', verificarToken, requierePermiso('PRODUCTOS_EDITAR'), async (req, res) => {
+  try {
+    const { producto_ids, tipo_venta } = req.body;
+    if (!Array.isArray(producto_ids) || producto_ids.length === 0) {
+      return res.status(400).json({ error: 'Selecciona al menos un producto' });
+    }
+    if (!['peso', 'unidad'].includes(tipo_venta)) {
+      return res.status(400).json({ error: 'Tipo de venta inválido' });
+    }
+
+    const result = await pool.query(
+      'UPDATE productos SET tipo_venta = $1 WHERE id = ANY($2::int[]) AND sucursal_id = $3',
+      [tipo_venta, producto_ids, req.usuario.sucursal_id]
+    );
+
+    res.json({ actualizados: result.rowCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al cambiar el tipo de venta' });
+  }
+});
+
+// Lista de productos que tienen código de barras pero aún no tienen
+// imagen — son los candidatos para completar con Open Food Facts.
+router.get('/sin-imagen', verificarToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, nombre, codigo_barras FROM productos
+       WHERE sucursal_id = $1 AND activo = true
+         AND codigo_barras IS NOT NULL AND codigo_barras != ''
+         AND (imagen_url IS NULL OR imagen_url = '')`,
+      [req.usuario.sucursal_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al buscar productos sin imagen' });
+  }
+});
+
+// Busca en Open Food Facts la imagen de UN producto por su código de
+// barras y la asigna si se encuentra. Se llama una vez por producto desde
+// el frontend (no todos de golpe) para no saturar la base de datos pública
+// externa ni el tiempo de espera del servidor.
+router.post('/:id/actualizar-imagen-externa', verificarToken, requierePermiso('PRODUCTOS_EDITAR'), async (req, res) => {
+  try {
+    const productoResult = await pool.query(
+      'SELECT id, codigo_barras, imagen_url FROM productos WHERE id = $1 AND sucursal_id = $2',
+      [req.params.id, req.usuario.sucursal_id]
+    );
+    if (productoResult.rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
+    const producto = productoResult.rows[0];
+
+    if (!producto.codigo_barras) {
+      return res.json({ actualizado: false, motivo: 'Sin código de barras' });
+    }
+
+    const respuestaExterna = await fetch(`https://world.openfoodfacts.org/api/v2/product/${producto.codigo_barras}.json`);
+    const datosExternos = await respuestaExterna.json();
+
+    if (datosExternos.status !== 1 || !datosExternos.product) {
+      return res.json({ actualizado: false, motivo: 'No encontrado en Open Food Facts' });
+    }
+
+    const imagenEncontrada = datosExternos.product.image_url || datosExternos.product.image_front_url || null;
+    if (!imagenEncontrada) {
+      return res.json({ actualizado: false, motivo: 'Encontrado, pero sin foto disponible' });
+    }
+
+    await pool.query('UPDATE productos SET imagen_url = $1 WHERE id = $2', [imagenEncontrada, producto.id]);
+    res.json({ actualizado: true });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ actualizado: false, motivo: 'Error al consultar la base de datos externa' });
   }
 });
 

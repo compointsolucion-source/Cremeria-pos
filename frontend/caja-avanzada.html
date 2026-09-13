@@ -541,12 +541,8 @@ async function cargarTicketMostradorEnPestana(folio) {
   }
 }
 
-function agregarProductoAvanzada(producto, cantidad) {
-  if (pestanas[pestanaActivaIndex].ticketIdExistente) {
-    mostrarToast('Esta pestaña ya es un ticket guardado — no se le pueden agregar más productos aquí, solo cobrarlo', 'error');
-    return;
-  }
-  carritoActivo().push({
+async function agregarProductoAvanzada(producto, cantidad) {
+  const nuevoItem = {
     tipo: 'producto',
     producto_id: producto.id,
     codigo_barras: producto.codigo_barras || '',
@@ -554,16 +550,33 @@ function agregarProductoAvanzada(producto, cantidad) {
     cantidad: cantidad,
     precio_unitario: parseFloat(producto.precio),
     existencia_referencia: producto.existencia_actual !== undefined ? producto.existencia_actual : null
-  });
+  };
+
+  const pestanaActual = pestanas[pestanaActivaIndex];
+  if (pestanaActual.ticketIdExistente) {
+    // Esta pestaña es un ticket real que ya vive en el servidor (vino de
+    // Mostrador) — el producto se manda de inmediato al ticket real, no
+    // solo a la tabla en pantalla, para que quede guardado de verdad.
+    try {
+      await apiFetch(`/tickets/${pestanaActual.ticketIdExistente}/agregar-item`, {
+        method: 'POST',
+        body: JSON.stringify(nuevoItem)
+      });
+      carritoActivo().push(nuevoItem);
+      renderTablaVentaAvanzada();
+      mostrarToast('Producto agregado al ticket', 'exito');
+    } catch (err) {
+      mostrarToast('No se pudo agregar al ticket: ' + err.message, 'error');
+    }
+    return;
+  }
+
+  carritoActivo().push(nuevoItem);
   renderTablaVentaAvanzada();
 }
 
-function agregarKitAvanzada(kit) {
-  if (pestanas[pestanaActivaIndex].ticketIdExistente) {
-    mostrarToast('Esta pestaña ya es un ticket guardado — no se le pueden agregar más productos aquí, solo cobrarlo', 'error');
-    return;
-  }
-  carritoActivo().push({
+async function agregarKitAvanzada(kit) {
+  const nuevoItem = {
     tipo: 'kit',
     kit_id: kit.id,
     codigo_barras: '',
@@ -571,7 +584,25 @@ function agregarKitAvanzada(kit) {
     cantidad: 1,
     precio_unitario: parseFloat(kit.precio_kit),
     existencia_referencia: null
-  });
+  };
+
+  const pestanaActual = pestanas[pestanaActivaIndex];
+  if (pestanaActual.ticketIdExistente) {
+    try {
+      await apiFetch(`/tickets/${pestanaActual.ticketIdExistente}/agregar-item`, {
+        method: 'POST',
+        body: JSON.stringify(nuevoItem)
+      });
+      carritoActivo().push(nuevoItem);
+      renderTablaVentaAvanzada();
+      mostrarToast('Kit agregado al ticket', 'exito');
+    } catch (err) {
+      mostrarToast('No se pudo agregar al ticket: ' + err.message, 'error');
+    }
+    return;
+  }
+
+  carritoActivo().push(nuevoItem);
   renderTablaVentaAvanzada();
 }
 
@@ -643,7 +674,7 @@ async function abrirArticuloComun() {
   const precio = parseFloat(precioTexto);
   if (isNaN(precio) || precio <= 0) { mostrarToast('Precio inválido', 'error'); return; }
 
-  carritoActivo().push({
+  const nuevoItem = {
     tipo: 'producto',
     producto_id: null, // sin producto real: no descuenta inventario
     codigo_barras: '0',
@@ -651,7 +682,25 @@ async function abrirArticuloComun() {
     cantidad: 1,
     precio_unitario: precio,
     existencia_referencia: null
-  });
+  };
+
+  const pestanaActual = pestanas[pestanaActivaIndex];
+  if (pestanaActual.ticketIdExistente) {
+    try {
+      await apiFetch(`/tickets/${pestanaActual.ticketIdExistente}/agregar-item`, {
+        method: 'POST',
+        body: JSON.stringify(nuevoItem)
+      });
+      carritoActivo().push(nuevoItem);
+      renderTablaVentaAvanzada();
+      mostrarToast('Artículo agregado al ticket', 'exito');
+    } catch (err) {
+      mostrarToast('No se pudo agregar al ticket: ' + err.message, 'error');
+    }
+    return;
+  }
+
+  carritoActivo().push(nuevoItem);
   renderTablaVentaAvanzada();
   mostrarToast('Artículo agregado', 'exito');
 }

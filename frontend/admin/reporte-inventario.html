@@ -56,15 +56,37 @@
       <button class="btn btn-secondary" onclick="exportarReporteCSV()">⬇️ Exportar CSV</button>
       <button class="btn btn-secondary" onclick="document.getElementById('inputImportar').click()">📥 Importar Excel</button>
       <input type="file" id="inputImportar" accept=".xlsx,.xls" style="display:none;" onchange="importarExcel(event)">
+      <button class="btn btn-secondary" onclick="actualizarImagenesMasivo()">🖼️ Actualizar Imágenes</button>
       <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
+
+    <div id="progresoImportacion" style="display:none; background:white; border-radius:12px; padding:14px 18px; margin-bottom:14px; box-shadow: var(--shadow);">
+      <div style="display:flex; justify-content:space-between; font-size:13px; color:#666; margin-bottom:6px;">
+        <span id="textoProgresoImportacion">Preparando...</span>
+        <span id="porcentajeProgresoImportacion">0%</span>
+      </div>
+      <div style="background:#EEE; border-radius:8px; height:10px; overflow:hidden;">
+        <div id="barraProgresoImportacion" style="background:var(--primary,#2E7D32); height:100%; width:0%; transition: width 0.2s;"></div>
+      </div>
+    </div>
+
+    <div style="background:white; border-radius:12px; padding:12px 16px; margin-bottom:14px; box-shadow: var(--shadow); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <b style="font-size:13px;">Corregir Tipo de Venta en lote:</b>
+      <span id="contadorSeleccionTipoVenta" style="font-size:13px; color:#666;">0 seleccionados</span>
+      <button class="btn btn-secondary" onclick="seleccionarTodosTipoVenta()">Seleccionar todos</button>
+      <button class="btn btn-secondary" onclick="seleccionarNingunoTipoVenta()">Quitar selección</button>
+      <button class="btn btn-primary" onclick="cambiarTipoVentaLote('unidad')">Marcar como Por Pieza</button>
+      <button class="btn btn-primary" onclick="cambiarTipoVentaLote('peso')">Marcar como A Granel</button>
     </div>
 
     <div class="contenedor-tabla">
       <table class="tabla-reporte-inv">
         <thead>
           <tr>
+            <th><input type="checkbox" id="checkTodosTipoVenta" onchange="toggleTodosCheckbox(this.checked)"></th>
             <th>Código</th>
             <th>Descripción del Producto</th>
+            <th>Tipo de Venta</th>
             <th class="numero">Costo</th>
             <th class="numero">Precio Venta</th>
             <th class="numero">Existencia</th>
@@ -110,11 +132,14 @@ async function cargarReporteInventario() {
       let claseExistencia = '';
       if (existencia <= 0) claseExistencia = 'valor-bajo';
       else if (existencia <= minimo) claseExistencia = 'valor-alerta';
+      const etiquetaTipoVenta = p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel (kg)';
 
       return `
         <tr>
+          <td><input type="checkbox" class="check-tipo-venta" data-id="${p.id}" onchange="actualizarContadorSeleccionTipoVenta()"></td>
           <td>${p.codigo_barras || '—'}</td>
           <td>${p.nombre}</td>
+          <td>${etiquetaTipoVenta}</td>
           <td class="numero">${p.precio_costo ? '$' + parseFloat(p.precio_costo).toFixed(2) : 'N/D'}</td>
           <td class="numero">$${parseFloat(p.precio).toFixed(2)}</td>
           <td class="numero ${claseExistencia}">${existencia.toFixed(2)}</td>
@@ -122,7 +147,8 @@ async function cargarReporteInventario() {
           <td class="numero">${parseFloat(p.stock_maximo).toFixed(2)}</td>
         </tr>
       `;
-    }).join('') || '<tr><td colspan="7" style="text-align:center; color:#888;">Sin productos en este departamento</td></tr>';
+    }).join('') || '<tr><td colspan="9" style="text-align:center; color:#888;">Sin productos en este departamento</td></tr>';
+    actualizarContadorSeleccionTipoVenta();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
@@ -131,9 +157,9 @@ async function cargarReporteInventario() {
 function exportarReporteCSV() {
   if (filasReporteActual.length === 0) { mostrarToast('No hay datos para exportar', 'error'); return; }
 
-  const encabezado = 'Codigo,Descripcion,Costo,Precio Venta,Existencia,Inv Minimo,Inv Maximo\n';
+  const encabezado = 'Codigo,Descripcion,Tipo Venta,Costo,Precio Venta,Existencia,Inv Minimo,Inv Maximo\n';
   const filas = filasReporteActual.map(p =>
-    `${p.codigo_barras || ''},"${p.nombre}",${p.precio_costo || 0},${p.precio},${p.existencia},${p.stock_minimo},${p.stock_maximo}`
+    `${p.codigo_barras || ''},"${p.nombre}",${p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel'},${p.precio_costo || 0},${p.precio},${p.existencia},${p.stock_minimo},${p.stock_maximo}`
   ).join('\n');
 
   const blob = new Blob([encabezado + filas], { type: 'text/csv' });
@@ -153,6 +179,85 @@ function parsearNumeroExcel(valor) {
   const limpio = String(valor).replace(/\$/g, '').replace(/\s/g, '').replace(',', '.');
   const numero = parseFloat(limpio);
   return isNaN(numero) ? null : numero;
+}
+
+function toggleTodosCheckbox(marcado) {
+  document.querySelectorAll('.check-tipo-venta').forEach(chk => chk.checked = marcado);
+  actualizarContadorSeleccionTipoVenta();
+}
+
+function seleccionarTodosTipoVenta() { toggleTodosCheckbox(true); document.getElementById('checkTodosTipoVenta').checked = true; }
+function seleccionarNingunoTipoVenta() { toggleTodosCheckbox(false); document.getElementById('checkTodosTipoVenta').checked = false; }
+
+function actualizarContadorSeleccionTipoVenta() {
+  const total = document.querySelectorAll('.check-tipo-venta:checked').length;
+  document.getElementById('contadorSeleccionTipoVenta').textContent = `${total} seleccionados`;
+}
+
+async function cambiarTipoVentaLote(tipoVenta) {
+  const seleccionados = [...document.querySelectorAll('.check-tipo-venta:checked')].map(chk => parseInt(chk.dataset.id));
+  if (seleccionados.length === 0) { mostrarToast('Selecciona al menos un producto primero', 'error'); return; }
+
+  const etiqueta = tipoVenta === 'unidad' ? 'Por Pieza' : 'A Granel (kg)';
+  const confirmado = await confirmarAccion(`¿Marcar ${seleccionados.length} productos como "${etiqueta}"?`);
+  if (!confirmado) return;
+
+  try {
+    const resultado = await apiFetch('/productos/cambiar-tipo-venta-lote', {
+      method: 'POST',
+      body: JSON.stringify({ producto_ids: seleccionados, tipo_venta: tipoVenta })
+    });
+    mostrarToast(`${resultado.actualizados} productos actualizados a "${etiqueta}"`, 'exito');
+    cargarReporteInventario();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function actualizarImagenesMasivo() {
+  try {
+    const candidatos = await apiFetch('/productos/sin-imagen');
+    if (candidatos.length === 0) {
+      mostrarToast('Todos tus productos con código de barras ya tienen imagen (o ninguno tiene código)', 'exito');
+      return;
+    }
+
+    const confirmado = await confirmarAccion(`Se buscará imagen en una base de datos pública (Open Food Facts) para ${candidatos.length} productos que tienen código de barras pero no foto. No todos se van a encontrar — es de mejor esfuerzo, no garantizado. ¿Continuar?`);
+    if (!confirmado) return;
+
+    const contenedorProgreso = document.getElementById('progresoImportacion');
+    const barra = document.getElementById('barraProgresoImportacion');
+    const texto = document.getElementById('textoProgresoImportacion');
+    const porcentaje = document.getElementById('porcentajeProgresoImportacion');
+    contenedorProgreso.style.display = 'block';
+
+    let actualizados = 0, sinEncontrar = 0;
+
+    for (let i = 0; i < candidatos.length; i++) {
+      const avance = Math.round((i / candidatos.length) * 100);
+      texto.textContent = `Buscando imagen ${i + 1} de ${candidatos.length}: ${candidatos[i].nombre}...`;
+      porcentaje.textContent = `${avance}%`;
+      barra.style.width = `${avance}%`;
+
+      try {
+        const resultado = await apiFetch(`/productos/${candidatos[i].id}/actualizar-imagen-externa`, { method: 'POST' });
+        if (resultado.actualizado) actualizados++; else sinEncontrar++;
+      } catch (err) {
+        sinEncontrar++;
+      }
+    }
+
+    barra.style.width = '100%';
+    porcentaje.textContent = '100%';
+    texto.textContent = 'Terminado';
+
+    mostrarToast(`Listo: ${actualizados} imágenes encontradas y asignadas, ${sinEncontrar} sin resultado en la base pública`, 'exito');
+    setTimeout(() => { contenedorProgreso.style.display = 'none'; }, 1500);
+    cargarReporteInventario();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    document.getElementById('progresoImportacion').style.display = 'none';
+  }
 }
 
 async function importarExcel(evento) {
@@ -183,14 +288,55 @@ async function importarExcel(evento) {
     const confirmado = await confirmarAccion(`Se van a procesar ${productos.length} filas del archivo. Los productos que ya existan (por código o nombre) se actualizarán; los nuevos se crearán. ¿Continuar?`);
     if (!confirmado) { evento.target.value = ''; return; }
 
-    mostrarToast('Importando, esto puede tardar unos segundos...', 'info');
-    const resultado = await apiFetch('/productos/importar', { method: 'POST', body: JSON.stringify({ productos }) });
+    // Se importa en lotes (no todo de un jalón) para poder mostrar un
+    // avance real en pantalla — cada lote es su propia petición al servidor.
+    const TAMANO_LOTE = 50;
+    const lotes = [];
+    for (let i = 0; i < productos.length; i += TAMANO_LOTE) {
+      lotes.push(productos.slice(i, i + TAMANO_LOTE));
+    }
 
-    mostrarToast(`Importación terminada: ${resultado.creados} creados, ${resultado.actualizados} actualizados, ${resultado.omitidos} omitidos (sin nombre)`, 'exito');
+    const contenedorProgreso = document.getElementById('progresoImportacion');
+    const barra = document.getElementById('barraProgresoImportacion');
+    const texto = document.getElementById('textoProgresoImportacion');
+    const porcentaje = document.getElementById('porcentajeProgresoImportacion');
+    contenedorProgreso.style.display = 'block';
+
+    let totalCreados = 0, totalActualizados = 0, totalOmitidos = 0;
+    const erroresLotes = [];
+
+    for (let i = 0; i < lotes.length; i++) {
+      const avance = Math.round((i / lotes.length) * 100);
+      texto.textContent = `Importando fila ${i * TAMANO_LOTE + 1} a ${Math.min((i + 1) * TAMANO_LOTE, productos.length)} de ${productos.length}...`;
+      porcentaje.textContent = `${avance}%`;
+      barra.style.width = `${avance}%`;
+
+      try {
+        const resultado = await apiFetch('/productos/importar', { method: 'POST', body: JSON.stringify({ productos: lotes[i] }) });
+        totalCreados += resultado.creados;
+        totalActualizados += resultado.actualizados;
+        totalOmitidos += resultado.omitidos;
+      } catch (errLote) {
+        // Un lote que falla no debe tumbar los que ya se subieron — se
+        // sigue con el resto y se reporta cuáles fallaron al final.
+        erroresLotes.push(`Filas ${i * TAMANO_LOTE + 1}-${Math.min((i + 1) * TAMANO_LOTE, productos.length)}: ${errLote.message}`);
+      }
+    }
+
+    barra.style.width = '100%';
+    porcentaje.textContent = '100%';
+    texto.textContent = 'Terminado';
+
+    mostrarToast(`Importación terminada: ${totalCreados} creados, ${totalActualizados} actualizados, ${totalOmitidos} omitidos (sin nombre)`, 'exito');
+    if (erroresLotes.length > 0) {
+      mostrarToast(`⚠️ Algunos lotes no se pudieron importar: ${erroresLotes.join(' | ')}`, 'error');
+    }
     evento.target.value = '';
+    setTimeout(() => { contenedorProgreso.style.display = 'none'; }, 1500);
     cargarReporteInventario();
   } catch (err) {
     mostrarToast('Error al importar: ' + err.message, 'error');
+    document.getElementById('progresoImportacion').style.display = 'none';
     evento.target.value = '';
   }
 }

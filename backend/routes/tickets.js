@@ -143,6 +143,60 @@ router.get('/historial-dia', verificarToken, async (req, res) => {
 });
 
 // Modificar cantidad de un item antes de cobrar (cliente se arrepiente en la fila)
+// Agrega un producto/kit más a un ticket que ya existe (aún pendiente de
+// pago) — para cuando se trae un ticket de Mostrador a Caja Avanzada y se
+// quiere seguir agregando cosas antes de cobrar, sin generar un ticket
+// aparte que dupliraría la venta.
+router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
+  const cliente = await pool.connect();
+  try {
+    const { tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario } = req.body;
+    if (!nombre_producto || !cantidad || !precio_unitario) {
+      return res.status(400).json({ error: 'Faltan datos del producto a agregar' });
+    }
+
+    await cliente.query('BEGIN');
+
+    const ticketResult = await cliente.query(
+      'SELECT * FROM tickets WHERE id = $1 AND sucursal_id = $2 AND estado = $3 FOR UPDATE',
+      [req.params.id, req.usuario.sucursal_id, 'pendiente']
+    );
+    if (ticketResult.rows.length === 0) {
+      await cliente.query('ROLLBACK');
+      return res.status(404).json({ error: 'El ticket no existe o ya no está pendiente (puede que ya se haya cobrado)' });
+    }
+    const ticket = ticketResult.rows[0];
+
+    const tipoNormalizado = tipo === 'kit' ? 'kit' : 'producto';
+    const subtotal = cantidad * precio_unitario;
+
+    const detalleResult = await cliente.query(
+      `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [ticket.id, tipoNormalizado, tipoNormalizado === 'producto' ? (producto_id || null) : null, tipoNormalizado === 'kit' ? (kit_id || null) : null, nombre_producto, cantidad, precio_unitario, subtotal]
+    );
+
+    const nuevoTotal = parseFloat(ticket.total) + subtotal;
+    const ticketActualizado = await cliente.query(
+      'UPDATE tickets SET total = $1 WHERE id = $2 RETURNING *',
+      [nuevoTotal, ticket.id]
+    );
+
+    await cliente.query('COMMIT');
+
+    const io = req.app.get('io');
+    if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ticket_actualizado', { folio: ticket.folio, total: nuevoTotal });
+
+    res.json({ ticket: ticketActualizado.rows[0], item: detalleResult.rows[0] });
+  } catch (err) {
+    await cliente.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Error al agregar el producto al ticket' });
+  } finally {
+    cliente.release();
+  }
+});
+
 router.put('/item/:itemId', verificarToken, async (req, res) => {
   try {
     const { cantidad } = req.body;
