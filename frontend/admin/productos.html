@@ -23,11 +23,16 @@
   .seccion-titulo { font-weight: 700; font-size: 14px; margin-top: 10px; color: #555; }
   .buscando-externo { font-size: 12px; color: #888; }
   .btn-cargar-mas { margin-top: 10px; }
+  .btn-mas-opciones {
+    background: none; border: none; color: var(--primary, #2E7D32); font-weight: 600;
+    font-size: 14px; text-align: left; padding: 6px 0; cursor: pointer;
+  }
 </style>
 </head>
 <body>
   <div class="top-bar">
     <h1>🖼️ Productos</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -48,32 +53,42 @@
         <select id="categoriaId"><option value="">Sin departamento</option></select>
       </div>
 
-      <div class="seccion-titulo">Precios</div>
-      <div class="fila-triple">
-        <input type="number" id="precioCosto" placeholder="Precio costo" step="0.01" oninput="calcularPrecioVenta()">
-        <input type="number" id="gananciaPorcentaje" placeholder="Ganancia %" step="0.01" oninput="calcularPrecioVenta()">
-        <input type="number" id="precio" placeholder="Precio de venta *" step="0.01">
-      </div>
-      <input type="number" id="precioMayoreo" placeholder="Precio mayoreo (opcional)" step="0.01">
-
-      <div class="seccion-titulo">Inventario</div>
-      <label><input type="checkbox" id="usaInventario" checked onchange="toggleCamposInventario()"> Este producto SÍ utiliza inventario</label>
-      <div class="fila-triple" id="camposInventario">
-        <input type="number" id="existenciaInicial" placeholder="Hay (existencia inicial)" step="0.01">
-        <input type="number" id="stockMinimo" placeholder="Mínimo" step="0.01">
-        <input type="number" id="stockMaximo" placeholder="Máximo" step="0.01">
-      </div>
+      <input type="number" id="precio" placeholder="Precio de venta *" step="0.01">
 
       <div style="display:flex; align-items:center; gap:12px;">
         <img id="previewImg" class="preview-img" src="">
         <input type="file" id="imagenInput" accept="image/*">
       </div>
-      <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero en Mostrador)</label>
+
+      <button type="button" class="btn-mas-opciones" onclick="toggleMasOpciones()">
+        <span id="flechaMasOpciones">▸</span> Más opciones (costo, ganancia %, mayoreo, inventario, favorito)
+      </button>
+
+      <div id="masOpcionesProducto" style="display:none; gap:10px; flex-direction:column;">
+        <div class="seccion-titulo">Precios</div>
+        <div class="fila-triple">
+          <input type="number" id="precioCosto" placeholder="Precio costo" step="0.01" oninput="calcularPrecioVenta()">
+          <input type="number" id="gananciaPorcentaje" placeholder="Ganancia %" step="0.01" oninput="calcularPrecioVenta()">
+        </div>
+        <input type="number" id="precioMayoreo" placeholder="Precio mayoreo (opcional)" step="0.01">
+
+        <div class="seccion-titulo">Inventario</div>
+        <label><input type="checkbox" id="usaInventario" checked onchange="toggleCamposInventario()"> Este producto SÍ utiliza inventario</label>
+        <div class="fila-triple" id="camposInventario">
+          <input type="number" id="existenciaInicial" placeholder="Hay (existencia inicial)" step="0.01">
+          <input type="number" id="stockMinimo" placeholder="Mínimo" step="0.01">
+          <input type="number" id="stockMaximo" placeholder="Máximo" step="0.01">
+        </div>
+
+        <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero en Mostrador)</label>
+      </div>
+
       <button class="btn btn-primary" id="btnGuardarProducto" onclick="guardarProducto()">Guardar Producto</button>
       <button class="btn btn-secondary" id="btnCancelarEdicion" style="display:none;" onclick="cancelarEdicion()">Cancelar Edición</button>
     </div>
 
     <h3>Catálogo actual</h3>
+    <input type="text" id="buscadorCatalogo" placeholder="🔍 Buscar producto por nombre o código para editar..." style="margin-bottom:10px;" oninput="filtrarTablaCatalogo()">
     <table class="tabla-productos">
       <thead><tr><th>Imagen</th><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Código</th><th>Acciones</th></tr></thead>
       <tbody id="tablaBody"></tbody>
@@ -156,6 +171,24 @@ function limpiarFormulario() {
   imagenBase64 = '';
 }
 
+function toggleMasOpciones() {
+  const panel = document.getElementById('masOpcionesProducto');
+  const abierto = panel.style.display === 'flex';
+  panel.style.display = abierto ? 'none' : 'flex';
+  document.getElementById('flechaMasOpciones').textContent = abierto ? '▸' : '▾';
+}
+
+let catalogoCompleto = [];
+
+function filtrarTablaCatalogo() {
+  const texto = document.getElementById('buscadorCatalogo').value.trim().toLowerCase();
+  const filas = document.querySelectorAll('#tablaBody tr');
+  filas.forEach(fila => {
+    const coincide = fila.dataset.nombre.includes(texto) || (fila.dataset.codigo && fila.dataset.codigo.includes(texto));
+    fila.style.display = coincide ? '' : 'none';
+  });
+}
+
 function toggleCamposInventario() {
   document.getElementById('camposInventario').style.display = document.getElementById('usaInventario').checked ? 'flex' : 'none';
 }
@@ -235,6 +268,8 @@ async function cargarProductos(reiniciar = true) {
       : '<span class="tipo-tag tag-peso">Kg</span>';
     const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
     const tr = document.createElement('tr');
+    tr.dataset.nombre = p.nombre.toLowerCase();
+    tr.dataset.codigo = (p.codigo_barras || '').toLowerCase();
     tr.innerHTML = `
       <td><img src="${p.imagen_url || ''}"></td>
       <td>${p.nombre}</td>
