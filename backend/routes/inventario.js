@@ -55,6 +55,7 @@ router.get('/', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, r
   try {
     const result = await pool.query(
       `SELECT p.id AS producto_id, p.nombre, p.tipo_venta, p.imagen_url, p.codigo_barras,
+              p.precio_costo, p.precio, p.precio_mayoreo,
               COALESCE(i.existencia_actual, 0) AS existencia_actual,
               COALESCE(i.stock_minimo, 0) AS stock_minimo
        FROM productos p
