@@ -40,14 +40,24 @@
     <!-- ============ IMPRESORA ============ -->
     <div class="card" style="margin-bottom:16px;">
       <div class="header-plegable" onclick="toggleSeccionConfig('secImpresora')">
-        <h3 class="card-titulo-grande">🖨️ Impresora Térmica</h3>
+        <h3 class="card-titulo-grande">🖨️ Impresoras Térmicas de Este Dispositivo</h3>
         <span class="flecha-plegable" id="flecha-secImpresora">▾</span>
       </div>
       <div class="form-config seccion-plegable" id="secImpresora">
-        <div class="estado-impresora desconectada" id="estadoImpresora">Sin conectar en este dispositivo</div>
-        <button class="btn btn-primary" onclick="conectar()">🔵 Conectar Impresora Bluetooth</button>
-        <button class="btn btn-secondary" onclick="conectarUSB()" style="margin-top:8px;">🔌 Conectar Impresora USB</button>
-        <p class="nota-pequena">Debes conectarla una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
+        <p class="card-subtexto">Este dispositivo puede tener conectadas hasta 2 impresoras distintas — por ejemplo, una para el ticket de venta y otra aparte solo para las fichas de turno. Si usas la misma impresora para ambas, conéctala igual en las 2 secciones.</p>
+
+        <p class="subtitulo-seccion">🎫 Impresora de Ticket (venta / comprobante)</p>
+        <div class="estado-impresora desconectada" id="estadoImpresoraTicket">Sin conectar en este dispositivo</div>
+        <button class="btn btn-primary" onclick="conectar('ticket')">🔵 Conectar Bluetooth</button>
+        <button class="btn btn-secondary" onclick="conectarUSB('ticket')" style="margin-top:8px;">🔌 Conectar USB</button>
+
+        <p class="subtitulo-seccion" style="margin-top:16px;">🔢 Impresora de Fichas (turnos)</p>
+        <div class="estado-impresora desconectada" id="estadoImpresoraFicha">Sin conectar en este dispositivo</div>
+        <button class="btn btn-primary" onclick="conectar('ficha')">🔵 Conectar Bluetooth</button>
+        <button class="btn btn-secondary" onclick="conectarUSB('ficha')" style="margin-top:8px;">🔌 Conectar USB</button>
+        <button class="btn btn-secondary" onclick="probarImpresionFicha()" style="margin-top:8px;">🖨️ Probar impresión (Ficha)</button>
+
+        <p class="nota-pequena" style="margin-top:10px;">Debes conectarlas una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
       </div>
     </div>
 
@@ -302,21 +312,23 @@ document.getElementById('logoInput').addEventListener('change', async (e) => {
   }
 });
 
-async function conectar() {
+async function conectar(canal) {
   try {
-    const nombre = await conectarImpresora();
-    document.getElementById('estadoImpresora').className = 'estado-impresora conectada';
-    document.getElementById('estadoImpresora').textContent = `Conectada: ${nombre}`;
+    const nombre = await conectarImpresora(canal);
+    const elemento = document.getElementById(canal === 'ficha' ? 'estadoImpresoraFicha' : 'estadoImpresoraTicket');
+    elemento.className = 'estado-impresora conectada';
+    elemento.textContent = `Conectada: ${nombre}`;
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-async function conectarUSB() {
+async function conectarUSB(canal) {
   try {
-    const nombre = await conectarImpresoraUSB();
-    document.getElementById('estadoImpresora').className = 'estado-impresora conectada';
-    document.getElementById('estadoImpresora').textContent = `Conectada: ${nombre}`;
+    const nombre = await conectarImpresoraUSB(canal);
+    const elemento = document.getElementById(canal === 'ficha' ? 'estadoImpresoraFicha' : 'estadoImpresoraTicket');
+    elemento.className = 'estado-impresora conectada';
+    elemento.textContent = `Conectada: ${nombre}`;
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
@@ -532,8 +544,37 @@ async function probarImpresionCaja() {
   await imprimirSegunModo(datos);
 }
 
+async function probarImpresionFicha() {
+  const anchoTicket = obtenerAnchoTicketDispositivo();
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  try {
+    if (modoImpresion === 'sistema') {
+      imprimirFichaConDialogoDelSistema('999', anchoTicket);
+    } else {
+      await imprimirFicha('999', anchoTicket);
+      mostrarToast('Ficha de prueba impresa', 'exito');
+    }
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
 cargarModoImpresion();
 cargarConfiguracion();
+
+// Refleja si alguna de las 2 impresoras ya se reconectó sola (el intento
+// automático corre en paralelo al cargar la página, así que se espera un
+// instante para darle tiempo de terminar antes de revisar).
+setTimeout(() => {
+  if (impresoraConectada('ticket')) {
+    document.getElementById('estadoImpresoraTicket').className = 'estado-impresora conectada';
+    document.getElementById('estadoImpresoraTicket').textContent = 'Conectada (reconexión automática)';
+  }
+  if (impresoraConectada('ficha')) {
+    document.getElementById('estadoImpresoraFicha').className = 'estado-impresora conectada';
+    document.getElementById('estadoImpresoraFicha').textContent = 'Conectada (reconexión automática)';
+  }
+}, 1500);
 </script>
 </body>
 </html>

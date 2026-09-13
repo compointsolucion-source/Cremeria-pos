@@ -5,69 +5,83 @@
 // Nota honesta: NO existe una tercera opción "por red/WiFi" — un navegador no
 // puede abrir ese tipo de conexión directa por seguridad; requeriría una
 // aplicación intermediaria corriendo en la red local, que no está construida.
+//
+// SOPORTE DE 2 IMPRESORAS INDEPENDIENTES POR DISPOSITIVO: un mismo Mostrador
+// puede tener conectada una impresora para el ticket de venta ("ticket") y
+// otra distinta para los boletos de turno ("ficha") — por ejemplo una
+// impresora adentro para el ticket y otra afuera, de autoservicio, para las
+// fichas. Cada canal se conecta, reconecta, y guarda su propia preferencia
+// por separado — conectar una no afecta a la otra.
 
 const SERVICIO_IMPRESORA = '000018f0-0000-1000-8000-00805f9b34fb';
 const CARACTERISTICA_IMPRESORA = '00002af1-0000-1000-8000-00805f9b34fb';
 
-let dispositivoBLE = null;
-let caracteristicaEscritura = null;
-let dispositivoUSB = null;
-let endpointSalidaUSB = null;
-let transporteActivo = null; // 'bluetooth' | 'usb' | null
+function estadoInicialCanalImpresora() {
+  return { dispositivoBLE: null, caracteristicaEscritura: null, dispositivoUSB: null, endpointSalidaUSB: null, transporteActivo: null };
+}
 
+const canalesImpresora = {
+  ticket: estadoInicialCanalImpresora(),
+  ficha: estadoInicialCanalImpresora()
+};
+
+function nombreCanal(canal) { return canal === 'ficha' ? 'de fichas' : 'de tickets'; }
 function bluetoothDisponible() { return !!navigator.bluetooth; }
 function usbDisponible() { return !!navigator.usb; }
 
 // Conecta por Bluetooth — debe llamarse desde un clic directo del usuario
-// (requisito de seguridad del navegador para Web Bluetooth).
-async function conectarImpresora() {
+// (requisito de seguridad del navegador para Web Bluetooth). "canal" indica
+// cuál de las 2 impresoras se está conectando: 'ticket' (por defecto) o 'ficha'.
+async function conectarImpresora(canal = 'ticket') {
   if (!bluetoothDisponible()) {
     throw new Error('Este navegador no soporta Bluetooth. Usa Chrome o Edge en Android/computadora.');
   }
+  const estado = canalesImpresora[canal];
 
-  dispositivoBLE = await navigator.bluetooth.requestDevice({
+  estado.dispositivoBLE = await navigator.bluetooth.requestDevice({
     filters: [{ services: [SERVICIO_IMPRESORA] }],
     optionalServices: [SERVICIO_IMPRESORA]
   });
 
-  dispositivoBLE.addEventListener('gattserverdisconnected', () => {
-    caracteristicaEscritura = null;
+  estado.dispositivoBLE.addEventListener('gattserverdisconnected', () => {
+    estado.caracteristicaEscritura = null;
   });
 
-  const servidor = await dispositivoBLE.gatt.connect();
+  const servidor = await estado.dispositivoBLE.gatt.connect();
   const servicio = await servidor.getPrimaryService(SERVICIO_IMPRESORA);
-  caracteristicaEscritura = await servicio.getCharacteristic(CARACTERISTICA_IMPRESORA);
-  transporteActivo = 'bluetooth';
+  estado.caracteristicaEscritura = await servicio.getCharacteristic(CARACTERISTICA_IMPRESORA);
+  estado.transporteActivo = 'bluetooth';
 
-  localStorage.setItem('impresora_transporte', 'bluetooth');
-  return dispositivoBLE.name || 'Impresora (Bluetooth)';
+  localStorage.setItem(`impresora_transporte_${canal}`, 'bluetooth');
+  return estado.dispositivoBLE.name || `Impresora ${nombreCanal(canal)} (Bluetooth)`;
 }
 
 // Conecta por USB — también debe llamarse desde un clic directo del usuario.
 // Como no conocemos de antemano el fabricante/modelo exacto de cada impresora
 // USB, se muestran TODOS los dispositivos USB conectados para que el usuario
 // elija la suya (filters: [] + acceptAllDevices).
-async function conectarImpresoraUSB() {
+async function conectarImpresoraUSB(canal = 'ticket') {
   if (!usbDisponible()) {
     throw new Error('Este navegador no soporta USB directo. Usa Chrome o Edge en computadora.');
   }
+  const estado = canalesImpresora[canal];
 
-  dispositivoUSB = await navigator.usb.requestDevice({ filters: [] });
-  await dispositivoUSB.open();
+  estado.dispositivoUSB = await navigator.usb.requestDevice({ filters: [] });
+  await estado.dispositivoUSB.open();
 
-  if (!dispositivoUSB.configuration) {
-    await dispositivoUSB.selectConfiguration(1);
+  if (!estado.dispositivoUSB.configuration) {
+    await estado.dispositivoUSB.selectConfiguration(1);
   }
 
   // Busca la primera interfaz con un endpoint de salida ("OUT") — es donde
   // se envían los comandos ESC/POS a la impresora.
   let interfazEncontrada = null;
-  for (const iface of dispositivoUSB.configuration.interfaces) {
+  for (const iface of estado.dispositivoUSB.configuration.interfaces) {
     const alt = iface.alternates[0];
     const endpointSalida = alt.endpoints.find(ep => ep.direction === 'out');
     if (endpointSalida) {
       interfazEncontrada = iface.interfaceNumber;
-      endpointSalidaUSB = endpointSalida.endpointNumber;
+      estado.endpointSalidaUSB = endpointSalida.endpointNumber;
       break;
     }
   }
@@ -75,100 +89,100 @@ async function conectarImpresoraUSB() {
     throw new Error('No se encontró un canal de impresión en este dispositivo USB.');
   }
 
-  await dispositivoUSB.claimInterface(interfazEncontrada);
-  transporteActivo = 'usb';
-  localStorage.setItem('impresora_transporte', 'usb');
-  return dispositivoUSB.productName || 'Impresora (USB)';
+  await estado.dispositivoUSB.claimInterface(interfazEncontrada);
+  estado.transporteActivo = 'usb';
+  localStorage.setItem(`impresora_transporte_${canal}`, 'usb');
+  return estado.dispositivoUSB.productName || `Impresora ${nombreCanal(canal)} (USB)`;
 }
 
-async function reconectarSiEsPosible() {
-  if (transporteActivo === 'bluetooth' && dispositivoBLE && dispositivoBLE.gatt && !dispositivoBLE.gatt.connected) {
-    const servidor = await dispositivoBLE.gatt.connect();
+async function reconectarSiEsPosible(canal = 'ticket') {
+  const estado = canalesImpresora[canal];
+  if (estado.transporteActivo === 'bluetooth' && estado.dispositivoBLE && estado.dispositivoBLE.gatt && !estado.dispositivoBLE.gatt.connected) {
+    const servidor = await estado.dispositivoBLE.gatt.connect();
     const servicio = await servidor.getPrimaryService(SERVICIO_IMPRESORA);
-    caracteristicaEscritura = await servicio.getCharacteristic(CARACTERISTICA_IMPRESORA);
-  } else if (transporteActivo === 'usb' && dispositivoUSB && !dispositivoUSB.opened) {
-    await dispositivoUSB.open();
+    estado.caracteristicaEscritura = await servicio.getCharacteristic(CARACTERISTICA_IMPRESORA);
+  } else if (estado.transporteActivo === 'usb' && estado.dispositivoUSB && !estado.dispositivoUSB.opened) {
+    await estado.dispositivoUSB.open();
   }
 }
 
 // Al cargar cualquier pantalla, intenta reconectar SOLA con el último
-// dispositivo autorizado (sin pedirle nada al usuario) — así no hay que
-// tocar "Conectar" cada vez que cambias de página. Solo funciona si el
-// usuario ya autorizó el dispositivo una vez antes (permiso persistente
-// del navegador); si nunca lo autorizó, no hace nada.
-async function intentarReconexionAutomatica() {
-  const transporteGuardado = localStorage.getItem('impresora_transporte');
+// dispositivo autorizado de cada canal (sin pedirle nada al usuario) — así
+// no hay que tocar "Conectar" cada vez que cambias de página. Solo funciona
+// si el usuario ya autorizó el dispositivo una vez antes (permiso
+// persistente del navegador); si nunca lo autorizó, no hace nada.
+async function intentarReconexionAutomatica(canal = 'ticket') {
+  const estado = canalesImpresora[canal];
+  const transporteGuardado = localStorage.getItem(`impresora_transporte_${canal}`);
   try {
     if (transporteGuardado === 'bluetooth' && bluetoothDisponible() && navigator.bluetooth.getDevices) {
       const dispositivosAutorizados = await navigator.bluetooth.getDevices();
       if (dispositivosAutorizados.length > 0) {
-        dispositivoBLE = dispositivosAutorizados[0];
-        dispositivoBLE.addEventListener('gattserverdisconnected', () => { caracteristicaEscritura = null; });
-        const servidor = await dispositivoBLE.gatt.connect();
+        estado.dispositivoBLE = dispositivosAutorizados[0];
+        estado.dispositivoBLE.addEventListener('gattserverdisconnected', () => { estado.caracteristicaEscritura = null; });
+        const servidor = await estado.dispositivoBLE.gatt.connect();
         const servicio = await servidor.getPrimaryService(SERVICIO_IMPRESORA);
-        caracteristicaEscritura = await servicio.getCharacteristic(CARACTERISTICA_IMPRESORA);
-        transporteActivo = 'bluetooth';
+        estado.caracteristicaEscritura = await servicio.getCharacteristic(CARACTERISTICA_IMPRESORA);
+        estado.transporteActivo = 'bluetooth';
       }
     } else if (transporteGuardado === 'usb' && usbDisponible()) {
       const dispositivosAutorizados = await navigator.usb.getDevices();
       if (dispositivosAutorizados.length > 0) {
-        dispositivoUSB = dispositivosAutorizados[0];
-        await dispositivoUSB.open();
-        if (!dispositivoUSB.configuration) await dispositivoUSB.selectConfiguration(1);
-        for (const iface of dispositivoUSB.configuration.interfaces) {
+        estado.dispositivoUSB = dispositivosAutorizados[0];
+        await estado.dispositivoUSB.open();
+        if (!estado.dispositivoUSB.configuration) await estado.dispositivoUSB.selectConfiguration(1);
+        for (const iface of estado.dispositivoUSB.configuration.interfaces) {
           const alt = iface.alternates[0];
           const endpointSalida = alt.endpoints.find(ep => ep.direction === 'out');
           if (endpointSalida) {
-            await dispositivoUSB.claimInterface(iface.interfaceNumber);
-            endpointSalidaUSB = endpointSalida.endpointNumber;
+            await estado.dispositivoUSB.claimInterface(iface.interfaceNumber);
+            estado.endpointSalidaUSB = endpointSalida.endpointNumber;
             break;
           }
         }
-        transporteActivo = 'usb';
+        estado.transporteActivo = 'usb';
       }
     }
   } catch (err) {
     // Silencioso a propósito: si falla la reconexión automática, el banner
     // de "Impresora no conectada" seguirá visible y el usuario puede
     // reconectar manualmente — no es un error que deba interrumpir la carga.
-    console.warn('Reconexión automática de impresora no disponible:', err.message);
+    console.warn(`Reconexión automática de impresora ${nombreCanal(canal)} no disponible:`, err.message);
   }
 }
 
-function impresoraConectada() {
-  if (transporteActivo === 'bluetooth') {
-    return !!(dispositivoBLE && dispositivoBLE.gatt && dispositivoBLE.gatt.connected && caracteristicaEscritura);
+function impresoraConectada(canal = 'ticket') {
+  const estado = canalesImpresora[canal];
+  if (estado.transporteActivo === 'bluetooth') {
+    return !!(estado.dispositivoBLE && estado.dispositivoBLE.gatt && estado.dispositivoBLE.gatt.connected && estado.caracteristicaEscritura);
   }
-  if (transporteActivo === 'usb') {
-    return !!(dispositivoUSB && dispositivoUSB.opened);
+  if (estado.transporteActivo === 'usb') {
+    return !!(estado.dispositivoUSB && estado.dispositivoUSB.opened);
   }
   return false;
 }
 
-// Envía bytes al transporte activo. Bluetooth va en trozos pequeños (BLE no
-// admite paquetes grandes); USB puede enviar todo de una vez.
-async function enviarBytes(bytes) {
-  if (transporteActivo === 'bluetooth') {
+// Envía bytes al transporte activo de un canal. Bluetooth va en trozos
+// pequeños (BLE no admite paquetes grandes); USB puede enviar todo de una vez.
+async function enviarBytes(bytes, canal = 'ticket') {
+  const estado = canalesImpresora[canal];
+  if (estado.transporteActivo === 'bluetooth') {
     const TAMANO_TROZO = 180;
     for (let i = 0; i < bytes.length; i += TAMANO_TROZO) {
       const trozo = bytes.slice(i, i + TAMANO_TROZO);
-      await caracteristicaEscritura.writeValueWithoutResponse(trozo);
+      await estado.caracteristicaEscritura.writeValueWithoutResponse(trozo);
     }
-  } else if (transporteActivo === 'usb') {
-    await dispositivoUSB.transferOut(endpointSalidaUSB, bytes);
+  } else if (estado.transporteActivo === 'usb') {
+    await estado.dispositivoUSB.transferOut(estado.endpointSalidaUSB, bytes);
   } else {
-    throw new Error('No hay impresora conectada.');
+    throw new Error(`No hay impresora ${nombreCanal(canal)} conectada.`);
   }
 }
 
-// Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
-// detalle de productos — es un boleto de espera, no un ticket de venta.
-// Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
-// el comando ESC/POS estándar. Solo funciona con impresión directa
-// (Bluetooth/USB) — el método "diálogo del sistema" pasa por el driver de
-// Windows y no manda comandos crudos, así que ahí no hay forma de abrirlo.
-// Intenta reconectar en automático apenas se carga la página.
-intentarReconexionAutomatica();
+// Intenta reconectar en automático apenas se carga la página — ambos
+// canales, cada uno de forma independiente.
+intentarReconexionAutomatica('ticket');
+intentarReconexionAutomatica('ficha');
 
 // Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
 // el comando ESC/POS estándar. Solo funciona con impresión directa
@@ -190,11 +204,11 @@ async function abrirCajonDinero() {
 // Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
 // detalle de productos — es un boleto de espera, no un ticket de venta.
 async function imprimirFicha(numero, ancho_ticket) {
-  if (!impresoraConectada()) {
-    await reconectarSiEsPosible();
+  if (!impresoraConectada('ficha')) {
+    await reconectarSiEsPosible('ficha');
   }
-  if (!impresoraConectada()) {
-    throw new Error('No hay impresora conectada. Toca "Conectar impresora" primero.');
+  if (!impresoraConectada('ficha')) {
+    throw new Error('No hay impresora de fichas conectada. Configúrala en Configuración → Impresora de Fichas.');
   }
 
   const columnas = ancho_ticket === '58mm' ? 32 : 48;
@@ -220,7 +234,7 @@ async function imprimirFicha(numero, ancho_ticket) {
     new Uint8Array([GS, 0x56, 0x00]) // cortar papel
   ]);
 
-  await enviarBytes(comandos);
+  await enviarBytes(comandos, 'ficha');
 }
 
 // Respaldo de ficha usando el diálogo de impresión del navegador (para
