@@ -183,7 +183,7 @@ requiereLogin();
 // Cada pestaña es una venta independiente en curso. Solo vive en memoria del
 // navegador — si recargas la página, se pierden las pestañas pendientes
 // (igual que en el software de referencia que se usó de modelo).
-let pestanas = [{ id: 1, nombre: 'Ticket 1', carrito: [], clienteAsignado: null }];
+let pestanas = [{ id: 1, nombre: 'Ticket 1', carrito: [], clienteAsignado: null, ticketIdExistente: null }];
 let pestanaActivaIndex = 0;
 let siguienteNumeroPestana = 2;
 let catalogoAvanzada = [];
@@ -229,7 +229,7 @@ function cambiarPestanaSiguiente() {
 // F6: deja la venta actual guardada en su pestaña y abre una nueva vacía
 // para seguir atendiendo — sin perder lo que ya llevabas capturado.
 function ponerPendiente() {
-  const nuevaPestana = { id: siguienteNumeroPestana, nombre: `Ticket ${siguienteNumeroPestana}`, carrito: [], clienteAsignado: null };
+  const nuevaPestana = { id: siguienteNumeroPestana, nombre: `Ticket ${siguienteNumeroPestana}`, carrito: [], clienteAsignado: null, ticketIdExistente: null };
   siguienteNumeroPestana++;
   pestanas.push(nuevaPestana);
   pestanaActivaIndex = pestanas.length - 1;
@@ -403,12 +403,63 @@ function manejarEnterCampoCodigo() {
     agregarConDecisionDeTipo(primeraCoincidencia);
     document.getElementById('campoCodigoProducto').value = '';
     document.getElementById('sugerenciasAvanzada').style.display = 'none';
-  } else {
-    mostrarToast('No se encontró ningún producto con ese código o nombre', 'error');
+    return;
+  }
+
+  // No es ni código ni nombre de producto — puede ser el folio de un ticket
+  // que ya se generó en Mostrador (ej. "S1-ZB9XP6"). Se intenta cargar ese
+  // ticket en una pestaña nueva antes de rendirse.
+  cargarTicketMostradorEnPestana(texto);
+}
+
+// Trae un ticket PENDIENTE generado en Mostrador (o en otra Caja Avanzada) y
+// lo muestra en una pestaña nueva, lista para revisar y cobrar. No se pueden
+// agregar más productos a esta pestaña — es solo para verla y cobrarla,
+// porque el ticket ya existe guardado tal cual en el servidor.
+async function cargarTicketMostradorEnPestana(folio) {
+  try {
+    const ticket = await apiFetch(`/tickets/folio/${folio}`);
+    if (ticket.estado !== 'pendiente') {
+      mostrarToast(`Ese ticket ya está ${ticket.estado}, no se puede volver a cargar`, 'error');
+      return;
+    }
+
+    const nuevaPestana = {
+      id: siguienteNumeroPestana,
+      nombre: `📥 ${ticket.folio}`,
+      carrito: ticket.items.map(i => ({
+        tipo: i.tipo,
+        producto_id: i.producto_id,
+        kit_id: i.kit_id,
+        codigo_barras: '',
+        nombre_producto: i.nombre_producto,
+        cantidad: parseFloat(i.cantidad),
+        precio_unitario: parseFloat(i.precio_unitario),
+        existencia_referencia: null
+      })),
+      clienteAsignado: null,
+      ticketIdExistente: ticket.id
+    };
+    siguienteNumeroPestana++;
+    pestanas.push(nuevaPestana);
+    pestanaActivaIndex = pestanas.length - 1;
+    filaSeleccionadaIndex = null;
+    renderPestanas();
+    renderTablaVentaAvanzada();
+
+    document.getElementById('campoCodigoProducto').value = '';
+    document.getElementById('sugerenciasAvanzada').style.display = 'none';
+    mostrarToast(`Ticket ${ticket.folio} (de Mostrador) cargado — listo para cobrar`, 'exito');
+  } catch (err) {
+    mostrarToast('No se encontró ningún producto ni ticket con ese código', 'error');
   }
 }
 
 function agregarProductoAvanzada(producto, cantidad) {
+  if (pestanas[pestanaActivaIndex].ticketIdExistente) {
+    mostrarToast('Esta pestaña ya es un ticket guardado — no se le pueden agregar más productos aquí, solo cobrarlo', 'error');
+    return;
+  }
   carritoActivo().push({
     tipo: 'producto',
     producto_id: producto.id,
@@ -422,6 +473,10 @@ function agregarProductoAvanzada(producto, cantidad) {
 }
 
 function agregarKitAvanzada(kit) {
+  if (pestanas[pestanaActivaIndex].ticketIdExistente) {
+    mostrarToast('Esta pestaña ya es un ticket guardado — no se le pueden agregar más productos aquí, solo cobrarlo', 'error');
+    return;
+  }
   carritoActivo().push({
     tipo: 'kit',
     kit_id: kit.id,
@@ -466,6 +521,7 @@ function seleccionarFilaAvanzada(idx) {
 
 function borrarFilaSeleccionadaAvanzada() {
   if (filaSeleccionadaIndex === null) { mostrarToast('Selecciona primero un renglón de la tabla para borrarlo', 'error'); return; }
+  if (pestanas[pestanaActivaIndex].ticketIdExistente) { mostrarToast('No se puede modificar un ticket ya guardado desde aquí', 'error'); return; }
   carritoActivo().splice(filaSeleccionadaIndex, 1);
   filaSeleccionadaIndex = null;
   renderTablaVentaAvanzada();
@@ -520,6 +576,7 @@ async function abrirArticuloComun() {
 // (si el producto tiene un precio de mayoreo configurado).
 function aplicarMayoreoAvanzada() {
   if (filaSeleccionadaIndex === null) { mostrarToast('Selecciona primero un renglón de la tabla', 'error'); return; }
+  if (pestanas[pestanaActivaIndex].ticketIdExistente) { mostrarToast('No se puede modificar un ticket ya guardado desde aquí', 'error'); return; }
   const item = carritoActivo()[filaSeleccionadaIndex];
   if (item.tipo === 'kit' || !item.producto_id) { mostrarToast('El mayoreo solo aplica a productos del catálogo', 'error'); return; }
 
@@ -801,6 +858,24 @@ function devolverDesdeHistorial() {
 
 async function irACobrarAvanzada() {
   if (carritoActivo().length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
+
+  const pestanaActual = pestanas[pestanaActivaIndex];
+
+  // Si esta pestaña ya es un ticket que se trajo de Mostrador, no se genera
+  // uno nuevo (se duplicaría la venta) — se manda directo a cobrar el que ya existe.
+  if (pestanaActual.ticketIdExistente) {
+    const folioExistente = pestanaActual.nombre.replace('📥 ', '');
+    if (pestanas.length === 1) {
+      pestanas[0] = { id: 1, nombre: 'Ticket 1', carrito: [], clienteAsignado: null, ticketIdExistente: null };
+    } else {
+      pestanas.splice(pestanaActivaIndex, 1);
+      pestanaActivaIndex = Math.max(0, pestanaActivaIndex - 1);
+    }
+    renderPestanas();
+    renderTablaVentaAvanzada();
+    window.location.href = `caja.html?folio=${folioExistente}`;
+    return;
+  }
 
   try {
     const ticket = await apiFetch('/tickets', {
