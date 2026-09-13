@@ -95,6 +95,53 @@ router.get('/folio/:folio', verificarToken, async (req, res) => {
   }
 });
 
+// Último ticket cobrado (para "Reimprimir Último Ticket" en Caja Avanzada)
+router.get('/ultimo-pagado', verificarToken, async (req, res) => {
+  try {
+    const ticketResult = await pool.query(
+      `SELECT * FROM tickets WHERE sucursal_id = $1 AND estado = 'pagado'
+       ORDER BY fecha_pago DESC LIMIT 1`,
+      [req.usuario.sucursal_id]
+    );
+    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'No se ha cobrado ningún ticket todavía' });
+
+    const ticket = ticketResult.rows[0];
+    const detalleResult = await pool.query('SELECT * FROM ticket_detalle WHERE ticket_id = $1', [ticket.id]);
+    res.json({ ...ticket, items: detalleResult.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener el último ticket' });
+  }
+});
+
+// Historial de ventas de un día (para el panel de "Ventas y Devoluciones del
+// día" en Caja Avanzada) — incluye pagados y cancelados, con nombre de cajero.
+router.get('/historial-dia', verificarToken, async (req, res) => {
+  try {
+    const { fecha, cajero_id } = req.query;
+    const fechaConsulta = fecha || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(
+      `SELECT t.id, t.folio, t.total, t.estado, t.metodo_pago, t.fecha_pago, t.fecha_creacion,
+              u.nombre AS cajero_nombre,
+              (SELECT COUNT(*) FROM ticket_detalle WHERE ticket_id = t.id) AS num_articulos
+       FROM tickets t
+       LEFT JOIN usuarios u ON t.cajero_usuario_id = u.id
+       WHERE t.sucursal_id = $1
+         AND COALESCE(t.fecha_pago, t.fecha_creacion)::date = $2
+         AND t.estado IN ('pagado', 'cancelado')
+         AND ($3::int IS NULL OR t.cajero_usuario_id = $3)
+       ORDER BY COALESCE(t.fecha_pago, t.fecha_creacion) DESC`,
+      [req.usuario.sucursal_id, fechaConsulta, cajero_id || null]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener el historial de ventas' });
+  }
+});
+
 // Modificar cantidad de un item antes de cobrar (cliente se arrepiente en la fila)
 router.put('/item/:itemId', verificarToken, async (req, res) => {
   try {

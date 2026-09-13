@@ -60,11 +60,14 @@
 
     <div class="barra-pestanas" id="barraPestanas" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
 
-    <div class="barra-superior-avanzada" style="position:relative;">
+    <div class="barra-superior-avanzada">
       <span>🔍</span>
-      <input type="text" id="campoCodigoProducto" placeholder="Código del producto o nombre... (Enter para agregar)" autofocus
-             oninput="buscarProductoAvanzada()" onkeydown="if(event.key==='Enter') manejarEnterCampoCodigo()">
-      <div id="sugerenciasAvanzada" class="sugerencias-avanzada"></div>
+      <div style="position:relative; flex:1;">
+        <input type="text" id="campoCodigoProducto" placeholder="Código del producto o nombre... (Enter para agregar)" autofocus
+               style="width:100%;"
+               oninput="buscarProductoAvanzada()" onkeydown="if(event.key==='Enter') manejarEnterCampoCodigo()">
+        <div id="sugerenciasAvanzada" class="sugerencias-avanzada"></div>
+      </div>
       <button class="btn btn-primary" onclick="manejarEnterCampoCodigo()">ENTER - Agregar Producto</button>
     </div>
 
@@ -97,6 +100,8 @@
       <button class="btn btn-secondary" onclick="ponerPendiente()">⏸️ F6 - Pendiente</button>
       <button class="btn btn-secondary" onclick="eliminarPestanaActual()">🗑️ Eliminar Ticket</button>
       <button class="btn btn-secondary" onclick="asignarClienteAvanzada()">👤 Asignar cliente</button>
+      <button class="btn btn-secondary" onclick="reimprimirUltimoTicketAvanzada()">🖨️ Reimprimir Último Ticket</button>
+      <button class="btn btn-secondary" onclick="abrirHistorialVentas()">📜 Ventas y Devoluciones del Día</button>
     </div>
 
     <div class="zona-total">
@@ -116,6 +121,34 @@
       <div id="resultadoVerificador" style="margin:16px 0;"></div>
       <input type="text" id="campoVerificador" placeholder="Código o nombre..." oninput="consultarVerificador()" style="margin-bottom:10px;">
       <button class="btn btn-secondary" style="width:100%;" onclick="cerrarVerificador()">Cerrar</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalHistorial" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100;">
+    <div class="card" style="width:95%; max-width:900px; max-height:85vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3>📜 Ventas y Devoluciones del Día</h3>
+        <button class="btn btn-secondary" onclick="cerrarHistorial()">✕ Cerrar</button>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+        <input type="date" id="fechaHistorial" onchange="cargarHistorialVentas()">
+        <select id="cajeroHistorial" onchange="cargarHistorialVentas()">
+          <option value="">Todos los cajeros</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:280px;">
+          <table class="tabla-venta">
+            <thead><tr><th>Folio</th><th>Cajero</th><th>Hora</th><th class="numero">Total</th></tr></thead>
+            <tbody id="tablaHistorialVentas"></tbody>
+          </table>
+        </div>
+        <div style="flex:1; min-width:280px;" id="detalleTicketHistorial">
+          <p style="color:#888; text-align:center;">Selecciona un ticket para ver el detalle</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -493,6 +526,154 @@ function consultarVerificador() {
     <div style="font-size:32px; font-weight:800; color:var(--primary,#2E7D32); margin:8px 0;">$${parseFloat(producto.precio).toFixed(2)}</div>
     <div style="font-size:14px; color:#666;">Existencia: ${existencia}</div>
   `;
+}
+
+// Reimprime el último ticket cobrado, con Total / Pagó con / Cambio, igual
+// que en Caja normal.
+async function reimprimirUltimoTicketAvanzada() {
+  try {
+    const ticket = await apiFetch('/tickets/ultimo-pagado');
+    const config = await apiFetch('/configuracion');
+
+    const datosTicket = {
+      ancho_ticket: config.ancho_ticket || '80mm',
+      negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
+      folio: ticket.folio,
+      fecha: new Date(ticket.fecha_pago).toLocaleString(),
+      items: ticket.items.map(i => ({
+        nombre_producto: i.nombre_producto,
+        detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+        subtotal: parseFloat(i.subtotal).toFixed(2)
+      })),
+      total: parseFloat(ticket.total).toFixed(2),
+      piePagina: `Pagado con ${ticket.metodo_pago.toUpperCase()} — REIMPRESIÓN`,
+      logoUrl: config.logo_url || null
+    };
+
+    const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+    if (modoImpresion === 'sistema') {
+      await imprimirConDialogoDelSistema(datosTicket);
+    } else {
+      await imprimirTicketBLE(datosTicket);
+    }
+    mostrarToast(`Reimprimiendo ticket ${ticket.folio}`, 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ---------- Historial de Ventas y Devoluciones del Día ----------
+let ticketSeleccionadoHistorial = null;
+
+async function abrirHistorialVentas() {
+  document.getElementById('modalHistorial').style.display = 'flex';
+  document.getElementById('fechaHistorial').value = new Date().toISOString().split('T')[0];
+  await cargarCajerosFiltroHistorial();
+  await cargarHistorialVentas();
+}
+
+function cerrarHistorial() {
+  document.getElementById('modalHistorial').style.display = 'none';
+}
+
+// Si el usuario no tiene permiso para ver la lista de empleados (ej. un
+// cajero), simplemente no se ofrece el filtro por nombre — no es un error,
+// solo una limitación normal de su rol.
+async function cargarCajerosFiltroHistorial() {
+  try {
+    const usuarios = await apiFetch('/usuarios');
+    const select = document.getElementById('cajeroHistorial');
+    select.innerHTML = '<option value="">Todos los cajeros</option>' + usuarios.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+  } catch (err) {
+    // Silencioso a propósito — ver el detalle arriba.
+  }
+}
+
+async function cargarHistorialVentas() {
+  try {
+    const fecha = document.getElementById('fechaHistorial').value;
+    const cajeroId = document.getElementById('cajeroHistorial').value;
+    const query = `?fecha=${fecha}${cajeroId ? '&cajero_id=' + cajeroId : ''}`;
+    const ventas = await apiFetch(`/tickets/historial-dia${query}`);
+
+    document.getElementById('tablaHistorialVentas').innerHTML = ventas.map(v => `
+      <tr onclick="seleccionarTicketHistorial(${v.id})" style="cursor:pointer;">
+        <td>${v.folio}${v.estado === 'cancelado' ? ' <span style="color:#C62828;">(cancelado)</span>' : ''}</td>
+        <td>${v.cajero_nombre || '—'}</td>
+        <td>${new Date(v.fecha_pago || v.fecha_creacion).toLocaleTimeString()}</td>
+        <td class="numero">$${parseFloat(v.total).toFixed(2)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" style="text-align:center; color:#888;">Sin ventas en esta fecha</td></tr>';
+
+    document.getElementById('detalleTicketHistorial').innerHTML = '<p style="color:#888; text-align:center;">Selecciona un ticket para ver el detalle</p>';
+    ticketSeleccionadoHistorial = null;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function seleccionarTicketHistorial(id) {
+  try {
+    const ventas = await apiFetch(`/tickets/historial-dia?fecha=${document.getElementById('fechaHistorial').value}`);
+    const resumen = ventas.find(v => v.id === id);
+    const ticketCompleto = await apiFetch(`/tickets/folio/${resumen.folio}`);
+    ticketSeleccionadoHistorial = ticketCompleto;
+
+    document.getElementById('detalleTicketHistorial').innerHTML = `
+      <h4>Folio: ${ticketCompleto.folio}</h4>
+      <p style="font-size:13px; color:#666;">Estado: ${ticketCompleto.estado} — Método: ${ticketCompleto.metodo_pago || '—'}</p>
+      <table class="tabla-venta" style="margin-bottom:10px;">
+        <thead><tr><th>Producto</th><th class="numero">Cant.</th><th class="numero">Importe</th></tr></thead>
+        <tbody>
+          ${ticketCompleto.items.map(i => `
+            <tr onclick="itemDevolucionSeleccionado=${i.id}" style="cursor:pointer;">
+              <td>${i.nombre_producto}</td><td class="numero">${i.cantidad}</td><td class="numero">$${parseFloat(i.subtotal).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <p style="text-align:right; font-weight:700;">Total: $${parseFloat(ticketCompleto.total).toFixed(2)}</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="imprimirCopiaHistorial()">🖨️ Imprimir copia</button>
+        <button class="btn btn-secondary" onclick="devolverDesdeHistorial()">↩️ Devolver producto (clic en el renglón primero)</button>
+      </div>
+    `;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+let itemDevolucionSeleccionado = null;
+
+async function imprimirCopiaHistorial() {
+  if (!ticketSeleccionadoHistorial) return;
+  const config = await apiFetch('/configuracion');
+  const datosTicket = {
+    ancho_ticket: config.ancho_ticket || '80mm',
+    negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
+    folio: ticketSeleccionadoHistorial.folio,
+    fecha: new Date(ticketSeleccionadoHistorial.fecha_pago || ticketSeleccionadoHistorial.fecha_creacion).toLocaleString(),
+    items: ticketSeleccionadoHistorial.items.map(i => ({
+      nombre_producto: i.nombre_producto,
+      detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+      subtotal: parseFloat(i.subtotal).toFixed(2)
+    })),
+    total: parseFloat(ticketSeleccionadoHistorial.total).toFixed(2),
+    piePagina: 'COPIA',
+    logoUrl: config.logo_url || null
+  };
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  if (modoImpresion === 'sistema') await imprimirConDialogoDelSistema(datosTicket);
+  else await imprimirTicketBLE(datosTicket);
+}
+
+// La devolución completa (con motivo, método de reembolso, y el ajuste real
+// de inventario/crédito) ya existe y está probada en la pantalla de
+// Devoluciones — aquí solo se manda para allá con el ticket ya identificado,
+// en vez de reconstruir esa lógica delicada por segunda vez.
+function devolverDesdeHistorial() {
+  if (!ticketSeleccionadoHistorial) { mostrarToast('Selecciona primero un ticket', 'error'); return; }
+  window.location.href = `admin/devoluciones.html?folio=${ticketSeleccionadoHistorial.folio}`;
 }
 
 async function irACobrarAvanzada() {

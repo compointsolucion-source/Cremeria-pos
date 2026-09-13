@@ -24,6 +24,7 @@
 <body>
   <div class="top-bar">
     <h1>↩️ Devoluciones</h1>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -172,6 +173,16 @@ async function cargarHistorial() {
 }
 
 cargarHistorial();
+
+// Si se llegó desde Caja Avanzada (o cualquier otro lugar) con un folio en
+// la URL, lo busca solo — sin esto, el enlace de "Devolver" desde el
+// historial no serviría de nada.
+const folioDesdeUrl = new URLSearchParams(window.location.search).get('folio');
+if (folioDesdeUrl) {
+  document.getElementById('folioBusqueda').value = folioDesdeUrl;
+  buscarTicket();
+  window.history.replaceState({}, '', 'devoluciones.html');
+}
 </script>
 </body>
 </html>
