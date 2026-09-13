@@ -60,6 +60,10 @@
       <button class="btn btn-secondary" onclick="abrirVarios()">🔢 INS - Varios</button>
       <button class="btn btn-secondary" onclick="abrirArticuloComun()">📝 Artículo en Común</button>
       <button class="btn btn-secondary" onclick="borrarFilaSeleccionadaAvanzada()">🗑️ DEL - Borrar Art.</button>
+      <button class="btn btn-secondary" onclick="aplicarMayoreoAvanzada()">🏷️ F11 - Mayoreo</button>
+      <button class="btn btn-secondary" onclick="abrirEntradaDinero()">💰 F7 - Entradas</button>
+      <button class="btn btn-secondary" onclick="abrirSalidaDinero()">💸 F8 - Salidas</button>
+      <button class="btn btn-secondary" onclick="abrirVerificadorPrecios()">🔍 F9 - Verificador</button>
     </div>
 
     <table class="tabla-venta">
@@ -84,6 +88,15 @@
         <div class="total-grande" id="totalVentaAvanzada">$0.00</div>
         <button class="btn btn-primary" style="margin-top:6px; width:100%;" onclick="irACobrarAvanzada()">💰 Cobrar</button>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalVerificador" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100;">
+    <div class="card" style="width:90%; max-width:380px; text-align:center;">
+      <h3>🔍 Verificador de Precios</h3>
+      <div id="resultadoVerificador" style="margin:16px 0;"></div>
+      <input type="text" id="campoVerificador" placeholder="Código o nombre..." oninput="consultarVerificador()" style="margin-bottom:10px;">
+      <button class="btn btn-secondary" style="width:100%;" onclick="cerrarVerificador()">Cerrar</button>
     </div>
   </div>
 
@@ -284,6 +297,87 @@ async function abrirArticuloComun() {
 
 // Genera el ticket (igual que Mostrador) y de inmediato lo carga en Caja
 // para cobrarlo — mismo flujo de siempre, solo que capturado desde aquí.
+// F11: alterna el precio del renglón seleccionado entre normal y mayoreo
+// (si el producto tiene un precio de mayoreo configurado).
+function aplicarMayoreoAvanzada() {
+  if (filaSeleccionadaIndex === null) { mostrarToast('Selecciona primero un renglón de la tabla', 'error'); return; }
+  const item = carritoAvanzada[filaSeleccionadaIndex];
+  if (item.tipo === 'kit' || !item.producto_id) { mostrarToast('El mayoreo solo aplica a productos del catálogo', 'error'); return; }
+
+  const producto = catalogoAvanzada.find(p => p.id === item.producto_id);
+  if (!producto || !producto.precio_mayoreo || parseFloat(producto.precio_mayoreo) <= 0) {
+    mostrarToast('Este producto no tiene precio de mayoreo configurado', 'error');
+    return;
+  }
+
+  const usandoMayoreo = item.precio_unitario === parseFloat(producto.precio_mayoreo);
+  item.precio_unitario = usandoMayoreo ? parseFloat(producto.precio) : parseFloat(producto.precio_mayoreo);
+  renderTablaVentaAvanzada();
+  mostrarToast(usandoMayoreo ? 'Precio normal aplicado' : 'Precio de mayoreo aplicado', 'exito');
+}
+
+// F7 / F8: entradas y salidas rápidas de dinero, usando el mismo módulo de
+// movimientos de caja que ya existe (requiere un turno abierto).
+async function abrirEntradaDinero() { await registrarMovimientoRapido('ingreso'); }
+async function abrirSalidaDinero() { await registrarMovimientoRapido('egreso'); }
+
+async function registrarMovimientoRapido(tipo) {
+  try {
+    const turno = await apiFetch('/turnos/actual');
+    if (!turno) { mostrarToast('No hay un turno de caja abierto', 'error'); return; }
+
+    const etiqueta = tipo === 'ingreso' ? 'Entrada' : 'Salida';
+    const montoTexto = await solicitarTexto(`Monto de la ${etiqueta.toLowerCase()}:`);
+    if (!montoTexto) return;
+    const monto = parseFloat(montoTexto);
+    if (isNaN(monto) || monto <= 0) { mostrarToast('Monto inválido', 'error'); return; }
+
+    const concepto = await solicitarTexto(`Concepto de la ${etiqueta.toLowerCase()}:`);
+    if (!concepto) return;
+
+    await apiFetch('/movimientos', { method: 'POST', body: JSON.stringify({ turno_id: turno.id, tipo, monto, concepto }) });
+    mostrarToast(`${etiqueta} de $${monto.toFixed(2)} registrada`, 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// F9: consulta precio y existencia sin agregar nada a la venta.
+function abrirVerificadorPrecios() {
+  document.getElementById('modalVerificador').style.display = 'flex';
+  document.getElementById('campoVerificador').value = '';
+  document.getElementById('resultadoVerificador').innerHTML = '<p style="color:#888;">Escribe un código o nombre...</p>';
+  document.getElementById('campoVerificador').focus();
+}
+
+function cerrarVerificador() {
+  document.getElementById('modalVerificador').style.display = 'none';
+  document.getElementById('campoCodigoProducto').focus();
+}
+
+function consultarVerificador() {
+  const texto = document.getElementById('campoVerificador').value.trim().toLowerCase();
+  const resultado = document.getElementById('resultadoVerificador');
+  if (!texto) { resultado.innerHTML = '<p style="color:#888;">Escribe un código o nombre...</p>'; return; }
+
+  const producto = catalogoAvanzada.find(p => (p.codigo_barras && p.codigo_barras.toLowerCase() === texto)) ||
+                    catalogoAvanzada.find(p => p.nombre.toLowerCase().includes(texto));
+
+  if (!producto) {
+    resultado.innerHTML = '<p style="color:#C62828;">No se encontró ningún producto</p>';
+    return;
+  }
+
+  const existencia = producto.existencia_actual !== undefined && producto.existencia_actual !== null
+    ? parseFloat(producto.existencia_actual).toFixed(2) : 'N/D';
+
+  resultado.innerHTML = `
+    <div style="font-size:16px; font-weight:700;">${producto.nombre}</div>
+    <div style="font-size:32px; font-weight:800; color:var(--primary,#2E7D32); margin:8px 0;">$${parseFloat(producto.precio).toFixed(2)}</div>
+    <div style="font-size:14px; color:#666;">Existencia: ${existencia}</div>
+  `;
+}
+
 async function irACobrarAvanzada() {
   if (carritoAvanzada.length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
 
@@ -321,6 +415,10 @@ document.addEventListener('keydown', (e) => {
 
   if (e.key === 'Insert') { e.preventDefault(); abrirVarios(); }
   else if (e.key === 'Delete') { e.preventDefault(); borrarFilaSeleccionadaAvanzada(); }
+  else if (e.key === 'F11') { e.preventDefault(); aplicarMayoreoAvanzada(); }
+  else if (e.key === 'F7') { e.preventDefault(); abrirEntradaDinero(); }
+  else if (e.key === 'F8') { e.preventDefault(); abrirSalidaDinero(); }
+  else if (e.key === 'F9') { e.preventDefault(); abrirVerificadorPrecios(); }
 });
 
 cargarCatalogoAvanzada();
