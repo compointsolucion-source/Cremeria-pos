@@ -59,6 +59,118 @@ router.get('/categorias', verificarToken, async (req, res) => {
   }
 });
 
+// Importación masiva desde Excel (formato: Código, Producto, P. Costo,
+// P. Venta, P. Mayoreo, Existencia, Inv. Mínimo, Inv. Máximo, Departamento).
+// El navegador ya convirtió el archivo a un arreglo de objetos — aquí solo
+// se procesa: si el código de barras (o si no hay código, el nombre) ya
+// existe, se ACTUALIZA; si no, se CREA. Los departamentos que no existan
+// se crean solos. Filas sin nombre de producto se omiten (no hay nada que
+// dar de alta) y se reportan como omitidas, no se inventan datos.
+router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
+  try {
+    const { productos } = req.body;
+    if (!Array.isArray(productos) || productos.length === 0) {
+      return res.status(400).json({ error: 'No se recibieron productos para importar' });
+    }
+
+    await conexion.query('BEGIN');
+
+    let creados = 0, actualizados = 0, omitidos = 0;
+    const categoriasCache = {};
+
+    for (const fila of productos) {
+      const nombre = (fila.nombre || '').trim();
+      if (!nombre) { omitidos++; continue; }
+
+      const codigo_barras = (fila.codigo_barras || '').trim() || null;
+      const precio_costo = fila.precio_costo || null;
+      const precio = fila.precio || null;
+      const precio_mayoreo = fila.precio_mayoreo || null;
+      const existencia = fila.existencia !== undefined ? fila.existencia : 0;
+      const stock_minimo = fila.stock_minimo || 0;
+      const stock_maximo = fila.stock_maximo || null;
+      const departamentoNombre = (fila.departamento || '').trim();
+
+      // Resolver (o crear) el departamento, cacheando para no repetir la
+      // misma consulta cientos de veces en un archivo grande.
+      let categoria_id = null;
+      if (departamentoNombre && departamentoNombre !== '- Sin Departamento -') {
+        const clave = departamentoNombre.toLowerCase();
+        if (categoriasCache[clave]) {
+          categoria_id = categoriasCache[clave];
+        } else {
+          const existente = await conexion.query('SELECT id FROM categorias WHERE LOWER(nombre) = $1', [clave]);
+          if (existente.rows.length > 0) {
+            categoria_id = existente.rows[0].id;
+          } else {
+            const nueva = await conexion.query('INSERT INTO categorias (nombre) VALUES ($1) RETURNING id', [departamentoNombre]);
+            categoria_id = nueva.rows[0].id;
+          }
+          categoriasCache[clave] = categoria_id;
+        }
+      }
+
+      // Buscar producto existente: primero por código de barras (si viene),
+      // si no por nombre exacto (sin distinguir mayúsculas) en esta sucursal.
+      let productoExistente = null;
+      if (codigo_barras) {
+        const porCodigo = await conexion.query('SELECT id FROM productos WHERE codigo_barras = $1 AND sucursal_id = $2', [codigo_barras, req.usuario.sucursal_id]);
+        if (porCodigo.rows.length > 0) productoExistente = porCodigo.rows[0];
+      }
+      if (!productoExistente) {
+        const porNombre = await conexion.query('SELECT id FROM productos WHERE LOWER(nombre) = $1 AND sucursal_id = $2', [nombre.toLowerCase(), req.usuario.sucursal_id]);
+        if (porNombre.rows.length > 0) productoExistente = porNombre.rows[0];
+      }
+
+      let productoId;
+      if (productoExistente) {
+        productoId = productoExistente.id;
+        await conexion.query(
+          `UPDATE productos SET
+            precio = COALESCE($1, precio), precio_costo = COALESCE($2, precio_costo),
+            precio_mayoreo = COALESCE($3, precio_mayoreo), categoria_id = COALESCE($4, categoria_id)
+           WHERE id = $5`,
+          [precio, precio_costo, precio_mayoreo, categoria_id, productoId]
+        );
+        actualizados++;
+      } else {
+        const nuevoProducto = await conexion.query(
+          `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true) RETURNING id`,
+          [req.usuario.sucursal_id, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras]
+        );
+        productoId = nuevoProducto.rows[0].id;
+        creados++;
+      }
+
+      await conexion.query(
+        `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (producto_id) DO UPDATE SET
+           existencia_actual = $2, stock_minimo = $3, stock_maximo = COALESCE($4, inventario.stock_maximo)`,
+        [productoId, existencia, stock_minimo, stock_maximo]
+      );
+    }
+
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id,
+      accion: 'importar_productos',
+      modulo: 'productos',
+      valor_nuevo: { total: productos.length, creados, actualizados, omitidos }
+    });
+
+    await conexion.query('COMMIT');
+    res.json({ creados, actualizados, omitidos });
+  } catch (err) {
+    await conexion.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Error al importar el archivo: ' + err.message });
+  } finally {
+    conexion.release();
+  }
+});
+
 // Buscar producto por código de barras (escaneo en mostrador)
 router.get('/codigo/:codigo', verificarToken, async (req, res) => {
   try {

@@ -6,6 +6,7 @@
 <title>Reporte de Inventario - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <script src="../js/tema.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   .contenido { max-width: 1000px; margin: 20px auto; padding: 0 14px; }
   .tarjetas-resumen-reporte { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -21,6 +22,12 @@
   .contenedor-tabla { max-height: 65vh; overflow: auto; border-radius: 12px; }
   .valor-bajo { color: #C62828; font-weight: 700; }
   .valor-alerta { color: #F9A825; font-weight: 700; }
+
+  @media print {
+    .top-bar, .filtros-reporte, .pantalla-completa-btn { display: none !important; }
+    .contenedor-tabla { max-height: none; overflow: visible; }
+    body { background: white; }
+  }
 </style>
 </head>
 <body>
@@ -47,6 +54,9 @@
         <option value="">Departamento: Todos</option>
       </select>
       <button class="btn btn-secondary" onclick="exportarReporteCSV()">⬇️ Exportar CSV</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('inputImportar').click()">📥 Importar Excel</button>
+      <input type="file" id="inputImportar" accept=".xlsx,.xls" style="display:none;" onchange="importarExcel(event)">
+      <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir</button>
     </div>
 
     <div class="contenedor-tabla">
@@ -133,6 +143,56 @@ function exportarReporteCSV() {
   a.download = `reporte-inventario-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Convierte "$180,00" o "10,00" a un número normal (180.00 / 10.00).
+// El formato mexicano de Excel usa coma como separador decimal.
+function parsearNumeroExcel(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  if (typeof valor === 'number') return valor;
+  const limpio = String(valor).replace(/\$/g, '').replace(/\s/g, '').replace(',', '.');
+  const numero = parseFloat(limpio);
+  return isNaN(numero) ? null : numero;
+}
+
+async function importarExcel(evento) {
+  const archivo = evento.target.files[0];
+  if (!archivo) return;
+
+  try {
+    mostrarToast('Leyendo archivo...', 'info');
+    const datos = await archivo.arrayBuffer();
+    const libro = XLSX.read(datos, { type: 'array' });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+
+    if (filas.length === 0) { mostrarToast('El archivo no tiene filas de datos', 'error'); return; }
+
+    const productos = filas.map(fila => ({
+      codigo_barras: String(fila['Código'] || '').trim(),
+      nombre: String(fila['Producto'] || '').trim(),
+      precio_costo: parsearNumeroExcel(fila['P. Costo']),
+      precio: parsearNumeroExcel(fila['P. Venta']),
+      precio_mayoreo: parsearNumeroExcel(fila['P. Mayoreo']),
+      existencia: parsearNumeroExcel(fila['Existencia']) || 0,
+      stock_minimo: parsearNumeroExcel(fila['Inv. Mínimo']) || 0,
+      stock_maximo: parsearNumeroExcel(fila['Inv. Máximo']),
+      departamento: String(fila['Departamento'] || '').trim()
+    }));
+
+    const confirmado = await confirmarAccion(`Se van a procesar ${productos.length} filas del archivo. Los productos que ya existan (por código o nombre) se actualizarán; los nuevos se crearán. ¿Continuar?`);
+    if (!confirmado) { evento.target.value = ''; return; }
+
+    mostrarToast('Importando, esto puede tardar unos segundos...', 'info');
+    const resultado = await apiFetch('/productos/importar', { method: 'POST', body: JSON.stringify({ productos }) });
+
+    mostrarToast(`Importación terminada: ${resultado.creados} creados, ${resultado.actualizados} actualizados, ${resultado.omitidos} omitidos (sin nombre)`, 'exito');
+    evento.target.value = '';
+    cargarReporteInventario();
+  } catch (err) {
+    mostrarToast('Error al importar: ' + err.message, 'error');
+    evento.target.value = '';
+  }
 }
 
 cargarDepartamentosFiltro();
