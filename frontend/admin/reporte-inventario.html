@@ -17,7 +17,10 @@
   .filtros-reporte select { flex: 1; min-width: 180px; }
   .tabla-reporte-inv { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; font-size: 13px; }
   .tabla-reporte-inv th, .tabla-reporte-inv td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #EEE; white-space: nowrap; }
-  .tabla-reporte-inv th { background: #F4F5F6; position: sticky; top: 0; }
+  .tabla-reporte-inv th { background: #F4F5F6; position: sticky; top: 0; cursor: pointer; user-select: none; }
+  .tabla-reporte-inv th:hover { background: #E8E8E8; }
+  .tabla-reporte-inv th.checkbox-col { cursor: default; }
+  .tabla-reporte-inv th.checkbox-col:hover { background: #F4F5F6; }
   .tabla-reporte-inv td.numero { text-align: right; }
   .contenedor-tabla { max-height: 65vh; overflow: auto; border-radius: 12px; }
   .valor-bajo { color: #C62828; font-weight: 700; }
@@ -48,6 +51,8 @@
         <div class="etiqueta">Cantidad total en existencia</div>
       </div>
     </div>
+
+    <input type="text" id="buscadorReporte" placeholder="🔍 Buscar por nombre o código..." style="width:100%; margin-bottom:10px;" oninput="filtrarReporteEnPantalla()">
 
     <div class="filtros-reporte">
       <select id="filtroCategoria" onchange="cargarReporteInventario()">
@@ -83,15 +88,15 @@
       <table class="tabla-reporte-inv">
         <thead>
           <tr>
-            <th><input type="checkbox" id="checkTodosTipoVenta" onchange="toggleTodosCheckbox(this.checked)"></th>
-            <th>Código</th>
-            <th>Descripción del Producto</th>
-            <th>Tipo de Venta</th>
-            <th class="numero">Costo</th>
-            <th class="numero">Precio Venta</th>
-            <th class="numero">Existencia</th>
-            <th class="numero">Inv. Mínimo</th>
-            <th class="numero">Inv. Máximo</th>
+            <th class="checkbox-col"><input type="checkbox" id="checkTodosTipoVenta" onchange="toggleTodosCheckbox(this.checked)"></th>
+            <th onclick="ordenarReportePor('codigo_barras')">Código <span id="flechaOrden-codigo_barras"></span></th>
+            <th onclick="ordenarReportePor('nombre')">Descripción del Producto <span id="flechaOrden-nombre"></span></th>
+            <th onclick="ordenarReportePor('tipo_venta')">Tipo de Venta <span id="flechaOrden-tipo_venta"></span></th>
+            <th class="numero" onclick="ordenarReportePor('precio_costo')">Costo <span id="flechaOrden-precio_costo"></span></th>
+            <th class="numero" onclick="ordenarReportePor('precio')">Precio Venta <span id="flechaOrden-precio"></span></th>
+            <th class="numero" onclick="ordenarReportePor('existencia')">Existencia <span id="flechaOrden-existencia"></span></th>
+            <th class="numero" onclick="ordenarReportePor('stock_minimo')">Inv. Mínimo <span id="flechaOrden-stock_minimo"></span></th>
+            <th class="numero" onclick="ordenarReportePor('stock_maximo')">Inv. Máximo <span id="flechaOrden-stock_maximo"></span></th>
           </tr>
         </thead>
         <tbody id="tablaReporteInventario"></tbody>
@@ -126,32 +131,84 @@ async function cargarReporteInventario() {
     document.getElementById('costoTotalReporte').textContent = `$${data.totales.costo_total.toFixed(2)}`;
     document.getElementById('cantidadTotalReporte').textContent = data.totales.cantidad_total.toFixed(2);
 
-    document.getElementById('tablaReporteInventario').innerHTML = data.productos.map(p => {
-      const existencia = parseFloat(p.existencia);
-      const minimo = parseFloat(p.stock_minimo);
-      let claseExistencia = '';
-      if (existencia <= 0) claseExistencia = 'valor-bajo';
-      else if (existencia <= minimo) claseExistencia = 'valor-alerta';
-      const etiquetaTipoVenta = p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel (kg)';
-
-      return `
-        <tr>
-          <td><input type="checkbox" class="check-tipo-venta" data-id="${p.id}" onchange="actualizarContadorSeleccionTipoVenta()"></td>
-          <td>${p.codigo_barras || '—'}</td>
-          <td>${p.nombre}</td>
-          <td>${etiquetaTipoVenta}</td>
-          <td class="numero">${p.precio_costo ? '$' + parseFloat(p.precio_costo).toFixed(2) : 'N/D'}</td>
-          <td class="numero">$${parseFloat(p.precio).toFixed(2)}</td>
-          <td class="numero ${claseExistencia}">${existencia.toFixed(2)}</td>
-          <td class="numero">${minimo.toFixed(2)}</td>
-          <td class="numero">${parseFloat(p.stock_maximo).toFixed(2)}</td>
-        </tr>
-      `;
-    }).join('') || '<tr><td colspan="9" style="text-align:center; color:#888;">Sin productos en este departamento</td></tr>';
-    actualizarContadorSeleccionTipoVenta();
+    document.getElementById('buscadorReporte').value = '';
+    renderFilasReporte(filasReporteActual);
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+}
+
+function renderFilasReporte(lista) {
+  document.getElementById('tablaReporteInventario').innerHTML = lista.map(p => {
+    const existencia = parseFloat(p.existencia);
+    const minimo = parseFloat(p.stock_minimo);
+    let claseExistencia = '';
+    if (existencia <= 0) claseExistencia = 'valor-bajo';
+    else if (existencia <= minimo) claseExistencia = 'valor-alerta';
+    const etiquetaTipoVenta = p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel (kg)';
+
+    return `
+      <tr>
+        <td><input type="checkbox" class="check-tipo-venta" data-id="${p.id}" onchange="actualizarContadorSeleccionTipoVenta()"></td>
+        <td>${p.codigo_barras || '—'}</td>
+        <td>${p.nombre}</td>
+        <td>${etiquetaTipoVenta}</td>
+        <td class="numero">${p.precio_costo ? '$' + parseFloat(p.precio_costo).toFixed(2) : 'N/D'}</td>
+        <td class="numero">$${parseFloat(p.precio).toFixed(2)}</td>
+        <td class="numero ${claseExistencia}">${existencia.toFixed(2)}</td>
+        <td class="numero">${minimo.toFixed(2)}</td>
+        <td class="numero">${parseFloat(p.stock_maximo).toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="9" style="text-align:center; color:#888;">Sin productos que coincidan</td></tr>';
+  actualizarContadorSeleccionTipoVenta();
+}
+
+// Filtra sobre lo que ya está cargado en el navegador — no vuelve a pedirle
+// nada al servidor, así que responde al instante mientras escribes.
+function filtrarReporteEnPantalla() {
+  const texto = document.getElementById('buscadorReporte').value.trim().toLowerCase();
+  if (!texto) { renderFilasReporte(filasReporteActual); return; }
+
+  const filtradas = filasReporteActual.filter(p =>
+    p.nombre.toLowerCase().includes(texto) ||
+    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
+  );
+  renderFilasReporte(filtradas);
+}
+
+// Ordena al hacer clic en un encabezado — alterna ascendente/descendente si
+// vuelves a hacer clic en la misma columna. Ordena sobre lo que se está
+// viendo actualmente (respeta el filtro de búsqueda si hay uno activo).
+let columnaOrdenActual = null;
+let ordenAscendente = true;
+
+function ordenarReportePor(campo) {
+  ordenAscendente = (columnaOrdenActual === campo) ? !ordenAscendente : true;
+  columnaOrdenActual = campo;
+
+  document.querySelectorAll('[id^="flechaOrden-"]').forEach(el => el.textContent = '');
+  document.getElementById(`flechaOrden-${campo}`).textContent = ordenAscendente ? '▲' : '▼';
+
+  const texto = document.getElementById('buscadorReporte').value.trim().toLowerCase();
+  const base = texto
+    ? filasReporteActual.filter(p => p.nombre.toLowerCase().includes(texto) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto)))
+    : filasReporteActual;
+
+  const camposTexto = ['codigo_barras', 'nombre', 'tipo_venta'];
+  const ordenadas = [...base].sort((a, b) => {
+    let valorA = a[campo], valorB = b[campo];
+    if (camposTexto.includes(campo)) {
+      valorA = (valorA || '').toString().toLowerCase();
+      valorB = (valorB || '').toString().toLowerCase();
+      return ordenAscendente ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA);
+    }
+    valorA = parseFloat(valorA) || 0;
+    valorB = parseFloat(valorB) || 0;
+    return ordenAscendente ? valorA - valorB : valorB - valorA;
+  });
+
+  renderFilasReporte(ordenadas);
 }
 
 function exportarReporteCSV() {
@@ -282,7 +339,8 @@ async function importarExcel(evento) {
       existencia: parsearNumeroExcel(fila['Existencia']) || 0,
       stock_minimo: parsearNumeroExcel(fila['Inv. Mínimo']) || 0,
       stock_maximo: parsearNumeroExcel(fila['Inv. Máximo']),
-      departamento: String(fila['Departamento'] || '').trim()
+      departamento: String(fila['Departamento'] || '').trim(),
+      imagen_url: String(fila['Imagen URL'] || '').trim()
     }));
 
     const confirmado = await confirmarAccion(`Se van a procesar ${productos.length} filas del archivo. Los productos que ya existan (por código o nombre) se actualizarán; los nuevos se crearán. ¿Continuar?`);

@@ -114,6 +114,7 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
           const stock_minimo = fila.stock_minimo || 0;
           const stock_maximo = fila.stock_maximo || null;
           const departamentoNombre = (fila.departamento || '').trim();
+          const imagen_url = (fila.imagen_url || '').trim() || null;
           const nombreLower = nombre.toLowerCase();
 
           let categoria_id = null;
@@ -136,16 +137,17 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
             await conexion.query(
               `UPDATE productos SET
                 precio = COALESCE($1, precio), precio_costo = COALESCE($2, precio_costo),
-                precio_mayoreo = COALESCE($3, precio_mayoreo), categoria_id = COALESCE($4, categoria_id)
+                precio_mayoreo = COALESCE($3, precio_mayoreo), categoria_id = COALESCE($4, categoria_id),
+                imagen_url = CASE WHEN (imagen_url IS NULL OR imagen_url = '') THEN COALESCE($6, imagen_url) ELSE imagen_url END
                WHERE id = $5`,
-              [precio, precio_costo, precio_mayoreo, categoria_id, productoId]
+              [precio, precio_costo, precio_mayoreo, categoria_id, productoId, imagen_url]
             );
             actualizados++;
           } else {
             const nuevoProducto = await conexion.query(
-              `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true) RETURNING id`,
-              [req.usuario.sucursal_id, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras]
+              `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario, imagen_url)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true, $8) RETURNING id`,
+              [req.usuario.sucursal_id, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras, imagen_url]
             );
             productoId = nuevoProducto.rows[0].id;
             // Se registra en memoria de inmediato para que, si el archivo
