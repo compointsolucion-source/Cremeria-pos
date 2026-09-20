@@ -158,17 +158,46 @@ function renderVentasPorHora(porHora) {
   }).join('');
 }
 
-function renderAlertas(data) {
-  const hayAlertas = data.stock_bajo.length > 0 || data.agotados.length > 0 || data.creditos_cerca_limite.length > 0;
-  document.getElementById('seccionAlertas').style.display = hayAlertas ? 'block' : 'none';
-  if (!hayAlertas) return;
+const LIMITE_ALERTAS_INICIAL = 5;
 
-  let html = '';
-  data.agotados.forEach(p => { html += `<div class="fila-alerta"><span>🔴 ${p.nombre}</span><span>Agotado</span></div>`; });
-  data.stock_bajo.forEach(p => { html += `<div class="fila-alerta"><span>🟡 ${p.nombre}</span><span>${parseFloat(p.existencia_actual).toFixed(2)} / mín. ${parseFloat(p.stock_minimo).toFixed(2)}</span></div>`; });
-  data.creditos_cerca_limite.forEach(c => { html += `<div class="fila-alerta"><span>💳 ${c.nombre}</span><span>$${parseFloat(c.saldo_actual).toFixed(2)} / $${parseFloat(c.limite_credito).toFixed(2)}</span></div>`; });
+function filaAlertaHTML(a) {
+  if (a.tipo === 'agotado') return `<div class="fila-alerta"><span>🔴 ${a.nombre}</span><span>Agotado</span></div>`;
+  if (a.tipo === 'stock_bajo') return `<div class="fila-alerta"><span>🟡 ${a.nombre}</span><span>${parseFloat(a.existencia_actual).toFixed(2)} / mín. ${parseFloat(a.stock_minimo).toFixed(2)}</span></div>`;
+  return `<div class="fila-alerta"><span>💳 ${a.nombre}</span><span>$${parseFloat(a.saldo_actual).toFixed(2)} / $${parseFloat(a.limite_credito).toFixed(2)}</span></div>`;
+}
+
+function renderAlertas(data) {
+  const todas = [
+    ...data.agotados.map(p => ({ tipo: 'agotado', ...p })),
+    ...data.stock_bajo.map(p => ({ tipo: 'stock_bajo', ...p })),
+    ...data.creditos_cerca_limite.map(c => ({ tipo: 'credito', ...c }))
+  ];
+
+  document.getElementById('seccionAlertas').style.display = todas.length > 0 ? 'block' : 'none';
+  if (todas.length === 0) return;
+
+  const visibles = todas.slice(0, LIMITE_ALERTAS_INICIAL);
+  const ocultas = todas.slice(LIMITE_ALERTAS_INICIAL);
+
+  let html = visibles.map(filaAlertaHTML).join('');
+
+  if (ocultas.length > 0) {
+    html += `
+      <div id="filasAlertasOcultas" style="display:none;">${ocultas.map(filaAlertaHTML).join('')}</div>
+      <div style="padding:10px 0; text-align:center;">
+        <a href="#" onclick="event.preventDefault(); mostrarMasAlertas(this);" style="font-size:13px; color:var(--primary); font-weight:600; text-decoration:none;">
+          Ver ${ocultas.length} más
+        </a>
+      </div>
+    `;
+  }
 
   document.getElementById('listaAlertas').innerHTML = html;
+}
+
+function mostrarMasAlertas(enlace) {
+  document.getElementById('filasAlertasOcultas').style.display = 'block';
+  enlace.parentElement.remove();
 }
 
 const LIMITE_ACTIVIDAD_INICIAL = 6;
