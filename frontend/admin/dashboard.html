@@ -7,57 +7,81 @@
 <link rel="stylesheet" href="../css/app-theme.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
-  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; margin-top: 24px; }
-  .menu-card {
-    background: white; border-radius: 14px; padding: 20px; text-align: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08); cursor: pointer; text-decoration: none; color: #2A2B2E;
-  }
-  .menu-card:active { background: #F0F0F0; }
-  .menu-card .icono { font-size: 32px; margin-bottom: 8px; }
+  body { background: #F5F6F8; }
 
-  .tarjetas-metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .tarjeta-metrica { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center; }
-  .tarjeta-metrica .valor { font-size: 20px; font-weight: 700; }
-  .tarjeta-metrica .etiqueta { font-size: 12px; color: #666; margin-top: 4px; }
-  .tarjeta-utilidad { background: #E8F5E9; }
+  .contenido { max-width: 960px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* ---------- Encabezados de sección: consistentes en todo el panel ---------- */
+  .titulo-seccion {
+    font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #8A8D93; margin: 0 0 10px; padding-left: 2px;
+  }
+
+  /* ---------- Tarjetas de métricas (KPIs) ---------- */
+  .tarjetas-metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .tarjeta-metrica {
+    background: white; border-radius: 12px; padding: 16px 18px; border: 1px solid #EBECEF;
+  }
+  .tarjeta-metrica .valor { font-size: 22px; font-weight: 700; line-height: 1.2; color: #1F2023; }
+  .tarjeta-metrica .etiqueta { font-size: 12.5px; color: #7A7D83; margin-top: 4px; font-weight: 500; }
   .tarjeta-utilidad .valor { color: #2E7D32; }
-  .tarjeta-fiado { background: #FFF3E0; }
-  .tarjeta-fiado .valor { color: #E65100; }
-  .tarjeta-alerta { background: #FFEBEE; }
+  .tarjeta-fiado .valor { color: #C77700; }
+  .tarjeta-alerta { background: #FDF3F3; border-color: #F6D9D9; }
   .tarjeta-alerta .valor { color: #C62828; }
 
-  .seccion-dashboard { margin-bottom: 20px; }
-  .seccion-dashboard h3 { margin-bottom: 8px; }
+  .seccion-dashboard { margin-bottom: 22px; }
 
-  .barra-hora { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; }
-  .barra-hora .etiqueta-hora { width: 40px; color: #666; }
-  .barra-hora .barra-fondo { flex: 1; background: #F0F0F0; border-radius: 6px; height: 18px; overflow: hidden; }
+  /* ---------- Contenedor blanco genérico (ventas por hora, alertas, actividad) ---------- */
+  .lista-alerta { background: white; border-radius: 12px; padding: 6px 16px; border: 1px solid #EBECEF; }
+
+  .barra-hora { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
+  .barra-hora .etiqueta-hora { width: 42px; color: #8A8D93; font-weight: 500; }
+  .barra-hora .barra-fondo { flex: 1; background: #F0F1F3; border-radius: 6px; height: 16px; overflow: hidden; }
   .barra-hora .barra-relleno { background: #2E7D32; height: 100%; border-radius: 6px; }
-  .barra-hora .monto-hora { width: 70px; text-align: right; font-weight: 600; }
+  .barra-hora .monto-hora { width: 74px; text-align: right; font-weight: 600; color: #1F2023; }
 
-  .lista-alerta { background: white; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .fila-alerta { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F0F0F0; font-size: 14px; }
+  .fila-alerta { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #F2F3F5; font-size: 13.5px; }
   .fila-alerta:last-child { border-bottom: none; }
 
-  .fila-actividad { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F0F0F0; font-size: 14px; }
-  .tag-actividad { font-size: 10px; padding: 2px 6px; border-radius: 6px; color: white; margin-right: 6px; }
+  .fila-actividad { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #F2F3F5; font-size: 13.5px; gap: 10px; }
+  .fila-actividad:last-child { border-bottom: none; }
+  .fila-actividad > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fila-actividad > span:last-child { color: #8A8D93; font-size: 12.5px; flex-shrink: 0; }
+  .tag-actividad { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 5px; color: white; flex-shrink: 0; }
   .tag-venta { background: #2E7D32; }
   .tag-compra { background: #1565C0; }
-  .tag-abono { background: #F9A825; }
+  .tag-abono { background: #C77700; }
   .tag-merma, .tag-ajuste_manual { background: #C62828; }
 
-  .sin-datos { color: #888; font-size: 13px; text-align: center; padding: 10px; }
+  .sin-datos { color: #ABAEB3; font-size: 13px; text-align: center; padding: 16px 0; }
 
-  .grupo-navegacion { margin-bottom: 16px; }
+  /* ---------- Navegación: lista de renglones, no tarjetas cuadradas ---------- */
+  .grupo-navegacion { margin-bottom: 22px; }
   .grupo-header {
-    background: white; border-radius: 12px; padding: 14px 18px; font-weight: 700;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    background: none; border: none; padding: 0 0 10px; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: #8A8D93;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
   }
-  .grupo-header .flecha { transition: transform 0.2s; }
+  .grupo-header .flecha { transition: transform 0.2s; color: #ABAEB3; }
   .grupo-header.colapsado .flecha { transform: rotate(-90deg); }
-  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 10px; }
+
+  .menu-grid {
+    background: white; border-radius: 12px; border: 1px solid #EBECEF; overflow: hidden;
+  }
   .menu-grid.colapsado { display: none; }
+
+  .menu-card {
+    display: flex; align-items: center; gap: 14px; padding: 13px 16px;
+    text-decoration: none; color: #2A2B2E; font-size: 14.5px; font-weight: 500;
+    border-bottom: 1px solid #F2F3F5;
+  }
+  .menu-grid .menu-card:last-child { border-bottom: none; }
+  .menu-card:hover { background: #FAFAFB; }
+  .menu-card:active { background: #F0F1F3; }
+  .menu-card .icono {
+    font-size: 17px; width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px;
+    background: #F4F5F6; display: flex; align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
@@ -70,17 +94,17 @@
     <div class="tarjetas-metricas" id="tarjetasMetricas"></div>
 
     <div class="seccion-dashboard">
-      <h3>Ventas de hoy por hora</h3>
+      <p class="titulo-seccion">Ventas de hoy por hora</p>
       <div id="ventasPorHora" class="lista-alerta"></div>
     </div>
 
     <div class="seccion-dashboard" id="seccionAlertas" style="display:none;">
-      <h3>⚠️ Alertas</h3>
+      <p class="titulo-seccion">⚠️ Alertas</p>
       <div id="listaAlertas" class="lista-alerta"></div>
     </div>
 
     <div class="seccion-dashboard">
-      <h3>Actividad reciente</h3>
+      <p class="titulo-seccion">Actividad reciente</p>
       <div id="listaActividad" class="lista-alerta"></div>
     </div>
 
