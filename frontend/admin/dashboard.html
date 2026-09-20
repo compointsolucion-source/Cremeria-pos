@@ -241,18 +241,44 @@ function renderAlertas(data) {
   document.getElementById('listaAlertas').innerHTML = html;
 }
 
+const LIMITE_ACTIVIDAD_INICIAL = 6;
+
+function filaActividadHTML(a) {
+  return `
+    <div class="fila-actividad">
+      <span><span class="tag-actividad tag-${a.tipo}">${nombresTipoActividad[a.tipo] || a.tipo}</span>${a.referencia}</span>
+      <span>${new Date(a.fecha).toLocaleString()}</span>
+    </div>
+  `;
+}
+
 function renderActividad(actividad) {
   const cont = document.getElementById('listaActividad');
   if (!actividad || actividad.length === 0) {
     cont.innerHTML = '<div class="sin-datos">Sin actividad reciente</div>';
     return;
   }
-  cont.innerHTML = actividad.map(a => `
-    <div class="fila-actividad">
-      <span><span class="tag-actividad tag-${a.tipo}">${nombresTipoActividad[a.tipo] || a.tipo}</span>${a.referencia}</span>
-      <span>${new Date(a.fecha).toLocaleString()}</span>
-    </div>
-  `).join('');
+
+  const visibles = actividad.slice(0, LIMITE_ACTIVIDAD_INICIAL);
+  const ocultos = actividad.slice(LIMITE_ACTIVIDAD_INICIAL);
+
+  cont.innerHTML = visibles.map(filaActividadHTML).join('');
+
+  if (ocultos.length > 0) {
+    cont.innerHTML += `
+      <div id="filasActividadOcultas" style="display:none;">${ocultos.map(filaActividadHTML).join('')}</div>
+      <div style="padding:10px 0; text-align:center;">
+        <a href="#" onclick="event.preventDefault(); mostrarMasActividad(this);" style="font-size:13px; color:var(--primary); font-weight:600; text-decoration:none;">
+          Ver ${ocultos.length} más
+        </a>
+      </div>
+    `;
+  }
+}
+
+function mostrarMasActividad(enlace) {
+  document.getElementById('filasActividadOcultas').style.display = 'block';
+  enlace.parentElement.remove();
 }
 
 function toggleGrupo(idGrupo) {

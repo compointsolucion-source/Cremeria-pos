@@ -2,17 +2,17 @@
   --primary: #2E7D32;
   --primary-dark: #1B5E20;
   --secondary: #E0E0E0;
-  --background: #F4F5F6;
+  --background: #F5F6F8;
   --surface: #FFFFFF;
-  --text: #2A2B2E;
-  --muted: #6B6E73;
+  --text: #1F2023;
+  --muted: #7A7D83;
   --success: #2E7D32;
-  --warning: #F9A825;
+  --warning: #C77700;
   --danger: #C62828;
-  --border: #D0D2D5;
+  --border: #E4E6E9;
   --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 2px 6px rgba(0,0,0,0.08);
+  --radius-sm: 9px;
+  --shadow: 0 1px 3px rgba(16,24,40,0.06);
 }
 
 * { box-sizing: border-box; }
@@ -21,43 +21,89 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
+h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+
 .top-bar {
   background: var(--text);
   color: white;
-  padding: 14px 20px;
+  padding: 14px 22px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.top-bar h1 { font-size: 18px; margin: 0; }
+.top-bar h1 { font-size: 17px; margin: 0; font-weight: 600; }
+
 .btn {
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 12px 18px;
-  font-size: 15px;
+  padding: 11px 18px;
+  font-size: 14.5px;
   cursor: pointer;
-  min-height: 44px;
+  min-height: 42px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
 }
 .btn-primary { background: var(--primary); color: white; }
-.btn-secondary { background: var(--secondary); color: var(--text); }
+.btn-secondary { background: white; color: var(--text); border-color: var(--border); }
 .btn-danger { background: var(--danger); color: white; }
-.btn:active { opacity: 0.85; }
+.btn:hover { filter: brightness(0.97); }
+.btn:active { filter: brightness(0.92); }
+
 .card {
   background: var(--surface);
   border-radius: var(--radius);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 18px;
 }
-input, select {
-  min-height: 44px;
-  font-size: 16px;
+
+input, select, textarea {
+  min-height: 42px;
+  font-size: 15px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   padding: 8px 12px;
   width: 100%;
+  font-family: inherit;
+  color: var(--text);
+  background: white;
 }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(46,125,50,0.12);
+}
+
+/* Título de sección discreto y reutilizable — para que cualquier pantalla
+   pueda organizar sus bloques de contenido de forma consistente, sin
+   inventar un estilo distinto cada vez. */
+.titulo-seccion-panel {
+  font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin: 0 0 10px; padding-left: 2px;
+}
+
+/* Estilo genérico de tabla, para pantallas que usan <table> simple sin
+   una clase propia ya definida — las que ya tienen su propia clase
+   (.tabla-productos, .tabla-venta, etc.) no se ven afectadas, porque esas
+   reglas son más específicas y siguen ganando. */
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 10px 12px; font-size: 13.5px; }
+thead th {
+  background: #FAFAFB; color: var(--muted); font-weight: 600; font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--border);
+}
+tbody tr { border-bottom: 1px solid #F2F3F5; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: #FAFAFB; }
 
 [data-tema="oscuro"] {
   --primary: #4CAF50;
@@ -71,11 +117,13 @@ input, select {
 }
 [data-tema="oscuro"] body { background: var(--background); color: var(--text); }
 [data-tema="oscuro"] .card { background: var(--surface); }
+[data-tema="oscuro"] .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
 [data-tema="oscuro"] input, [data-tema="oscuro"] select, [data-tema="oscuro"] textarea {
   background: var(--surface); color: var(--text); border-color: var(--border);
 }
-[data-tema="oscuro"] .btn-secondary { background: var(--secondary); color: var(--text); }
 [data-tema="oscuro"] table, [data-tema="oscuro"] th, [data-tema="oscuro"] td { background: var(--surface); color: var(--text); border-color: var(--border); }
+[data-tema="oscuro"] thead th { background: #232426; }
+[data-tema="oscuro"] tbody tr:hover { background: #313235; }
 
 .boton-tema-flotante {
   position: fixed;
@@ -84,7 +132,7 @@ input, select {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: none;
+  border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: 20px;
