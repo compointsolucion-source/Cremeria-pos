@@ -1,0 +1,110 @@
+/* Sidebar de navegación — estilo dashboard SaaS minimalista.
+   Usa el mismo interruptor de modo oscuro/claro que ya existe en todo el
+   sistema ([data-tema="oscuro"]) en vez de agregar un segundo selector
+   aparte solo para esto. */
+
+:root {
+  --sidebar-ancho: 240px;
+  --sidebar-fondo: #FFFFFF;
+  --sidebar-texto: #4B4F58;
+  --sidebar-texto-tenue: #9AA0AA;
+  --sidebar-borde: #ECEDF0;
+  --sidebar-hover: #F5F6F8;
+  --sidebar-activo-fondo: #EAF3EB;
+  --sidebar-activo-texto: #1F6B24;
+  --sidebar-activo-borde: #2E7D32;
+}
+
+[data-tema="oscuro"] {
+  --sidebar-fondo: #0B0F19;        /* estilo Slate-950 */
+  --sidebar-texto: #C7CBD3;
+  --sidebar-texto-tenue: #6B7180;
+  --sidebar-borde: #1B2030;
+  --sidebar-hover: #151A28;
+  --sidebar-activo-fondo: #16241A;
+  --sidebar-activo-texto: #6FCF77;
+  --sidebar-activo-borde: #4CAF50;
+}
+
+body.con-sidebar { margin: 0; }
+
+.sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-ancho);
+  background: var(--sidebar-fondo);
+  border-right: 1px solid var(--sidebar-borde);
+  display: flex;
+  flex-direction: column;
+  z-index: 500;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-encabezado {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 16px; border-bottom: 1px solid var(--sidebar-borde);
+}
+.sidebar-marca {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--sidebar-activo-texto); text-decoration: none;
+  font-weight: 700; font-size: 14.5px;
+}
+.sidebar-cerrar-movil { display: none; background: none; border: none; color: var(--sidebar-texto); cursor: pointer; padding: 4px; }
+
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 14px 10px; }
+.sidebar-grupo { margin-bottom: 18px; }
+.sidebar-titulo-grupo {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--sidebar-texto-tenue); margin: 0 0 6px; padding: 0 10px;
+}
+
+.sidebar-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; margin-bottom: 2px; border-radius: 8px;
+  color: var(--sidebar-texto); text-decoration: none; font-size: 14px; font-weight: 500;
+  border-left: 3px solid transparent;
+  cursor: pointer; background: none; border-top: none; border-right: none; border-bottom: none;
+  border-left-width: 3px; width: 100%; text-align: left;
+}
+.sidebar-item .sidebar-icono { display: flex; align-items: center; flex-shrink: 0; color: var(--sidebar-texto-tenue); }
+.sidebar-item:hover { background: var(--sidebar-hover); }
+.sidebar-item.activo {
+  background: var(--sidebar-activo-fondo); color: var(--sidebar-activo-texto);
+  border-left-color: var(--sidebar-activo-borde); font-weight: 700;
+}
+.sidebar-item.activo .sidebar-icono { color: var(--sidebar-activo-texto); }
+
+.sidebar-pie { padding: 12px 10px; border-top: 1px solid var(--sidebar-borde); }
+.sidebar-salir:hover { background: var(--sidebar-hover); }
+
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 499;
+}
+.sidebar-overlay.visible { display: block; }
+
+/* Botón hamburguesa que cada pantalla coloca en su propia barra superior */
+.btn-abrir-sidebar {
+  display: none; background: none; border: none; color: white; cursor: pointer;
+  padding: 6px; margin-right: 4px;
+}
+
+/* Escritorio: el sidebar queda fijo, el contenido se recorre a la derecha */
+body.con-sidebar .top-bar,
+body.con-sidebar > .contenido {
+  margin-left: var(--sidebar-ancho);
+}
+
+/* Pantallas angostas (tablets de Mostrador/Caja): el sidebar se oculta y
+   se abre como panel superpuesto con el botón ☰ — no le roba espacio a
+   la pantalla de venta. */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.abierto { transform: translateX(0); box-shadow: 4px 0 16px rgba(0,0,0,0.15); }
+  .sidebar-cerrar-movil { display: block; }
+  .btn-abrir-sidebar { display: inline-flex; }
+
+  body.con-sidebar .top-bar,
+  body.con-sidebar > .contenido {
+    margin-left: 0;
+  }
+}

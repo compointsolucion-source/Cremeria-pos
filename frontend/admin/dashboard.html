@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Administración - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
 <style>
   body { background: #F5F6F8; }
@@ -55,38 +56,16 @@
 
   .sin-datos { color: #ABAEB3; font-size: 13px; text-align: center; padding: 16px 0; }
 
-  /* ---------- Navegación: lista de renglones, no tarjetas cuadradas ---------- */
-  .grupo-navegacion { margin-bottom: 22px; }
-  .grupo-header {
-    background: none; border: none; padding: 0 0 10px; font-size: 13px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em; color: #8A8D93;
-    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-  }
-  .grupo-header .flecha { transition: transform 0.2s; color: #ABAEB3; }
-  .grupo-header.colapsado .flecha { transform: rotate(-90deg); }
-
-  .menu-grid {
-    background: white; border-radius: 12px; border: 1px solid #EBECEF; overflow: hidden;
-  }
-  .menu-grid.colapsado { display: none; }
-
-  .menu-card {
-    display: flex; align-items: center; gap: 14px; padding: 13px 16px;
-    text-decoration: none; color: #2A2B2E; font-size: 14.5px; font-weight: 500;
-    border-bottom: 1px solid #F2F3F5;
-  }
-  .menu-grid .menu-card:last-child { border-bottom: none; }
-  .menu-card:hover { background: #FAFAFB; }
-  .menu-card:active { background: #F0F1F3; }
-  .menu-card .icono {
-    font-size: 17px; width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px;
-    background: #F4F5F6; display: flex; align-items: center; justify-content: center;
-  }
 </style>
 </head>
 <body>
   <div class="top-bar">
-    <h1>⚙️ Administración</h1>
+    <div style="display:flex; align-items:center;">
+      <button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>⚙️ Administración</h1>
+    </div>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
@@ -108,55 +87,6 @@
       <div id="listaActividad" class="lista-alerta"></div>
     </div>
 
-    <div class="grupo-navegacion">
-      <div class="grupo-header" onclick="toggleGrupo('grupoVentas')">🥩 Ventas <span class="flecha" id="flechaGrupoVentas">▾</span></div>
-      <div class="menu-grid" id="grupoVentas">
-        <a class="menu-card" href="../mostrador.html"><div class="icono">🥩</div>Mostrador</a>
-        <a class="menu-card" href="../caja.html"><div class="icono">💰</div>Caja</a>
-        <a class="menu-card" href="../caja-avanzada.html"><div class="icono">🖥️</div>Caja Avanzada</a>
-        <a class="menu-card" href="devoluciones.html"><div class="icono">↩️</div>Devoluciones</a>
-        <a class="menu-card" href="caja-turno.html"><div class="icono">📊</div>Corte de Caja</a>
-        <a class="menu-card" href="../pantalla-turnos.html"><div class="icono">📺</div>Pantalla de Turnos</a>
-        <a class="menu-card" href="../kiosco-fichas.html"><div class="icono">🎫</div>Kiosco de Fichas (clientes)</a>
-      </div>
-    </div>
-
-    <div class="grupo-navegacion">
-      <div class="grupo-header" onclick="toggleGrupo('grupoCatalogo')">📦 Catálogo e Inventario <span class="flecha" id="flechaGrupoCatalogo">▾</span></div>
-      <div class="menu-grid" id="grupoCatalogo">
-        <a class="menu-card" href="productos.html"><div class="icono">🖼️</div>Productos</a>
-        <a class="menu-card" href="departamentos.html"><div class="icono">🗂️</div>Departamentos</a>
-        <a class="menu-card" href="kits.html"><div class="icono">📦</div>Kits/Combos</a>
-        <a class="menu-card" href="inventario.html"><div class="icono">📊</div>Inventario</a>
-        <a class="menu-card" href="reporte-inventario.html"><div class="icono">📋</div>Reporte Inventario</a>
-        <a class="menu-card" href="compras.html"><div class="icono">🚚</div>Compras/Proveedores</a>
-      </div>
-    </div>
-
-    <div class="grupo-navegacion">
-      <div class="grupo-header" onclick="toggleGrupo('grupoClientes')">👤 Clientes <span class="flecha" id="flechaGrupoClientes">▾</span></div>
-      <div class="menu-grid" id="grupoClientes">
-        <a class="menu-card" href="clientes.html"><div class="icono">👤</div>Clientes/Créditos</a>
-      </div>
-    </div>
-
-    <div class="grupo-navegacion">
-      <div class="grupo-header" onclick="toggleGrupo('grupoReportes')">📈 Reportes <span class="flecha" id="flechaGrupoReportes">▾</span></div>
-      <div class="menu-grid" id="grupoReportes">
-        <a class="menu-card" href="reportes.html"><div class="icono">📈</div>Reportes</a>
-        <a class="menu-card" href="bitacora.html"><div class="icono">📋</div>Bitácora</a>
-      </div>
-    </div>
-
-    <div class="grupo-navegacion">
-      <div class="grupo-header" onclick="toggleGrupo('grupoAdmin')">⚙️ Administración <span class="flecha" id="flechaGrupoAdmin">▾</span></div>
-      <div class="menu-grid" id="grupoAdmin">
-        <a class="menu-card" href="equipo.html"><div class="icono">👥</div>Equipo</a>
-        <a class="menu-card" href="configuracion.html"><div class="icono">⚙️</div>Configuración</a>
-        <a class="menu-card" href="cambiar-password.html"><div class="icono">🔒</div>Cambiar Contraseña</a>
-        <a class="menu-card" href="backups.html"><div class="icono">💾</div>Backups</a>
-      </div>
-    </div>
   </div>
 
 <script src="../js/api.js"></script>
@@ -281,27 +211,8 @@ function mostrarMasActividad(enlace) {
   enlace.parentElement.remove();
 }
 
-function toggleGrupo(idGrupo) {
-  const grupo = document.getElementById(idGrupo);
-  const flecha = document.getElementById('flecha' + idGrupo.charAt(0).toUpperCase() + idGrupo.slice(1));
-  const header = grupo.previousElementSibling;
-  grupo.classList.toggle('colapsado');
-  header.classList.toggle('colapsado');
-
-  const colapsados = JSON.parse(localStorage.getItem('grupos_colapsados') || '{}');
-  colapsados[idGrupo] = grupo.classList.contains('colapsado');
-  localStorage.setItem('grupos_colapsados', JSON.stringify(colapsados));
-}
-
-function restaurarEstadoGrupos() {
-  const colapsados = JSON.parse(localStorage.getItem('grupos_colapsados') || '{}');
-  Object.keys(colapsados).forEach(idGrupo => {
-    if (colapsados[idGrupo]) toggleGrupo(idGrupo);
-  });
-}
-
-restaurarEstadoGrupos();
 cargarDashboard();
 </script>
+<script src="../js/sidebar-nav.js"></script>
 </body>
 </html>
