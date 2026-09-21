@@ -11,6 +11,52 @@ socket.emit('unirse_sucursal', usuario.sucursal_id);
 socket.on('nuevo_ticket', () => cargarBandeja());
 socket.on('ticket_pagado', () => cargarBandeja());
 
+// Cancela un ticket que aún está pendiente de pago — para cuando el
+// cliente ya no lo requiere. Antes de cancelar, pide el motivo con
+// opciones automáticas (para tener estadísticas útiles después en
+// Bitácora), en vez de solo un sí/no genérico.
+let ticketPendienteParaCancelar = null; // { id, folio }
+
+function cancelarTicketPendiente(id, folio) {
+  ticketPendienteParaCancelar = { id, folio };
+  document.getElementById('folioMotivoCancelacion').textContent = `Ticket ${folio}`;
+  document.getElementById('modalMotivoCancelacion').style.display = 'flex';
+}
+
+function cerrarModalMotivoCancelacion() {
+  document.getElementById('modalMotivoCancelacion').style.display = 'none';
+  ticketPendienteParaCancelar = null;
+}
+
+async function confirmarMotivoCancelacion(motivo) {
+  if (!ticketPendienteParaCancelar) return;
+
+  if (motivo === 'otro') {
+    const motivoLibre = await solicitarTexto('Escribe el motivo de la cancelación:');
+    if (!motivoLibre) return; // canceló el prompt, no cierra el modal de motivos por si quiere elegir otra opción
+    motivo = motivoLibre.trim();
+  }
+
+  const { id, folio } = ticketPendienteParaCancelar;
+  document.getElementById('modalMotivoCancelacion').style.display = 'none';
+
+  try {
+    await apiFetch(`/tickets/${id}/cancelar`, { method: 'POST', body: JSON.stringify({ motivo }) });
+    mostrarToast(`Ticket ${folio} cancelado (${motivo})`, 'exito');
+
+    if (ticketActual && ticketActual.folio === folio) {
+      ticketActual = null;
+      clienteSeleccionado = null;
+      document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+    }
+    cargarBandeja();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  } finally {
+    ticketPendienteParaCancelar = null;
+  }
+}
+
 async function cargarBandeja() {
   try {
     const pendientes = await apiFetch('/tickets/pendientes');
@@ -28,9 +74,16 @@ async function cargarBandeja() {
       div.className = `ticket-pendiente ${claseEspera}`;
       div.innerHTML = `
         <span><b>${t.folio}</b><br><small>${textoEspera}</small></span>
-        <span>$${parseFloat(t.total).toFixed(2)}</span>
+        <span style="display:flex; align-items:center; gap:10px;">
+          $${parseFloat(t.total).toFixed(2)}
+          <button class="btn-cancelar-ticket-pendiente" title="Cancelar (el cliente ya no lo requiere)" data-id="${t.id}" data-folio="${t.folio}">✕</button>
+        </span>
       `;
       div.onclick = () => cargarTicket(t.folio);
+      div.querySelector('.btn-cancelar-ticket-pendiente').onclick = (evento) => {
+        evento.stopPropagation(); // no debe abrir el ticket para cobrar, solo cancelarlo
+        cancelarTicketPendiente(t.id, t.folio);
+      };
       cont.appendChild(div);
     });
   } catch (err) {

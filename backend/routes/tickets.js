@@ -503,6 +503,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
 // Cancelar ticket
 router.post('/:id/cancelar', verificarToken, requierePermiso('VENTAS_CANCELAR'), async (req, res) => {
   try {
+    const { motivo } = req.body;
     const result = await pool.query(
       `UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente' RETURNING folio`,
       [req.params.id]
@@ -514,7 +515,7 @@ router.post('/:id/cancelar', verificarToken, requierePermiso('VENTAS_CANCELAR'),
         accion: 'cancelar_ticket',
         modulo: 'tickets',
         referencia_id: parseInt(req.params.id),
-        valor_nuevo: { folio: result.rows[0].folio }
+        valor_nuevo: { folio: result.rows[0].folio, motivo: motivo || 'Sin motivo especificado' }
       });
     }
 

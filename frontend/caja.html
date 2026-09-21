@@ -26,6 +26,11 @@
   .ticket-pendiente.espera-reciente { border-left: 4px solid var(--success, #2E7D32); }
   .ticket-pendiente.espera-media { border-left: 4px solid var(--warning, #F9A825); }
   .ticket-pendiente.espera-larga { border-left: 4px solid var(--danger, #C62828); }
+  .btn-cancelar-ticket-pendiente {
+    background: none; border: 1px solid var(--danger, #C62828); color: var(--danger, #C62828);
+    border-radius: 6px; width: 24px; height: 24px; font-size: 13px; line-height: 1; cursor: pointer;
+  }
+  .btn-cancelar-ticket-pendiente:hover { background: var(--danger, #C62828); color: white; }
   #scanner { width: 100%; max-width: 320px; margin-bottom: 14px; }
   .metodo-pago-btns { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
   .metodo-pago-btns button { flex: 1; min-width: 80px; }
@@ -63,6 +68,20 @@
 
     <div class="panel-cobro card" id="panelCobro">
       <p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalMotivoCancelacion" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100;">
+    <div class="card" style="width:90%; max-width:360px;">
+      <h3 style="margin-bottom:4px;">¿Por qué se cancela?</h3>
+      <p id="folioMotivoCancelacion" style="font-size:13px; color:#666; margin-bottom:14px;"></p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-secondary" style="justify-content:flex-start;" onclick="confirmarMotivoCancelacion('Error de captura')">✏️ Error de captura</button>
+        <button class="btn btn-secondary" style="justify-content:flex-start;" onclick="confirmarMotivoCancelacion('Cliente cambió de opinión')">🙅 Cliente cambió de opinión</button>
+        <button class="btn btn-secondary" style="justify-content:flex-start;" onclick="confirmarMotivoCancelacion('Producto caducado')">📅 Producto caducado</button>
+        <button class="btn btn-secondary" style="justify-content:flex-start;" onclick="confirmarMotivoCancelacion('otro')">➕ Otro (especificar)</button>
+      </div>
+      <button class="btn btn-secondary" style="width:100%; margin-top:14px;" onclick="cerrarModalMotivoCancelacion()">Cancelar (no cancelar el ticket)</button>
     </div>
   </div>
 
