@@ -88,10 +88,14 @@ body.con-sidebar { margin: 0; }
   padding: 6px; margin-right: 4px;
 }
 
-/* Escritorio: el sidebar queda fijo, el contenido se recorre a la derecha */
-body.con-sidebar .top-bar,
-body.con-sidebar > .contenido {
-  margin-left: var(--sidebar-ancho);
+/* Escritorio: el sidebar queda fijo, el contenido se recorre a la derecha.
+   Se usa padding-left en el body (no margin en una clase de contenedor
+   específica) porque cada pantalla nombra su contenedor principal
+   distinto (.contenido, .contenido-avanzada, o ninguno) — el padding en
+   body funciona igual sin importar cómo esté armada cada una. El sidebar
+   y su fondo son position:fixed, así que no los mueve este padding. */
+body.con-sidebar {
+  padding-left: var(--sidebar-ancho);
 }
 
 /* Pantallas angostas (tablets de Mostrador/Caja): el sidebar se oculta y
@@ -103,8 +107,7 @@ body.con-sidebar > .contenido {
   .sidebar-cerrar-movil { display: block; }
   .btn-abrir-sidebar { display: inline-flex; }
 
-  body.con-sidebar .top-bar,
-  body.con-sidebar > .contenido {
-    margin-left: 0;
+  body.con-sidebar {
+    padding-left: 0;
   }
 }

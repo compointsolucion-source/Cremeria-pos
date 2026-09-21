@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Configuración - Cremería POS</title>
 <link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -30,7 +31,10 @@
 </head>
 <body>
   <div class="top-bar">
-    <h1>⚙️ Configuración</h1>
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>⚙️ Configuración</h1></div>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
@@ -576,5 +580,6 @@ setTimeout(() => {
   }
 }, 1500);
 </script>
+<script src="../js/sidebar-nav.js"></script>
 </body>
 </html>
