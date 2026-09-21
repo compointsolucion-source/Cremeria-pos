@@ -28,7 +28,9 @@ const ICONOS_SIDEBAR = {
   base_datos: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
   salir: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  cerrar: '<path d="M5 5l14 14M19 5L5 19"/>'
+  cerrar: '<path d="M5 5l14 14M19 5L5 19"/>',
+  flecha_izquierda: '<path d="M15 5l-7 7 7 7"/>',
+  flecha_derecha: '<path d="M9 5l7 7-7 7"/>'
 };
 
 function svgIcono(nombre, tamano) {
@@ -126,12 +128,14 @@ function construirSidebar() {
 
   return `
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="cerrarSidebarMovil()"></div>
+    <button class="sidebar-boton-reabrir" id="botonReabrirSidebar" onclick="expandirSidebarEscritorio()" title="Mostrar menú">${svgIcono('flecha_derecha', 18)}</button>
     <aside class="sidebar" id="sidebarPrincipal">
       <div class="sidebar-encabezado">
         <a class="sidebar-marca" href="${inicioHref}">
           <span class="sidebar-icono">${svgIcono('inicio', 20)}</span>
           <span>Cremería POS</span>
         </a>
+        <button class="sidebar-colapsar-escritorio" onclick="colapsarSidebarEscritorio()" title="Ocultar menú">${svgIcono('flecha_izquierda', 18)}</button>
         <button class="sidebar-cerrar-movil" onclick="cerrarSidebarMovil()">${svgIcono('cerrar', 20)}</button>
       </div>
       <nav class="sidebar-nav">${gruposHTML}</nav>
@@ -143,6 +147,26 @@ function construirSidebar() {
       </div>
     </aside>
   `;
+}
+
+// Colapsar/expandir en escritorio: usa el mismo deslizamiento (transform)
+// que ya existe para móvil, pero se activa con un botón propio y recuerda
+// la preferencia en este dispositivo — así no hay que volver a ocultarlo
+// cada vez que entras.
+function colapsarSidebarEscritorio() {
+  document.body.classList.add('sidebar-colapsado-escritorio');
+  localStorage.setItem('sidebar_colapsado', 'true');
+}
+
+function expandirSidebarEscritorio() {
+  document.body.classList.remove('sidebar-colapsado-escritorio');
+  localStorage.setItem('sidebar_colapsado', 'false');
+}
+
+function restaurarEstadoSidebar() {
+  if (localStorage.getItem('sidebar_colapsado') === 'true') {
+    document.body.classList.add('sidebar-colapsado-escritorio');
+  }
 }
 
 function abrirSidebarMovil() {
@@ -158,6 +182,7 @@ function cerrarSidebarMovil() {
 function inicializarSidebar() {
   document.body.insertAdjacentHTML('afterbegin', construirSidebar());
   document.body.classList.add('con-sidebar');
+  restaurarEstadoSidebar();
 }
 
 inicializarSidebar();

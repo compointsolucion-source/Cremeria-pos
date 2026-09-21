@@ -50,6 +50,22 @@ body.con-sidebar { margin: 0; }
   font-weight: 700; font-size: 14.5px;
 }
 .sidebar-cerrar-movil { display: none; background: none; border: none; color: var(--sidebar-texto); cursor: pointer; padding: 4px; }
+.sidebar-colapsar-escritorio {
+  background: none; border: none; color: var(--sidebar-texto-tenue); cursor: pointer;
+  padding: 4px; display: flex; align-items: center; border-radius: 6px;
+}
+.sidebar-colapsar-escritorio:hover { background: var(--sidebar-hover); color: var(--sidebar-texto); }
+
+/* Botón flotante para volver a mostrar el sidebar cuando está colapsado en
+   escritorio — oculto por defecto, solo aparece cuando el sidebar no se ve. */
+.sidebar-boton-reabrir {
+  display: none;
+  position: fixed; top: 16px; left: 16px; z-index: 501;
+  width: 36px; height: 36px; border-radius: 8px;
+  background: var(--surface, white); border: 1px solid var(--sidebar-borde, #E4E6E9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  align-items: center; justify-content: center; cursor: pointer; color: var(--sidebar-texto, #4B4F58);
+}
 
 .sidebar-nav { flex: 1; overflow-y: auto; padding: 14px 10px; }
 .sidebar-grupo { margin-bottom: 18px; }
@@ -98,6 +114,19 @@ body.con-sidebar {
   padding-left: var(--sidebar-ancho);
 }
 
+/* Sidebar colapsado manualmente en escritorio: se desliza fuera igual que
+   en móvil, el contenido recupera el espacio, y aparece el botón flotante
+   para volver a mostrarlo. */
+body.con-sidebar.sidebar-colapsado-escritorio {
+  padding-left: 0;
+}
+body.con-sidebar.sidebar-colapsado-escritorio .sidebar {
+  transform: translateX(-100%);
+}
+body.con-sidebar.sidebar-colapsado-escritorio .sidebar-boton-reabrir {
+  display: flex;
+}
+
 /* Pantallas angostas (tablets de Mostrador/Caja): el sidebar se oculta y
    se abre como panel superpuesto con el botón ☰ — no le roba espacio a
    la pantalla de venta. */
@@ -105,6 +134,8 @@ body.con-sidebar {
   .sidebar { transform: translateX(-100%); }
   .sidebar.abierto { transform: translateX(0); box-shadow: 4px 0 16px rgba(0,0,0,0.15); }
   .sidebar-cerrar-movil { display: block; }
+  .sidebar-colapsar-escritorio { display: none; }
+  .sidebar-boton-reabrir { display: none !important; }
   .btn-abrir-sidebar { display: inline-flex; }
 
   body.con-sidebar {
