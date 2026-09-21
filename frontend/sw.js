@@ -14,6 +14,7 @@ const ARCHIVOS_A_GUARDAR = [
   '/caja.html',
   '/caja-avanzada.html',
   '/css/app-theme.css',
+  '/css/sidebar.css',
   '/js/api.js',
   '/js/estado-conexion.js',
   '/js/ui-components.js',
@@ -21,8 +22,12 @@ const ARCHIVOS_A_GUARDAR = [
   '/js/lector-fisico.js',
   '/js/impresora-termica.js',
   '/js/offline-db.js',
+  '/js/sidebar-nav.js',
   '/js/mostrador.js',
-  '/js/caja.js'
+  '/js/caja.js',
+  '/manifest.json',
+  '/iconos/icono-192.png',
+  '/iconos/icono-512.png'
 ];
 
 self.addEventListener('install', (evento) => {
