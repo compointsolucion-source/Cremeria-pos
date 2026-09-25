@@ -89,6 +89,24 @@
           <option value="58mm">Papel de 58mm</option>
         </select>
         <p class="nota-pequena">Esto es solo para esta computadora/tablet — si tienes otro dispositivo con una impresora de otro tamaño (ej. tu celular), configúralo ahí por separado sin que se afecten entre sí.</p>
+
+        <p class="subtitulo-seccion" style="margin-top:16px;">Acomodo de Mostrador en ESTE dispositivo</p>
+        <select id="layoutMostradorDispositivo" onchange="guardarLayoutMostrador()">
+          <option value="auto">Automático (según el tamaño de pantalla detectado)</option>
+          <option value="pestanas">Pestañas — un panel completo a la vez (recomendado para celular)</option>
+          <option value="deslizable">Panel deslizable — el ticket se abre como cajón desde abajo</option>
+          <option value="dividido">Dividido — lado a lado, ajustado para tablet</option>
+        </select>
+        <p class="nota-pequena" id="deteccionDispositivoTexto"></p>
+
+        <p class="subtitulo-seccion" style="margin-top:16px;">Tema de color de ESTE dispositivo</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary" style="border-color:#2E7D32;" onclick="establecerColorTema('verde'); marcarColorTemaActivo('verde')" data-color-boton="verde">🟢 Verde</button>
+          <button type="button" class="btn btn-secondary" style="border-color:#1565C0;" onclick="establecerColorTema('azul'); marcarColorTemaActivo('azul')" data-color-boton="azul">🔵 Azul</button>
+          <button type="button" class="btn btn-secondary" style="border-color:#6A1B9A;" onclick="establecerColorTema('morado'); marcarColorTemaActivo('morado')" data-color-boton="morado">🟣 Morado</button>
+          <button type="button" class="btn btn-secondary" style="border-color:#E65100;" onclick="establecerColorTema('naranja'); marcarColorTemaActivo('naranja')" data-color-boton="naranja">🟠 Naranja</button>
+          <button type="button" class="btn btn-secondary" style="border-color:#000000;" onclick="establecerColorTema('alto-contraste'); marcarColorTemaActivo('alto-contraste')" data-color-boton="alto-contraste">⚫ Alto Contraste</button>
+        </div>
       </div>
     </div>
 
@@ -457,6 +475,37 @@ function guardarAnchoTicketDispositivo() {
   mostrarToast('Ancho de papel guardado para este dispositivo', 'exito');
 }
 
+// Mismo criterio de tamaño que usa Mostrador para elegir el acomodo
+// automático — se repite aquí solo para mostrar el mensaje informativo.
+function detectarTipoDispositivoTexto() {
+  const ancho = window.innerWidth;
+  if (ancho < 600) return 'celular';
+  if (ancho < 1024) return 'tablet';
+  return 'computadora';
+}
+
+function cargarLayoutMostrador() {
+  document.getElementById('layoutMostradorDispositivo').value = localStorage.getItem('layout_mostrador_preferencia') || 'auto';
+  document.getElementById('deteccionDispositivoTexto').textContent =
+    `Este dispositivo se detecta como: ${detectarTipoDispositivoTexto()} (ancho de pantalla: ${window.innerWidth}px)`;
+}
+
+function guardarLayoutMostrador() {
+  localStorage.setItem('layout_mostrador_preferencia', document.getElementById('layoutMostradorDispositivo').value);
+  mostrarToast('Acomodo de Mostrador guardado para este dispositivo', 'exito');
+}
+
+function marcarColorTemaActivo(colorActivo) {
+  document.querySelectorAll('[data-color-boton]').forEach(boton => {
+    boton.style.borderWidth = boton.dataset.colorBoton === colorActivo ? '3px' : '1px';
+  });
+}
+
+function cargarColorTema() {
+  const colorGuardado = localStorage.getItem('color_tema') || 'verde';
+  marcarColorTemaActivo(colorGuardado);
+}
+
 // Nota: "líneas en blanco" y varios ajustes hoy son compartidos entre ambos
 // tickets en la base de datos (un solo valor guardado) — se muestran en las
 // dos tarjetas para que sea claro qué controla cada una, pero al guardar
@@ -567,6 +616,8 @@ async function probarImpresionFicha() {
 
 cargarModoImpresion();
 cargarConfiguracion();
+cargarLayoutMostrador();
+cargarColorTema();
 
 // Refleja si alguna de las 2 impresoras ya se reconectó sola (el intento
 // automático corre en paralelo al cargar la página, así que se espera un

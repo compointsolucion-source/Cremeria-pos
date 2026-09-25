@@ -346,6 +346,91 @@ function renderCarrito() {
   });
 
   document.getElementById('totalTicket').textContent = total.toFixed(2);
+  const totalPeek = document.getElementById('totalTicketPeek');
+  if (totalPeek) totalPeek.textContent = total.toFixed(2);
+
+  // Badge de la pestaña "Ticket" en móvil, para ver de un vistazo cuántos
+  // artículos lleva sin tener que cambiar de pestaña.
+  const badge = document.getElementById('badgeTicketMovil');
+  if (badge) {
+    badge.textContent = carrito.length;
+    badge.style.display = carrito.length > 0 ? 'inline-block' : 'none';
+  }
+}
+
+// ---------- Acomodo de Mostrador (Pestañas / Deslizable / Dividido) ----------
+// Se aplica solo por debajo de 1024px (celulares y tablets) — en escritorio
+// el layout de siempre (lado a lado) nunca cambia, sin importar esta
+// preferencia. La elección es por dispositivo (localStorage), con "auto"
+// como opción que detecta el tamaño de pantalla y elige un modo razonable.
+function detectarTipoDispositivoMostrador() {
+  const ancho = window.innerWidth;
+  if (ancho < 600) return 'celular';
+  if (ancho < 1024) return 'tablet';
+  return 'pc';
+}
+
+function resolverModoLayoutMostrador() {
+  const preferencia = localStorage.getItem('layout_mostrador_preferencia') || 'auto';
+  if (preferencia !== 'auto') return preferencia;
+
+  const tipo = detectarTipoDispositivoMostrador();
+  if (tipo === 'celular') return 'pestanas';
+  if (tipo === 'tablet') return 'dividido';
+  return 'dividido'; // no debería aplicarse en pc (media query >1024px lo ignora), valor de respaldo
+}
+
+function aplicarLayoutMostrador() {
+  const layout = document.querySelector('.layout');
+  const barraTabs = document.getElementById('pestanasMovilMostrador');
+  if (!layout) return;
+
+  layout.classList.remove('layout-modo-pestanas', 'layout-modo-deslizable', 'layout-modo-dividido', 'ver-ticket-movil', 'expandido-cajon');
+
+  const modo = resolverModoLayoutMostrador();
+  layout.classList.add('layout-modo-' + modo);
+
+  // La barra de pestañas de arriba solo tiene sentido en el modo Pestañas —
+  // en Deslizable y Dividido se controla todo con el propio panel.
+  if (barraTabs) barraTabs.style.display = (modo === 'pestanas' && window.innerWidth <= 1024) ? 'flex' : 'none';
+
+  const carrito = document.getElementById('panelCarritoMostrador');
+  if (carrito) carrito.classList.remove('expandido');
+}
+
+// Vuelve a evaluar el acomodo si la pantalla cambia de tamaño (ej. se gira
+// el celular) — con un pequeño retraso para no recalcular en cada pixel
+// mientras se arrastra la ventana.
+let temporizadorResizeMostrador;
+window.addEventListener('resize', () => {
+  clearTimeout(temporizadorResizeMostrador);
+  temporizadorResizeMostrador = setTimeout(aplicarLayoutMostrador, 200);
+});
+
+// En el modo Deslizable, tocar el encabezado del ticket lo expande/contrae
+// — en los otros 2 modos este clic no tiene ningún efecto visual (la regla
+// CSS solo existe dentro de .layout-modo-deslizable).
+function toggleCarritoDeslizable() {
+  const layout = document.querySelector('.layout');
+  if (!layout || !layout.classList.contains('layout-modo-deslizable')) return;
+  document.getElementById('panelCarritoMostrador').classList.toggle('expandido');
+  layout.classList.toggle('expandido-cajon');
+}
+
+// Alterna entre ver Productos o Ticket a pantalla completa en celulares —
+// evita el problema de ambos paneles aplastados uno junto al otro. Usa una
+// clase en .layout (no estilo inline) para que la regla responsiva en CSS
+// siga mandando sin importar el tamaño de pantalla — así, si algún día se
+// gira el celular o se cambia de tamaño de ventana, no queda una pantalla
+// rota con un panel escondido a la fuerza en modo escritorio.
+function cambiarPestanaMovil(pestana) {
+  const layout = document.querySelector('.layout');
+  const btnProductos = document.getElementById('pestanaProductosBtn');
+  const btnTicket = document.getElementById('pestanaTicketBtn');
+
+  layout.classList.toggle('ver-ticket-movil', pestana === 'ticket');
+  btnProductos.classList.toggle('activa', pestana !== 'ticket');
+  btnTicket.classList.toggle('activa', pestana === 'ticket');
 }
 
 function quitarItem(idx) {
@@ -612,3 +697,4 @@ setInterval(actualizarContadorFichas, 15000);
 setInterval(actualizarFichaActual, 15000);
 
 cargarDatos();
+aplicarLayoutMostrador();

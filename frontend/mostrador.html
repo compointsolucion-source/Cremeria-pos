@@ -16,6 +16,59 @@
   .layout { display: flex; height: calc(100vh - 60px); }
   .panel-productos { flex: 2; padding: 14px; overflow-y: auto; }
   .panel-carrito { flex: 1; min-width: 300px; padding: 14px; background: white; display: flex; flex-direction: column; }
+
+  /* Pestañas Productos/Ticket — solo se muestran en el modo "pestañas".
+     En escritorio (>1024px) siempre quedan ocultas y ambos paneles se ven
+     lado a lado, sin importar qué acomodo esté elegido para pantallas
+     angostas. */
+  .pestanas-movil-mostrador { display: none; }
+  .pestana-movil {
+    flex: 1; padding: 12px; border: none; background: #F0F0F0; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .pestana-movil.activa { background: var(--primary, #2E7D32); color: white; }
+  .badge-ticket-movil {
+    background: white; color: var(--primary, #2E7D32); border-radius: 10px;
+    padding: 1px 7px; font-size: 11px; font-weight: 800;
+  }
+  #panelCarritoMostrador h3 { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .peek-total-deslizable { display: none; font-size: 14px; color: var(--primary, #2E7D32); }
+
+  /* Corrección del bug real que originó todo esto: en pantallas angostas,
+     el min-width:300px del panel del carrito aplastaba la lista de
+     productos a una columna casi inservible. Debajo de 1024px (celulares
+     y tablets) se aplica uno de los 3 acomodos elegibles en Configuración
+     — la clase exacta la decide mostrador.js (auto o manual). */
+  @media (max-width: 1024px) {
+    .layout { flex-direction: column; height: auto; }
+    .panel-productos, .panel-carrito { flex: none; width: 100%; min-width: 0; }
+
+    /* Modo 1: Pestañas — un panel completo a la vez (la barra de pestañas
+       la muestra/oculta directamente mostrador.js según el modo activo). */
+    .layout.layout-modo-pestanas .panel-productos { display: block; }
+    .layout.layout-modo-pestanas .panel-carrito { display: none; }
+    .layout.layout-modo-pestanas.ver-ticket-movil .panel-productos { display: none; }
+    .layout.layout-modo-pestanas.ver-ticket-movil .panel-carrito { display: flex; }
+
+    /* Modo 2: Panel deslizable — productos siempre visibles arriba; el
+       ticket es un cajón fijo abajo, angosto por defecto ("peek" con el
+       total), que se expande al tocarlo. */
+    .layout.layout-modo-deslizable .panel-productos { display: block; padding-bottom: 80px; }
+    .layout.layout-modo-deslizable .panel-carrito {
+      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+      border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px rgba(0,0,0,0.18);
+      max-height: 64px; overflow: hidden; transition: max-height 0.25s ease;
+    }
+    .layout.layout-modo-deslizable .panel-carrito.expandido { max-height: 75vh; overflow-y: auto; }
+    .layout.layout-modo-deslizable .peek-total-deslizable { display: inline; }
+    .layout.layout-modo-deslizable.expandido-cajon .peek-total-deslizable { display: none; }
+
+    /* Modo 3: Dividido — lado a lado, con proporciones para tablet (no
+       para un celular angosto, que necesitaría el modo Pestañas). */
+    .layout.layout-modo-dividido { flex-direction: row; height: calc(100vh - 60px); }
+    .layout.layout-modo-dividido .panel-productos { flex: 3; width: auto; }
+    .layout.layout-modo-dividido .panel-carrito { flex: 2; width: auto; min-width: 220px; display: flex; }
+  }
   .categorias { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; }
   .categoria-tab {
     padding: 10px 16px; border-radius: 20px; background: #E0E0E0; white-space: nowrap;
@@ -102,8 +155,13 @@
     🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraMostrador(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraMostradorUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
   </div>
 
+  <div class="pestanas-movil-mostrador" id="pestanasMovilMostrador">
+    <button class="pestana-movil activa" id="pestanaProductosBtn" onclick="cambiarPestanaMovil('productos')">🛒 Productos</button>
+    <button class="pestana-movil" id="pestanaTicketBtn" onclick="cambiarPestanaMovil('ticket')">🧾 Ticket <span id="badgeTicketMovil" class="badge-ticket-movil" style="display:none;">0</span></button>
+  </div>
+
   <div class="layout">
-    <div class="panel-productos">
+    <div class="panel-productos" id="panelProductosMostrador">
       <button class="btn btn-secondary" style="margin-bottom:10px;" onclick="toggleScannerProducto()">📷 Escanear código de barras</button>
       <div id="scannerProducto"></div>
 
@@ -113,8 +171,8 @@
       <div class="grid-productos" id="gridProductos"></div>
     </div>
 
-    <div class="panel-carrito">
-      <h3>Ticket actual</h3>
+    <div class="panel-carrito" id="panelCarritoMostrador">
+      <h3 onclick="toggleCarritoDeslizable()">Ticket actual <span class="peek-total-deslizable">$<span id="totalTicketPeek">0.00</span></span></h3>
       <div id="carritoItems" style="flex:1; overflow-y:auto;"></div>
       <div class="total-box">Total: $<span id="totalTicket">0.00</span></div>
       <button class="btn btn-primary" style="width:100%" onclick="generarTicket()">🖨 Generar e Imprimir Ticket</button>

@@ -125,6 +125,31 @@ tbody tr:hover { background: #FAFAFB; }
 [data-tema="oscuro"] thead th { background: #232426; }
 [data-tema="oscuro"] tbody tr:hover { background: #313235; }
 
+/* ===== 5 temas de color — independientes de claro/oscuro, se pueden
+   combinar (ej. "Azul" + oscuro). "Verde" es el color de toda la vida del
+   sistema y es el que ya se ve si no se elige nada distinto. ===== */
+[data-color-tema="verde"] { --primary: #2E7D32; --primary-dark: #1B5E20; }
+[data-tema="oscuro"][data-color-tema="verde"] { --primary: #4CAF50; --primary-dark: #388E3C; }
+
+[data-color-tema="azul"] { --primary: #1565C0; --primary-dark: #0D47A1; }
+[data-tema="oscuro"][data-color-tema="azul"] { --primary: #42A5F5; --primary-dark: #1E88E5; }
+
+[data-color-tema="morado"] { --primary: #6A1B9A; --primary-dark: #4A148C; }
+[data-tema="oscuro"][data-color-tema="morado"] { --primary: #AB47BC; --primary-dark: #8E24AA; }
+
+[data-color-tema="naranja"] { --primary: #E65100; --primary-dark: #BF360C; }
+[data-tema="oscuro"][data-color-tema="naranja"] { --primary: #FFA726; --primary-dark: #FB8C00; }
+
+/* Alto contraste: pensado para legibilidad, no solo un color distinto —
+   negro/blanco puro y bordes más marcados en toda la interfaz. */
+[data-color-tema="alto-contraste"] { --primary: #000000; --primary-dark: #000000; --border: #000000; }
+[data-color-tema="alto-contraste"] .card,
+[data-color-tema="alto-contraste"] input,
+[data-color-tema="alto-contraste"] select,
+[data-color-tema="alto-contraste"] textarea,
+[data-color-tema="alto-contraste"] .btn { border-width: 2px; }
+[data-tema="oscuro"][data-color-tema="alto-contraste"] { --primary: #FFFFFF; --primary-dark: #FFFFFF; --border: #FFFFFF; }
+
 .boton-tema-flotante {
   position: fixed;
   bottom: 16px;

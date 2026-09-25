@@ -1,9 +1,25 @@
 // Modo oscuro/claro/sistema, aplicado globalmente. Se incluye en todas las
 // pantallas e inyecta un botón flotante para alternar sin editar cada página.
+// También maneja los 5 temas de color (independientes de claro/oscuro —
+// se pueden combinar, ej. "Azul" + oscuro).
 (function () {
   function obtenerTemaPreferido() {
     return localStorage.getItem('tema') || 'sistema';
   }
+
+  function obtenerColorTemaPreferido() {
+    return localStorage.getItem('color_tema') || 'verde';
+  }
+
+  function aplicarColorTema(colorTema) {
+    document.documentElement.setAttribute('data-color-tema', colorTema);
+  }
+
+  // Se expone para que Configuración pueda cambiarlo y guardarlo.
+  window.establecerColorTema = function (colorTema) {
+    localStorage.setItem('color_tema', colorTema);
+    aplicarColorTema(colorTema);
+  };
 
   function sistemaEsOscuro() {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -42,6 +58,7 @@
 
   // Aplicar el tema lo antes posible (antes de pintar) para evitar parpadeo
   aplicarTema(obtenerTemaPreferido());
+  aplicarColorTema(obtenerColorTemaPreferido());
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', inyectarBotonTema);

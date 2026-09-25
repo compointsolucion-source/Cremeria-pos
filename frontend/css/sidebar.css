@@ -11,8 +11,8 @@
   --sidebar-borde: #ECEDF0;
   --sidebar-hover: #F5F6F8;
   --sidebar-activo-fondo: #EAF3EB;
-  --sidebar-activo-texto: #1F6B24;
-  --sidebar-activo-borde: #2E7D32;
+  --sidebar-activo-texto: var(--primary, #1F6B24);
+  --sidebar-activo-borde: var(--primary, #2E7D32);
 }
 
 [data-tema="oscuro"] {
@@ -22,8 +22,8 @@
   --sidebar-borde: #1B2030;
   --sidebar-hover: #151A28;
   --sidebar-activo-fondo: #16241A;
-  --sidebar-activo-texto: #6FCF77;
-  --sidebar-activo-borde: #4CAF50;
+  --sidebar-activo-texto: var(--primary, #6FCF77);
+  --sidebar-activo-borde: var(--primary, #4CAF50);
 }
 
 body.con-sidebar { margin: 0; }
