@@ -125,7 +125,21 @@ function renderProductos() {
 
   const lista = categoriaActiva ? productos.filter(p => p.categoria_id === categoriaActiva) : productos;
 
-  lista.forEach(p => {
+  // Dentro de un departamento específico, los primeros 15 favoritos van
+  // arriba de todo (uso rápido), separados visualmente del resto del
+  // catálogo de ese departamento. En "Todos" no aplica este límite —
+  // ahí ya se ve el catálogo completo por búsqueda/categoría.
+  const LIMITE_FAVORITOS_RAPIDOS = 15;
+  let favoritosRapidos = [];
+  let restoDeLista = lista;
+
+  if (categoriaActiva) {
+    favoritosRapidos = lista.filter(p => p.favorito).slice(0, LIMITE_FAVORITOS_RAPIDOS);
+    const idsFavoritosMostrados = new Set(favoritosRapidos.map(p => p.id));
+    restoDeLista = lista.filter(p => !idsFavoritosMostrados.has(p.id));
+  }
+
+  function tarjetaProducto(p) {
     const card = document.createElement('div');
     card.className = 'producto-card';
     const badge = p.tipo_venta === 'unidad'
@@ -142,8 +156,26 @@ function renderProductos() {
       ${avisoPromo}
     `;
     card.onclick = () => seleccionarProducto(p);
-    grid.appendChild(card);
-  });
+    return card;
+  }
+
+  if (favoritosRapidos.length > 0) {
+    const tituloFavoritos = document.createElement('div');
+    tituloFavoritos.className = 'titulo-seccion-grid';
+    tituloFavoritos.style.cssText = 'grid-column:1/-1; font-weight:700; font-size:13px; color:#666; margin:4px 0;';
+    tituloFavoritos.textContent = `⭐ Favoritos rápidos (${favoritosRapidos.length})`;
+    grid.appendChild(tituloFavoritos);
+
+    favoritosRapidos.forEach(p => grid.appendChild(tarjetaProducto(p)));
+
+    const tituloResto = document.createElement('div');
+    tituloResto.className = 'titulo-seccion-grid';
+    tituloResto.style.cssText = 'grid-column:1/-1; font-weight:700; font-size:13px; color:#666; margin:14px 0 4px;';
+    tituloResto.textContent = 'Todos los productos';
+    grid.appendChild(tituloResto);
+  }
+
+  restoDeLista.forEach(p => grid.appendChild(tarjetaProducto(p)));
 }
 
 function seleccionarProducto(producto) {

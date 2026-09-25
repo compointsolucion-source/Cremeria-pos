@@ -61,9 +61,11 @@
 
       <input type="number" id="precio" placeholder="Precio de venta *" step="0.01">
 
-      <div style="display:flex; align-items:center; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <img id="previewImg" class="preview-img" src="">
         <input type="file" id="imagenInput" accept="image/*">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('imagenInputCamara').click()">📷 Tomar Foto</button>
+        <input type="file" id="imagenInputCamara" accept="image/*" capture="environment" style="display:none;">
       </div>
 
       <button type="button" class="btn-mas-opciones" onclick="toggleMasOpciones()">
@@ -237,7 +239,11 @@ async function buscarCodigoExterno() {
   }
 }
 
-document.getElementById('imagenInput').addEventListener('change', async (e) => {
+// Un solo manejador compartido entre "elegir archivo" (que en la mayoría de
+// celulares ya ofrece cámara o galería) y "Tomar Foto" (que fuerza la
+// cámara directo, con capture="environment") — mismo procesamiento para
+// cualquiera de los dos.
+async function manejarSeleccionImagen(e) {
   const file = e.target.files[0];
   if (!file) return;
   try {
@@ -248,7 +254,10 @@ document.getElementById('imagenInput').addEventListener('change', async (e) => {
   } catch (err) {
     mostrarToast('No se pudo procesar la imagen: ' + err.message, 'error');
   }
-});
+}
+
+document.getElementById('imagenInput').addEventListener('change', manejarSeleccionImagen);
+document.getElementById('imagenInputCamara').addEventListener('change', manejarSeleccionImagen);
 
 async function cargarCategorias() {
   const cats = await apiFetch('/departamentos');

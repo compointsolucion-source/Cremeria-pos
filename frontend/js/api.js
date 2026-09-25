@@ -28,7 +28,7 @@ function cerrarSesion() {
   }
   localStorage.removeItem('token');
   localStorage.removeItem('usuario');
-  window.location.href = 'login.html';
+  window.location.href = '/login.html';
 }
 
 async function apiFetch(endpoint, options = {}) {
@@ -78,5 +78,5 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 function requiereLogin() {
-  if (!getToken()) window.location.href = 'login.html';
+  if (!getToken()) window.location.href = '/login.html';
 }
