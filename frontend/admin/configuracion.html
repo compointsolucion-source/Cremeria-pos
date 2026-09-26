@@ -323,6 +323,34 @@
       </div>
     </div>
 
+    <!-- ============ ZONA PELIGROSA (solo dueño) ============ -->
+    <div class="card" id="cardZonaPeligrosa" style="display:none; border:1px solid #C62828; margin-top:16px;">
+      <div class="header-plegable" onclick="toggleSeccionConfig('secZonaPeligrosa')">
+        <h3 class="card-titulo-grande" style="color:#C62828;">⚠️ Zona peligrosa</h3>
+        <span class="flecha-plegable colapsada" id="flecha-secZonaPeligrosa">▾</span>
+      </div>
+      <div class="form-config seccion-plegable colapsada" id="secZonaPeligrosa">
+        <p class="card-subtexto">Borra todas las ventas, tickets, turnos, movimientos de caja, créditos/abonos, devoluciones y bitácora de tu sucursal, y deja existencias y saldos de clientes en $0. <b>No borra</b> tu catálogo (productos, categorías, kits, proveedores), clientes, usuarios ni esta configuración. Úsalo solo para dejar el sistema limpio antes de arrancar en real — no se puede deshacer.</p>
+        <button class="btn btn-danger" onclick="abrirModalReinicioFabrica()">🗑️ Reinicio de fábrica</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal de Reinicio de Fábrica: dos candados (contraseña + palabra exacta) -->
+  <div class="modal-confirm-overlay" id="modalReinicioFabrica">
+    <div class="modal-confirm-caja">
+      <p style="font-weight:700; color:#C62828;">⚠️ Esto va a borrar TODAS las ventas, turnos, cortes de caja, créditos/abonos y devoluciones de tu sucursal — no se puede deshacer.</p>
+      <p style="font-size:13px; color:#666; margin-bottom:10px;">El catálogo, clientes, usuarios y configuración NO se borran.</p>
+      <label style="font-size:13px; display:block; margin-bottom:4px;">Tu contraseña:</label>
+      <input type="password" id="reinicioFabricaPassword" style="margin-bottom:12px;" autocomplete="off">
+      <label style="font-size:13px; display:block; margin-bottom:4px;">Escribe <b>BORRAR</b> para confirmar:</label>
+      <input type="text" id="reinicioFabricaConfirmacion" style="margin-bottom:14px;" autocomplete="off">
+      <div class="modal-confirm-botones">
+        <button class="btn btn-secondary" id="reinicioFabricaCancelar">Cancelar</button>
+        <button class="btn btn-danger" id="reinicioFabricaAceptar">Borrar todo</button>
+      </div>
+    </div>
   </div>
 
 <script src="../js/api.js"></script>
@@ -338,6 +366,52 @@ function toggleSeccionConfig(idSeccion) {
   document.getElementById(idSeccion).classList.toggle('colapsada');
   document.getElementById('flecha-' + idSeccion).classList.toggle('colapsada');
 }
+
+// La Zona Peligrosa solo la ve el dueño — ni gerente ni cajero, aunque
+// entraran directo a esta URL, deben poder intentarlo (el backend también
+// lo revisa con requiereRol('dueno'), esto es solo para no mostrarla).
+const usuarioActualConfig = getUsuario();
+if (usuarioActualConfig && usuarioActualConfig.rol === 'dueno') {
+  document.getElementById('cardZonaPeligrosa').style.display = 'block';
+}
+
+function abrirModalReinicioFabrica() {
+  document.getElementById('reinicioFabricaPassword').value = '';
+  document.getElementById('reinicioFabricaConfirmacion').value = '';
+  document.getElementById('modalReinicioFabrica').classList.add('abierto');
+}
+
+function cerrarModalReinicioFabrica() {
+  document.getElementById('modalReinicioFabrica').classList.remove('abierto');
+}
+
+document.getElementById('reinicioFabricaCancelar').addEventListener('click', cerrarModalReinicioFabrica);
+
+document.getElementById('reinicioFabricaAceptar').addEventListener('click', async () => {
+  const password = document.getElementById('reinicioFabricaPassword').value;
+  const confirmacion = document.getElementById('reinicioFabricaConfirmacion').value;
+
+  if (!password) { mostrarToast('Escribe tu contraseña', 'error'); return; }
+  if (confirmacion.trim() !== 'BORRAR') { mostrarToast('Debes escribir exactamente la palabra BORRAR', 'error'); return; }
+
+  const boton = document.getElementById('reinicioFabricaAceptar');
+  boton.disabled = true;
+  boton.textContent = 'Borrando...';
+
+  try {
+    const resultado = await apiFetch('/sistema/reinicio-fabrica', {
+      method: 'POST',
+      body: JSON.stringify({ password, confirmacion })
+    });
+    cerrarModalReinicioFabrica();
+    mostrarToast(resultado.mensaje || 'Reinicio de fábrica completado', 'exito', 6000);
+  } catch (err) {
+    mostrarToast(err.message, 'error', 6000);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Borrar todo';
+  }
+});
 
 document.getElementById('logoInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
