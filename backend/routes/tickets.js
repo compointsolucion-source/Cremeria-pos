@@ -353,7 +353,7 @@ router.put('/item/:itemId/descuento', verificarToken, requierePermiso('DESCUENTO
 router.post('/:id/pagar', verificarToken, async (req, res) => {
   const conexion = await pool.connect();
   try {
-    const { metodo_pago, monto_efectivo, monto_tarjeta, turno_id, cliente_id } = req.body;
+    const { metodo_pago, monto_efectivo, monto_tarjeta, turno_id, cliente_id, efectivo_recibido } = req.body;
 
     if (metodo_pago === 'credito' && !cliente_id) {
       return res.status(400).json({ error: 'Selecciona un cliente para autorizar el fiado' });
@@ -404,9 +404,10 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
         monto_tarjeta = $4,
         turno_id = $5,
         cliente_id = $6,
-        fecha_pago = NOW()
+        fecha_pago = NOW(),
+        efectivo_recibido = $8
        WHERE id = $7 AND estado = 'pendiente' RETURNING *`,
-      [req.usuario.id, metodo_pago, monto_efectivo || 0, monto_tarjeta || 0, turno_id || null, metodo_pago === 'credito' ? cliente_id : null, req.params.id]
+      [req.usuario.id, metodo_pago, monto_efectivo || 0, monto_tarjeta || 0, turno_id || null, metodo_pago === 'credito' ? cliente_id : null, req.params.id, efectivo_recibido || null]
     );
     if (result.rows.length === 0) {
       await conexion.query('ROLLBACK');

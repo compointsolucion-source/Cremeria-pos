@@ -115,6 +115,11 @@
       <button class="btn btn-secondary" onclick="abrirCajonManualAvanzada()">🗄️ Abrir Cajón</button>
     </div>
 
+    <div class="card" id="panelUltimaVenta" style="margin-top:10px; display:none; font-size:13px;">
+      <b style="font-size:13px;">📋 Última venta</b>
+      <div id="contenidoUltimaVenta" style="margin-top:6px; color:#555;"></div>
+    </div>
+
     <div class="zona-total">
       <div>
         <div class="contador-articulos"><b id="contadorArticulosAvanzada">0</b> productos en la venta actual</div>
@@ -797,6 +802,38 @@ function consultarVerificador() {
 
 // Reimprime el último ticket cobrado, con Total / Pagó con / Cambio, igual
 // que en Caja normal.
+// Muestra en pantalla, de forma permanente (no solo un toast que
+// desaparece), los datos de la última venta cobrada — para que si al
+// cajero se le olvida el cambio que dio o cómo se pagó, lo pueda ver aquí
+// sin tener que reimprimir ni buscar en el historial.
+async function actualizarPanelUltimaVenta() {
+  try {
+    const ticket = await apiFetch('/tickets/ultimo-pagado');
+    const panel = document.getElementById('panelUltimaVenta');
+    const contenido = document.getElementById('contenidoUltimaVenta');
+
+    const nombresMetodo = {
+      efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia',
+      mixto: 'Mixto', credito: 'Fiado', dolares: 'Dólares', cheque: 'Cheque', vale_despensa: 'Vale de Despensa'
+    };
+    const metodoLegible = nombresMetodo[ticket.metodo_pago] || ticket.metodo_pago || '—';
+
+    let detalleExtra = '';
+    if (ticket.metodo_pago === 'efectivo' && ticket.efectivo_recibido) {
+      const cambio = parseFloat(ticket.efectivo_recibido) - parseFloat(ticket.total);
+      detalleExtra = ` — Pagó con $${parseFloat(ticket.efectivo_recibido).toFixed(2)}, cambio $${Math.max(0, cambio).toFixed(2)}`;
+    } else if (ticket.metodo_pago === 'mixto') {
+      detalleExtra = ` — Efectivo $${parseFloat(ticket.monto_efectivo).toFixed(2)} + Tarjeta $${parseFloat(ticket.monto_tarjeta).toFixed(2)}`;
+    }
+
+    contenido.innerHTML = `Folio <b>${ticket.folio}</b> — Total <b>$${parseFloat(ticket.total).toFixed(2)}</b> — Pagado con <b>${metodoLegible}</b>${detalleExtra}`;
+    panel.style.display = 'block';
+  } catch (err) {
+    // Si nunca se ha cobrado nada en esta sucursal, no hay "última venta"
+    // que mostrar — no es un error, simplemente no se muestra el panel.
+  }
+}
+
 async function reimprimirUltimoTicketAvanzada() {
   try {
     const ticket = await apiFetch('/tickets/ultimo-pagado');
@@ -1222,7 +1259,7 @@ async function confirmarCobroAvanzada() {
 
     const resultadoPago = await apiFetch(`/tickets/${ticketParaCobrarAvanzada.id}/pagar`, {
       method: 'POST',
-      body: JSON.stringify({ metodo_pago: metodoPagoCobrarAvanzada, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id })
+      body: JSON.stringify({ metodo_pago: metodoPagoCobrarAvanzada, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket })
     });
 
     mostrarToast('Pago procesado correctamente', 'exito');
@@ -1234,6 +1271,7 @@ async function confirmarCobroAvanzada() {
     }
 
     await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada, recibidoEfectivoParaTicket, cambioParaTicket);
+    actualizarPanelUltimaVenta();
 
     // Cerrar el ticket ya cobrado: quita esta pestaña (o la vacía si es la única)
     if (pestanas.length === 1) {
@@ -1327,6 +1365,7 @@ document.addEventListener('keydown', (e) => {
 
 renderPestanas();
 cargarCatalogoAvanzada();
+actualizarPanelUltimaVenta();
 </script>
 <script src="js/registrar-sw.js"></script>
 <script src="js/sidebar-nav.js"></script>

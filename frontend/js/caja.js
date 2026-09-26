@@ -439,7 +439,8 @@ async function cobrar() {
         monto_efectivo: montoEfectivo,
         monto_tarjeta: montoTarjeta,
         turno_id: turno.id,
-        cliente_id
+        cliente_id,
+        efectivo_recibido: recibidoEfectivoParaTicket
       })
     });
 
