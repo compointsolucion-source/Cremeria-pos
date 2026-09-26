@@ -12,6 +12,8 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
+  .fila-doble { display: flex; gap: 8px; }
+  .fila-doble > * { flex: 1; }
   .contenido { max-width: 550px; margin: 20px auto; padding: 0 14px; }
   .form-config { display: grid; gap: 10px; }
   .estado-impresora { padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
@@ -64,6 +66,20 @@
         <button class="btn btn-secondary" onclick="probarImpresionFicha()" style="margin-top:8px;">🖨️ Probar impresión (Ficha)</button>
 
         <p class="nota-pequena" style="margin-top:10px;">Debes conectarlas una vez en cada dispositivo (Mostrador y Caja son equipos distintos, cada uno necesita su propia conexión).</p>
+
+        <p class="subtitulo-seccion" style="margin-top:16px;">🌐 O imprimir Fichas por Red (IP), en vez de Bluetooth/USB</p>
+        <p class="nota-pequena">Necesitas tener corriendo el "Intermediario de Impresión" en una computadora de tu misma red WiFi. Si no lo tienes, pide el instalador.</p>
+        <input type="text" id="intermediarioUrlFicha" placeholder="URL del intermediario (ej. http://192.168.1.50:3500)">
+        <div class="fila-doble" style="margin-top:8px;">
+          <input type="text" id="intermediarioIpImpresoraFicha" placeholder="IP de la impresora (ej. 192.168.1.100)">
+          <input type="number" id="intermediarioPuertoImpresoraFicha" placeholder="Puerto (normalmente 9100)" value="9100">
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-secondary" onclick="guardarConfigRedFichaUI()">Guardar</button>
+          <button class="btn btn-secondary" onclick="probarIntermediarioUI()">🔍 Probar conexión al intermediario</button>
+          <button class="btn btn-secondary" onclick="quitarConfigRedFichaUI()">Quitar (volver a Bluetooth/USB)</button>
+        </div>
+        <p class="nota-pequena" id="estadoRedFichaTexto"></p>
       </div>
     </div>
 
@@ -599,6 +615,54 @@ async function probarImpresionCaja() {
   await imprimirSegunModo(datos);
 }
 
+function cargarConfigRedFichaUI() {
+  const config = configuracionRedFicha();
+  document.getElementById('intermediarioUrlFicha').value = config.urlIntermediario;
+  document.getElementById('intermediarioIpImpresoraFicha').value = config.ipImpresora;
+  document.getElementById('intermediarioPuertoImpresoraFicha').value = config.puertoImpresora || 9100;
+  actualizarEstadoRedFichaTexto();
+}
+
+function actualizarEstadoRedFichaTexto() {
+  const config = configuracionRedFicha();
+  const texto = document.getElementById('estadoRedFichaTexto');
+  texto.textContent = (config.urlIntermediario && config.ipImpresora)
+    ? '✅ Configurado — las fichas se imprimirán por red en vez de Bluetooth/USB en este dispositivo.'
+    : 'Sin configurar — las fichas usan Bluetooth/USB normal.';
+}
+
+function guardarConfigRedFichaUI() {
+  const url = document.getElementById('intermediarioUrlFicha').value.trim();
+  const ip = document.getElementById('intermediarioIpImpresoraFicha').value.trim();
+  const puerto = parseInt(document.getElementById('intermediarioPuertoImpresoraFicha').value || 9100);
+
+  if (!url || !ip) { mostrarToast('Completa la URL del intermediario y la IP de la impresora', 'error'); return; }
+
+  guardarConfiguracionRedFicha(url, ip, puerto);
+  actualizarEstadoRedFichaTexto();
+  mostrarToast('Configuración de red guardada para este dispositivo', 'exito');
+}
+
+function quitarConfigRedFichaUI() {
+  guardarConfiguracionRedFicha('', '', 9100);
+  document.getElementById('intermediarioUrlFicha').value = '';
+  document.getElementById('intermediarioIpImpresoraFicha').value = '';
+  document.getElementById('intermediarioPuertoImpresoraFicha').value = 9100;
+  actualizarEstadoRedFichaTexto();
+  mostrarToast('Configuración de red quitada — vuelve a usar Bluetooth/USB', 'exito');
+}
+
+async function probarIntermediarioUI() {
+  const url = document.getElementById('intermediarioUrlFicha').value.trim();
+  if (!url) { mostrarToast('Escribe primero la URL del intermediario', 'error'); return; }
+  try {
+    await probarIntermediarioRed(url);
+    mostrarToast('✅ El intermediario respondió correctamente', 'exito');
+  } catch (err) {
+    mostrarToast('No se pudo conectar con el intermediario: ' + err.message, 'error');
+  }
+}
+
 async function probarImpresionFicha() {
   const anchoTicket = obtenerAnchoTicketDispositivo();
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
@@ -618,6 +682,7 @@ cargarModoImpresion();
 cargarConfiguracion();
 cargarLayoutMostrador();
 cargarColorTema();
+cargarConfigRedFichaUI();
 
 // Refleja si alguna de las 2 impresoras ya se reconectó sola (el intento
 // automático corre en paralelo al cargar la página, así que se espera un

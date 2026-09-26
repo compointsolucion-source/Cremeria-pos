@@ -1,0 +1,55 @@
+INTERMEDIARIO DE IMPRESIÓN POR RED — Cremería POS
+====================================================
+
+¿QUÉ ES ESTO?
+Un programita chiquito que corre en una computadora de tu negocio (la que
+tú elijas — no necesitas comprar nada nuevo) y sirve de puente entre tu
+sistema web y tu impresora de fichas Xprinter conectada por red/IP.
+
+Tu celular Android no puede hablar directo con la impresora por IP (los
+navegadores no lo permiten por seguridad) — pero SÍ puede hablarle a esta
+computadora por la red WiFi, y esta computadora sí puede hablarle
+directamente a la impresora.
+
+REQUISITOS
+- Una computadora (Windows, Mac o Linux) conectada a la MISMA red WiFi
+  que tu impresora Xprinter, y que puedas dejar prendida durante el
+  horario de tu negocio.
+- Tener Node.js instalado en esa computadora. Si no lo tienes, descárgalo
+  gratis de: https://nodejs.org (elige la versión "LTS").
+
+INSTALACIÓN (una sola vez)
+1. Copia esta carpeta completa a la computadora que elegiste.
+2. Abre una terminal (Símbolo del sistema en Windows, Terminal en Mac)
+   dentro de esta carpeta.
+3. Escribe:  npm install
+   (esto instala lo que el programa necesita — tarda unos segundos)
+4. Escribe:  npm start
+   Deberías ver el mensaje: "Intermediario de impresión escuchando en
+   http://localhost:3500"
+
+USO DIARIO
+- Deja esta ventana de la terminal abierta mientras quieras poder
+  imprimir fichas por red — si la cierras, deja de funcionar (pero tu
+  sistema web sigue funcionando normal para todo lo demás).
+- Si reinicias la computadora, tienes que volver a hacer el paso 4
+  (npm start) para que arranque de nuevo.
+
+ENCONTRAR LA IP DE ESTA COMPUTADORA
+Necesitas la dirección IP de la computadora donde corre esto (no la de
+la impresora) para configurarla en Cremería POS → Configuración:
+- Windows: abre "Símbolo del sistema" y escribe: ipconfig
+  Busca "Dirección IPv4" (algo como 192.168.1.50)
+- Mac: Preferencias del Sistema → Red → ahí se muestra tu IP
+
+Esa dirección, junto con el puerto 3500, es lo que vas a poner en
+Cremería POS → Configuración → Impresora de Fichas por Red.
+
+¿NO FUNCIONA?
+- Confirma que la computadora y la impresora estén en la MISMA red WiFi
+  (no una en WiFi y otra en datos móviles, por ejemplo).
+- Confirma que la IP de tu impresora esté en el mismo rango que tu red
+  (ej. si tu red es 192.168.1.X, la impresora también debe ser
+  192.168.1.X — no 192.168.123.X). Usa la herramienta de configuración
+  de tu Xprinter para cambiarla si hace falta.
+- Revisa que ningún antivirus/firewall esté bloqueando el puerto 3500.

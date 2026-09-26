@@ -184,6 +184,46 @@ async function enviarBytes(bytes, canal = 'ticket') {
 intentarReconexionAutomatica('ticket');
 intentarReconexionAutomatica('ficha');
 
+// ---------- Impresión por red (IP), vía el intermediario local ----------
+// Un navegador no puede abrir una conexión directa por IP a una impresora
+// (restricción de seguridad de todos los navegadores, no solo de este
+// sistema) — por eso esto pasa por un pequeño servidor que corre en una
+// computadora de la misma red local ("intermediario"), que sí puede
+// hacerlo. La configuración (URL del intermediario, IP y puerto de la
+// impresora) es por dispositivo, igual que todo lo demás de impresión.
+function configuracionRedFicha() {
+  return {
+    urlIntermediario: localStorage.getItem('intermediario_url_ficha') || '',
+    ipImpresora: localStorage.getItem('intermediario_ip_impresora_ficha') || '',
+    puertoImpresora: parseInt(localStorage.getItem('intermediario_puerto_impresora_ficha') || '9100')
+  };
+}
+
+function guardarConfiguracionRedFicha(urlIntermediario, ipImpresora, puertoImpresora) {
+  localStorage.setItem('intermediario_url_ficha', urlIntermediario);
+  localStorage.setItem('intermediario_ip_impresora_ficha', ipImpresora);
+  localStorage.setItem('intermediario_puerto_impresora_ficha', puertoImpresora || 9100);
+}
+
+async function probarIntermediarioRed(urlIntermediario) {
+  const respuesta = await fetch(urlIntermediario.replace(/\/$/, ''), { method: 'GET' });
+  if (!respuesta.ok) throw new Error('El intermediario respondió con un error');
+  return respuesta.json();
+}
+
+async function enviarBytesPorRed(bytes, config) {
+  const url = config.urlIntermediario.replace(/\/$/, '') + '/imprimir-red';
+  const respuesta = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ip: config.ipImpresora, puerto: config.puertoImpresora, datos: Array.from(bytes) })
+  });
+  const datos = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) {
+    throw new Error(datos.error || 'Error al imprimir por red');
+  }
+}
+
 // Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
 // el comando ESC/POS estándar. Solo funciona con impresión directa
 // (Bluetooth/USB) — el método "diálogo del sistema" pasa por el driver de
@@ -204,11 +244,16 @@ async function abrirCajonDinero() {
 // Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
 // detalle de productos — es un boleto de espera, no un ticket de venta.
 async function imprimirFicha(numero, ancho_ticket) {
-  if (!impresoraConectada('ficha')) {
-    await reconectarSiEsPosible('ficha');
-  }
-  if (!impresoraConectada('ficha')) {
-    throw new Error('No hay impresora de fichas conectada. Configúrala en Configuración → Impresora de Fichas.');
+  const configRed = configuracionRedFicha();
+  const usaRed = !!(configRed.urlIntermediario && configRed.ipImpresora);
+
+  if (!usaRed) {
+    if (!impresoraConectada('ficha')) {
+      await reconectarSiEsPosible('ficha');
+    }
+    if (!impresoraConectada('ficha')) {
+      throw new Error('No hay impresora de fichas conectada. Configúrala en Configuración → Impresora de Fichas.');
+    }
   }
 
   const columnas = ancho_ticket === '58mm' ? 32 : 48;
@@ -234,7 +279,11 @@ async function imprimirFicha(numero, ancho_ticket) {
     new Uint8Array([GS, 0x56, 0x00]) // cortar papel
   ]);
 
-  await enviarBytes(comandos, 'ficha');
+  if (usaRed) {
+    await enviarBytesPorRed(comandos, configRed);
+  } else {
+    await enviarBytes(comandos, 'ficha');
+  }
 }
 
 // Respaldo de ficha usando el diálogo de impresión del navegador (para

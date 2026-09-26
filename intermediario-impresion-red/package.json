@@ -1,0 +1,13 @@
+{
+  "name": "cremeria-pos-intermediario-impresion",
+  "version": "1.0.0",
+  "description": "Intermediario local para imprimir por red/IP desde Cremería POS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
