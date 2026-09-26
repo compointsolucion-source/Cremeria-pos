@@ -388,17 +388,23 @@ async function cobrar() {
     if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo desde el panel de administración.', 'error'); return; }
 
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
+    let recibidoEfectivoParaTicket = null, cambioParaTicket = null;
     const totalAPagar = totalNetoActual();
 
     if (metodoPago === 'efectivo') {
       montoEfectivo = totalAPagar;
+      const recibido = parseFloat(document.getElementById('montoRecibido').value || 0);
       const bloquearInsuficiente = (configuracionNegocioCaja || {}).efectivo_bloquear_insuficiente !== false;
-      if (bloquearInsuficiente) {
-        const recibido = parseFloat(document.getElementById('montoRecibido').value || 0);
-        if (recibido < totalAPagar) {
-          mostrarToast('El efectivo ingresado es menor que el total — este negocio no permite cobrar así', 'error');
-          return;
-        }
+      if (bloquearInsuficiente && recibido < totalAPagar) {
+        mostrarToast('El efectivo ingresado es menor que el total — este negocio no permite cobrar así', 'error');
+        return;
+      }
+      // Si no se bloqueó por insuficiente y el cajero dejó el campo en 0,
+      // no tiene sentido imprimir "Pagó con $0.00" — solo se imprime si
+      // de verdad se capturó un monto.
+      if (recibido > 0) {
+        recibidoEfectivoParaTicket = recibido.toFixed(2);
+        cambioParaTicket = Math.max(0, recibido - totalAPagar).toFixed(2);
       }
     } else if (metodoPago === 'tarjeta') {
       const comision = parseFloat((configuracionNegocioCaja || {}).tarjeta_comision_porcentaje || 0);
@@ -444,7 +450,7 @@ async function cobrar() {
     if ((configuracionNegocioCaja || {}).cajon_abrir_automatico) {
       try { await abrirCajonDinero(); } catch (err) { console.error('No se pudo abrir el cajón automáticamente:', err.message); }
     }
-    await imprimirComprobante(ticketActual, metodoPago);
+    await imprimirComprobante(ticketActual, metodoPago, recibidoEfectivoParaTicket, cambioParaTicket);
     ticketActual = null;
     clienteSeleccionado = null;
     document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
@@ -468,7 +474,7 @@ async function cargarConfiguracionNegocioCaja() {
   }
 }
 
-async function imprimirComprobante(ticket, metodoPagoUsado) {
+async function imprimirComprobante(ticket, metodoPagoUsado, montoRecibido = null, cambio = null) {
   const config = configuracionNegocioCaja || {};
   const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
   const aplicaComision = metodoPagoUsado === 'tarjeta' && comision > 0;
@@ -499,6 +505,8 @@ async function imprimirComprobante(ticket, metodoPagoUsado) {
     fecha: new Date().toLocaleString(),
     items: itemsComprobante,
     total: (subtotalTicket + montoComision).toFixed(2),
+    montoRecibido,
+    cambio,
     piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
     lineasSuperiores: config.lineas_superiores || 0,
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,

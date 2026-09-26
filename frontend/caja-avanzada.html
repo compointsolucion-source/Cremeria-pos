@@ -1184,13 +1184,18 @@ async function confirmarCobroAvanzada() {
 
     const total = parseFloat(ticketParaCobrarAvanzada.total);
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
+    let recibidoEfectivoParaTicket = null, cambioParaTicket = null;
 
     if (metodoPagoCobrarAvanzada === 'efectivo') {
       montoEfectivo = total;
       const config = configuracionCobrarAvanzada || {};
-      if (config.efectivo_bloquear_insuficiente !== false) {
-        const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
-        if (recibido < total) { mostrarToast('El efectivo ingresado es menor que el total', 'error'); return; }
+      const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
+      if (config.efectivo_bloquear_insuficiente !== false && recibido < total) {
+        mostrarToast('El efectivo ingresado es menor que el total', 'error'); return;
+      }
+      if (recibido > 0) {
+        recibidoEfectivoParaTicket = recibido.toFixed(2);
+        cambioParaTicket = Math.max(0, recibido - total).toFixed(2);
       }
     } else if (metodoPagoCobrarAvanzada === 'tarjeta') {
       const comision = parseFloat((configuracionCobrarAvanzada || {}).tarjeta_comision_porcentaje || 0);
@@ -1228,7 +1233,7 @@ async function confirmarCobroAvanzada() {
       try { await abrirCajonDinero(); } catch (err) { console.error('No se pudo abrir el cajón automáticamente:', err.message); }
     }
 
-    await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada);
+    await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada, recibidoEfectivoParaTicket, cambioParaTicket);
 
     // Cerrar el ticket ya cobrado: quita esta pestaña (o la vacía si es la única)
     if (pestanas.length === 1) {
@@ -1249,7 +1254,7 @@ async function confirmarCobroAvanzada() {
   }
 }
 
-async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado) {
+async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecibido = null, cambio = null) {
   const config = configuracionCobrarAvanzada || {};
   const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
   const aplicaComision = metodoPagoUsado === 'tarjeta' && comision > 0;
@@ -1271,6 +1276,8 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado) {
     fecha: new Date().toLocaleString(),
     items: itemsComprobante,
     total: (parseFloat(ticket.total) + montoComision).toFixed(2),
+    montoRecibido,
+    cambio,
     piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
     lineasSuperiores: config.lineas_superiores || 0,
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,

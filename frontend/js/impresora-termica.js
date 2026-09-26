@@ -261,6 +261,17 @@ async function imprimirFicha(numero, ancho_ticket) {
     const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
     return ' '.repeat(espacios) + texto;
   };
+  // El número de la ficha se imprime 4 veces más grande (ancho y alto) que
+  // el texto normal — los espacios para centrarlo TAMBIÉN se imprimen a
+  // ese tamaño, así que hay que calcular el centrado sobre una cuarta
+  // parte de las columnas normales. Antes se centraba como si fuera texto
+  // normal, y los espacios de más empujaban el número fuera del papel,
+  // partiéndolo entre dos renglones.
+  const centrarGrande = (texto) => {
+    const columnasEfectivas = Math.max(1, Math.floor(columnas / 4));
+    const espacios = Math.max(0, Math.floor((columnasEfectivas - texto.length) / 2));
+    return ' '.repeat(espacios) + texto;
+  };
 
   const ESC = 0x1B, GS = 0x1D;
   const inicializar = new Uint8Array([ESC, 0x40]);
@@ -271,7 +282,7 @@ async function imprimirFicha(numero, ancho_ticket) {
     bytesConEstilo(centrar('SU TURNO'), {}),
     new Uint8Array([0x0A]),
     new Uint8Array([GS, 0x21, 0x33]), // letra muy grande (x4 alto, x4 ancho)
-    new TextEncoder().encode(centrar(numeroTexto) + '\n'),
+    new TextEncoder().encode(centrarGrande(numeroTexto) + '\n'),
     new Uint8Array([GS, 0x21, 0x00]), // tamaño normal
     new Uint8Array([0x0A]),
     bytesConEstilo(centrar('Espere a ser llamado'), {}),
@@ -486,7 +497,7 @@ function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
   return lineas;
 }
 
-function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null }) {
+function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null }) {
   const columnas = ancho_ticket === '58mm' ? 32 : 48;
   const centrar = (texto) => {
     const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
@@ -539,7 +550,19 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirP
   });
 
   lineas.push(separador);
-  lineas.push(filaMonto('TOTAL', total));
+  // No se usa filaMonto() aquí a propósito: esa función calcula espacios
+  // asumiendo que cada letra mide lo mismo, pero esta línea se imprime en
+  // negritas — en varias impresoras térmicas, las negritas usan letras más
+  // anchas, y ese cálculo empujaba el monto fuera del ancho físico del
+  // papel (por eso "TOTAL" se veía pero el número desaparecía). Un formato
+  // simple y corto como este cabe siempre, sin importar el ancho real de
+  // la letra en negritas.
+  lineas.push(`TOTAL: $${total}`);
+  // El efectivo recibido y el cambio solo tienen sentido en pagos en
+  // efectivo — si no se mandan (tarjeta, transferencia, etc.), no se
+  // imprime nada de más.
+  if (montoRecibido !== null) lineas.push(`Pagó con: $${montoRecibido}`);
+  if (cambio !== null) lineas.push(`Cambio: $${cambio}`);
   lineas.push(separador);
 
   if (piePagina) lineas.push(centrar(piePagina));
