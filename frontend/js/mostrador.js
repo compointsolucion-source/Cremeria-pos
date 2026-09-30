@@ -294,22 +294,36 @@ function cerrarModal(id) {
 
 // ---------- Escáner de código de barras ----------
 function toggleScannerProducto() {
+  const contenedor = document.getElementById('scannerProducto');
+  const boton = document.getElementById('btnActivarCamaraMostrador');
+
   if (scannerActivo) {
-    html5QrCode.stop();
+    html5QrCode.stop().catch(() => {});
     scannerActivo = false;
+    contenedor.style.display = 'none';
+    boton.textContent = '📷';
     return;
   }
+
+  contenedor.style.display = 'block';
   html5QrCode = new Html5Qrcode("scannerProducto");
   html5QrCode.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: { width: 280, height: 160 } },
     async (codigo) => {
-      html5QrCode.stop();
+      html5QrCode.stop().catch(() => {});
       scannerActivo = false;
+      contenedor.style.display = 'none';
+      boton.textContent = '📷';
       await buscarPorCodigo(codigo);
     }
-  );
-  scannerActivo = true;
+  ).then(() => {
+    scannerActivo = true;
+    boton.textContent = '✖';
+  }).catch((err) => {
+    contenedor.style.display = 'none';
+    mostrarToast('No se pudo activar la cámara: ' + (err.message || err), 'error');
+  });
 }
 
 async function buscarPorCodigo(codigo) {
