@@ -331,7 +331,18 @@
         <span class="flecha-plegable colapsada" id="flecha-secPromosTurnos">▾</span>
       </div>
       <div class="form-config seccion-plegable colapsada" id="secPromosTurnos">
-        <p class="card-subtexto">Se muestran rotando en un panel lateral de la <b>Pantalla de Turnos</b>, mientras los clientes esperan su número. Puedes agregar imágenes (promociones, anuncios) o un código QR (por ejemplo, a tus redes sociales o catálogo). Máximo 8.</p>
+        <p class="card-subtexto">Se muestran rotando en un panel lateral de la <b>Pantalla de Turnos</b>, mientras los clientes esperan su número. Puedes agregar imágenes (promociones, anuncios), un código QR (por ejemplo, a tus redes sociales o catálogo) o un video promocional. Máximo 8.</p>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 12px; background:var(--background); border-radius:10px;">
+          <label style="display:flex; flex-direction:column; gap:4px; font-size:13px; flex:1; min-width:160px;">
+            Segundos entre anuncios
+            <input type="number" id="promosIntervaloSegundos" min="3" max="120" step="1" value="10">
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:18px;">
+            <input type="checkbox" id="promosOrdenAleatorio" style="width:auto; min-height:auto;">
+            Mostrar en orden aleatorio
+          </label>
+        </div>
 
         <div id="listaPromosTurnos" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
 
@@ -339,6 +350,7 @@
           <select id="promoTipo" onchange="actualizarFormPromo()">
             <option value="imagen">Imagen</option>
             <option value="qr">Código QR</option>
+            <option value="video">Video</option>
           </select>
           <input type="text" id="promoTitulo" placeholder="Título (opcional, ej. '2x1 en jamón')" maxlength="80">
           <div id="promoCampoImagen">
@@ -347,6 +359,12 @@
           </div>
           <div id="promoCampoQr" style="display:none;">
             <input type="text" id="promoQrContenido" placeholder="Contenido del QR (ej. https://facebook.com/tu-negocio)" maxlength="500">
+          </div>
+          <div id="promoCampoVideo" style="display:none;">
+            <input type="file" id="promoVideoInput" accept="video/*">
+            <p class="card-subtexto" style="margin:4px 0 0;">Máximo 25MB. Se reproduce sin sonido y en bucle.</p>
+            <video id="previewPromoVideo" style="display:none; width:100%; max-height:140px; border-radius:8px; background:#000; margin-top:6px;" muted controls></video>
+            <p id="promoVideoEstado" style="font-size:12px; color:#888; margin:4px 0 0;"></p>
           </div>
           <div style="display:flex; gap:8px;">
             <button class="btn btn-primary" onclick="confirmarNuevaPromo()">Agregar</button>
@@ -529,6 +547,8 @@ async function cargarConfiguracion() {
 
     promosTurnosState = Array.isArray(config.promos_pantalla_turnos) ? config.promos_pantalla_turnos : [];
     renderListaPromosTurnos();
+    document.getElementById('promosIntervaloSegundos').value = config.promos_intervalo_segundos !== undefined ? config.promos_intervalo_segundos : 10;
+    document.getElementById('promosOrdenAleatorio').checked = !!config.promos_orden_aleatorio;
   } catch (err) {
     console.error(err);
   }
@@ -668,6 +688,7 @@ async function guardarPersonalizacionTicket() {
 // ============ Anuncios / Promociones (Pantalla de Turnos) ============
 let promosTurnosState = [];
 let promoImagenUrlTemp = '';
+let promoVideoUrlTemp = '';
 
 function renderListaPromosTurnos() {
   const cont = document.getElementById('listaPromosTurnos');
@@ -678,11 +699,11 @@ function renderListaPromosTurnos() {
   cont.innerHTML = promosTurnosState.map((p, i) => `
     <div style="display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:8px; padding:8px;">
       <div id="miniaturaPromo${i}" style="width:48px; height:48px; border-radius:6px; background:#EEE; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; font-size:20px;">
-        ${p.tipo === 'imagen' ? `<img src="${p.imagen_url}" style="width:100%; height:100%; object-fit:cover;">` : '⏳'}
+        ${p.tipo === 'imagen' ? `<img src="${p.imagen_url}" style="width:100%; height:100%; object-fit:cover;">` : (p.tipo === 'video' ? '🎬' : '⏳')}
       </div>
       <div style="flex-grow:1; font-size:13px; min-width:0;">
-        <div style="font-weight:600;">${p.titulo || (p.tipo === 'qr' ? 'Código QR' : 'Imagen')}</div>
-        <div style="color:#888; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.tipo === 'qr' ? p.qr_contenido : 'Imagen'}</div>
+        <div style="font-weight:600;">${p.titulo || (p.tipo === 'qr' ? 'Código QR' : (p.tipo === 'video' ? 'Video' : 'Imagen'))}</div>
+        <div style="color:#888; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.tipo === 'qr' ? p.qr_contenido : (p.tipo === 'video' ? 'Video' : 'Imagen')}</div>
       </div>
       <button class="btn btn-secondary" onclick="eliminarPromo(${i})">Quitar</button>
     </div>
@@ -709,7 +730,11 @@ function mostrarFormNuevaPromo() {
   document.getElementById('promoQrContenido').value = '';
   document.getElementById('promoImagenInput').value = '';
   document.getElementById('previewPromoImagen').style.display = 'none';
+  document.getElementById('promoVideoInput').value = '';
+  document.getElementById('previewPromoVideo').style.display = 'none';
+  document.getElementById('promoVideoEstado').textContent = '';
   promoImagenUrlTemp = '';
+  promoVideoUrlTemp = '';
   actualizarFormPromo();
 }
 
@@ -722,6 +747,7 @@ function actualizarFormPromo() {
   const tipo = document.getElementById('promoTipo').value;
   document.getElementById('promoCampoImagen').style.display = tipo === 'imagen' ? 'block' : 'none';
   document.getElementById('promoCampoQr').style.display = tipo === 'qr' ? 'block' : 'none';
+  document.getElementById('promoCampoVideo').style.display = tipo === 'video' ? 'block' : 'none';
 }
 
 document.getElementById('promoImagenInput').addEventListener('change', async (e) => {
@@ -737,6 +763,29 @@ document.getElementById('promoImagenInput').addEventListener('change', async (e)
   }
 });
 
+document.getElementById('promoVideoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) {
+    mostrarToast('El video es demasiado grande (máximo 25MB)', 'error');
+    e.target.value = '';
+    return;
+  }
+  const preview = document.getElementById('previewPromoVideo');
+  const estado = document.getElementById('promoVideoEstado');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  estado.textContent = 'Subiendo video...';
+  promoVideoUrlTemp = '';
+  try {
+    promoVideoUrlTemp = await subirVideoACloudinary(file, 'promos');
+    estado.textContent = 'Video listo ✓';
+  } catch (err) {
+    estado.textContent = '';
+    mostrarToast(err.message, 'error');
+  }
+});
+
 function confirmarNuevaPromo() {
   if (promosTurnosState.length >= 8) { mostrarToast('Ya tienes el máximo de 8 anuncios', 'error'); return; }
   const tipo = document.getElementById('promoTipo').value;
@@ -744,6 +793,9 @@ function confirmarNuevaPromo() {
   if (tipo === 'imagen') {
     if (!promoImagenUrlTemp) { mostrarToast('Sube una imagen primero', 'error'); return; }
     promosTurnosState.push({ tipo: 'imagen', titulo, imagen_url: promoImagenUrlTemp });
+  } else if (tipo === 'video') {
+    if (!promoVideoUrlTemp) { mostrarToast('Sube un video primero (espera a que termine de subir)', 'error'); return; }
+    promosTurnosState.push({ tipo: 'video', titulo, video_url: promoVideoUrlTemp });
   } else {
     const contenido = document.getElementById('promoQrContenido').value.trim();
     if (!contenido) { mostrarToast('Escribe el contenido del código QR', 'error'); return; }
@@ -759,10 +811,19 @@ function eliminarPromo(indice) {
 }
 
 async function guardarPromosTurnos() {
+  const intervalo = Number(document.getElementById('promosIntervaloSegundos').value);
+  if (!Number.isFinite(intervalo) || intervalo < 3 || intervalo > 120) {
+    mostrarToast('El intervalo debe ser un número entre 3 y 120 segundos', 'error');
+    return;
+  }
   try {
     await apiFetch('/configuracion', {
       method: 'PUT',
-      body: JSON.stringify({ promos_pantalla_turnos: promosTurnosState })
+      body: JSON.stringify({
+        promos_pantalla_turnos: promosTurnosState,
+        promos_intervalo_segundos: intervalo,
+        promos_orden_aleatorio: document.getElementById('promosOrdenAleatorio').checked
+      })
     });
     mostrarToast('Anuncios guardados', 'exito');
   } catch (err) {

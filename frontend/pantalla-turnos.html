@@ -50,6 +50,7 @@
   }
   .panel-promos.visible { display: flex; }
   .promo-imagen { max-width: 100%; max-height: 380px; border-radius: 14px; object-fit: contain; }
+  .promo-video { max-width: 100%; max-height: 380px; border-radius: 14px; }
   .promo-qr-caja { background: #FFFFFF; padding: 18px; border-radius: 14px; }
   .promo-qr-caja img { display: block; width: 220px; height: 220px; }
   .promo-titulo { font-size: 22px; font-weight: 700; color: #F0F0F0; }
@@ -150,15 +151,32 @@ socket.on('ficha_llamada', cargarContadorEsperando);
 // ============ Panel de anuncios/promociones ============
 // Se carga una sola vez al abrir la pantalla (no cambia mientras la
 // pantalla queda encendida todo el día) y rota entre los anuncios
-// configurados cada 10 segundos. Si no hay ninguno, el panel simplemente
-// no se muestra y el número de turno usa toda la pantalla, como antes.
+// configurados, con el intervalo y el orden (fijo o aleatorio) que se haya
+// configurado en Configuración → Anuncios y Promociones. Si no hay ninguno,
+// el panel simplemente no se muestra y el número de turno usa toda la
+// pantalla, como antes.
 let promosTurnos = [];
 let indicePromoActual = 0;
+let temporizadorPromos = null;
+
+// Fisher-Yates simple, para no depender de Math.random() dentro del sort
+// (que no da una mezcla uniforme de verdad).
+function mezclarArreglo(arreglo) {
+  const copia = arreglo.slice();
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
 
 async function cargarPromosTurnos() {
   try {
     const config = await apiFetch('/configuracion');
-    promosTurnos = Array.isArray(config.promos_pantalla_turnos) ? config.promos_pantalla_turnos : [];
+    let promos = Array.isArray(config.promos_pantalla_turnos) ? config.promos_pantalla_turnos : [];
+    if (config.promos_orden_aleatorio) promos = mezclarArreglo(promos);
+    promosTurnos = promos;
+
     const panel = document.getElementById('panelPromos');
     if (promosTurnos.length === 0) {
       panel.classList.remove('visible');
@@ -166,7 +184,11 @@ async function cargarPromosTurnos() {
     }
     panel.classList.add('visible');
     mostrarPromoActual();
-    if (promosTurnos.length > 1) setInterval(avanzarPromo, 10000);
+
+    if (promosTurnos.length > 1) {
+      const segundos = Number(config.promos_intervalo_segundos) > 0 ? Number(config.promos_intervalo_segundos) : 10;
+      temporizadorPromos = setInterval(avanzarPromo, segundos * 1000);
+    }
   } catch (err) {
     console.error('No se pudieron cargar los anuncios:', err.message);
   }
@@ -186,6 +208,8 @@ function mostrarPromoActual() {
 
   if (promo.tipo === 'imagen') {
     panel.innerHTML = `${titulo}<img class="promo-imagen" src="${promo.imagen_url}">`;
+  } else if (promo.tipo === 'video') {
+    panel.innerHTML = `${titulo}<video class="promo-video" src="${promo.video_url}" autoplay muted playsinline loop></video>`;
   } else if (promo.tipo === 'qr') {
     panel.innerHTML = `${titulo}<div class="promo-qr-caja" id="cajaQrPromo"></div>`;
     QRCode.toCanvas(document.createElement('canvas'), promo.qr_contenido, { width: 220, margin: 1 }, (err, canvas) => {

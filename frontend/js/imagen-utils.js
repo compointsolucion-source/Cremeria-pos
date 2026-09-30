@@ -42,3 +42,21 @@ async function subirImagenACloudinary(imagenBase64, carpeta = 'general') {
   });
   return data.url;
 }
+
+// Sube un archivo de video directo (sin comprimir a base64: apiFetch siempre
+// manda JSON, así que aquí se usa un fetch aparte con FormData/multipart).
+// "carpeta" organiza los videos en Cloudinary igual que con las imágenes.
+async function subirVideoACloudinary(archivo, carpeta = 'general') {
+  const formData = new FormData();
+  formData.append('video', archivo);
+  formData.append('carpeta', carpeta);
+
+  const respuesta = await fetch(`${API_URL}/imagenes/subir-video`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: formData
+  });
+  const data = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) throw new Error(data.error || 'No se pudo subir el video');
+  return data.url;
+}

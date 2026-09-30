@@ -35,8 +35,14 @@ const VALORES_POR_DEFECTO = {
   cajon_abrir_automatico: false,
   // Anuncios/promociones que rotan en el panel lateral de la Pantalla de
   // Turnos mientras los clientes esperan — cada uno es
-  // { tipo: 'imagen'|'qr', titulo, imagen_url, qr_contenido }.
-  promos_pantalla_turnos: []
+  // { tipo: 'imagen'|'qr'|'video', titulo, imagen_url, qr_contenido, video_url }.
+  promos_pantalla_turnos: [],
+  // Segundos que cada anuncio permanece en pantalla antes de pasar al
+  // siguiente (no aplica a un video: este avanza solo hasta que termina).
+  promos_intervalo_segundos: 10,
+  // Si está activo, los anuncios se muestran en orden aleatorio en vez del
+  // orden en que se guardaron.
+  promos_orden_aleatorio: false
 };
 
 // Campos cuyo valor es un objeto/arreglo (columna JSONB) — el driver de
@@ -52,12 +58,19 @@ function validarPromos(promos) {
   if (promos.length > MAX_PROMOS) return `Máximo ${MAX_PROMOS} anuncios`;
   for (const promo of promos) {
     if (!promo || typeof promo !== 'object') return 'Cada anuncio debe ser un objeto';
-    if (!['imagen', 'qr'].includes(promo.tipo)) return 'Cada anuncio debe ser de tipo "imagen" o "qr"';
+    if (!['imagen', 'qr', 'video'].includes(promo.tipo)) return 'Cada anuncio debe ser de tipo "imagen", "qr" o "video"';
     if (promo.titulo && String(promo.titulo).length > 80) return 'El título del anuncio es muy largo (máximo 80 caracteres)';
     if (promo.tipo === 'imagen' && !promo.imagen_url) return 'Falta la imagen de uno de los anuncios';
     if (promo.tipo === 'qr' && !promo.qr_contenido) return 'Falta el contenido del código QR de uno de los anuncios';
+    if (promo.tipo === 'video' && !promo.video_url) return 'Falta el video de uno de los anuncios';
     if (promo.qr_contenido && String(promo.qr_contenido).length > 500) return 'El contenido del código QR es muy largo';
   }
+  return true;
+}
+
+function validarIntervaloPromos(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 3 || n > 120) return 'El intervalo de anuncios debe ser un número entre 3 y 120 segundos';
   return true;
 }
 
@@ -71,7 +84,8 @@ const VALIDACIONES = {
   tipo_codigo_escaneo: (v) => ['qr', 'barras', 'ambos'].includes(v) || 'Tipo de código de escaneo inválido',
   tamano_letra: (v) => ['normal', 'grande'].includes(v) || 'Tamaño de letra inválido',
   tipo_fuente: (v) => ['monospace', 'sans-serif'].includes(v) || 'Tipo de fuente inválido',
-  promos_pantalla_turnos: validarPromos
+  promos_pantalla_turnos: validarPromos,
+  promos_intervalo_segundos: validarIntervaloPromos
 };
 
 // Obtener la configuración de la sucursal (valores por defecto si no existe)
@@ -130,7 +144,7 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
       referencia_id: req.usuario.sucursal_id,
       // logo_url y promos_pantalla_turnos excluidos a propósito: pueden pesar
       // varios KB (imágenes/URLs), no aportan nada útil en la bitácora
-      valor_nuevo: Object.fromEntries(camposRecibidos.filter(c => c !== 'logo_url' && c !== 'promos_pantalla_turnos').map(c => [c, req.body[c]]))
+      valor_nuevo: Object.fromEntries(camposRecibidos.filter(c => !['logo_url', 'promos_pantalla_turnos'].includes(c)).map(c => [c, req.body[c]]))
     });
 
     res.json(result.rows[0]);
