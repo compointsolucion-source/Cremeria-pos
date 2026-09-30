@@ -125,9 +125,9 @@ function renderPermisosEmpleado(u) {
     <div style="margin-bottom:8px;">
       <div style="font-weight:600; font-size:12px; color:#888; margin-bottom:4px;">${grupo}</div>
       ${claves.map(clave => `
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:4px;">
+        <label class="opcion-check" style="font-size:13px;">
+          <span>${ETIQUETAS_PERMISOS[clave]}</span>
           <input type="checkbox" ${efectivos.includes(clave) ? 'checked' : ''} onchange="togglePermiso(${u.id}, '${clave}', this.checked)">
-          ${ETIQUETAS_PERMISOS[clave]}
         </label>
       `).join('')}
     </div>

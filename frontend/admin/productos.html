@@ -82,14 +82,20 @@
         <input type="number" id="precioMayoreo" placeholder="Precio mayoreo (opcional)" step="0.01">
 
         <div class="seccion-titulo">Inventario</div>
-        <label><input type="checkbox" id="usaInventario" checked onchange="toggleCamposInventario()"> Este producto SÍ utiliza inventario</label>
+        <label class="opcion-check">
+          <span>Este producto SÍ utiliza inventario</span>
+          <input type="checkbox" id="usaInventario" checked onchange="toggleCamposInventario()">
+        </label>
         <div class="fila-triple" id="camposInventario">
           <input type="number" id="existenciaInicial" placeholder="Hay (existencia inicial)" step="0.01">
           <input type="number" id="stockMinimo" placeholder="Mínimo" step="0.01">
           <input type="number" id="stockMaximo" placeholder="Máximo" step="0.01">
         </div>
 
-        <label><input type="checkbox" id="favorito"> Marcar como favorito (aparece primero en Mostrador)</label>
+        <label class="opcion-check">
+          <span>Marcar como favorito (aparece primero en Mostrador)</span>
+          <input type="checkbox" id="favorito">
+        </label>
       </div>
 
       <button class="btn btn-primary" id="btnGuardarProducto" onclick="guardarProducto()">Guardar Producto</button>

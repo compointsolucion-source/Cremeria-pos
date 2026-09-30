@@ -22,7 +22,6 @@
   .desconectada { background: #FFEBEE; color: #C62828; }
   .fila-lineas { display: flex; align-items: center; gap: 10px; }
   .fila-lineas input[type="number"] { width: 70px; }
-  .opcion-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
   .subtitulo-seccion { font-weight: 600; font-size: 14px; margin: 10px 0 2px; color: #444; }
   .nota-pequena { font-size: 12px; color: #888; margin: -4px 0 4px; }
   .card-titulo-grande { font-size: 17px; margin-bottom: 4px; }
@@ -169,20 +168,20 @@
         <p class="nota-pequena">⚠️ El tipo de fuente solo aplica cuando imprimes con "Impresora ya instalada" (diálogo de Windows). Si imprimes directo por Bluetooth/USB, la impresora térmica usa su propia fuente incorporada — no se puede cambiar desde aquí. Con "Moderna" las columnas de precio pueden no alinear perfecto (las fuentes modernas no tienen ancho fijo por letra).</p>
 
         <label class="opcion-check">
+          <span>Nombre del negocio en negritas</span>
           <input type="checkbox" id="negocioNegritas">
-          Nombre del negocio en negritas
         </label>
         <label class="opcion-check">
+          <span>Total en negritas</span>
           <input type="checkbox" id="totalNegritas">
-          Total en negritas
         </label>
         <label class="opcion-check">
+          <span>Incluir precio unitario por producto</span>
           <input type="checkbox" id="incluirPrecioUnitario">
-          Incluir precio unitario por producto
         </label>
         <label class="opcion-check">
+          <span>Descripción completa (varios renglones si el nombre es largo)</span>
           <input type="checkbox" id="descripcionCompleta">
-          Descripción completa (varios renglones si el nombre es largo)
         </label>
 
         <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">Guardar Apariencia</button>
@@ -229,61 +228,61 @@
 
         <p class="subtitulo-seccion">💵 Efectivo</p>
         <label class="opcion-check">
+          <span>No permitir cobrar si el efectivo ingresado es menor que el total</span>
           <input type="checkbox" id="efectivoBloquear">
-          No permitir cobrar si el efectivo ingresado es menor que el total
         </label>
 
         <p class="subtitulo-seccion">💵 Dólares Americanos</p>
         <label class="opcion-check">
+          <span>Deseo habilitar el cobro en Dólares Americanos</span>
           <input type="checkbox" id="dolaresHabilitado" onchange="toggleCampoDolar()">
-          Deseo habilitar el cobro en Dólares Americanos
         </label>
         <p class="nota-pequena">Al habilitarlo, Caja convierte el total a dólares usando este tipo de cambio.</p>
         <input type="number" id="tipoCambioDolar" placeholder="Tipo de cambio (pesos por dólar)" step="0.0001">
 
         <p class="subtitulo-seccion">💳 Tarjeta de Crédito/Débito</p>
         <label class="opcion-check">
+          <span>Deseo habilitar cobro con Tarjeta de Crédito/Débito</span>
           <input type="checkbox" id="tarjetaHabilitado">
-          Deseo habilitar cobro con Tarjeta de Crédito/Débito
         </label>
         <input type="number" id="tarjetaComision" placeholder="Comisión por cobro con tarjeta (%, opcional)" step="0.01">
         <p class="nota-pequena">La comisión es solo informativa (para tus reportes) — no se le cobra de más al cliente.</p>
 
         <p class="subtitulo-seccion">🏦 Transferencias Bancarias</p>
         <label class="opcion-check">
+          <span>Deseo habilitar cobro con Transferencias</span>
           <input type="checkbox" id="transferenciaHabilitado">
-          Deseo habilitar cobro con Transferencias
         </label>
         <input type="text" id="transferenciaEtiqueta" placeholder="Nombre a mostrar en el botón (ej. Transferencia)">
 
         <p class="subtitulo-seccion">🖋️ Cheque</p>
         <label class="opcion-check">
+          <span>Deseo habilitar cobro con Cheque</span>
           <input type="checkbox" id="chequeHabilitado">
-          Deseo habilitar cobro con Cheque
         </label>
 
         <p class="subtitulo-seccion">🎟️ Vales de Despensa</p>
         <label class="opcion-check">
+          <span>Deseo habilitar cobro con Vales de Despensa</span>
           <input type="checkbox" id="valesHabilitado">
-          Deseo habilitar cobro con Vales de Despensa
         </label>
 
         <p class="subtitulo-seccion">🔀 Pagos Mixtos</p>
         <label class="opcion-check">
+          <span>Deseo habilitar el cobro con varias formas de pago (mixto)</span>
           <input type="checkbox" id="mixtoHabilitado">
-          Deseo habilitar el cobro con varias formas de pago (mixto)
         </label>
 
         <p class="subtitulo-seccion">📒 Crédito / Fiado</p>
         <label class="opcion-check">
+          <span>Deseo habilitar la venta a crédito (fiado)</span>
           <input type="checkbox" id="creditoHabilitado">
-          Deseo habilitar la venta a crédito (fiado)
         </label>
 
         <p class="subtitulo-seccion">🗄️ Cajón de Dinero</p>
         <label class="opcion-check">
+          <span>Abrir el cajón de dinero automáticamente al cobrar (solo funciona con impresión directa Bluetooth/USB, conectada al mismo puerto que la impresora)</span>
           <input type="checkbox" id="cajonAutomatico">
-          Abrir el cajón de dinero automáticamente al cobrar (solo funciona con impresión directa Bluetooth/USB, conectada al mismo puerto que la impresora)
         </label>
 
         <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarFormasPago()">Guardar Formas de Pago</button>
@@ -306,8 +305,8 @@
         </div>
 
         <label class="opcion-check">
+          <span>Imprimir datos del cliente (solo aplica en ventas a crédito/fiado)</span>
           <input type="checkbox" id="imprimirDatosCliente">
-          Imprimir datos del cliente (solo aplica en ventas a crédito/fiado)
         </label>
 
         <div class="fila-lineas">
@@ -338,9 +337,9 @@
             Segundos entre anuncios
             <input type="number" id="promosIntervaloSegundos" min="3" max="120" step="1" value="10">
           </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:18px;">
-            <input type="checkbox" id="promosOrdenAleatorio" style="width:auto; min-height:auto;">
-            Mostrar en orden aleatorio
+          <label class="opcion-check" style="font-size:13px; margin-top:18px; border-bottom:none; padding:0;">
+            <span>Mostrar en orden aleatorio</span>
+            <input type="checkbox" id="promosOrdenAleatorio">
           </label>
         </div>
 
