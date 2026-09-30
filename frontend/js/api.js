@@ -1,4 +1,6 @@
-const API_URL = 'https://cremeria-pos.onrender.com/api';
+// API_URL ahora vive en js/config.js (que se carga antes que este archivo
+// en cada pantalla) — así, replicar el software para un negocio nuevo solo
+// requiere editar ese archivo, sin tocar api.js.
 
 function getToken() {
   return localStorage.getItem('token');
