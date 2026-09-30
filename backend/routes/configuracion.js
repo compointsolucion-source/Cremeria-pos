@@ -54,7 +54,14 @@ const VALORES_POR_DEFECTO = {
   // sistema. Es política de negocio (aplica igual en todos los mostradores
   // de la sucursal), por eso vive aquí y no en localStorage.
   etiqueta_modo: 'auto',
-  ancho_etiqueta: '50mm'
+  ancho_etiqueta: '50mm',
+  // Cómo interpretar el dato numérico embebido en el código de barras de
+  // las etiquetas que la báscula ya imprime por su cuenta (PLU + peso o
+  // precio): 'peso' = kilogramos (3 decimales implícitos), 'precio' =
+  // importe ya calculado en pesos (2 decimales implícitos). Es política de
+  // negocio (debe coincidir con cómo está configurada la báscula física),
+  // por eso vive aquí y no en localStorage.
+  bascula_tipo_dato: 'peso'
 };
 
 // Campos cuyo valor es un objeto/arreglo (columna JSONB) — el driver de
@@ -99,7 +106,8 @@ const VALIDACIONES = {
   promos_pantalla_turnos: validarPromos,
   promos_intervalo_segundos: validarIntervaloPromos,
   etiqueta_modo: (v) => ['auto', 'sistema'].includes(v) || 'Modo de etiqueta inválido',
-  ancho_etiqueta: (v) => ['40mm', '50mm', '58mm'].includes(v) || 'Ancho de etiqueta inválido'
+  ancho_etiqueta: (v) => ['40mm', '50mm', '58mm'].includes(v) || 'Ancho de etiqueta inválido',
+  bascula_tipo_dato: (v) => ['peso', 'precio'].includes(v) || 'Tipo de dato de báscula inválido'
 };
 
 // Obtener la configuración de la sucursal (valores por defecto si no existe)

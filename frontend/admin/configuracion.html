@@ -116,6 +116,15 @@
 
         <hr style="border:none; border-top:1px solid #eee; margin:16px 0;">
 
+        <p class="subtitulo-seccion">🔖 Leer etiquetas que la báscula ya imprimió (PLU)</p>
+        <p class="nota-pequena">Si tu báscula es de las que imprime su propia etiqueta con código de barras (con el PLU del producto y el peso o precio), Mostrador y Caja pueden leer esa etiqueta directo con el lector de código de barras y agregar el producto ya pesado, sin volver a pesarlo. El PLU debe coincidir exactamente con el "Código de barras" de ese producto en Compoint. Esto aplica a todo el negocio.</p>
+        <select id="basculaTipoDato" onchange="guardarEtiquetaConfig()">
+          <option value="peso">La etiqueta trae el Peso (kg) — Compoint calcula el importe con el precio actual</option>
+          <option value="precio">La etiqueta trae el Precio ya calculado — Compoint lo usa directo</option>
+        </select>
+
+        <hr style="border:none; border-top:1px solid #eee; margin:16px 0;">
+
         <p class="subtitulo-seccion">🏷️ Etiqueta final (bolsa) — tipo Torrey</p>
         <p class="nota-pequena">Elige cómo se genera la etiqueta que se pega en la bolsa al final de pesar un producto. Esta opción aplica a todo el negocio (todos los mostradores), no solo a este dispositivo.</p>
         <select id="etiquetaModo" onchange="guardarEtiquetaConfig()">
@@ -635,7 +644,8 @@ suscribirsePeso((peso) => {
 function guardarEtiquetaConfig() {
   const etiqueta_modo = document.getElementById('etiquetaModo').value;
   const ancho_etiqueta = document.getElementById('anchoEtiqueta').value;
-  apiFetch('/configuracion', { method: 'PUT', body: JSON.stringify({ etiqueta_modo, ancho_etiqueta }) })
+  const bascula_tipo_dato = document.getElementById('basculaTipoDato').value;
+  apiFetch('/configuracion', { method: 'PUT', body: JSON.stringify({ etiqueta_modo, ancho_etiqueta, bascula_tipo_dato }) })
     .then(() => mostrarToast('Configuración de etiqueta guardada', 'exito'))
     .catch(err => mostrarToast(err.message, 'error'));
 }
@@ -715,6 +725,7 @@ async function cargarConfiguracion() {
     document.getElementById('terminos').value = config.terminos || '';
     document.getElementById('etiquetaModo').value = config.etiqueta_modo || 'auto';
     document.getElementById('anchoEtiqueta').value = config.ancho_etiqueta || '50mm';
+    document.getElementById('basculaTipoDato').value = config.bascula_tipo_dato || 'peso';
 
     document.getElementById('tamanoLetra').value = config.tamano_letra || 'normal';
     document.getElementById('tipoFuente').value = config.tipo_fuente || 'monospace';

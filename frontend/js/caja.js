@@ -575,7 +575,7 @@ function toggleScanner() {
   html5QrCode.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: { width: 280, height: 160 } },
-    (folio) => { cargarTicket(folio); html5QrCode.stop().catch(() => {}); scannerActivo = false; }
+    (codigo) => { procesarCodigoEscaneadoCaja(codigo); html5QrCode.stop().catch(() => {}); scannerActivo = false; }
   ).then(() => {
     scannerActivo = true;
   }).catch((err) => {
@@ -583,9 +583,71 @@ function toggleScanner() {
   });
 }
 
-// Lector de código de barras físico: escanea el folio del ticket y lo carga
-// automáticamente, igual que si se hubiera escaneado con la cámara.
-activarLectorFisico(cargarTicket);
+// Un código escaneado en Caja puede ser dos cosas muy distintas: el folio de
+// un ticket (lo normal — lo trae desde Mostrador para cobrar), o una
+// etiqueta que la báscula ya imprimió por su cuenta (PLU + peso/precio
+// embebido) para agregar ese producto ya pesado al ticket que está abierto
+// en este momento, sin tener que regresarlo a Mostrador. Se distinguen por
+// formato (la etiqueta de báscula son 13 dígitos numéricos con dígito
+// verificador válido; el folio de ticket nunca tiene esa forma), así que no
+// hace falta que el cajero elija nada.
+async function procesarCodigoEscaneadoCaja(codigo) {
+  const tipoDatoBascula = (configuracionNegocioCaja && configuracionNegocioCaja.bascula_tipo_dato) || 'peso';
+  const decodificado = decodificarCodigoBascula(codigo, tipoDatoBascula);
+  if (decodificado) {
+    await agregarProductoPesadoPorEtiquetaCaja(decodificado);
+    return;
+  }
+  cargarTicket(codigo);
+}
+
+// Agrega un producto ya pesado (leído de la etiqueta de la báscula) al
+// ticket que está abierto ahorita en Caja. Requiere tener un ticket
+// cargado — si el cajero aún no ha cargado ninguno, no hay a dónde agregarlo.
+async function agregarProductoPesadoPorEtiquetaCaja({ plu, valor, tipoDato }) {
+  if (!ticketActual) {
+    mostrarToast('Primero carga un ticket (escanea su folio o selecciónalo de la bandeja) antes de agregar un producto pesado.', 'error');
+    return;
+  }
+
+  let producto;
+  try {
+    producto = await apiFetch(`/productos/codigo/${plu}`);
+  } catch (err) {
+    mostrarToast(`La etiqueta trae el código de producto "${plu}", pero ningún producto tiene ese código de barras registrado.`, 'error');
+    return;
+  }
+
+  let peso, precioUnitario;
+  if (tipoDato === 'precio') {
+    precioUnitario = parseFloat(producto.precio);
+    peso = precioUnitario > 0 ? valor / precioUnitario : 0;
+  } else {
+    peso = valor;
+    precioUnitario = parseFloat(producto.precio);
+  }
+
+  try {
+    await apiFetch(`/tickets/${ticketActual.id}/agregar-item`, {
+      method: 'POST',
+      body: JSON.stringify({
+        tipo: 'producto',
+        producto_id: producto.id,
+        nombre_producto: producto.nombre,
+        cantidad: peso,
+        precio_unitario: precioUnitario
+      })
+    });
+    await cargarTicket(ticketActual.folio);
+    mostrarToast(`${producto.nombre}: ${peso.toFixed(3)} kg agregado desde la etiqueta de báscula`, 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Lector de código de barras físico: puede traer el folio de un ticket o
+// una etiqueta de báscula (ver procesarCodigoEscaneadoCaja arriba).
+activarLectorFisico(procesarCodigoEscaneadoCaja);
 
 cargarBandeja();
 setInterval(cargarBandeja, 15000);

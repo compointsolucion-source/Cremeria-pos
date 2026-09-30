@@ -384,6 +384,16 @@ function toggleScannerProducto() {
 }
 
 async function buscarPorCodigo(codigo) {
+  // Antes que nada, revisa si es una etiqueta que la báscula ya imprimió por
+  // su cuenta (PLU + peso/precio embebido) — si lo es, el producto ya viene
+  // pesado y se agrega directo al carrito, sin abrir el teclado de peso.
+  const tipoDatoBascula = (configuracionNegocio && configuracionNegocio.bascula_tipo_dato) || 'peso';
+  const decodificado = decodificarCodigoBascula(codigo, tipoDatoBascula);
+  if (decodificado) {
+    await agregarProductoPesadoPorEtiqueta(decodificado);
+    return;
+  }
+
   try {
     const producto = await apiFetch(`/productos/codigo/${codigo}`);
     seleccionarProducto(producto);
@@ -395,6 +405,40 @@ async function buscarPorCodigo(codigo) {
       mostrarToast('No se encontró ningún producto o kit con ese código: ' + codigo, 'error');
     }
   }
+}
+
+// Agrega directo al carrito un producto ya pesado en la báscula (viene de
+// una etiqueta con PLU + peso/precio embebido, escaneada en vez de pesarlo
+// de nuevo en pantalla). Si el PLU no corresponde a ningún producto, avisa
+// con el PLU exacto para poder revisar el catálogo.
+async function agregarProductoPesadoPorEtiqueta({ plu, valor, tipoDato }) {
+  let producto;
+  try {
+    producto = await apiFetch(`/productos/codigo/${plu}`);
+  } catch (err) {
+    mostrarToast(`La etiqueta trae el código de producto "${plu}", pero ningún producto tiene ese código de barras registrado.`, 'error');
+    return;
+  }
+
+  let peso, precioUnitario;
+  if (tipoDato === 'precio') {
+    precioUnitario = parseFloat(producto.precio);
+    const subtotal = valor;
+    peso = precioUnitario > 0 ? subtotal / precioUnitario : 0;
+  } else {
+    peso = valor;
+    precioUnitario = precioEfectivo(producto, peso);
+  }
+
+  carrito.push({
+    tipo: 'producto',
+    producto_id: producto.id,
+    nombre_producto: producto.nombre,
+    cantidad: peso,
+    precio_unitario: precioUnitario
+  });
+  renderCarrito();
+  mostrarToast(`${producto.nombre}: ${peso.toFixed(3)} kg agregado desde la etiqueta de báscula`, 'exito');
 }
 
 // ---------- Carrito ----------
