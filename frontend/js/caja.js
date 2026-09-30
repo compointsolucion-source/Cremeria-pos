@@ -567,7 +567,7 @@ setTimeout(actualizarBannerImpresoraCaja, 500);
 
 function toggleScanner() {
   if (scannerActivo) {
-    html5QrCode.stop();
+    html5QrCode.stop().catch(() => {});
     scannerActivo = false;
     return;
   }
@@ -575,9 +575,12 @@ function toggleScanner() {
   html5QrCode.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: { width: 280, height: 160 } },
-    (folio) => { cargarTicket(folio); html5QrCode.stop(); scannerActivo = false; }
-  );
-  scannerActivo = true;
+    (folio) => { cargarTicket(folio); html5QrCode.stop().catch(() => {}); scannerActivo = false; }
+  ).then(() => {
+    scannerActivo = true;
+  }).catch((err) => {
+    mostrarToast(mensajeErrorCamara(err), 'error');
+  });
 }
 
 // Lector de código de barras físico: escanea el folio del ticket y lo carga

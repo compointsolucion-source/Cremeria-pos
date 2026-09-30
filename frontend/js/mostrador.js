@@ -322,7 +322,7 @@ function toggleScannerProducto() {
     boton.textContent = '✖';
   }).catch((err) => {
     contenedor.style.display = 'none';
-    mostrarToast('No se pudo activar la cámara: ' + (err.message || err), 'error');
+    mostrarToast(mensajeErrorCamara(err), 'error');
   });
 }
 

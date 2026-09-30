@@ -2,6 +2,28 @@
 // Reemplazan alert()/confirm() nativos del navegador por una experiencia más
 // profesional y consistente en todo el sistema.
 
+// Traduce los errores típicos al activar la cámara (getUserMedia) a un
+// mensaje que la persona SÍ puede accionar, en vez del texto técnico crudo
+// del navegador (ej. "NotAllowedError: Permission denied") que no dice qué
+// hacer. Se usa en los 3 lugares que activan la cámara para escanear
+// (Productos, Mostrador, Caja).
+function mensajeErrorCamara(err) {
+  const nombre = err && err.name;
+  if (nombre === 'NotAllowedError' || nombre === 'PermissionDeniedError') {
+    return 'No diste permiso de cámara a este sitio. Toca el candado 🔒 junto a la dirección (o revisa los permisos de Cámara del navegador/app en los ajustes del dispositivo), actívala y vuelve a intentar.';
+  }
+  if (nombre === 'NotFoundError' || nombre === 'DevicesNotFoundError') {
+    return 'No se encontró ninguna cámara en este dispositivo.';
+  }
+  if (nombre === 'NotReadableError' || nombre === 'TrackStartError') {
+    return 'La cámara ya está siendo usada por otra aplicación. Ciérrala e intenta de nuevo.';
+  }
+  if (nombre === 'OverconstrainedError') {
+    return 'No se pudo usar la cámara trasera de este dispositivo.';
+  }
+  return 'No se pudo activar la cámara: ' + (err && err.message ? err.message : err);
+}
+
 function asegurarContenedorToast() {
   let cont = document.getElementById('toastContainer');
   if (!cont) {
