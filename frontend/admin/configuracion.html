@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="../manifest.json">
-<meta name="theme-color" content="#2E7D32">
-<title>Configuración - Cremería POS</title>
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Configuración - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
@@ -17,7 +18,7 @@
   .contenido { max-width: 550px; margin: 20px auto; padding: 0 14px; }
   .form-config { display: grid; gap: 10px; }
   .estado-impresora { padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
-  .conectada { background: #E8F5E9; color: #2E7D32; }
+  .conectada { background: #E8F5E9; color: #5FAE46; }
   .desconectada { background: #FFEBEE; color: #C62828; }
   .fila-lineas { display: flex; align-items: center; gap: 10px; }
   .fila-lineas input[type="number"] { width: 70px; }
@@ -117,7 +118,7 @@
 
         <p class="subtitulo-seccion" style="margin-top:16px;">Tema de color de ESTE dispositivo</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button type="button" class="btn btn-secondary" style="border-color:#2E7D32;" onclick="establecerColorTema('verde'); marcarColorTemaActivo('verde')" data-color-boton="verde">🟢 Verde</button>
+          <button type="button" class="btn btn-secondary" style="border-color:#5FAE46;" onclick="establecerColorTema('verde'); marcarColorTemaActivo('verde')" data-color-boton="verde">🟢 Verde</button>
           <button type="button" class="btn btn-secondary" style="border-color:#1565C0;" onclick="establecerColorTema('azul'); marcarColorTemaActivo('azul')" data-color-boton="azul">🔵 Azul</button>
           <button type="button" class="btn btn-secondary" style="border-color:#6A1B9A;" onclick="establecerColorTema('morado'); marcarColorTemaActivo('morado')" data-color-boton="morado">🟣 Morado</button>
           <button type="button" class="btn btn-secondary" style="border-color:#E65100;" onclick="establecerColorTema('naranja'); marcarColorTemaActivo('naranja')" data-color-boton="naranja">🟠 Naranja</button>
@@ -323,6 +324,41 @@
       </div>
     </div>
 
+    <!-- ============ ANUNCIOS / PROMOCIONES (Pantalla de Turnos) ============ -->
+    <div class="card">
+      <div class="header-plegable" onclick="toggleSeccionConfig('secPromosTurnos')">
+        <h3 class="card-titulo-grande">📢 Anuncios y Promociones</h3>
+        <span class="flecha-plegable colapsada" id="flecha-secPromosTurnos">▾</span>
+      </div>
+      <div class="form-config seccion-plegable colapsada" id="secPromosTurnos">
+        <p class="card-subtexto">Se muestran rotando en un panel lateral de la <b>Pantalla de Turnos</b>, mientras los clientes esperan su número. Puedes agregar imágenes (promociones, anuncios) o un código QR (por ejemplo, a tus redes sociales o catálogo). Máximo 8.</p>
+
+        <div id="listaPromosTurnos" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+
+        <div id="formNuevaPromo" style="display:none; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; display:flex; flex-direction:column; gap:8px;">
+          <select id="promoTipo" onchange="actualizarFormPromo()">
+            <option value="imagen">Imagen</option>
+            <option value="qr">Código QR</option>
+          </select>
+          <input type="text" id="promoTitulo" placeholder="Título (opcional, ej. '2x1 en jamón')" maxlength="80">
+          <div id="promoCampoImagen">
+            <input type="file" id="promoImagenInput" accept="image/*">
+            <img id="previewPromoImagen" style="display:none; width:100%; max-height:140px; object-fit:contain; border-radius:8px; background:#EEE; margin-top:6px;">
+          </div>
+          <div id="promoCampoQr" style="display:none;">
+            <input type="text" id="promoQrContenido" placeholder="Contenido del QR (ej. https://facebook.com/tu-negocio)" maxlength="500">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" onclick="confirmarNuevaPromo()">Agregar</button>
+            <button class="btn btn-secondary" onclick="cancelarNuevaPromo()">Cancelar</button>
+          </div>
+        </div>
+
+        <button class="btn btn-secondary" id="botonAgregarPromo" onclick="mostrarFormNuevaPromo()">+ Agregar anuncio</button>
+        <button class="btn btn-primary" style="margin-top:10px; display:block; width:100%;" onclick="guardarPromosTurnos()">Guardar Anuncios</button>
+      </div>
+    </div>
+
     <!-- ============ ZONA PELIGROSA (solo dueño) ============ -->
     <div class="card" id="cardZonaPeligrosa" style="display:none; border:1px solid #C62828; margin-top:16px;">
       <div class="header-plegable" onclick="toggleSeccionConfig('secZonaPeligrosa')">
@@ -490,6 +526,9 @@ async function cargarConfiguracion() {
       logoBase64 = config.logo_url;
       document.getElementById('previewLogo').src = config.logo_url;
     }
+
+    promosTurnosState = Array.isArray(config.promos_pantalla_turnos) ? config.promos_pantalla_turnos : [];
+    renderListaPromosTurnos();
   } catch (err) {
     console.error(err);
   }
@@ -621,6 +660,111 @@ async function guardarPersonalizacionTicket() {
     });
     mostrarToast('Guardado correctamente', 'exito');
     cargarConfiguracion();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ============ Anuncios / Promociones (Pantalla de Turnos) ============
+let promosTurnosState = [];
+let promoImagenUrlTemp = '';
+
+function renderListaPromosTurnos() {
+  const cont = document.getElementById('listaPromosTurnos');
+  if (promosTurnosState.length === 0) {
+    cont.innerHTML = '<p style="font-size:13px; color:#888;">Sin anuncios configurados todavía.</p>';
+    return;
+  }
+  cont.innerHTML = promosTurnosState.map((p, i) => `
+    <div style="display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:8px; padding:8px;">
+      <div id="miniaturaPromo${i}" style="width:48px; height:48px; border-radius:6px; background:#EEE; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; font-size:20px;">
+        ${p.tipo === 'imagen' ? `<img src="${p.imagen_url}" style="width:100%; height:100%; object-fit:cover;">` : '⏳'}
+      </div>
+      <div style="flex-grow:1; font-size:13px; min-width:0;">
+        <div style="font-weight:600;">${p.titulo || (p.tipo === 'qr' ? 'Código QR' : 'Imagen')}</div>
+        <div style="color:#888; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.tipo === 'qr' ? p.qr_contenido : 'Imagen'}</div>
+      </div>
+      <button class="btn btn-secondary" onclick="eliminarPromo(${i})">Quitar</button>
+    </div>
+  `).join('');
+
+  // El QR de cada anuncio se genera aparte (es async) y se inyecta cuando
+  // está listo, para no bloquear el render de la lista.
+  promosTurnosState.forEach((p, i) => {
+    if (p.tipo === 'qr' && window.QRCode) {
+      QRCode.toDataURL(p.qr_contenido, { width: 96, margin: 1 }, (err, url) => {
+        if (err) return;
+        const el = document.getElementById(`miniaturaPromo${i}`);
+        if (el) el.innerHTML = `<img src="${url}" style="width:100%; height:100%; object-fit:contain;">`;
+      });
+    }
+  });
+}
+
+function mostrarFormNuevaPromo() {
+  document.getElementById('formNuevaPromo').style.display = 'flex';
+  document.getElementById('botonAgregarPromo').style.display = 'none';
+  document.getElementById('promoTipo').value = 'imagen';
+  document.getElementById('promoTitulo').value = '';
+  document.getElementById('promoQrContenido').value = '';
+  document.getElementById('promoImagenInput').value = '';
+  document.getElementById('previewPromoImagen').style.display = 'none';
+  promoImagenUrlTemp = '';
+  actualizarFormPromo();
+}
+
+function cancelarNuevaPromo() {
+  document.getElementById('formNuevaPromo').style.display = 'none';
+  document.getElementById('botonAgregarPromo').style.display = 'inline-flex';
+}
+
+function actualizarFormPromo() {
+  const tipo = document.getElementById('promoTipo').value;
+  document.getElementById('promoCampoImagen').style.display = tipo === 'imagen' ? 'block' : 'none';
+  document.getElementById('promoCampoQr').style.display = tipo === 'qr' ? 'block' : 'none';
+}
+
+document.getElementById('promoImagenInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const comprimida = await comprimirImagen(file, 700, 0.8);
+    document.getElementById('previewPromoImagen').src = comprimida;
+    document.getElementById('previewPromoImagen').style.display = 'block';
+    promoImagenUrlTemp = await subirImagenACloudinary(comprimida, 'promos');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+});
+
+function confirmarNuevaPromo() {
+  if (promosTurnosState.length >= 8) { mostrarToast('Ya tienes el máximo de 8 anuncios', 'error'); return; }
+  const tipo = document.getElementById('promoTipo').value;
+  const titulo = document.getElementById('promoTitulo').value.trim();
+  if (tipo === 'imagen') {
+    if (!promoImagenUrlTemp) { mostrarToast('Sube una imagen primero', 'error'); return; }
+    promosTurnosState.push({ tipo: 'imagen', titulo, imagen_url: promoImagenUrlTemp });
+  } else {
+    const contenido = document.getElementById('promoQrContenido').value.trim();
+    if (!contenido) { mostrarToast('Escribe el contenido del código QR', 'error'); return; }
+    promosTurnosState.push({ tipo: 'qr', titulo, qr_contenido: contenido });
+  }
+  renderListaPromosTurnos();
+  cancelarNuevaPromo();
+}
+
+function eliminarPromo(indice) {
+  promosTurnosState.splice(indice, 1);
+  renderListaPromosTurnos();
+}
+
+async function guardarPromosTurnos() {
+  try {
+    await apiFetch('/configuracion', {
+      method: 'PUT',
+      body: JSON.stringify({ promos_pantalla_turnos: promosTurnosState })
+    });
+    mostrarToast('Anuncios guardados', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }

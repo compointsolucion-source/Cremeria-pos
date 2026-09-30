@@ -1,13 +1,13 @@
 {
-  "name": "Cremería POS - Compoint",
-  "short_name": "Cremería POS",
-  "description": "Sistema de punto de venta para cremería/carnicería",
+  "name": "Compoint Punto",
+  "short_name": "Compoint Punto",
+  "description": "Sistema de punto de venta para negocios de mostrador y peso (cremería, carnicería, y más)",
   "start_url": "login.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#F5F6F8",
-  "theme_color": "#2E7D32",
+  "background_color": "#FFFFFF",
+  "theme_color": "#5FAE46",
   "icons": [
     {
       "src": "iconos/icono-192.png",

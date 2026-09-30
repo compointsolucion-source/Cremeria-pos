@@ -38,6 +38,26 @@ function svgIcono(nombre, tamano) {
   return `<svg width="${t}" height="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONOS_SIDEBAR[nombre] || ''}</svg>`;
 }
 
+// Ícono de marca (la red de nodos del logo de Compoint) para el encabezado
+// del sidebar — a diferencia de svgIcono(), usa "currentColor" solo en el
+// nodo verde de acento por separado, para que se vea igual en modo claro y oscuro.
+function svgIconoCompoint(tamano) {
+  const t = tamano || 20;
+  return `<svg width="${t}" height="${t}" viewBox="0 0 200 200" fill="none">
+    <g stroke="currentColor" stroke-width="6" opacity="0.9">
+      <path d="M100 15 150 31 181 74 181 126 150 169 100 185 50 169 19 126 19 74 50 31 100 15" fill="none"/>
+      <path d="M100 15 90 105 M181 74 90 105 M150 169 90 105 M50 169 90 105 M19 74 90 105"/>
+      <path d="M100 15 181 126 M150 31 150 169 M100 185 19 74 M50 169 50 31 M181 74 19 126"/>
+    </g>
+    <g fill="currentColor">
+      <circle cx="100" cy="15" r="9"/><circle cx="150" cy="31" r="9"/><circle cx="181" cy="74" r="9"/>
+      <circle cx="181" cy="126" r="9"/><circle cx="150" cy="169" r="9"/><circle cx="100" cy="185" r="9"/>
+      <circle cx="50" cy="169" r="9"/><circle cx="19" cy="126" r="9"/><circle cx="19" cy="74" r="9"/><circle cx="50" cy="31" r="9"/>
+    </g>
+    <circle cx="90" cy="105" r="16" fill="#5FAE46"/>
+  </svg>`;
+}
+
 // Estructura del menú — un solo lugar para agregar/quitar módulos del
 // sistema completo. "activo" se calcula solo comparando con el archivo
 // de la página actual, no hay que tocarlo a mano.
@@ -132,8 +152,8 @@ function construirSidebar() {
     <aside class="sidebar" id="sidebarPrincipal">
       <div class="sidebar-encabezado">
         <a class="sidebar-marca" href="${inicioHref}">
-          <span class="sidebar-icono">${svgIcono('inicio', 20)}</span>
-          <span>Cremería POS</span>
+          <span class="sidebar-icono">${svgIconoCompoint(22)}</span>
+          <span>Compoint Punto</span>
         </a>
         <button class="sidebar-colapsar-escritorio" onclick="colapsarSidebarEscritorio()" title="Ocultar menú">${svgIcono('flecha_izquierda', 18)}</button>
         <button class="sidebar-cerrar-movil" onclick="cerrarSidebarMovil()">${svgIcono('cerrar', 20)}</button>

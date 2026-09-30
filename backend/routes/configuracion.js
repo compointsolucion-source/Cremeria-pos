@@ -32,8 +32,34 @@ const VALORES_POR_DEFECTO = {
   vales_habilitado: false,
   mixto_habilitado: true,
   credito_habilitado: true,
-  cajon_abrir_automatico: false
+  cajon_abrir_automatico: false,
+  // Anuncios/promociones que rotan en el panel lateral de la Pantalla de
+  // Turnos mientras los clientes esperan — cada uno es
+  // { tipo: 'imagen'|'qr', titulo, imagen_url, qr_contenido }.
+  promos_pantalla_turnos: []
 };
+
+// Campos cuyo valor es un objeto/arreglo (columna JSONB) — el driver de
+// Postgres NO los serializa solo: un arreglo de JS pasado tal cual a una
+// consulta parametrizada se manda como literal de arreglo de Postgres
+// ("{...}"), que rompe una columna jsonb. Hay que JSON.stringify() antes.
+const CAMPOS_JSON = ['promos_pantalla_turnos'];
+
+const MAX_PROMOS = 8;
+
+function validarPromos(promos) {
+  if (!Array.isArray(promos)) return 'Los anuncios deben ser una lista';
+  if (promos.length > MAX_PROMOS) return `Máximo ${MAX_PROMOS} anuncios`;
+  for (const promo of promos) {
+    if (!promo || typeof promo !== 'object') return 'Cada anuncio debe ser un objeto';
+    if (!['imagen', 'qr'].includes(promo.tipo)) return 'Cada anuncio debe ser de tipo "imagen" o "qr"';
+    if (promo.titulo && String(promo.titulo).length > 80) return 'El título del anuncio es muy largo (máximo 80 caracteres)';
+    if (promo.tipo === 'imagen' && !promo.imagen_url) return 'Falta la imagen de uno de los anuncios';
+    if (promo.tipo === 'qr' && !promo.qr_contenido) return 'Falta el contenido del código QR de uno de los anuncios';
+    if (promo.qr_contenido && String(promo.qr_contenido).length > 500) return 'El contenido del código QR es muy largo';
+  }
+  return true;
+}
 
 // Lista blanca de campos editables desde el PUT — evita construir la
 // consulta SQL a mano cada vez que se agrega una opción nueva (así se
@@ -44,7 +70,8 @@ const VALIDACIONES = {
   ancho_ticket: (v) => ['58mm', '80mm'].includes(v) || 'Ancho de ticket inválido',
   tipo_codigo_escaneo: (v) => ['qr', 'barras', 'ambos'].includes(v) || 'Tipo de código de escaneo inválido',
   tamano_letra: (v) => ['normal', 'grande'].includes(v) || 'Tamaño de letra inválido',
-  tipo_fuente: (v) => ['monospace', 'sans-serif'].includes(v) || 'Tipo de fuente inválido'
+  tipo_fuente: (v) => ['monospace', 'sans-serif'].includes(v) || 'Tipo de fuente inválido',
+  promos_pantalla_turnos: validarPromos
 };
 
 // Obtener la configuración de la sucursal (valores por defecto si no existe)
@@ -81,7 +108,10 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
     }
 
     const columnas = ['sucursal_id', ...camposRecibidos];
-    const valores = [req.usuario.sucursal_id, ...camposRecibidos.map(c => req.body[c])];
+    const valores = [
+      req.usuario.sucursal_id,
+      ...camposRecibidos.map(c => CAMPOS_JSON.includes(c) ? JSON.stringify(req.body[c]) : req.body[c])
+    ];
     const marcadores = valores.map((_, i) => `$${i + 1}`);
     const actualizaciones = camposRecibidos.map((campo, i) => `${campo} = $${i + 2}`).join(', ');
 
@@ -98,8 +128,9 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
       accion: 'actualizar_configuracion',
       modulo: 'configuracion',
       referencia_id: req.usuario.sucursal_id,
-      // logo_url excluido a propósito: puede pesar varios KB, no aporta nada útil en la bitácora
-      valor_nuevo: Object.fromEntries(camposRecibidos.filter(c => c !== 'logo_url').map(c => [c, req.body[c]]))
+      // logo_url y promos_pantalla_turnos excluidos a propósito: pueden pesar
+      // varios KB (imágenes/URLs), no aportan nada útil en la bitácora
+      valor_nuevo: Object.fromEntries(camposRecibidos.filter(c => c !== 'logo_url' && c !== 'promos_pantalla_turnos').map(c => [c, req.body[c]]))
     });
 
     res.json(result.rows[0]);

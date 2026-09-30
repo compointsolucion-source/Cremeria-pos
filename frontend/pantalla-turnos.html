@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2E7D32">
-<title>Pantalla de Turnos - Cremería POS</title>
+<link rel="icon" href="favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Pantalla de Turnos - Compoint Punto</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -14,35 +16,56 @@
     background: #1B1C1E;
     color: white;
     height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
+    overflow: hidden;
+  }
+  .layout-principal { display: flex; width: 100vw; height: 100vh; }
+  .columna-principal {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
   }
   .etiqueta { font-size: 28px; color: #A0A3A8; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px; }
-  .numero-turno { font-size: 220px; font-weight: 800; line-height: 1; color: #4CAF50; }
+  .numero-turno { font-size: 220px; font-weight: 800; line-height: 1; color: #74C95A; }
   .mostrador-destino { font-size: 60px; font-weight: 700; margin-top: 10px; }
   .flecha { font-size: 60px; margin: 0 20px; color: #F9A825; }
   .fila-actual { display: flex; align-items: center; justify-content: center; margin-top: 20px; }
-  .historial { position: fixed; bottom: 0; left: 0; right: 0; background: #2A2B2E; padding: 16px; display: flex; gap: 30px; justify-content: center; overflow-x: auto; }
+  .historial { position: fixed; bottom: 0; left: 0; right: 0; background: #2A2B2E; padding: 16px; display: flex; gap: 30px; justify-content: center; overflow-x: auto; z-index: 2; }
   .historial-item { text-align: center; opacity: 0.6; }
   .historial-item .num { font-size: 28px; font-weight: 700; }
   .historial-item .mostrador { font-size: 14px; color: #A0A3A8; }
   .sin-turnos { font-size: 40px; color: #A0A3A8; }
-  .contador-esperando { position: fixed; top: 16px; left: 16px; font-size: 20px; color: #A0A3A8; background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 10px; }
+  .contador-esperando { position: fixed; top: 16px; left: 16px; font-size: 20px; color: #A0A3A8; background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 10px; z-index: 2; }
   .pantalla-completa-btn {
     position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.1);
-    border: none; color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;
+    border: none; color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 2;
   }
+
+  /* Panel de anuncios/promociones — solo se muestra si el negocio configuró
+     al menos uno en Configuración → Anuncios y Promociones. */
+  .panel-promos {
+    display: none;
+    width: 380px; flex-shrink: 0;
+    background: #242527; border-left: 1px solid rgba(255,255,255,0.08);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 32px; padding-bottom: 130px; text-align: center;
+  }
+  .panel-promos.visible { display: flex; }
+  .promo-imagen { max-width: 100%; max-height: 380px; border-radius: 14px; object-fit: contain; }
+  .promo-qr-caja { background: #FFFFFF; padding: 18px; border-radius: 14px; }
+  .promo-qr-caja img { display: block; width: 220px; height: 220px; }
+  .promo-titulo { font-size: 22px; font-weight: 700; color: #F0F0F0; }
 </style>
 </head>
 <body>
   <button class="pantalla-completa-btn" onclick="document.documentElement.requestFullscreen()">⛶ Pantalla completa</button>
   <div class="contador-esperando" id="contadorEsperando">Esperando: —</div>
 
-  <div id="turnoActual">
-    <div class="sin-turnos">Esperando el primer turno del día...</div>
+  <div class="layout-principal">
+    <div class="columna-principal">
+      <div id="turnoActual">
+        <div class="sin-turnos">Esperando el primer turno del día...</div>
+      </div>
+    </div>
+    <div class="panel-promos" id="panelPromos"></div>
   </div>
 
   <div class="historial" id="historial"></div>
@@ -124,9 +147,59 @@ async function cargarContadorEsperando() {
 socket.on('nueva_ficha', cargarContadorEsperando);
 socket.on('ficha_llamada', cargarContadorEsperando);
 
+// ============ Panel de anuncios/promociones ============
+// Se carga una sola vez al abrir la pantalla (no cambia mientras la
+// pantalla queda encendida todo el día) y rota entre los anuncios
+// configurados cada 10 segundos. Si no hay ninguno, el panel simplemente
+// no se muestra y el número de turno usa toda la pantalla, como antes.
+let promosTurnos = [];
+let indicePromoActual = 0;
+
+async function cargarPromosTurnos() {
+  try {
+    const config = await apiFetch('/configuracion');
+    promosTurnos = Array.isArray(config.promos_pantalla_turnos) ? config.promos_pantalla_turnos : [];
+    const panel = document.getElementById('panelPromos');
+    if (promosTurnos.length === 0) {
+      panel.classList.remove('visible');
+      return;
+    }
+    panel.classList.add('visible');
+    mostrarPromoActual();
+    if (promosTurnos.length > 1) setInterval(avanzarPromo, 10000);
+  } catch (err) {
+    console.error('No se pudieron cargar los anuncios:', err.message);
+  }
+}
+
+function avanzarPromo() {
+  indicePromoActual = (indicePromoActual + 1) % promosTurnos.length;
+  mostrarPromoActual();
+}
+
+function mostrarPromoActual() {
+  const promo = promosTurnos[indicePromoActual];
+  const panel = document.getElementById('panelPromos');
+  if (!promo) return;
+
+  const titulo = promo.titulo ? `<div class="promo-titulo">${promo.titulo}</div>` : '';
+
+  if (promo.tipo === 'imagen') {
+    panel.innerHTML = `${titulo}<img class="promo-imagen" src="${promo.imagen_url}">`;
+  } else if (promo.tipo === 'qr') {
+    panel.innerHTML = `${titulo}<div class="promo-qr-caja" id="cajaQrPromo"></div>`;
+    QRCode.toCanvas(document.createElement('canvas'), promo.qr_contenido, { width: 220, margin: 1 }, (err, canvas) => {
+      if (err) { console.error(err); return; }
+      const caja = document.getElementById('cajaQrPromo');
+      if (caja) caja.appendChild(canvas);
+    });
+  }
+}
+
 cargarTurnoActual();
 cargarHistorial();
 cargarContadorEsperando();
+cargarPromosTurnos();
 setInterval(cargarContadorEsperando, 15000);
 </script>
 </body>

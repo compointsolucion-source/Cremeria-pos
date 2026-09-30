@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2E7D32">
-<title>Mostrador - Cremería POS</title>
+<link rel="icon" href="favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Mostrador - Compoint Punto</title>
 <link rel="stylesheet" href="css/app-theme.css">
 <link rel="stylesheet" href="css/sidebar.css">
 <script src="js/tema.js"></script>
@@ -26,13 +27,13 @@
     flex: 1; padding: 12px; border: none; background: #F0F0F0; font-weight: 700; font-size: 14px;
     display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .pestana-movil.activa { background: var(--primary, #2E7D32); color: white; }
+  .pestana-movil.activa { background: var(--primary, #5FAE46); color: white; }
   .badge-ticket-movil {
-    background: white; color: var(--primary, #2E7D32); border-radius: 10px;
+    background: white; color: var(--primary, #5FAE46); border-radius: 10px;
     padding: 1px 7px; font-size: 11px; font-weight: 800;
   }
   #panelCarritoMostrador h3 { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-  .peek-total-deslizable { display: none; font-size: 14px; color: var(--primary, #2E7D32); }
+  .peek-total-deslizable { display: none; font-size: 14px; color: var(--primary, #5FAE46); }
 
   /* Corrección del bug real que originó todo esto: en pantallas angostas,
      el min-width:300px del panel del carrito aplastaba la lista de
@@ -74,7 +75,7 @@
     padding: 10px 16px; border-radius: 20px; background: #E0E0E0; white-space: nowrap;
     cursor: pointer; font-weight: 600; font-size: 14px;
   }
-  .categoria-tab.activa { background: #2E7D32; color: white; }
+  .categoria-tab.activa { background: #5FAE46; color: white; }
   .categoria-tab.kits { background: #F9A825; color: white; }
   .grid-productos {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;
@@ -121,7 +122,7 @@
   .subtotal-preview { text-align: center; color: #555; margin-top: 8px; }
   .stepper { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 14px 0; }
   .stepper button {
-    width: 54px; height: 54px; border-radius: 50%; border: none; background: #2E7D32;
+    width: 54px; height: 54px; border-radius: 50%; border: none; background: #5FAE46;
     color: white; font-size: 28px; cursor: pointer;
   }
   .stepper .cantidad-num { font-size: 32px; font-weight: 700; min-width: 60px; text-align: center; }
@@ -143,9 +144,9 @@
     <button class="btn btn-secondary" onclick="reimprimirUltimaFicha()">🔁 Reimprimir Última</button>
     <span id="contadorFichasPendientes" style="font-size:13px; color:#666;"></span>
 
-    <div id="panelFichaActual" style="display:none; background:white; border:2px solid var(--primary,#2E7D32); border-radius:10px; padding:6px 14px; align-items:center; gap:10px;">
+    <div id="panelFichaActual" style="display:none; background:white; border:2px solid var(--primary,#5FAE46); border-radius:10px; padding:6px 14px; align-items:center; gap:10px;">
       <span style="font-size:13px; color:#666;">Atendiendo:</span>
-      <span id="numeroFichaActual" style="font-size:20px; font-weight:800; color:var(--primary,#2E7D32);"></span>
+      <span id="numeroFichaActual" style="font-size:20px; font-weight:800; color:var(--primary,#5FAE46);"></span>
       <span style="font-size:13px; color:#666;">→ <b id="nombreMostradorFichaActual"></b></span>
       <button class="btn btn-secondary" onclick="sonarCampanitaFicha()" title="Anunciar en voz alta esta ficha y el mostrador">🔔 Campanita</button>
     </div>

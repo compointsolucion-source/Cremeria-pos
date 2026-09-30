@@ -1,4 +1,4 @@
-// Service Worker de Cremería POS — guarda copia de Mostrador, Caja y Caja
+// Service Worker de Compoint Punto — guarda copia de Mostrador, Caja y Caja
 // Avanzada para que abran incluso sin internet. Las llamadas a la API
 // NUNCA se interceptan aquí (siempre van a la red) — la sincronización de
 // datos offline se maneja en las tandas siguientes, no en este archivo.
@@ -7,7 +7,7 @@
 // versión más nueva (y se actualiza la copia de respaldo de paso) — la
 // copia guardada solo se usa cuando de verdad no hay conexión. Esto evita
 // quedarse con una versión vieja por olvidar subir CACHE_VERSION.
-const CACHE_VERSION = 'cremeria-pos-v4';
+const CACHE_VERSION = 'compoint-punto-v5';
 
 const ARCHIVOS_A_GUARDAR = [
   '/mostrador.html',

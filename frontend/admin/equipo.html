@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="../manifest.json">
-<meta name="theme-color" content="#2E7D32">
-<title>Equipo - Cremería POS</title>
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Equipo - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
@@ -19,7 +20,7 @@
   .rol-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: #E0E0E0; }
   .rol-dueno { background: #F9A825; color: white; }
   .rol-gerente { background: #1565C0; color: white; }
-  .rol-cajero { background: #2E7D32; color: white; }
+  .rol-cajero { background: #5FAE46; color: white; }
   .rol-mostrador { background: #6A1B9A; color: white; }
   .inactivo { opacity: 0.5; }
   .acciones-empleado { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
@@ -97,7 +98,7 @@ async function cargarEquipo() {
           <span>${u.nombre} <span class="rol-tag rol-${u.rol}">${rolNombres[u.rol]}</span></span>
           <span style="font-size:13px; color:#888;">${u.usuario}</span>
         </div>
-        ${u.nombre_mostrador ? `<div style="font-size:13px; color:#2E7D32; margin-top:2px;">🏪 Asignado a: <b>${u.nombre_mostrador}</b></div>` : ''}
+        ${u.nombre_mostrador ? `<div style="font-size:13px; color:#5FAE46; margin-top:2px;">🏪 Asignado a: <b>${u.nombre_mostrador}</b></div>` : ''}
         ${u.rol !== 'dueno' ? `
           <div class="acciones-empleado">
             <button class="btn btn-secondary" onclick="toggleActivo(${u.id}, ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>

@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="../manifest.json">
-<meta name="theme-color" content="#2E7D32">
-<title>Clientes y Créditos - Cremería POS</title>
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Clientes y Créditos - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
@@ -17,7 +18,7 @@
   .cliente-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; }
   .cliente-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
   .cliente-card .saldo { font-size: 13px; color: #C62828; margin-top: 4px; }
-  .cliente-card .saldo.al-corriente { color: #2E7D32; }
+  .cliente-card .saldo.al-corriente { color: #5FAE46; }
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
   .modal-overlay.abierto { display: flex; }
   .modal-cuenta { background: white; border-radius: 16px; padding: 20px; width: 90%; max-width: 420px; max-height: 80vh; overflow-y: auto; }
@@ -165,7 +166,7 @@ function generarComprobante() {
   if (!data) return;
 
   const filasCargos = data.cargos.map(c => `<tr><td>Cargo — Ticket ${c.folio}</td><td>${new Date(c.fecha).toLocaleDateString()}</td><td style="color:#C62828;">+$${parseFloat(c.monto).toFixed(2)}</td></tr>`).join('');
-  const filasAbonos = data.abonos.map(a => `<tr><td>Abono (${a.metodo_pago})</td><td>${new Date(a.fecha).toLocaleDateString()}</td><td style="color:#2E7D32;">-$${parseFloat(a.monto).toFixed(2)}</td></tr>`).join('');
+  const filasAbonos = data.abonos.map(a => `<tr><td>Abono (${a.metodo_pago})</td><td>${new Date(a.fecha).toLocaleDateString()}</td><td style="color:#5FAE46;">-$${parseFloat(a.monto).toFixed(2)}</td></tr>`).join('');
 
   const html = `
     <!DOCTYPE html>
@@ -196,7 +197,7 @@ function generarComprobante() {
         <tbody>${filasCargos}${filasAbonos}</tbody>
       </table>
 
-      <p style="margin-top:30px; font-size:12px; color:#888;">Este documento es un estado de cuenta informativo, generado por el sistema Cremería POS.</p>
+      <p style="margin-top:30px; font-size:12px; color:#888;">Este documento es un estado de cuenta informativo, generado por el sistema Compoint Punto.</p>
 
       <script>
         window.onload = () => window.print();

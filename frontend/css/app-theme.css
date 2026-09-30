@@ -1,12 +1,12 @@
 :root {
-  --primary: #2E7D32;
-  --primary-dark: #1B5E20;
+  --primary: #5FAE46;
+  --primary-dark: #4C9439;
   --secondary: #E0E0E0;
   --background: #F5F6F8;
   --surface: #FFFFFF;
   --text: #1F2023;
   --muted: #7A7D83;
-  --success: #2E7D32;
+  --success: #5FAE46;
   --warning: #C77700;
   --danger: #C62828;
   --border: #E4E6E9;
@@ -106,8 +106,8 @@ tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #FAFAFB; }
 
 [data-tema="oscuro"] {
-  --primary: #4CAF50;
-  --primary-dark: #388E3C;
+  --primary: #74C95A;
+  --primary-dark: #5FAE46;
   --secondary: #3A3B3E;
   --background: #1B1C1E;
   --surface: #2A2B2E;
@@ -128,8 +128,8 @@ tbody tr:hover { background: #FAFAFB; }
 /* ===== 5 temas de color — independientes de claro/oscuro, se pueden
    combinar (ej. "Azul" + oscuro). "Verde" es el color de toda la vida del
    sistema y es el que ya se ve si no se elige nada distinto. ===== */
-[data-color-tema="verde"] { --primary: #2E7D32; --primary-dark: #1B5E20; }
-[data-tema="oscuro"][data-color-tema="verde"] { --primary: #4CAF50; --primary-dark: #388E3C; }
+[data-color-tema="verde"] { --primary: #5FAE46; --primary-dark: #4C9439; }
+[data-tema="oscuro"][data-color-tema="verde"] { --primary: #74C95A; --primary-dark: #5FAE46; }
 
 [data-color-tema="azul"] { --primary: #1565C0; --primary-dark: #0D47A1; }
 [data-tema="oscuro"][data-color-tema="azul"] { --primary: #42A5F5; --primary-dark: #1E88E5; }
