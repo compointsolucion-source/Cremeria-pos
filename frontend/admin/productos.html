@@ -14,13 +14,14 @@
 <style>
   .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
   .campo-con-camara { position: relative; }
-  .campo-con-camara input { padding-right: 112px; }
+  .campo-con-camara input { padding-right: 44px; }
   .btn-mini-camara {
     position: absolute; top: 6px; right: 6px; bottom: 6px;
-    display: flex; align-items: center; gap: 4px;
+    display: flex; align-items: center; justify-content: center;
+    width: 32px;
     background: var(--primary, #5FAE46); color: white; border: none;
-    border-radius: 7px; padding: 0 10px; font-size: 11.5px; font-weight: 600;
-    cursor: pointer; white-space: nowrap;
+    border-radius: 7px; font-size: 15px;
+    cursor: pointer;
   }
   #scannerCodigoBarras { width: 100%; max-width: 320px; margin: 8px 0; }
   .tabla-productos { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
@@ -60,7 +61,7 @@
 
       <div class="campo-con-camara">
         <input type="text" id="codigoBarras" placeholder="Código de barras (escanéalo o escríbelo)" onblur="buscarCodigoExterno()">
-        <button type="button" class="btn-mini-camara" id="btnActivarCamaraCodigo" onclick="toggleScannerCodigoBarras()">📷 Activar cámara</button>
+        <button type="button" class="btn-mini-camara" id="btnActivarCamaraCodigo" onclick="toggleScannerCodigoBarras()" title="Activar cámara para escanear código de barras">📷</button>
       </div>
       <div id="scannerCodigoBarras" style="display:none;"></div>
       <div id="estadoBusquedaExterna" class="buscando-externo"></div>
@@ -248,7 +249,7 @@ function toggleScannerCodigoBarras() {
     html5QrCodeProducto.stop().catch(() => {});
     scannerCodigoActivo = false;
     contenedor.style.display = 'none';
-    boton.textContent = '📷 Activar cámara';
+    boton.textContent = '📷';
     return;
   }
 
@@ -261,13 +262,13 @@ function toggleScannerCodigoBarras() {
       html5QrCodeProducto.stop().catch(() => {});
       scannerCodigoActivo = false;
       contenedor.style.display = 'none';
-      boton.textContent = '📷 Activar cámara';
+      boton.textContent = '📷';
       document.getElementById('codigoBarras').value = codigo;
       buscarCodigoExterno();
     }
   ).then(() => {
     scannerCodigoActivo = true;
-    boton.textContent = '✖ Cerrar cámara';
+    boton.textContent = '✖';
   }).catch((err) => {
     contenedor.style.display = 'none';
     mostrarToast('No se pudo activar la cámara: ' + (err.message || err), 'error');
