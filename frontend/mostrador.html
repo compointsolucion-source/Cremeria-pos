@@ -18,6 +18,23 @@
   .panel-productos { flex: 2; padding: 14px; overflow-y: auto; }
   .panel-carrito { flex: 1; min-width: 300px; padding: 14px; background: white; display: flex; flex-direction: column; }
 
+  /* En escritorio, la barra de arriba (Generar Ficha/Llamar Siguiente/
+     Atendiendo) y el banner de impresora (cuando aparece) suman altura que
+     el cálculo "100vh - 60px" de .layout no contemplaba — eso empujaba todo
+     hacia abajo y el botón "Generar e Imprimir Ticket" quedaba fuera de la
+     pantalla, obligando a hacer scroll de toda la página para verlo. Aquí
+     se vuelve el body una columna flex y .layout ocupa exactamente el
+     espacio que sobra debajo de esas barras (sea cual sea su altura real),
+     así el panel del ticket siempre queda ajustado sin scroll de página —
+     dentro de él, #carritoItems sigue haciendo su propio scroll interno si
+     el ticket tiene muchos productos. No toca el comportamiento en
+     celular/tablet (≤1024px), que ya tiene su propio acomodo debajo. */
+  @media (min-width: 1025px) {
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    .layout { flex: 1 1 auto; min-height: 0; height: auto; }
+  }
+
   /* Pestañas Productos/Ticket — solo se muestran en el modo "pestañas".
      En escritorio (>1024px) siempre quedan ocultas y ambos paneles se ven
      lado a lado, sin importar qué acomodo esté elegido para pantallas
