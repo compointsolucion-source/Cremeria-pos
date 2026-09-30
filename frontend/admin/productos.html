@@ -70,13 +70,19 @@
 
       <div class="fila-triple">
         <select id="tipoVenta">
+          <option value="unidad" selected>Por unidad / pieza</option>
           <option value="peso">A granel (usa decimales, por kg)</option>
-          <option value="unidad">Por unidad / pieza</option>
         </select>
         <select id="categoriaId"><option value="">Sin departamento</option></select>
       </div>
 
-      <input type="number" id="precio" placeholder="Precio de venta *" step="0.01">
+      <div class="seccion-titulo">Precios</div>
+      <div class="fila-triple">
+        <input type="number" id="precioCosto" placeholder="Precio costo" step="0.01" oninput="calcularPrecioVenta()">
+        <input type="number" id="gananciaPorcentaje" placeholder="Ganancia %" step="0.01" oninput="calcularPrecioVenta()">
+        <input type="number" id="precio" placeholder="Precio de venta *" step="0.01" oninput="calcularGananciaDesdeVenta()">
+      </div>
+      <input type="number" id="precioMayoreo" placeholder="Precio mayoreo (opcional)" step="0.01">
 
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <img id="previewImg" class="preview-img" src="">
@@ -86,17 +92,10 @@
       </div>
 
       <button type="button" class="btn-mas-opciones" onclick="toggleMasOpciones()">
-        <span id="flechaMasOpciones">▸</span> Más opciones (costo, ganancia %, mayoreo, inventario, favorito)
+        <span id="flechaMasOpciones">▸</span> Más opciones (inventario, favorito)
       </button>
 
       <div id="masOpcionesProducto" style="display:none; gap:10px; flex-direction:column;">
-        <div class="seccion-titulo">Precios</div>
-        <div class="fila-triple">
-          <input type="number" id="precioCosto" placeholder="Precio costo" step="0.01" oninput="calcularPrecioVenta()">
-          <input type="number" id="gananciaPorcentaje" placeholder="Ganancia %" step="0.01" oninput="calcularPrecioVenta()">
-        </div>
-        <input type="number" id="precioMayoreo" placeholder="Precio mayoreo (opcional)" step="0.01">
-
         <div class="seccion-titulo">Inventario</div>
         <label class="opcion-check">
           <span>Este producto SÍ utiliza inventario</span>
@@ -192,6 +191,7 @@ function limpiarFormulario() {
   document.getElementById('precioMayoreo').value = '';
   document.getElementById('codigoBarras').value = '';
   document.getElementById('categoriaId').value = '';
+  document.getElementById('tipoVenta').value = 'unidad';
   document.getElementById('existenciaInicial').value = '';
   document.getElementById('stockMinimo').value = '';
   document.getElementById('stockMaximo').value = '';
@@ -231,6 +231,21 @@ function calcularPrecioVenta() {
   if (costo > 0 && ganancia > 0) {
     const precioCalculado = costo * (1 + ganancia / 100);
     document.getElementById('precio').value = precioCalculado.toFixed(2);
+  }
+}
+
+// Calculadora en el otro sentido: si ya conoces el costo y prefieres teclear
+// directo el precio de venta que vas a cobrar, la Ganancia % se calcula sola
+// (en vez de tener que sacar el porcentaje a mano). No hay riesgo de que
+// esto se vuelva un ciclo infinito con calcularPrecioVenta() de arriba:
+// escribir aquí solo actualiza el campo de Ganancia %, y cambiar un campo
+// por código (sin que la persona lo teclee) no dispara su propio "oninput".
+function calcularGananciaDesdeVenta() {
+  const costo = parseFloat(document.getElementById('precioCosto').value || 0);
+  const precio = parseFloat(document.getElementById('precio').value || 0);
+  if (costo > 0 && precio > 0) {
+    const gananciaCalculada = ((precio - costo) / costo) * 100;
+    document.getElementById('gananciaPorcentaje').value = gananciaCalculada.toFixed(2);
   }
 }
 
