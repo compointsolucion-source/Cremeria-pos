@@ -46,7 +46,15 @@ const VALORES_POR_DEFECTO = {
   promos_intervalo_segundos: 10,
   // Si está activo, los anuncios se muestran en orden aleatorio en vez del
   // orden en que se guardaron.
-  promos_orden_aleatorio: false
+  promos_orden_aleatorio: false,
+  // Etiqueta final de bolsa (báscula tipo Torrey): 'auto' = cada báscula
+  // conectada imprime su propia etiqueta de forma autónoma (o no se usa
+  // etiqueta); 'sistema' = Compoint genera e imprime la etiqueta usando la
+  // impresora de etiquetas configurada, con el nombre/precio exactos del
+  // sistema. Es política de negocio (aplica igual en todos los mostradores
+  // de la sucursal), por eso vive aquí y no en localStorage.
+  etiqueta_modo: 'auto',
+  ancho_etiqueta: '50mm'
 };
 
 // Campos cuyo valor es un objeto/arreglo (columna JSONB) — el driver de
@@ -89,7 +97,9 @@ const VALIDACIONES = {
   tamano_letra: (v) => ['normal', 'grande'].includes(v) || 'Tamaño de letra inválido',
   tipo_fuente: (v) => ['monospace', 'sans-serif'].includes(v) || 'Tipo de fuente inválido',
   promos_pantalla_turnos: validarPromos,
-  promos_intervalo_segundos: validarIntervaloPromos
+  promos_intervalo_segundos: validarIntervaloPromos,
+  etiqueta_modo: (v) => ['auto', 'sistema'].includes(v) || 'Modo de etiqueta inválido',
+  ancho_etiqueta: (v) => ['40mm', '50mm', '58mm'].includes(v) || 'Ancho de etiqueta inválido'
 };
 
 // Obtener la configuración de la sucursal (valores por defecto si no existe)

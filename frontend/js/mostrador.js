@@ -196,12 +196,48 @@ function precioEfectivo(producto, cantidad) {
   return mejorPrecio;
 }
 
+// Suscripción activa a la báscula mientras el modal de peso está abierto —
+// se cancela al cerrar el modal (con cerrarModal('modalPeso') o al
+// confirmar) para no seguir actualizando un panel que ya no se ve.
+let cancelarSuscripcionPesoModal = null;
+
 function abrirModalPeso(producto) {
   productoSeleccionado = producto;
   pesoActual = '';
   document.getElementById('modalProductoNombre').textContent = producto.nombre;
   actualizarDisplayPeso();
   document.getElementById('modalPeso').classList.add('abierto');
+
+  // Muestra el panel de "peso en vivo" solo si hay báscula conectada en
+  // este dispositivo y el usuario no desactivó su uso en Configuración —
+  // si no hay báscula, el teclado numérico sigue funcionando igual que
+  // siempre, sin ningún cambio visible.
+  const panelBascula = document.getElementById('basculaEnVivo');
+  const usarBascula = localStorage.getItem('bascula_usar_en_mostrador') !== '0';
+  if (panelBascula && usarBascula && typeof basculaConectada === 'function' && basculaConectada()) {
+    panelBascula.style.display = 'block';
+    const valorTexto = document.getElementById('basculaPesoLive');
+    const ultimo = ultimoPesoBascula();
+    if (ultimo !== null) valorTexto.textContent = ultimo.toFixed(3);
+    cancelarSuscripcionPesoModal = suscribirsePeso((peso) => {
+      valorTexto.textContent = peso.toFixed(3);
+    });
+  } else if (panelBascula) {
+    panelBascula.style.display = 'none';
+  }
+}
+
+// Toma la última lectura de la báscula y la coloca como si se hubiera
+// tecleado a mano — el usuario todavía puede corregirla con el teclado
+// antes de confirmar.
+function usarPesoBascula() {
+  const peso = ultimoPesoBascula();
+  if (peso === null || peso === undefined) {
+    mostrarToast('Aún no hay una lectura de la báscula', 'error');
+    return;
+  }
+  pesoActual = peso.toFixed(3);
+  actualizarDisplayPeso();
 }
 
 function teclear(valor) {
@@ -229,16 +265,33 @@ function confirmarPeso() {
   const peso = parseFloat(pesoActual || '0');
   if (peso <= 0) { mostrarToast('Ingresa un peso válido', 'error'); return; }
 
+  const precioUnitario = precioEfectivo(productoSeleccionado, peso);
   carrito.push({
     tipo: 'producto',
     producto_id: productoSeleccionado.id,
     nombre_producto: productoSeleccionado.nombre,
     cantidad: peso,
-    precio_unitario: precioEfectivo(productoSeleccionado, peso)
+    precio_unitario: precioUnitario
   });
 
   renderCarrito();
   cerrarModal('modalPeso');
+
+  // Etiqueta final de bolsa: solo si el negocio eligió que Compoint la
+  // genere ("sistema") — si eligieron "auto" (la propia báscula imprime su
+  // etiqueta, o no usan etiqueta), no se hace nada aquí. No bloquea la
+  // venta si falla (ej. impresora de etiquetas sin conectar): se avisa con
+  // un toast, pero el producto ya quedó agregado al carrito.
+  if (configuracionNegocio && configuracionNegocio.etiqueta_modo === 'sistema' && typeof imprimirEtiquetaPeso === 'function') {
+    imprimirEtiquetaPeso({
+      nombreProducto: productoSeleccionado.nombre,
+      peso,
+      precioUnitario,
+      subtotal: peso * precioUnitario,
+      codigo: productoSeleccionado.codigo_barras || productoSeleccionado.id,
+      ancho_etiqueta: configuracionNegocio.ancho_etiqueta || '50mm'
+    }).catch(err => mostrarToast('No se pudo imprimir la etiqueta: ' + err.message, 'error'));
+  }
 }
 
 // ---------- Modal de UNIDAD (piezas) ----------
@@ -290,6 +343,10 @@ function agregarKit(kit) {
 
 function cerrarModal(id) {
   document.getElementById(id).classList.remove('abierto');
+  if (id === 'modalPeso' && cancelarSuscripcionPesoModal) {
+    cancelarSuscripcionPesoModal();
+    cancelarSuscripcionPesoModal = null;
+  }
 }
 
 // ---------- Escáner de código de barras ----------

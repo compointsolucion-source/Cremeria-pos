@@ -22,10 +22,15 @@ function estadoInicialCanalImpresora() {
 
 const canalesImpresora = {
   ticket: estadoInicialCanalImpresora(),
-  ficha: estadoInicialCanalImpresora()
+  ficha: estadoInicialCanalImpresora(),
+  etiqueta: estadoInicialCanalImpresora()
 };
 
-function nombreCanal(canal) { return canal === 'ficha' ? 'de fichas' : 'de tickets'; }
+function nombreCanal(canal) {
+  if (canal === 'ficha') return 'de fichas';
+  if (canal === 'etiqueta') return 'de etiquetas';
+  return 'de tickets';
+}
 function bluetoothDisponible() { return !!navigator.bluetooth; }
 function usbDisponible() { return !!navigator.usb; }
 
@@ -183,6 +188,7 @@ async function enviarBytes(bytes, canal = 'ticket') {
 // canales, cada uno de forma independiente.
 intentarReconexionAutomatica('ticket');
 intentarReconexionAutomatica('ficha');
+intentarReconexionAutomatica('etiqueta');
 
 // ---------- Impresión por red (IP), vía el intermediario local ----------
 // Un navegador no puede abrir una conexión directa por IP a una impresora
@@ -222,6 +228,22 @@ async function enviarBytesPorRed(bytes, config) {
   if (!respuesta.ok) {
     throw new Error(datos.error || 'Error al imprimir por red');
   }
+}
+
+// Misma idea que configuracionRedFicha(), pero para el canal de etiquetas
+// (ej. una impresora de etiquetas tipo Torrey en red en vez de Bluetooth/USB).
+function configuracionRedEtiqueta() {
+  return {
+    urlIntermediario: localStorage.getItem('intermediario_url_etiqueta') || '',
+    ipImpresora: localStorage.getItem('intermediario_ip_impresora_etiqueta') || '',
+    puertoImpresora: parseInt(localStorage.getItem('intermediario_puerto_impresora_etiqueta') || '9100')
+  };
+}
+
+function guardarConfiguracionRedEtiqueta(urlIntermediario, ipImpresora, puertoImpresora) {
+  localStorage.setItem('intermediario_url_etiqueta', urlIntermediario);
+  localStorage.setItem('intermediario_ip_impresora_etiqueta', ipImpresora);
+  localStorage.setItem('intermediario_puerto_impresora_etiqueta', puertoImpresora || 9100);
 }
 
 // Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
@@ -294,6 +316,86 @@ async function imprimirFicha(numero, ancho_ticket) {
     await enviarBytesPorRed(comandos, configRed);
   } else {
     await enviarBytes(comandos, 'ficha');
+  }
+}
+
+// Imprime la etiqueta final de un producto pesado: nombre, peso, precio
+// unitario, total y (si se pudo generar) un código de barras con el folio o
+// el id del producto — pensada para pegarse en la bolsa como entrega final,
+// al estilo de las etiquetas que imprimen básculas Torrey/Rhino con
+// impresora de etiquetas integrada, pero generada aquí por el sistema para
+// que el precio y el nombre salgan exactamente como están en Compoint.
+// "ancho_etiqueta" acepta '40mm' | '50mm' | '58mm' (más angosto que un
+// ticket normal, porque una etiqueta de bolsa no necesita tanto ancho).
+async function imprimirEtiquetaPeso({ nombreProducto, peso, precioUnitario, subtotal, codigo, ancho_etiqueta = '50mm' }) {
+  const configRed = configuracionRedEtiqueta();
+  const usaRed = !!(configRed.urlIntermediario && configRed.ipImpresora);
+
+  if (!usaRed) {
+    if (!impresoraConectada('etiqueta')) {
+      await reconectarSiEsPosible('etiqueta');
+    }
+    if (!impresoraConectada('etiqueta')) {
+      throw new Error('No hay impresora de etiquetas conectada. Configúrala en Configuración → Báscula → Etiqueta final.');
+    }
+  }
+
+  const columnas = ancho_etiqueta === '40mm' ? 24 : (ancho_etiqueta === '58mm' ? 32 : 28);
+  const centrar = (texto) => {
+    const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
+    return ' '.repeat(espacios) + texto;
+  };
+  const envolverTexto = (texto) => {
+    if (texto.length <= columnas) return [texto];
+    const palabras = texto.split(' ');
+    const renglones = [];
+    let actual = '';
+    palabras.forEach(palabra => {
+      if ((actual + ' ' + palabra).trim().length > columnas) {
+        if (actual) renglones.push(actual.trim());
+        actual = palabra;
+      } else {
+        actual = (actual + ' ' + palabra).trim();
+      }
+    });
+    if (actual) renglones.push(actual);
+    return renglones;
+  };
+
+  const ESC = 0x1B, GS = 0x1D;
+  const inicializar = new Uint8Array([ESC, 0x40]);
+
+  const partes = [inicializar];
+  envolverTexto(nombreProducto).forEach(renglon => {
+    partes.push(bytesConEstilo(renglon, { negrita: true }));
+  });
+  partes.push(bytesDeLineas([
+    `Peso: ${peso.toFixed(3)} kg`,
+    `P/U: $${precioUnitario.toFixed(2)}`
+  ]));
+  partes.push(bytesConEstilo(`TOTAL: $${subtotal.toFixed(2)}`, { negrita: true }));
+
+  // Código de barras con el id/código del producto, si se proporcionó — útil
+  // para volver a escanear la bolsa en caja en vez de buscar el producto a mano.
+  if (codigo && typeof JsBarcode !== 'undefined') {
+    try {
+      const anchoPx = ancho_etiqueta === '58mm' ? 220 : (ancho_etiqueta === '40mm' ? 160 : 190);
+      const canvasBarras = generarCanvasBarras(String(codigo), anchoPx);
+      partes.push(canvasAComandosRaster(canvasBarras));
+    } catch (err) {
+      console.error('No se pudo generar el código de barras de la etiqueta:', err.message);
+    }
+  }
+
+  partes.push(new Uint8Array([0x0A, 0x0A]));
+  partes.push(new Uint8Array([GS, 0x56, 0x00])); // cortar papel (si la impresora lo soporta)
+
+  const comandos = bytesJuntos(partes);
+
+  if (usaRed) {
+    await enviarBytesPorRed(comandos, configRed);
+  } else {
+    await enviarBytes(comandos, 'etiqueta');
   }
 }
 

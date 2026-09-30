@@ -212,6 +212,10 @@
   <div class="modal-overlay" id="modalPeso">
     <div class="modal-caja">
       <h3 id="modalProductoNombre">Producto</h3>
+      <div id="basculaEnVivo" style="display:none; background:#F4F5F6; border-radius:10px; padding:8px 12px; margin-bottom:10px; text-align:center; font-size:14px;">
+        ⚖️ Báscula: <b id="basculaPesoLive">0.000</b> kg
+        <button class="btn btn-secondary" style="margin-left:8px; padding:4px 10px; font-size:13px;" onclick="usarPesoBascula()">Usar este peso</button>
+      </div>
       <div class="display-valor" id="displayPeso">0.000</div>
       <div class="subtotal-preview" id="subtotalPreview">Subtotal: $0.00</div>
       <div class="teclado">
@@ -258,6 +262,7 @@
 <script src="js/ui-components.js"></script>
 <script src="js/lector-fisico.js"></script>
 <script src="js/impresora-termica.js"></script>
+<script src="js/bascula.js"></script>
 <script src="js/offline-db.js"></script>
 <script src="js/mostrador.js"></script>
 <script src="js/registrar-sw.js"></script>

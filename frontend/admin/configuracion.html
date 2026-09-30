@@ -83,6 +83,75 @@
       </div>
     </div>
 
+    <!-- ============ BÁSCULA ============ -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="header-plegable" onclick="toggleSeccionConfig('secBascula')">
+        <h3 class="card-titulo-grande">⚖️ Báscula de Este Dispositivo</h3>
+        <span class="flecha-plegable" id="flecha-secBascula">▾</span>
+      </div>
+      <div class="form-config seccion-plegable" id="secBascula">
+        <p class="card-subtexto">Conecta una báscula para leer el peso en vivo al pesar un producto en Mostrador, en vez de teclearlo a mano. Es una ayuda opcional — si no la conectas, el teclado numérico sigue funcionando igual que siempre.</p>
+        <p class="nota-pequena">Nota: no existe un solo protocolo que compartan todas las marcas de básculas. Esto funciona con la mayoría de básculas puestas en modo "salida continua" (revisa el manual de tu báscula para activarlo), pero puede necesitar ajustar la velocidad (baud rate) según el modelo real que conectes. Si el peso no se lee bien, siempre puedes seguir tecleándolo a mano.</p>
+
+        <div class="estado-impresora desconectada" id="estadoBascula">Sin conectar en este dispositivo</div>
+        <p id="basculaPesoActualTexto" style="text-align:center; font-size:22px; font-weight:700; display:none; margin:4px 0 10px;">⚖️ <span id="basculaPesoActualValor">0.000</span> kg</p>
+
+        <p class="subtitulo-seccion">Velocidad del puerto (baud rate) — solo para conexión USB</p>
+        <select id="basculaBaudRate">
+          <option value="9600">9600 (la más común)</option>
+          <option value="4800">4800</option>
+          <option value="2400">2400</option>
+          <option value="19200">19200</option>
+        </select>
+        <p class="nota-pequena">Si no sabes cuál usa tu báscula, deja 9600 e intenta conectar — es la velocidad más común en básculas comerciales. Si el peso se ve como símbolos o no aparece, prueba con otra.</p>
+
+        <button class="btn btn-secondary" onclick="conectarBasculaUSB()" style="margin-top:8px;">🔌 Conectar por USB (puerto serie)</button>
+        <button class="btn btn-primary" onclick="conectarBasculaBT()" style="margin-top:8px;">🔵 Conectar Bluetooth</button>
+        <button class="btn btn-secondary" onclick="desconectarBasculaUI()" style="margin-top:8px;">Desconectar</button>
+
+        <label style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+          <input type="checkbox" id="basculaUsarEnMostrador" onchange="guardarUsoBasculaMostrador()">
+          Usar el peso de la báscula en Mostrador (si está conectada)
+        </label>
+
+        <hr style="border:none; border-top:1px solid #eee; margin:16px 0;">
+
+        <p class="subtitulo-seccion">🏷️ Etiqueta final (bolsa) — tipo Torrey</p>
+        <p class="nota-pequena">Elige cómo se genera la etiqueta que se pega en la bolsa al final de pesar un producto. Esta opción aplica a todo el negocio (todos los mostradores), no solo a este dispositivo.</p>
+        <select id="etiquetaModo" onchange="guardarEtiquetaConfig()">
+          <option value="auto">Automático — la propia báscula imprime su etiqueta (o no se usa etiqueta)</option>
+          <option value="sistema">Compoint genera e imprime la etiqueta con una impresora de etiquetas conectada</option>
+        </select>
+        <select id="anchoEtiqueta" onchange="guardarEtiquetaConfig()" style="margin-top:8px;">
+          <option value="40mm">Etiqueta de 40mm</option>
+          <option value="50mm">Etiqueta de 50mm</option>
+          <option value="58mm">Etiqueta de 58mm</option>
+        </select>
+
+        <div id="secImpresoraEtiqueta" style="margin-top:12px;">
+          <p class="subtitulo-seccion">Impresora de Etiquetas de este dispositivo</p>
+          <div class="estado-impresora desconectada" id="estadoImpresoraEtiqueta">Sin conectar en este dispositivo</div>
+          <button class="btn btn-primary" onclick="conectar('etiqueta')">🔵 Conectar Bluetooth</button>
+          <button class="btn btn-secondary" onclick="conectarUSB('etiqueta')" style="margin-top:8px;">🔌 Conectar USB</button>
+          <button class="btn btn-secondary" onclick="probarImpresionEtiqueta()" style="margin-top:8px;">🖨️ Probar impresión (Etiqueta)</button>
+
+          <p class="subtitulo-seccion" style="margin-top:16px;">🌐 O imprimir Etiquetas por Red (IP), en vez de Bluetooth/USB</p>
+          <p class="nota-pequena">Necesitas tener corriendo el "Intermediario de Impresión" en una computadora de tu misma red WiFi. Si no lo tienes, pide el instalador.</p>
+          <input type="text" id="intermediarioUrlEtiqueta" placeholder="URL del intermediario (ej. http://192.168.1.50:3500)">
+          <div class="fila-doble" style="margin-top:8px;">
+            <input type="text" id="intermediarioIpImpresoraEtiqueta" placeholder="IP de la impresora (ej. 192.168.1.100)">
+            <input type="number" id="intermediarioPuertoImpresoraEtiqueta" placeholder="Puerto (normalmente 9100)" value="9100">
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="guardarConfigRedEtiquetaUI()">Guardar</button>
+            <button class="btn btn-secondary" onclick="probarIntermediarioEtiquetaUI()">🔍 Probar conexión al intermediario</button>
+            <button class="btn btn-secondary" onclick="quitarConfigRedEtiquetaUI()">Quitar (volver a Bluetooth/USB)</button>
+          </div>
+          <p class="nota-pequena" id="estadoRedEtiquetaTexto"></p>
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:16px;">
       <div class="header-plegable" onclick="toggleSeccionConfig('secMetodo')">
         <h3 class="card-titulo-grande">Método de impresión en este dispositivo</h3>
@@ -412,6 +481,7 @@
 <script src="../js/ui-components.js"></script>
 <script src="../js/imagen-utils.js"></script>
 <script src="../js/impresora-termica.js"></script>
+<script src="../js/bascula.js"></script>
 <script>
 requiereLogin();
 let logoBase64 = '';
@@ -480,10 +550,16 @@ document.getElementById('logoInput').addEventListener('change', async (e) => {
   }
 });
 
+function elementoEstadoImpresora(canal) {
+  if (canal === 'ficha') return 'estadoImpresoraFicha';
+  if (canal === 'etiqueta') return 'estadoImpresoraEtiqueta';
+  return 'estadoImpresoraTicket';
+}
+
 async function conectar(canal) {
   try {
     const nombre = await conectarImpresora(canal);
-    const elemento = document.getElementById(canal === 'ficha' ? 'estadoImpresoraFicha' : 'estadoImpresoraTicket');
+    const elemento = document.getElementById(elementoEstadoImpresora(canal));
     elemento.className = 'estado-impresora conectada';
     elemento.textContent = `Conectada: ${nombre}`;
   } catch (err) {
@@ -494,9 +570,136 @@ async function conectar(canal) {
 async function conectarUSB(canal) {
   try {
     const nombre = await conectarImpresoraUSB(canal);
-    const elemento = document.getElementById(canal === 'ficha' ? 'estadoImpresoraFicha' : 'estadoImpresoraTicket');
+    const elemento = document.getElementById(elementoEstadoImpresora(canal));
     elemento.className = 'estado-impresora conectada';
     elemento.textContent = `Conectada: ${nombre}`;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ---------- Báscula ----------
+function actualizarEstadoBasculaUI(nombre) {
+  const elemento = document.getElementById('estadoBascula');
+  elemento.className = 'estado-impresora conectada';
+  elemento.textContent = `Conectada: ${nombre}`;
+}
+
+async function conectarBasculaUSB() {
+  try {
+    const baudRate = parseInt(document.getElementById('basculaBaudRate').value || '9600');
+    const nombre = await conectarBasculaSerial(baudRate);
+    actualizarEstadoBasculaUI(nombre);
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function conectarBasculaBT() {
+  try {
+    const nombre = await conectarBasculaBluetooth();
+    actualizarEstadoBasculaUI(nombre);
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function desconectarBasculaUI() {
+  await desconectarBascula();
+  const elemento = document.getElementById('estadoBascula');
+  elemento.className = 'estado-impresora desconectada';
+  elemento.textContent = 'Sin conectar en este dispositivo';
+  document.getElementById('basculaPesoActualTexto').style.display = 'none';
+  mostrarToast('Báscula desconectada', 'exito');
+}
+
+function guardarUsoBasculaMostrador() {
+  localStorage.setItem('bascula_usar_en_mostrador', document.getElementById('basculaUsarEnMostrador').checked ? '1' : '0');
+}
+
+function cargarUsoBasculaMostrador() {
+  document.getElementById('basculaUsarEnMostrador').checked = localStorage.getItem('bascula_usar_en_mostrador') !== '0';
+}
+
+// Muestra en vivo, en esta misma pantalla, cada peso que llegue de la
+// báscula — así se puede probar la conexión sin tener que ir a Mostrador.
+suscribirsePeso((peso) => {
+  const texto = document.getElementById('basculaPesoActualTexto');
+  const valor = document.getElementById('basculaPesoActualValor');
+  if (!texto || !valor) return;
+  texto.style.display = 'block';
+  valor.textContent = peso.toFixed(3);
+});
+
+// ---------- Etiqueta final (bolsa) ----------
+function guardarEtiquetaConfig() {
+  const etiqueta_modo = document.getElementById('etiquetaModo').value;
+  const ancho_etiqueta = document.getElementById('anchoEtiqueta').value;
+  apiFetch('/configuracion', { method: 'PUT', body: JSON.stringify({ etiqueta_modo, ancho_etiqueta }) })
+    .then(() => mostrarToast('Configuración de etiqueta guardada', 'exito'))
+    .catch(err => mostrarToast(err.message, 'error'));
+}
+
+function cargarConfigRedEtiquetaUI() {
+  const config = configuracionRedEtiqueta();
+  document.getElementById('intermediarioUrlEtiqueta').value = config.urlIntermediario;
+  document.getElementById('intermediarioIpImpresoraEtiqueta').value = config.ipImpresora;
+  document.getElementById('intermediarioPuertoImpresoraEtiqueta').value = config.puertoImpresora || 9100;
+  actualizarEstadoRedEtiquetaTexto();
+}
+
+function actualizarEstadoRedEtiquetaTexto() {
+  const config = configuracionRedEtiqueta();
+  const texto = document.getElementById('estadoRedEtiquetaTexto');
+  texto.textContent = (config.urlIntermediario && config.ipImpresora)
+    ? '✅ Configurado — las etiquetas se imprimirán por red en vez de Bluetooth/USB en este dispositivo.'
+    : 'Sin configurar — las etiquetas usan Bluetooth/USB normal.';
+}
+
+function guardarConfigRedEtiquetaUI() {
+  const url = document.getElementById('intermediarioUrlEtiqueta').value.trim();
+  const ip = document.getElementById('intermediarioIpImpresoraEtiqueta').value.trim();
+  const puerto = parseInt(document.getElementById('intermediarioPuertoImpresoraEtiqueta').value || 9100);
+
+  if (!url || !ip) { mostrarToast('Completa la URL del intermediario y la IP de la impresora', 'error'); return; }
+
+  guardarConfiguracionRedEtiqueta(url, ip, puerto);
+  actualizarEstadoRedEtiquetaTexto();
+  mostrarToast('Configuración de red guardada para este dispositivo', 'exito');
+}
+
+function quitarConfigRedEtiquetaUI() {
+  guardarConfiguracionRedEtiqueta('', '', 9100);
+  document.getElementById('intermediarioUrlEtiqueta').value = '';
+  document.getElementById('intermediarioIpImpresoraEtiqueta').value = '';
+  document.getElementById('intermediarioPuertoImpresoraEtiqueta').value = 9100;
+  actualizarEstadoRedEtiquetaTexto();
+  mostrarToast('Configuración de red quitada — vuelve a usar Bluetooth/USB', 'exito');
+}
+
+async function probarIntermediarioEtiquetaUI() {
+  const url = document.getElementById('intermediarioUrlEtiqueta').value.trim();
+  if (!url) { mostrarToast('Escribe primero la URL del intermediario', 'error'); return; }
+  try {
+    await probarIntermediarioRed(url);
+    mostrarToast('✅ El intermediario respondió correctamente', 'exito');
+  } catch (err) {
+    mostrarToast('No se pudo conectar con el intermediario: ' + err.message, 'error');
+  }
+}
+
+async function probarImpresionEtiqueta() {
+  const ancho_etiqueta = document.getElementById('anchoEtiqueta').value || '50mm';
+  try {
+    await imprimirEtiquetaPeso({
+      nombreProducto: 'Producto de Prueba',
+      peso: 1.250,
+      precioUnitario: 120,
+      subtotal: 150,
+      codigo: '0000000001',
+      ancho_etiqueta
+    });
+    mostrarToast('Etiqueta de prueba impresa', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
@@ -510,6 +713,8 @@ async function cargarConfiguracion() {
     document.getElementById('rfc').value = config.rfc || '';
     document.getElementById('anchoTicket').value = config.ancho_ticket || '80mm';
     document.getElementById('terminos').value = config.terminos || '';
+    document.getElementById('etiquetaModo').value = config.etiqueta_modo || 'auto';
+    document.getElementById('anchoEtiqueta').value = config.ancho_etiqueta || '50mm';
 
     document.getElementById('tamanoLetra').value = config.tamano_letra || 'normal';
     document.getElementById('tipoFuente').value = config.tipo_fuente || 'monospace';
@@ -962,10 +1167,12 @@ cargarConfiguracion();
 cargarLayoutMostrador();
 cargarColorTema();
 cargarConfigRedFichaUI();
+cargarConfigRedEtiquetaUI();
+cargarUsoBasculaMostrador();
 
-// Refleja si alguna de las 2 impresoras ya se reconectó sola (el intento
-// automático corre en paralelo al cargar la página, así que se espera un
-// instante para darle tiempo de terminar antes de revisar).
+// Refleja si alguna de las impresoras o la báscula ya se reconectó sola (el
+// intento automático corre en paralelo al cargar la página, así que se
+// espera un instante para darle tiempo de terminar antes de revisar).
 setTimeout(() => {
   if (impresoraConectada('ticket')) {
     document.getElementById('estadoImpresoraTicket').className = 'estado-impresora conectada';
@@ -974,6 +1181,13 @@ setTimeout(() => {
   if (impresoraConectada('ficha')) {
     document.getElementById('estadoImpresoraFicha').className = 'estado-impresora conectada';
     document.getElementById('estadoImpresoraFicha').textContent = 'Conectada (reconexión automática)';
+  }
+  if (impresoraConectada('etiqueta')) {
+    document.getElementById('estadoImpresoraEtiqueta').className = 'estado-impresora conectada';
+    document.getElementById('estadoImpresoraEtiqueta').textContent = 'Conectada (reconexión automática)';
+  }
+  if (basculaConectada()) {
+    actualizarEstadoBasculaUI('Reconexión automática');
   }
 }, 1500);
 </script>
