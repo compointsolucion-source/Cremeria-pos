@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 const VALORES_POR_DEFECTO = {
   logo_url: null,
@@ -91,9 +95,9 @@ const VALIDACIONES = {
 // Obtener la configuración de la sucursal (valores por defecto si no existe)
 router.get('/', verificarToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM configuracion WHERE sucursal_id = $1', [req.usuario.sucursal_id]);
+    const result = await pool.query('SELECT * FROM configuracion WHERE sucursal_id = $1', [req.sucursalId]);
     if (result.rows.length === 0) {
-      return res.json({ sucursal_id: req.usuario.sucursal_id, ...VALORES_POR_DEFECTO });
+      return res.json({ sucursal_id: req.sucursalId, ...VALORES_POR_DEFECTO });
     }
     res.json(result.rows[0]);
   } catch (err) {
@@ -105,7 +109,7 @@ router.get('/', verificarToken, async (req, res) => {
 // Actualizar (o crear si no existe) la configuración. Construye el UPDATE
 // dinámicamente solo con los campos que realmente llegaron en el body —
 // los demás se quedan como estaban (no se pisan con null por accidente).
-router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.put('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const camposRecibidos = CAMPOS_EDITABLES.filter(campo => req.body[campo] !== undefined);
 
@@ -117,13 +121,13 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
     }
 
     if (camposRecibidos.length === 0) {
-      const actual = await pool.query('SELECT * FROM configuracion WHERE sucursal_id = $1', [req.usuario.sucursal_id]);
-      return res.json(actual.rows[0] || { sucursal_id: req.usuario.sucursal_id, ...VALORES_POR_DEFECTO });
+      const actual = await pool.query('SELECT * FROM configuracion WHERE sucursal_id = $1', [req.sucursalId]);
+      return res.json(actual.rows[0] || { sucursal_id: req.sucursalId, ...VALORES_POR_DEFECTO });
     }
 
     const columnas = ['sucursal_id', ...camposRecibidos];
     const valores = [
-      req.usuario.sucursal_id,
+      req.sucursalId,
       ...camposRecibidos.map(c => CAMPOS_JSON.includes(c) ? JSON.stringify(req.body[c]) : req.body[c])
     ];
     const marcadores = valores.map((_, i) => `$${i + 1}`);
@@ -141,7 +145,7 @@ router.put('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
       usuario_id: req.usuario.id,
       accion: 'actualizar_configuracion',
       modulo: 'configuracion',
-      referencia_id: req.usuario.sucursal_id,
+      referencia_id: req.sucursalId,
       // logo_url y promos_pantalla_turnos excluidos a propósito: pueden pesar
       // varios KB (imágenes/URLs), no aportan nada útil en la bitácora
       valor_nuevo: Object.fromEntries(camposRecibidos.filter(c => !['logo_url', 'promos_pantalla_turnos'].includes(c)).map(c => [c, req.body[c]]))

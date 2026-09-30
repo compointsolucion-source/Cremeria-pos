@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requierePermiso } = require('../middleware/auth');
+const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Resuelve el rango de fechas: si no se especifica, usa "hoy" completo.
 function resolverRango(query) {
@@ -17,7 +21,7 @@ function resolverRango(query) {
 router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
 
     // Resumen por método de pago
     const porMetodo = await pool.query(
@@ -117,7 +121,7 @@ router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (re
 router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
 
     const result = await pool.query(
       `SELECT t.folio, t.fecha_pago, t.metodo_pago, t.total, t.descuento_monto, u.nombre AS cajero
@@ -146,7 +150,7 @@ router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER
 router.get('/compras', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
 
     const porProveedor = await pool.query(
       `SELECT pr.nombre AS proveedor, COALESCE(SUM(c.total),0) AS total, COUNT(*) AS num_compras
@@ -187,7 +191,7 @@ router.get('/compras', verificarToken, requierePermiso('REPORTES_VER'), async (r
 router.get('/clientes', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
     const { desde, hasta } = resolverRango(req.query);
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
 
     const deudaActiva = await pool.query(
       `SELECT COALESCE(SUM(saldo_actual),0) AS total FROM clientes WHERE sucursal_id = $1 AND activo = true`,

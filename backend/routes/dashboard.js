@@ -1,11 +1,75 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
+
+// Dashboard consolidado, solo para jefe_general: suma todas las sucursales
+// ACTIVAS en un solo vistazo, sin tener que entrar una por una. Se define
+// ANTES del router.use(...) de abajo (y trae su propio verificarToken) a
+// propósito: esta ruta no debe exigir una sucursal seleccionada — es
+// justo lo contrario, ve todas a la vez.
+router.get('/general', verificarToken, requiereRol('jefe_general'), async (req, res) => {
+  try {
+    const ahora = new Date();
+    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
+
+    const porSucursal = await pool.query(
+      `SELECT
+         s.id, s.nombre,
+         COALESCE(v.total, 0) AS ventas_hoy,
+         COALESCE(v.num_tickets, 0) AS tickets_hoy,
+         COALESCE(f.total, 0) AS fiado_total,
+         COALESCE(b.bajos, 0) AS stock_bajo_count,
+         COALESCE(b.agotados, 0) AS agotados_count
+       FROM sucursales s
+       LEFT JOIN (
+         SELECT sucursal_id, SUM(total) AS total, COUNT(*) AS num_tickets
+         FROM tickets
+         WHERE estado = 'pagado' AND fecha_pago BETWEEN $1 AND $2
+         GROUP BY sucursal_id
+       ) v ON v.sucursal_id = s.id
+       LEFT JOIN (
+         SELECT sucursal_id, SUM(saldo_actual) AS total
+         FROM clientes WHERE activo = true
+         GROUP BY sucursal_id
+       ) f ON f.sucursal_id = s.id
+       LEFT JOIN (
+         SELECT p.sucursal_id,
+           COUNT(*) FILTER (WHERE i.existencia_actual <= i.stock_minimo AND i.existencia_actual > 0) AS bajos,
+           COUNT(*) FILTER (WHERE i.existencia_actual <= 0) AS agotados
+         FROM inventario i JOIN productos p ON i.producto_id = p.id
+         WHERE p.activo = true
+         GROUP BY p.sucursal_id
+       ) b ON b.sucursal_id = s.id
+       WHERE s.activa = true
+       ORDER BY s.nombre ASC`,
+      [inicioHoy, finHoy]
+    );
+
+    const totales = porSucursal.rows.reduce((acc, fila) => {
+      acc.ventas_hoy += parseFloat(fila.ventas_hoy);
+      acc.tickets_hoy += parseInt(fila.tickets_hoy, 10);
+      acc.fiado_total += parseFloat(fila.fiado_total);
+      acc.stock_bajo_count += parseInt(fila.stock_bajo_count, 10);
+      acc.agotados_count += parseInt(fila.agotados_count, 10);
+      return acc;
+    }, { ventas_hoy: 0, tickets_hoy: 0, fiado_total: 0, stock_bajo_count: 0, agotados_count: 0 });
+
+    res.json({ sucursales: porSucursal.rows, totales });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al generar el dashboard general' });
+  }
+});
+
+// Toda ruta DE AQUÍ EN ADELANTE ya filtra por sucursal — se resuelve una
+// sola vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 router.get('/resumen', verificarToken, async (req, res) => {
   try {
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
     const ahora = new Date();
     const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
     const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);

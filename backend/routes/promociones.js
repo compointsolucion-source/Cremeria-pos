@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, tienePermiso } = require('../middleware/auth');
+const { verificarToken, tienePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 function puedeEditarPrecios(req, res, next) {
   if (tienePermiso(req.usuario, 'PRODUCTOS_PRECIO') || tienePermiso(req.usuario, 'PRODUCTOS_EDITAR')) return next();
@@ -31,7 +35,7 @@ router.post('/:producto_id', verificarToken, puedeEditarPrecios, async (req, res
       return res.status(400).json({ error: 'Cantidad mínima y precio promocional deben ser mayores a 0' });
     }
 
-    const productoResult = await pool.query('SELECT precio FROM productos WHERE id = $1 AND sucursal_id = $2', [req.params.producto_id, req.usuario.sucursal_id]);
+    const productoResult = await pool.query('SELECT precio FROM productos WHERE id = $1 AND sucursal_id = $2', [req.params.producto_id, req.sucursalId]);
     if (productoResult.rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
     if (parseFloat(precio_promocional) >= parseFloat(productoResult.rows[0].precio)) {
       return res.status(400).json({ error: 'El precio promocional debe ser menor al precio normal del producto' });

@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol, requierePermiso, tienePermiso } = require('../middleware/auth');
+const { verificarToken, requiereRol, requierePermiso, tienePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Inventario valorizado: costo total, valor potencial de venta, margen potencial.
 // El "costo" usa el promedio de costo_unitario de las compras registradas de
@@ -30,7 +34,7 @@ router.get('/valorizado', verificarToken, requierePermiso('INVENTARIO_VER'), asy
        LEFT JOIN costos_promedio cp ON p.id = cp.producto_id
        WHERE p.sucursal_id = $1 AND p.activo = true
        ORDER BY p.nombre ASC`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
 
     const totalCosto = result.rows.reduce((sum, r) => sum + (r.valor_costo ? parseFloat(r.valor_costo) : 0), 0);
@@ -69,7 +73,7 @@ router.get('/reporte', verificarToken, requierePermiso('INVENTARIO_VER'), async 
        WHERE p.sucursal_id = $1 AND p.activo = true AND p.usa_inventario = true
          AND ($2::int IS NULL OR p.categoria_id = $2)
        ORDER BY p.nombre ASC`,
-      [req.usuario.sucursal_id, categoria_id || null]
+      [req.sucursalId, categoria_id || null]
     );
 
     const costoTotal = result.rows.reduce((sum, r) => sum + (r.precio_costo ? parseFloat(r.precio_costo) * parseFloat(r.existencia) : 0), 0);
@@ -94,7 +98,7 @@ router.get('/', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, r
        LEFT JOIN inventario i ON p.id = i.producto_id
        WHERE p.sucursal_id = $1 AND p.activo = true
        ORDER BY p.nombre ASC`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -110,7 +114,7 @@ router.get('/alertas', verificarToken, async (req, res) => {
       `SELECT p.id AS producto_id, p.nombre, i.existencia_actual, i.stock_minimo
        FROM inventario i JOIN productos p ON i.producto_id = p.id
        WHERE p.sucursal_id = $1 AND i.existencia_actual <= i.stock_minimo AND p.activo = true`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -120,7 +124,7 @@ router.get('/alertas', verificarToken, async (req, res) => {
 });
 
 // Configurar el stock mínimo de un producto
-router.put('/:producto_id/minimo', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.put('/:producto_id/minimo', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { stock_minimo, stock_maximo } = req.body;
     await pool.query(

@@ -69,8 +69,11 @@ async function login() {
     localStorage.setItem('token', data.token);
     localStorage.setItem('usuario', JSON.stringify(data.usuario));
 
-    // Redirigir según rol
-    if (data.usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
+    // Redirigir según rol. jefe_general no tiene una sola sucursal fija —
+    // entra primero a elegir con cuál va a trabajar (o ver el resumen de
+    // todas), antes que a cualquier pantalla que ya asuma una sucursal.
+    if (data.usuario.rol === 'jefe_general') window.location.href = 'admin/sucursales.html';
+    else if (data.usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
     else if (data.usuario.rol === 'cajero') window.location.href = 'caja.html';
     else window.location.href = 'admin/dashboard.html';
   } catch (err) {

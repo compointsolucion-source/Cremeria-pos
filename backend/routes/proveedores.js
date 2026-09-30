@@ -1,13 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 router.get('/', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM proveedores WHERE sucursal_id = $1 AND activo = true ORDER BY nombre ASC',
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -16,14 +20,14 @@ router.get('/', verificarToken, async (req, res) => {
   }
 });
 
-router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { nombre, contacto, telefono } = req.body;
     if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
 
     const result = await pool.query(
       `INSERT INTO proveedores (sucursal_id, nombre, contacto, telefono) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.usuario.sucursal_id, nombre, contacto || null, telefono || null]
+      [req.sucursalId, nombre, contacto || null, telefono || null]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -32,9 +36,9 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
   }
 });
 
-router.delete('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.delete('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    await pool.query('UPDATE proveedores SET activo = false WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    await pool.query('UPDATE proveedores SET activo = false WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);

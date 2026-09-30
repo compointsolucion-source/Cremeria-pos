@@ -33,11 +33,27 @@ function cerrarSesion() {
   window.location.href = '/login.html';
 }
 
+// Para jefe_general (sucursal_id NULL: ve/opera TODAS las sucursales), cada
+// solicitud debe decir con cuál sucursal está trabajando en este momento —
+// se agrega aquí, en un solo lugar, en vez de tener que acordarse de
+// mandarlo en cada pantalla. El resto de los roles ya trae su sucursal fija
+// en el token y no les afecta en nada.
+function sucursalSeleccionada() {
+  return localStorage.getItem('sucursal_seleccionada') || '';
+}
+
+function fijarSucursalSeleccionada(id, nombre) {
+  localStorage.setItem('sucursal_seleccionada', id);
+  localStorage.setItem('sucursal_seleccionada_nombre', nombre || '');
+}
+
 async function apiFetch(endpoint, options = {}) {
   const token = getToken();
+  const usuario = getUsuario();
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(usuario && usuario.rol === 'jefe_general' && sucursalSeleccionada() ? { 'X-Sucursal-Id': sucursalSeleccionada() } : {}),
     ...(options.headers || {})
   };
 

@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requierePermiso } = require('../middleware/auth');
+const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Historial de devoluciones
 router.get('/', verificarToken, async (req, res) => {
@@ -14,7 +18,7 @@ router.get('/', verificarToken, async (req, res) => {
        JOIN usuarios u ON d.usuario_id = u.id
        WHERE t.sucursal_id = $1
        ORDER BY d.fecha DESC LIMIT 50`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -41,7 +45,7 @@ router.post('/', verificarToken, requierePermiso('VENTAS_DEVOLVER'), async (req,
 
     const ticketResult = await conexion.query(
       'SELECT * FROM tickets WHERE id = $1 AND sucursal_id = $2 AND estado = $3',
-      [ticket_id, req.usuario.sucursal_id, 'pagado']
+      [ticket_id, req.sucursalId, 'pagado']
     );
     if (ticketResult.rows.length === 0) {
       await conexion.query('ROLLBACK');

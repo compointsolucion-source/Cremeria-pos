@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Solo dueño/gerente pueden ver la bitácora completa
-router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { modulo, usuario_id, desde, hasta } = req.query;
     const condiciones = [`u.sucursal_id = $1`];
-    const valores = [req.usuario.sucursal_id];
+    const valores = [req.sucursalId];
     let contador = 1;
 
     if (modulo) { contador++; condiciones.push(`b.modulo = $${contador}`); valores.push(modulo); }

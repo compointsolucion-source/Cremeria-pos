@@ -1,15 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Listar kits activos con sus productos incluidos
 router.get('/', verificarToken, async (req, res) => {
   try {
     const kitsResult = await pool.query(
       'SELECT * FROM kits WHERE sucursal_id = $1 AND activo = true ORDER BY nombre ASC',
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     const kits = kitsResult.rows;
 
@@ -35,7 +39,7 @@ router.get('/codigo/:codigo', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM kits WHERE codigo_barras = $1 AND sucursal_id = $2 AND activo = true',
-      [req.params.codigo, req.usuario.sucursal_id]
+      [req.params.codigo, req.sucursalId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'No existe un kit con ese código' });
     res.json(result.rows[0]);
@@ -46,7 +50,7 @@ router.get('/codigo/:codigo', verificarToken, async (req, res) => {
 });
 
 // Crear kit
-router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   const cliente = await pool.connect();
   try {
     const { nombre, precio_kit, imagen_url, codigo_barras, productos } = req.body;
@@ -59,7 +63,7 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
     const kitResult = await cliente.query(
       `INSERT INTO kits (sucursal_id, nombre, precio_kit, imagen_url, codigo_barras)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.usuario.sucursal_id, nombre, precio_kit, imagen_url || null, codigo_barras || null]
+      [req.sucursalId, nombre, precio_kit, imagen_url || null, codigo_barras || null]
     );
     const kit = kitResult.rows[0];
 
@@ -91,9 +95,9 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
 });
 
 // Desactivar kit
-router.delete('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.delete('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    await pool.query('UPDATE kits SET activo = false WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    await pool.query('UPDATE kits SET activo = false WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);

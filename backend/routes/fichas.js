@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, requiereSucursalId } = require('../middleware/auth');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Cancela automáticamente cualquier ficha que se haya quedado "esperando"
 // de un día anterior (nunca se atendió antes de cerrar el negocio). Se llama
@@ -20,7 +24,7 @@ async function limpiarFichasDeDiasAnteriores(sucursalId) {
 // hoy, empieza en 1).
 router.post('/', verificarToken, async (req, res) => {
   try {
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
     await limpiarFichasDeDiasAnteriores(sucursalId);
 
     const maxResult = await pool.query(
@@ -52,7 +56,7 @@ router.get('/ultima', verificarToken, async (req, res) => {
     const result = await pool.query(
       `SELECT * FROM fichas WHERE sucursal_id = $1 AND fecha_creacion::date = CURRENT_DATE
        ORDER BY fecha_creacion DESC LIMIT 1`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'No se ha generado ninguna ficha hoy' });
     res.json(result.rows[0]);
@@ -69,7 +73,7 @@ router.get('/actual', verificarToken, async (req, res) => {
     const result = await pool.query(
       `SELECT * FROM fichas WHERE sucursal_id = $1 AND estado = 'llamado'
        ORDER BY fecha_llamado DESC LIMIT 1`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows[0] || null);
   } catch (err) {
@@ -84,7 +88,7 @@ router.get('/recientes', verificarToken, async (req, res) => {
     const result = await pool.query(
       `SELECT * FROM fichas WHERE sucursal_id = $1 AND estado IN ('llamado','atendido')
        ORDER BY fecha_llamado DESC LIMIT 8`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -99,7 +103,7 @@ router.get('/pendientes-count', verificarToken, async (req, res) => {
     const result = await pool.query(
       `SELECT COUNT(*) AS total FROM fichas
        WHERE sucursal_id = $1 AND estado = 'esperando' AND fecha_creacion::date = CURRENT_DATE`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json({ total: parseInt(result.rows[0].total) });
   } catch (err) {
@@ -120,14 +124,14 @@ router.post('/llamar-siguiente', verificarToken, async (req, res) => {
     const { mostrador } = req.body;
     if (!mostrador) return res.status(400).json({ error: 'Especifica qué mostrador está llamando' });
 
-    await limpiarFichasDeDiasAnteriores(req.usuario.sucursal_id);
+    await limpiarFichasDeDiasAnteriores(req.sucursalId);
 
     await cliente.query('BEGIN');
 
     const siguienteResult = await cliente.query(
       `SELECT * FROM fichas WHERE sucursal_id = $1 AND estado = 'esperando'
        ORDER BY fecha_creacion ASC LIMIT 1 FOR UPDATE`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     if (siguienteResult.rows.length === 0) {
       await cliente.query('ROLLBACK');
@@ -145,7 +149,7 @@ router.post('/llamar-siguiente', verificarToken, async (req, res) => {
     await cliente.query('COMMIT');
 
     const io = req.app.get('io');
-    if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ficha_llamada', fichaLlamada);
+    if (io) io.to(`sucursal_${req.sucursalId}`).emit('ficha_llamada', fichaLlamada);
 
     res.json(fichaLlamada);
   } catch (err) {

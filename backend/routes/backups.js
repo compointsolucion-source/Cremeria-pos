@@ -1,16 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Exporta todos los datos de la sucursal en un solo JSON descargable.
 // Esto es una EXPORTACIÓN manual, no un sistema de backup automático ni de
 // restauración con un clic — restaurar estos datos requeriría reinsertarlos
 // manualmente en la base de datos. Se documenta así para no simular una
 // función de "restaurar" que no existe.
-router.get('/exportar', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.get('/exportar', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    const sucursalId = req.usuario.sucursal_id;
+    const sucursalId = req.sucursalId;
     const tablas = {};
 
     const consulta = async (nombre, sql, valores) => {

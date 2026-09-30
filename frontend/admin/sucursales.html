@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Sucursales - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
+  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .resumen-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .resumen-tile .valor { font-size: 22px; font-weight: 800; }
+  .resumen-tile .etiqueta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .form-sucursal { display: grid; gap: 10px; margin-bottom: 20px; }
+  .tope-aviso { font-size: 12.5px; color: var(--muted); margin-top: -4px; }
+  .sucursal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .sucursal-card.inactiva { opacity: 0.55; }
+  .sucursal-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sucursal-card-header h3 { font-size: 16px; }
+  .sucursal-datos { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .sucursal-acciones { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .sucursal-acciones .btn { font-size: 12.5px; padding: 7px 12px; min-height: 34px; }
+  .etiqueta-inactiva { display: inline-block; font-size: 11px; font-weight: 700; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; padding: 1px 7px; margin-left: 8px; }
+  .form-editar-sucursal { display: grid; gap: 8px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>🏬 Sucursales</h1></div>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <p class="titulo-seccion-panel">Resumen de todas las sucursales — hoy</p>
+    <div class="resumen-grid" id="resumenGeneral">
+      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Ventas de hoy</div></div>
+      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Tickets de hoy</div></div>
+      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Fiado pendiente</div></div>
+      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Productos en stock bajo</div></div>
+    </div>
+
+    <div class="card form-sucursal">
+      <h3>Nueva sucursal</h3>
+      <input type="text" id="nuevaSucursalNombre" placeholder="Nombre (ej. Sucursal Centro)">
+      <input type="text" id="nuevaSucursalDireccion" placeholder="Dirección (opcional)">
+      <input type="text" id="nuevaSucursalTelefono" placeholder="Teléfono (opcional)">
+      <button class="btn btn-primary" onclick="crearSucursal()">Dar de alta</button>
+      <p class="tope-aviso" id="topeAviso"></p>
+    </div>
+
+    <p class="titulo-seccion-panel">Todas las sucursales</p>
+    <div id="listaSucursales"></div>
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+
+const usuarioActual = getUsuario();
+if (!usuarioActual || usuarioActual.rol !== 'jefe_general') {
+  // Esta pantalla es exclusiva de jefe_general — cualquier otro rol no
+  // tiene nada que hacer aquí (su sucursal ya viene fija).
+  window.location.href = 'dashboard.html';
+}
+
+let sucursalesState = [];
+let topeSucursales = 0;
+
+function operarSucursal(id, nombre) {
+  fijarSucursalSeleccionada(id, nombre);
+  window.location.href = 'dashboard.html';
+}
+
+async function cargarResumenGeneral() {
+  try {
+    const data = await apiFetch('/dashboard/general');
+    const t = data.totales;
+    const tiles = document.querySelectorAll('#resumenGeneral .resumen-tile .valor');
+    tiles[0].textContent = `$${t.ventas_hoy.toFixed(2)}`;
+    tiles[1].textContent = t.tickets_hoy;
+    tiles[2].textContent = `$${t.fiado_total.toFixed(2)}`;
+    tiles[3].textContent = t.stock_bajo_count + t.agotados_count;
+  } catch (err) {
+    console.error('No se pudo cargar el resumen general:', err.message);
+  }
+}
+
+async function cargarSucursales() {
+  try {
+    const data = await apiFetch('/sucursales');
+    sucursalesState = data.sucursales;
+    topeSucursales = data.tope;
+
+    document.getElementById('topeAviso').textContent =
+      `${sucursalesState.length} de ${topeSucursales} sucursales usadas en esta instalación`;
+
+    document.getElementById('listaSucursales').innerHTML = sucursalesState.map(s => `
+      <div class="sucursal-card ${s.activa ? '' : 'inactiva'}">
+        <div class="sucursal-card-header">
+          <h3>${s.nombre}${s.activa ? '' : '<span class="etiqueta-inactiva">Inactiva</span>'}</h3>
+        </div>
+        <div class="sucursal-datos">${s.direccion || 'Sin dirección registrada'}${s.telefono ? ' · ' + s.telefono : ''}</div>
+        <div class="sucursal-acciones">
+          <button class="btn btn-primary" onclick="operarSucursal(${s.id}, '${s.nombre.replace(/'/g, "\\'")}')">Operar esta sucursal</button>
+          <button class="btn btn-secondary" onclick="mostrarFormEditar(${s.id})">Editar</button>
+          <button class="btn btn-secondary" onclick="alternarActiva(${s.id}, ${!s.activa})">${s.activa ? 'Desactivar' : 'Reactivar'}</button>
+        </div>
+        <div class="form-editar-sucursal" id="formEditar${s.id}" style="display:none;">
+          <input type="text" id="editarNombre${s.id}" value="${s.nombre.replace(/"/g, '&quot;')}" placeholder="Nombre">
+          <input type="text" id="editarDireccion${s.id}" value="${(s.direccion || '').replace(/"/g, '&quot;')}" placeholder="Dirección">
+          <input type="text" id="editarTelefono${s.id}" value="${(s.telefono || '').replace(/"/g, '&quot;')}" placeholder="Teléfono">
+          <button class="btn btn-primary" onclick="guardarEdicion(${s.id})">Guardar cambios</button>
+        </div>
+      </div>
+    `).join('') || '<p style="color:var(--muted); font-size:13px;">Sin sucursales todavía</p>';
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+function mostrarFormEditar(id) {
+  const form = document.getElementById(`formEditar${id}`);
+  form.style.display = form.style.display === 'none' ? 'grid' : 'none';
+}
+
+async function crearSucursal() {
+  const nombre = document.getElementById('nuevaSucursalNombre').value.trim();
+  if (!nombre) { mostrarToast('El nombre de la sucursal es obligatorio', 'error'); return; }
+  try {
+    await apiFetch('/sucursales', {
+      method: 'POST',
+      body: JSON.stringify({
+        nombre,
+        direccion: document.getElementById('nuevaSucursalDireccion').value.trim(),
+        telefono: document.getElementById('nuevaSucursalTelefono').value.trim()
+      })
+    });
+    document.getElementById('nuevaSucursalNombre').value = '';
+    document.getElementById('nuevaSucursalDireccion').value = '';
+    document.getElementById('nuevaSucursalTelefono').value = '';
+    mostrarToast('Sucursal creada', 'exito');
+    cargarSucursales();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function guardarEdicion(id) {
+  try {
+    await apiFetch(`/sucursales/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        nombre: document.getElementById(`editarNombre${id}`).value.trim(),
+        direccion: document.getElementById(`editarDireccion${id}`).value.trim(),
+        telefono: document.getElementById(`editarTelefono${id}`).value.trim()
+      })
+    });
+    mostrarToast('Sucursal actualizada', 'exito');
+    cargarSucursales();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function alternarActiva(id, nuevoValor) {
+  const confirmado = await confirmarAccion(nuevoValor ? '¿Reactivar esta sucursal?' : '¿Desactivar esta sucursal? Su personal no podrá iniciar sesión mientras esté inactiva. Su historial se conserva.');
+  if (!confirmado) return;
+  try {
+    await apiFetch(`/sucursales/${id}`, { method: 'PUT', body: JSON.stringify({ activa: nuevoValor }) });
+    cargarSucursales();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+cargarResumenGeneral();
+cargarSucursales();
+</script>
+<script src="../js/sidebar-nav.js"></script>
+</body>
+</html>

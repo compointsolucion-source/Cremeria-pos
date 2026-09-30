@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Historial de compras
 router.get('/', verificarToken, async (req, res) => {
@@ -11,7 +15,7 @@ router.get('/', verificarToken, async (req, res) => {
       `SELECT c.*, p.nombre AS proveedor_nombre FROM compras c
        JOIN proveedores p ON c.proveedor_id = p.id
        WHERE c.sucursal_id = $1 ORDER BY c.fecha DESC LIMIT 50`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -21,7 +25,7 @@ router.get('/', verificarToken, async (req, res) => {
 });
 
 // Registrar una compra: actualiza inventario y, si se indica, el precio de venta
-router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   const conexion = await pool.connect();
   try {
     const { proveedor_id, items } = req.body; // [{producto_id, cantidad, costo_unitario, precio_venta_nuevo}]
@@ -35,7 +39,7 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
 
     const compraResult = await conexion.query(
       `INSERT INTO compras (sucursal_id, proveedor_id, usuario_id, total) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.usuario.sucursal_id, proveedor_id, req.usuario.id, total]
+      [req.sucursalId, proveedor_id, req.usuario.id, total]
     );
     const compra = compraResult.rows[0];
 

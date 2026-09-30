@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol, requierePermiso, tienePermiso } = require('../middleware/auth');
+const { verificarToken, requiereRol, requierePermiso, tienePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Listar productos activos (para mostrador y admin). Soporta paginación
 // opcional con ?limit=&offset= — si no se pasan, devuelve todo (compatibilidad
@@ -20,7 +24,7 @@ router.get('/', verificarToken, async (req, res) => {
        LEFT JOIN categorias c ON p.categoria_id = c.id
        WHERE p.sucursal_id = $1 AND p.activo = true
        ORDER BY p.favorito DESC, p.orden ASC, p.nombre ASC`;
-    const valores = [req.usuario.sucursal_id];
+    const valores = [req.sucursalId];
 
     if (limit) {
       valores.push(parseInt(limit));
@@ -36,7 +40,7 @@ router.get('/', verificarToken, async (req, res) => {
     if (limit) {
       const totalResult = await pool.query(
         'SELECT COUNT(*) FROM productos WHERE sucursal_id = $1 AND activo = true',
-        [req.usuario.sucursal_id]
+        [req.sucursalId]
       );
       res.json({ productos: result.rows, total: parseInt(totalResult.rows[0].count) });
     } else {
@@ -82,7 +86,7 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
     const categoriasCache = {};
     categoriasExistentes.rows.forEach(c => { categoriasCache[c.nombre_lower] = c.id; });
 
-    const productosExistentes = await pool.query('SELECT id, codigo_barras, LOWER(nombre) AS nombre_lower FROM productos WHERE sucursal_id = $1', [req.usuario.sucursal_id]);
+    const productosExistentes = await pool.query('SELECT id, codigo_barras, LOWER(nombre) AS nombre_lower FROM productos WHERE sucursal_id = $1', [req.sucursalId]);
     const porCodigo = {}, porNombre = {};
     productosExistentes.rows.forEach(p => {
       if (p.codigo_barras) porCodigo[p.codigo_barras] = p.id;
@@ -147,7 +151,7 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
             const nuevoProducto = await conexion.query(
               `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario, imagen_url)
                VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true, $8) RETURNING id`,
-              [req.usuario.sucursal_id, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras, imagen_url]
+              [req.sucursalId, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras, imagen_url]
             );
             productoId = nuevoProducto.rows[0].id;
             // Se registra en memoria de inmediato para que, si el archivo
@@ -196,7 +200,7 @@ router.get('/codigo/:codigo', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM productos WHERE codigo_barras = $1 AND sucursal_id = $2 AND activo = true',
-      [req.params.codigo, req.usuario.sucursal_id]
+      [req.params.codigo, req.sucursalId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'No existe un producto con ese código' });
     res.json(result.rows[0]);
@@ -246,7 +250,7 @@ router.post('/cambiar-tipo-venta-lote', verificarToken, requierePermiso('PRODUCT
 
     const result = await pool.query(
       'UPDATE productos SET tipo_venta = $1 WHERE id = ANY($2::int[]) AND sucursal_id = $3',
-      [tipo_venta, producto_ids, req.usuario.sucursal_id]
+      [tipo_venta, producto_ids, req.sucursalId]
     );
 
     res.json({ actualizados: result.rowCount });
@@ -265,7 +269,7 @@ router.get('/sin-imagen', verificarToken, async (req, res) => {
        WHERE sucursal_id = $1 AND activo = true
          AND codigo_barras IS NOT NULL AND codigo_barras != ''
          AND (imagen_url IS NULL OR imagen_url = '')`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -282,7 +286,7 @@ router.post('/:id/actualizar-imagen-externa', verificarToken, requierePermiso('P
   try {
     const productoResult = await pool.query(
       'SELECT id, codigo_barras, imagen_url FROM productos WHERE id = $1 AND sucursal_id = $2',
-      [req.params.id, req.usuario.sucursal_id]
+      [req.params.id, req.sucursalId]
     );
     if (productoResult.rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
     const producto = productoResult.rows[0];
@@ -336,7 +340,7 @@ router.post('/', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req,
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
       [
-        req.usuario.sucursal_id, categoria_id || null, nombre, precio, imagen_url || null, favorito || false,
+        req.sucursalId, categoria_id || null, nombre, precio, imagen_url || null, favorito || false,
         orden || 0, codigo_barras || null, tipo_venta || 'peso',
         precio_costo || null, ganancia_porcentaje || null, precio_mayoreo || null, usa_inventario !== false
       ]
@@ -408,7 +412,7 @@ router.put('/:id', verificarToken, async (req, res) => {
         usa_inventario = COALESCE($13, usa_inventario)
        WHERE id = $14 AND sucursal_id = $15 RETURNING *`,
       [nombre, precio, categoria_id, imagen_url, favorito, orden, activo, codigo_barras || null, tipo_venta,
-       precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario, req.params.id, req.usuario.sucursal_id]
+       precio_costo, ganancia_porcentaje, precio_mayoreo, usa_inventario, req.params.id, req.sucursalId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json(result.rows[0]);
@@ -420,11 +424,11 @@ router.put('/:id', verificarToken, async (req, res) => {
 });
 
 // Eliminar (desactivar) producto
-router.delete('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.delete('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     await pool.query(
       'UPDATE productos SET activo = false WHERE id = $1 AND sucursal_id = $2',
-      [req.params.id, req.usuario.sucursal_id]
+      [req.params.id, req.sucursalId]
     );
     res.json({ ok: true });
   } catch (err) {

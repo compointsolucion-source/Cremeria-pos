@@ -59,6 +59,7 @@ app.use('/api/promociones', require('./routes/promociones'));
 app.use('/api/imagenes', require('./routes/imagenes'));
 app.use('/api/fichas', require('./routes/fichas'));
 app.use('/api/sistema', require('./routes/sistema'));
+app.use('/api/sucursales', require('./routes/sucursales'));
 // Recargas y pago de servicios: estructura lista, pendiente de conectar a un
 // proveedor real (ver backend/utils/proveedorRecargas.js).
 app.use('/api/recargas', require('./routes/recargas'));

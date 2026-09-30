@@ -21,6 +21,28 @@ function requiereRol(...rolesPermitidos) {
   };
 }
 
+// Resuelve CON QUÉ sucursal trabaja esta solicitud y lo deja en req.sucursalId.
+// - Para casi todos los usuarios (dueño de una sucursal, gerente, cajero,
+//   mostrador), su sucursal viene fija en el token — es la de siempre.
+// - Para "jefe_general" (sucursal_id NULL en su usuario: ve/opera TODAS las
+//   sucursales), la solicitud debe indicar con cuál quiere trabajar en ese
+//   momento, vía ?sucursal_id=N o el header X-Sucursal-Id — así puede cambiar
+//   de sucursal sin cerrar sesión. Si no la indica, se corta aquí con un
+//   error claro en vez de dejar pasar una consulta sin filtro de sucursal.
+function requiereSucursalId(req, res, next) {
+  if (req.usuario.sucursal_id) {
+    req.sucursalId = req.usuario.sucursal_id;
+    return next();
+  }
+
+  const idIndicado = parseInt(req.query.sucursal_id || req.headers['x-sucursal-id'], 10);
+  if (!idIndicado) {
+    return res.status(400).json({ error: 'Selecciona una sucursal para continuar (falta sucursal_id)' });
+  }
+  req.sucursalId = idIndicado;
+  next();
+}
+
 // Permisos base que cada rol ya tiene SIN que el dueño configure nada — así
 // no se le quita a nadie una capacidad que ya usaba. El dueño/gerente puede
 // después REVOCAR alguno explícitamente (permisos[clave] = false) o AGREGAR
@@ -50,7 +72,7 @@ const TODOS_LOS_PERMISOS = [
 // para los demás, se respeta primero cualquier override explícito
 // (true=otorgado, false=revocado) y si no hay override, el permiso base de su rol.
 function tienePermiso(usuario, permiso) {
-  if (usuario.rol === 'dueno' || usuario.rol === 'gerente') return true;
+  if (usuario.rol === 'jefe_general' || usuario.rol === 'dueno' || usuario.rol === 'gerente') return true;
   const permisos = usuario.permisos || {};
   if (permisos[permiso] === true) return true;
   if (permisos[permiso] === false) return false;
@@ -64,4 +86,4 @@ function requierePermiso(permiso) {
   };
 }
 
-module.exports = { verificarToken, requiereRol, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };
+module.exports = { verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };

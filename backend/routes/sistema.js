@@ -2,8 +2,12 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // ============================================================================
 // REINICIO DE FÁBRICA
@@ -18,9 +22,9 @@ const { registrarBitacora } = require('../utils/bitacora');
 // propia contraseña, (3) debe escribir la palabra exacta "BORRAR". Además
 // exige que no haya un turno de caja abierto, para no dejar la sesión de
 // caja actual en un estado inconsistente.
-router.post('/reinicio-fabrica', verificarToken, requiereRol('dueno'), async (req, res) => {
+router.post('/reinicio-fabrica', verificarToken, requiereRol('jefe_general', 'dueno'), async (req, res) => {
   const { password, confirmacion } = req.body;
-  const sucursalId = req.usuario.sucursal_id;
+  const sucursalId = req.sucursalId;
 
   if (!password || !confirmacion) {
     return res.status(400).json({ error: 'Faltan la contraseña o la palabra de confirmación' });

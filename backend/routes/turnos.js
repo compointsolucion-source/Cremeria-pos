@@ -1,15 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requierePermiso } = require('../middleware/auth');
+const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Obtener turno abierto actual de la sucursal
 router.get('/actual', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM turnos WHERE sucursal_id = $1 AND estado = 'abierto' ORDER BY fecha_apertura DESC LIMIT 1`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows[0] || null);
   } catch (err) {
@@ -25,7 +29,7 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
 
     const abierto = await pool.query(
       `SELECT * FROM turnos WHERE sucursal_id = $1 AND estado = 'abierto'`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     if (abierto.rows.length > 0) {
       return res.status(400).json({ error: 'Ya hay un turno abierto en esta sucursal' });
@@ -33,7 +37,7 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
 
     const result = await pool.query(
       `INSERT INTO turnos (sucursal_id, usuario_id, fondo_inicial) VALUES ($1, $2, $3) RETURNING *`,
-      [req.usuario.sucursal_id, req.usuario.id, fondo_inicial || 0]
+      [req.sucursalId, req.usuario.id, fondo_inicial || 0]
     );
 
     await registrarBitacora(pool, {
@@ -136,7 +140,7 @@ router.get('/historial', verificarToken, async (req, res) => {
       `SELECT t.*, u.nombre AS usuario_nombre FROM turnos t
        JOIN usuarios u ON t.usuario_id = u.id
        WHERE t.sucursal_id = $1 ORDER BY t.fecha_apertura DESC LIMIT 50`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {

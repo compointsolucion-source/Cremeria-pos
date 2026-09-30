@@ -1,15 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol, requierePermiso } = require('../middleware/auth');
+const { verificarToken, requiereRol, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Listar clientes. Soporta paginación opcional con ?limit=&offset=
 router.get('/', verificarToken, async (req, res) => {
   try {
     const { limit, offset } = req.query;
     let query = 'SELECT * FROM clientes WHERE sucursal_id = $1 AND activo = true ORDER BY nombre ASC';
-    const valores = [req.usuario.sucursal_id];
+    const valores = [req.sucursalId];
 
     if (limit) {
       valores.push(parseInt(limit));
@@ -25,7 +29,7 @@ router.get('/', verificarToken, async (req, res) => {
     if (limit) {
       const totalResult = await pool.query(
         'SELECT COUNT(*) FROM clientes WHERE sucursal_id = $1 AND activo = true',
-        [req.usuario.sucursal_id]
+        [req.sucursalId]
       );
       res.json({ clientes: result.rows, total: parseInt(totalResult.rows[0].count) });
     } else {
@@ -42,7 +46,7 @@ router.get('/buscar/:texto', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM clientes WHERE sucursal_id = $1 AND activo = true AND nombre ILIKE $2 ORDER BY nombre ASC LIMIT 10`,
-      [req.usuario.sucursal_id, `%${req.params.texto}%`]
+      [req.sucursalId, `%${req.params.texto}%`]
     );
     res.json(result.rows);
   } catch (err) {
@@ -59,7 +63,7 @@ router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, 
 
     const result = await pool.query(
       `INSERT INTO clientes (sucursal_id, nombre, telefono, limite_credito) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.usuario.sucursal_id, nombre, telefono || null, limite_credito || 0]
+      [req.sucursalId, nombre, telefono || null, limite_credito || 0]
     );
 
     await registrarBitacora(pool, {
@@ -78,7 +82,7 @@ router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, 
 });
 
 // Editar cliente (nombre, teléfono, límite)
-router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { nombre, telefono, limite_credito, activo } = req.body;
     const result = await pool.query(
@@ -88,7 +92,7 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
         limite_credito = COALESCE($3, limite_credito),
         activo = COALESCE($4, activo)
        WHERE id = $5 AND sucursal_id = $6 RETURNING *`,
-      [nombre, telefono, limite_credito, activo, req.params.id, req.usuario.sucursal_id]
+      [nombre, telefono, limite_credito, activo, req.params.id, req.sucursalId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Cliente no encontrado' });
     res.json(result.rows[0]);
@@ -101,7 +105,7 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
 // Estado de cuenta: cargos y abonos de un cliente
 router.get('/:id/estado-cuenta', verificarToken, async (req, res) => {
   try {
-    const cliente = await pool.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    const cliente = await pool.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
     if (cliente.rows.length === 0) return res.status(404).json({ error: 'Cliente no encontrado' });
 
     const cargos = await pool.query(

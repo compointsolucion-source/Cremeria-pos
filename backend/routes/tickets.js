@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requierePermiso } = require('../middleware/auth');
+const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 const bcrypt = require('bcryptjs');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Generar folio corto único: M<sucursal>-<timestamp base36>
 function generarFolio(sucursalId) {
@@ -23,12 +27,12 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     await cliente.query('BEGIN');
 
     const total = items.reduce((sum, it) => sum + (it.cantidad * it.precio_unitario), 0);
-    const folio = generarFolio(req.usuario.sucursal_id);
+    const folio = generarFolio(req.sucursalId);
 
     const ticketResult = await cliente.query(
       `INSERT INTO tickets (folio, sucursal_id, mostrador_usuario_id, estado, total)
        VALUES ($1, $2, $3, 'pendiente', $4) RETURNING *`,
-      [folio, req.usuario.sucursal_id, req.usuario.id, total]
+      [folio, req.sucursalId, req.usuario.id, total]
     );
     const ticket = ticketResult.rows[0];
 
@@ -48,7 +52,7 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
 
     // Avisar a caja en tiempo real
     const io = req.app.get('io');
-    if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('nuevo_ticket', { folio, total });
+    if (io) io.to(`sucursal_${req.sucursalId}`).emit('nuevo_ticket', { folio, total });
 
     res.json({ ...ticket, items: itemsGuardados });
   } catch (err) {
@@ -65,7 +69,7 @@ router.get('/pendientes', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM tickets WHERE sucursal_id = $1 AND estado = 'pendiente' ORDER BY fecha_creacion ASC`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -79,7 +83,7 @@ router.get('/folio/:folio', verificarToken, async (req, res) => {
   try {
     const ticketResult = await pool.query(
       'SELECT * FROM tickets WHERE folio = $1 AND sucursal_id = $2',
-      [req.params.folio, req.usuario.sucursal_id]
+      [req.params.folio, req.sucursalId]
     );
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado' });
 
@@ -101,7 +105,7 @@ router.get('/ultimo-pagado', verificarToken, async (req, res) => {
     const ticketResult = await pool.query(
       `SELECT * FROM tickets WHERE sucursal_id = $1 AND estado = 'pagado'
        ORDER BY fecha_pago DESC LIMIT 1`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'No se ha cobrado ningún ticket todavía' });
 
@@ -132,7 +136,7 @@ router.get('/historial-dia', verificarToken, async (req, res) => {
          AND t.estado IN ('pagado', 'cancelado')
          AND ($3::int IS NULL OR t.cajero_usuario_id = $3)
        ORDER BY COALESCE(t.fecha_pago, t.fecha_creacion) DESC`,
-      [req.usuario.sucursal_id, fechaConsulta, cajero_id || null]
+      [req.sucursalId, fechaConsulta, cajero_id || null]
     );
 
     res.json(result.rows);
@@ -159,7 +163,7 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
 
     const ticketResult = await cliente.query(
       'SELECT * FROM tickets WHERE id = $1 AND sucursal_id = $2 AND estado = $3 FOR UPDATE',
-      [req.params.id, req.usuario.sucursal_id, 'pendiente']
+      [req.params.id, req.sucursalId, 'pendiente']
     );
     if (ticketResult.rows.length === 0) {
       await cliente.query('ROLLBACK');
@@ -185,7 +189,7 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
     await cliente.query('COMMIT');
 
     const io = req.app.get('io');
-    if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ticket_actualizado', { folio: ticket.folio, total: nuevoTotal });
+    if (io) io.to(`sucursal_${req.sucursalId}`).emit('ticket_actualizado', { folio: ticket.folio, total: nuevoTotal });
 
     res.json({ ticket: ticketActualizado.rows[0], item: detalleResult.rows[0] });
   } catch (err) {
@@ -270,7 +274,7 @@ router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'
     if (!motivo) return res.status(400).json({ error: 'El motivo del descuento es obligatorio' });
     if (!porcentaje && !monto) return res.status(400).json({ error: 'Especifica un porcentaje o un monto de descuento' });
 
-    const ticketResult = await pool.query('SELECT * FROM tickets WHERE id = $1 AND sucursal_id = $2 AND estado = $3', [req.params.id, req.usuario.sucursal_id, 'pendiente']);
+    const ticketResult = await pool.query('SELECT * FROM tickets WHERE id = $1 AND sucursal_id = $2 AND estado = $3', [req.params.id, req.sucursalId, 'pendiente']);
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado o ya no está pendiente' });
     const ticket = ticketResult.rows[0];
 
@@ -280,7 +284,7 @@ router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'
     }
 
     const porcentajeEfectivo = (descuentoMonto / parseFloat(ticket.total)) * 100;
-    const autorizadoPor = await verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, req.usuario, req.usuario.sucursal_id);
+    const autorizadoPor = await verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, req.usuario, req.sucursalId);
 
     await pool.query(
       'UPDATE tickets SET descuento_monto = $1, descuento_motivo = $2, descuento_autorizado_por = $3 WHERE id = $4',
@@ -317,7 +321,7 @@ router.put('/item/:itemId/descuento', verificarToken, requierePermiso('DESCUENTO
     );
     if (itemResult.rows.length === 0) return res.status(404).json({ error: 'Producto del ticket no encontrado' });
     const item = itemResult.rows[0];
-    if (item.sucursal_id !== req.usuario.sucursal_id) return res.status(404).json({ error: 'Producto del ticket no encontrado' });
+    if (item.sucursal_id !== req.sucursalId) return res.status(404).json({ error: 'Producto del ticket no encontrado' });
     if (item.estado !== 'pendiente') return res.status(400).json({ error: 'El ticket ya no está pendiente' });
 
     const descuentoMonto = porcentaje ? (parseFloat(item.subtotal) * (parseFloat(porcentaje) / 100)) : parseFloat(monto);
@@ -326,7 +330,7 @@ router.put('/item/:itemId/descuento', verificarToken, requierePermiso('DESCUENTO
     }
 
     const porcentajeEfectivo = (descuentoMonto / parseFloat(item.subtotal)) * 100;
-    const autorizadoPor = await verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, req.usuario, req.usuario.sucursal_id);
+    const autorizadoPor = await verificarAutorizacionDescuento(porcentajeEfectivo, autorizacion, req.usuario, req.sucursalId);
 
     await pool.query(
       'UPDATE ticket_detalle SET descuento_monto = $1, descuento_motivo = $2 WHERE id = $3',
@@ -382,7 +386,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
 
     // Validar límite de crédito si aplica
     if (metodo_pago === 'credito') {
-      const clienteResult = await conexion.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2', [cliente_id, req.usuario.sucursal_id]);
+      const clienteResult = await conexion.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2', [cliente_id, req.sucursalId]);
       if (clienteResult.rows.length === 0) {
         await conexion.query('ROLLBACK');
         return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -489,7 +493,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     await conexion.query('COMMIT');
 
     const io = req.app.get('io');
-    if (io) io.to(`sucursal_${req.usuario.sucursal_id}`).emit('ticket_pagado', { id: req.params.id });
+    if (io) io.to(`sucursal_${req.sucursalId}`).emit('ticket_pagado', { id: req.params.id });
 
     res.json({ ...ticketPagado, total_neto: totalNeto, productos_agotados: [...new Set(productosAgotados)] });
   } catch (err) {

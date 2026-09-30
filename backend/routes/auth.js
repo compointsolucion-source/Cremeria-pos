@@ -41,6 +41,17 @@ router.post('/login', limitadorLogin, async (req, res) => {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
 
+    // jefe_general no pertenece a una sola sucursal (sucursal_id NULL) — para
+    // el resto, si la sucursal a la que pertenecen quedó desactivada, no
+    // dejamos entrar (su cuenta y su historial siguen intactos, solo no
+    // pueden operar mientras esa sucursal esté pausada).
+    if (user.sucursal_id) {
+      const sucursal = await pool.query('SELECT activa FROM sucursales WHERE id = $1', [user.sucursal_id]);
+      if (sucursal.rows.length > 0 && !sucursal.rows[0].activa) {
+        return res.status(403).json({ error: 'Tu sucursal está desactivada actualmente. Contacta al dueño del negocio.' });
+      }
+    }
+
     const token = jwt.sign(
       {
         id: user.id,

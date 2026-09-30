@@ -2,20 +2,24 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
-const { verificarToken, requiereRol, tienePermiso, TODOS_LOS_PERMISOS } = require('../middleware/auth');
+const { verificarToken, requiereRol, tienePermiso, TODOS_LOS_PERMISOS, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+
+// Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
+// vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
+router.use(verificarToken, requiereSucursalId);
 
 // Listar el equipo de la sucursal (nunca se devuelve el password_hash).
 // Incluye "permisos_efectivos": la lista de qué SÍ puede hacer cada empleado
 // ahora mismo, combinando lo que trae su rol por defecto con cualquier
 // override que se le haya puesto — para que la pantalla de Equipo sepa
 // exactamente qué casillas marcar sin tener que recalcularlo ella misma.
-router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador
        FROM usuarios WHERE sucursal_id = $1 ORDER BY creado_en ASC`,
-      [req.usuario.sucursal_id]
+      [req.sucursalId]
     );
 
     const equipo = result.rows.map(u => ({
@@ -31,7 +35,7 @@ router.get('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res
 });
 
 // Crear un nuevo empleado
-router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { nombre, usuario, password, rol } = req.body;
     if (!nombre || !usuario || !password || !rol) {
@@ -50,7 +54,7 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
       `INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo)
        VALUES ($1, $2, $3, $4, $5, true)
        RETURNING id, nombre, usuario, rol, activo, creado_en`,
-      [req.usuario.sucursal_id, nombre, usuario, passwordHash, rol]
+      [req.sucursalId, nombre, usuario, passwordHash, rol]
     );
 
     await registrarBitacora(pool, {
@@ -70,7 +74,7 @@ router.post('/', verificarToken, requiereRol('dueno', 'gerente'), async (req, re
 });
 
 // Editar nombre/rol/activo/permisos de un empleado (dueño/gerente)
-router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { nombre, rol, activo, permisos, nombre_mostrador } = req.body;
     if (rol && !['gerente', 'cajero', 'mostrador'].includes(rol)) {
@@ -78,7 +82,7 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
     }
 
     // Nunca permitir que se edite/desactive al usuario dueño desde aquí
-    const objetivo = await pool.query('SELECT rol, nombre, activo, permisos FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    const objetivo = await pool.query('SELECT rol, nombre, activo, permisos FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede modificar al usuario dueño desde aquí' });
     const valorAnterior = objetivo.rows[0];
@@ -92,7 +96,7 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
         nombre_mostrador = CASE WHEN $7::boolean THEN $8 ELSE nombre_mostrador END
        WHERE id = $5 AND sucursal_id = $6
        RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador`,
-      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.usuario.sucursal_id, nombre_mostrador !== undefined, nombre_mostrador || null]
+      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.sucursalId, nombre_mostrador !== undefined, nombre_mostrador || null]
     );
 
     await registrarBitacora(pool, {
@@ -112,14 +116,14 @@ router.put('/:id', verificarToken, requiereRol('dueno', 'gerente'), async (req, 
 });
 
 // Restablecer la contraseña de un empleado (el dueño/gerente no necesita la anterior)
-router.put('/:id/restablecer-password', verificarToken, requiereRol('dueno', 'gerente'), async (req, res) => {
+router.put('/:id/restablecer-password', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { password_nueva } = req.body;
     if (!password_nueva || password_nueva.length < 6) {
       return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
     }
 
-    const objetivo = await pool.query('SELECT rol FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.usuario.sucursal_id]);
+    const objetivo = await pool.query('SELECT rol FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede restablecer la contraseña del dueño desde aquí' });
 
