@@ -10,8 +10,19 @@
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
+  .campo-con-camara { position: relative; }
+  .campo-con-camara input { padding-right: 112px; }
+  .btn-mini-camara {
+    position: absolute; top: 6px; right: 6px; bottom: 6px;
+    display: flex; align-items: center; gap: 4px;
+    background: var(--primary, #5FAE46); color: white; border: none;
+    border-radius: 7px; padding: 0 10px; font-size: 11.5px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  #scannerCodigoBarras { width: 100%; max-width: 320px; margin: 8px 0; }
   .tabla-productos { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
   .tabla-productos th, .tabla-productos td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
   .tabla-productos img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; }
@@ -47,7 +58,11 @@
     <div class="card form-producto">
       <h3 id="tituloFormulario">Nuevo producto</h3>
 
-      <input type="text" id="codigoBarras" placeholder="Código de barras (escanéalo o escríbelo)" onblur="buscarCodigoExterno()">
+      <div class="campo-con-camara">
+        <input type="text" id="codigoBarras" placeholder="Código de barras (escanéalo o escríbelo)" onblur="buscarCodigoExterno()">
+        <button type="button" class="btn-mini-camara" id="btnActivarCamaraCodigo" onclick="toggleScannerCodigoBarras()">📷 Activar cámara</button>
+      </div>
+      <div id="scannerCodigoBarras" style="display:none;"></div>
       <div id="estadoBusquedaExterna" class="buscando-externo"></div>
 
       <input type="text" id="nombre" placeholder="Descripción / Nombre del producto">
@@ -216,6 +231,47 @@ function calcularPrecioVenta() {
     const precioCalculado = costo * (1 + ganancia / 100);
     document.getElementById('precio').value = precioCalculado.toFixed(2);
   }
+}
+
+// ---------- Escáner de código de barras (cámara del celular/tablet) ----------
+// Mismo patrón que ya usan Mostrador y Caja (librería html5-qrcode): al
+// detectar un código lo escribe en el campo y dispara la misma búsqueda que
+// correría si lo hubieras tecleado o escaneado con un lector físico.
+let scannerCodigoActivo = false;
+let html5QrCodeProducto = null;
+
+function toggleScannerCodigoBarras() {
+  const contenedor = document.getElementById('scannerCodigoBarras');
+  const boton = document.getElementById('btnActivarCamaraCodigo');
+
+  if (scannerCodigoActivo) {
+    html5QrCodeProducto.stop().catch(() => {});
+    scannerCodigoActivo = false;
+    contenedor.style.display = 'none';
+    boton.textContent = '📷 Activar cámara';
+    return;
+  }
+
+  contenedor.style.display = 'block';
+  html5QrCodeProducto = new Html5Qrcode('scannerCodigoBarras');
+  html5QrCodeProducto.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 160 } },
+    (codigo) => {
+      html5QrCodeProducto.stop().catch(() => {});
+      scannerCodigoActivo = false;
+      contenedor.style.display = 'none';
+      boton.textContent = '📷 Activar cámara';
+      document.getElementById('codigoBarras').value = codigo;
+      buscarCodigoExterno();
+    }
+  ).then(() => {
+    scannerCodigoActivo = true;
+    boton.textContent = '✖ Cerrar cámara';
+  }).catch((err) => {
+    contenedor.style.display = 'none';
+    mostrarToast('No se pudo activar la cámara: ' + (err.message || err), 'error');
+  });
 }
 
 // Al salir del campo de código de barras, busca en TU catálogo primero (por si
