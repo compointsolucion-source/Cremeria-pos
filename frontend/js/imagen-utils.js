@@ -35,12 +35,31 @@ function comprimirImagen(file, maxAncho = 500, calidad = 0.7) {
 // Sube una imagen ya comprimida (base64) a Cloudinary a través del backend,
 // y devuelve la URL final corta que se debe guardar (no el base64 completo).
 // "carpeta" organiza las imágenes en Cloudinary (ej. 'productos', 'kits', 'logos').
+//
+// Si el servidor todavía no tiene Cloudinary configurado (faltan sus
+// variables de entorno en Render), NO se bloquea la operación: se usa la
+// imagen ya comprimida tal cual (el mismo base64 que ya se ve en la vista
+// previa) como si fuera la URL final. Pesa más que un link de Cloudinary,
+// pero el negocio puede seguir tomando fotos y guardando productos/kits/
+// anuncios mientras se configura — en cuanto se pongan esas variables en
+// el servidor, las imágenes nuevas vuelven a subirse a Cloudinary solas,
+// sin tocar nada aquí.
 async function subirImagenACloudinary(imagenBase64, carpeta = 'general') {
-  const data = await apiFetch('/imagenes/subir', {
-    method: 'POST',
-    body: JSON.stringify({ imagen_base64: imagenBase64, carpeta })
-  });
-  return data.url;
+  try {
+    const data = await apiFetch('/imagenes/subir', {
+      method: 'POST',
+      body: JSON.stringify({ imagen_base64: imagenBase64, carpeta })
+    });
+    return data.url;
+  } catch (err) {
+    if (err.message && err.message.includes('Cloudinary no está configurado')) {
+      if (typeof mostrarToast === 'function') {
+        mostrarToast('Imagen guardada (Cloudinary no está configurado todavía, así que se guardó directo)', 'info');
+      }
+      return imagenBase64;
+    }
+    throw err;
+  }
 }
 
 // Sube un archivo de video directo (sin comprimir a base64: apiFetch siempre
