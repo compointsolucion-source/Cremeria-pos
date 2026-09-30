@@ -46,8 +46,8 @@ router.post('/login', limitadorLogin, async (req, res) => {
     // dejamos entrar (su cuenta y su historial siguen intactos, solo no
     // pueden operar mientras esa sucursal esté pausada).
     if (user.sucursal_id) {
-      const sucursal = await pool.query('SELECT activa FROM sucursales WHERE id = $1', [user.sucursal_id]);
-      if (sucursal.rows.length > 0 && !sucursal.rows[0].activa) {
+      const sucursal = await pool.query('SELECT activo FROM sucursales WHERE id = $1', [user.sucursal_id]);
+      if (sucursal.rows.length > 0 && !sucursal.rows[0].activo) {
         return res.status(403).json({ error: 'Tu sucursal está desactivada actualmente. Contacta al dueño del negocio.' });
       }
     }

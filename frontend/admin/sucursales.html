@@ -107,15 +107,15 @@ async function cargarSucursales() {
       `${sucursalesState.length} de ${topeSucursales} sucursales usadas en esta instalación`;
 
     document.getElementById('listaSucursales').innerHTML = sucursalesState.map(s => `
-      <div class="sucursal-card ${s.activa ? '' : 'inactiva'}">
+      <div class="sucursal-card ${s.activo ? '' : 'inactiva'}">
         <div class="sucursal-card-header">
-          <h3>${s.nombre}${s.activa ? '' : '<span class="etiqueta-inactiva">Inactiva</span>'}</h3>
+          <h3>${s.nombre}${s.activo ? '' : '<span class="etiqueta-inactiva">Inactiva</span>'}</h3>
         </div>
         <div class="sucursal-datos">${s.direccion || 'Sin dirección registrada'}${s.telefono ? ' · ' + s.telefono : ''}</div>
         <div class="sucursal-acciones">
           <button class="btn btn-primary" onclick="operarSucursal(${s.id}, '${s.nombre.replace(/'/g, "\\'")}')">Operar esta sucursal</button>
           <button class="btn btn-secondary" onclick="mostrarFormEditar(${s.id})">Editar</button>
-          <button class="btn btn-secondary" onclick="alternarActiva(${s.id}, ${!s.activa})">${s.activa ? 'Desactivar' : 'Reactivar'}</button>
+          <button class="btn btn-secondary" onclick="alternarActiva(${s.id}, ${!s.activo})">${s.activo ? 'Desactivar' : 'Reactivar'}</button>
         </div>
         <div class="form-editar-sucursal" id="formEditar${s.id}" style="display:none;">
           <input type="text" id="editarNombre${s.id}" value="${s.nombre.replace(/"/g, '&quot;')}" placeholder="Nombre">
@@ -178,7 +178,7 @@ async function alternarActiva(id, nuevoValor) {
   const confirmado = await confirmarAccion(nuevoValor ? '¿Reactivar esta sucursal?' : '¿Desactivar esta sucursal? Su personal no podrá iniciar sesión mientras esté inactiva. Su historial se conserva.');
   if (!confirmado) return;
   try {
-    await apiFetch(`/sucursales/${id}`, { method: 'PUT', body: JSON.stringify({ activa: nuevoValor }) });
+    await apiFetch(`/sucursales/${id}`, { method: 'PUT', body: JSON.stringify({ activo: nuevoValor }) });
     cargarSucursales();
   } catch (err) {
     mostrarToast(err.message, 'error');

@@ -36,7 +36,7 @@ router.post('/', verificarToken, requiereRol('jefe_general'), async (req, res) =
     }
 
     const result = await pool.query(
-      `INSERT INTO sucursales (nombre, direccion, telefono, activa)
+      `INSERT INTO sucursales (nombre, direccion, telefono, activo)
        VALUES ($1, $2, $3, true) RETURNING *`,
       [nombre.trim(), direccion || null, telefono || null]
     );
@@ -57,12 +57,12 @@ router.post('/', verificarToken, requiereRol('jefe_general'), async (req, res) =
 });
 
 // Editar nombre/dirección/teléfono/estatus de una sucursal existente.
-// Desactivar (activa=false) NO borra nada — solo la saca del selector y de
+// Desactivar (activo=false) NO borra nada — solo la saca del selector y de
 // los reportes consolidados, para poder "pausar" una sucursal sin perder su
 // historial ni liberar su lugar en el tope a propósito.
 router.put('/:id', verificarToken, requiereRol('jefe_general'), async (req, res) => {
   try {
-    const { nombre, direccion, telefono, activa } = req.body;
+    const { nombre, direccion, telefono, activo } = req.body;
     const campos = [];
     const valores = [];
     let i = 1;
@@ -70,7 +70,7 @@ router.put('/:id', verificarToken, requiereRol('jefe_general'), async (req, res)
     if (nombre !== undefined) { campos.push(`nombre = $${i++}`); valores.push(nombre.trim()); }
     if (direccion !== undefined) { campos.push(`direccion = $${i++}`); valores.push(direccion); }
     if (telefono !== undefined) { campos.push(`telefono = $${i++}`); valores.push(telefono); }
-    if (activa !== undefined) { campos.push(`activa = $${i++}`); valores.push(!!activa); }
+    if (activo !== undefined) { campos.push(`activo = $${i++}`); valores.push(!!activo); }
 
     if (campos.length === 0) {
       return res.status(400).json({ error: 'No hay nada que actualizar' });

@@ -42,7 +42,7 @@ router.get('/general', verificarToken, requiereRol('jefe_general'), async (req, 
          WHERE p.activo = true
          GROUP BY p.sucursal_id
        ) b ON b.sucursal_id = s.id
-       WHERE s.activa = true
+       WHERE s.activo = true
        ORDER BY s.nombre ASC`,
       [inicioHoy, finHoy]
     );
