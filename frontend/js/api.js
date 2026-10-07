@@ -47,6 +47,34 @@ function fijarSucursalSeleccionada(id, nombre) {
   localStorage.setItem('sucursal_seleccionada_nombre', nombre || '');
 }
 
+// Licencia: aviso 7 días antes de vencer (barra arriba) y bloqueo total al vencer.
+function mostrarAvisoLicencia(dias, vence) {
+  if (document.getElementById('aviso-licencia')) return;
+  const poner = () => {
+    const d = document.createElement('div');
+    d.id = 'aviso-licencia';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#F9A825;color:#1A1A1A;text-align:center;padding:8px 12px;font:600 14px sans-serif';
+    const txt = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias} días`;
+    d.textContent = `Tu licencia vence ${txt} (${vence}). Para renovar comunícate con Compoint: 33 25 90 70 90`;
+    d.onclick = () => d.remove();
+    document.body.appendChild(d);
+  };
+  if (document.body) poner(); else document.addEventListener('DOMContentLoaded', poner);
+}
+
+function bloquearPorLicencia(mensaje) {
+  const poner = () => {
+    if (document.getElementById('bloqueo-licencia')) return;
+    const d = document.createElement('div');
+    d.id = 'bloqueo-licencia';
+    d.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#0F2A1A;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:sans-serif';
+    d.innerHTML = '<h1 style="margin:0 0 12px">Licencia vencida</h1><p style="max-width:420px;font-size:17px;line-height:1.5"></p>';
+    d.querySelector('p').textContent = mensaje;
+    document.body.appendChild(d);
+  };
+  if (document.body) poner(); else document.addEventListener('DOMContentLoaded', poner);
+}
+
 async function apiFetch(endpoint, options = {}) {
   const token = getToken();
   const usuario = getUsuario();
@@ -78,6 +106,18 @@ async function apiFetch(endpoint, options = {}) {
     500: 'Ocurrió un error inesperado en el servidor.',
     503: 'El servicio no está disponible en este momento. Intenta de nuevo en un momento.'
   };
+
+  // Licencia vencida: se bloquea la pantalla completa.
+  if (response.status === 402) {
+    const d402 = await response.json().catch(() => ({}));
+    const msg402 = d402.error || 'Licencia vencida. Comunícate con Compoint: 33 25 90 70 90';
+    if (!document.getElementById('error')) bloquearPorLicencia(msg402); // en login se muestra en el mensaje de error
+    throw new Error(msg402);
+  }
+
+  // Aviso previo al vencimiento (el servidor manda el encabezado desde 7 días antes)
+  const diasLic = response.headers.get('X-Licencia-Dias');
+  if (diasLic !== null) mostrarAvisoLicencia(Number(diasLic), response.headers.get('X-Licencia-Vence'));
 
   // Solo un token inválido/expirado (401) cierra la sesión. Un 403 significa
   // que el usuario SÍ está autenticado pero no tiene permiso para esta acción

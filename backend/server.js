@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const pool = require('./db');
+const { verificarLicencia, asegurarTabla } = require('./middleware/licencia');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,7 +15,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 // lo que rompería el límite de intentos de login (afectaría a todos por igual).
 app.set('trust proxy', 1);
 
-app.use(cors());
+app.use(cors({ exposedHeaders: ['X-Licencia-Dias', 'X-Licencia-Vence'] }));
 app.use(express.json({ limit: '15mb' }));
 app.set('io', io);
 
@@ -35,6 +36,11 @@ io.on('connection', (socket) => {
     socket.join(`sucursal_${sucursalId}`);
   });
 });
+
+// Licencia (renta anual): bloquea todo /api si venció y avisa 7 días antes.
+// Sin fila en la tabla "licencia" no hay control.
+asegurarTabla();
+app.use('/api', verificarLicencia);
 
 // Rutas
 app.use('/api/auth', require('./routes/auth'));
