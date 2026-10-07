@@ -7,7 +7,7 @@
 // Uso:
 //   DATABASE_URL="postgresql://(base NUEVA del cliente)" node scripts/alta-cliente.js \
 //     --negocio "Cremería La Esperanza" --dueno "Juan Pérez" --usuario juan \
-//     --password "Clave-segura-123" [--giro cremeria] [--direccion "..."] [--telefono "..."]
+//     --password "Clave-segura-123" [--sucursales 2] [--giro cremeria] [--direccion "..."] [--telefono "..."]
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -46,6 +46,7 @@ if (a.giro && a.giro !== true && !GIROS[a.giro]) { console.error('Giro no válid
 const schemaPath = path.join(__dirname, 'schema.sql');
 if (!fs.existsSync(schemaPath)) { console.error('No existe scripts/schema.sql. Primero corre exportar-esquema.js contra tu base actual.'); process.exit(1); }
 
+const totalSucursales = Math.max(1, parseInt(a.sucursales, 10) || 1);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL) ? false : { rejectUnauthorized: false } });
 
 (async () => {
@@ -63,9 +64,12 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localh
 
     await c.query('INSERT INTO configuracion (sucursal_id, direccion, telefono) VALUES ($1,$2,$3)', [sucursalId, a.direccion || null, a.telefono || null]);
 
+    // Con 2 o más sucursales el dueño entra como "jefe_general" (ve y opera
+    // todas, sin sucursal fija). Con una sola, como "dueno" de esa sucursal.
     const hash = await bcrypt.hash(String(a.password), 10);
+    const multi = totalSucursales > 1;
     await c.query('INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo) VALUES ($1,$2,$3,$4,$5,true)',
-      [sucursalId, a.dueno, a.usuario, hash, 'dueno']);
+      [multi ? null : sucursalId, a.dueno, a.usuario, hash, multi ? 'jefe_general' : 'dueno']);
 
     if (a.giro && GIROS[a.giro]) {
       for (let i = 0; i < GIROS[a.giro].length; i++) await c.query('INSERT INTO categorias (nombre, orden) VALUES ($1,$2)', [GIROS[a.giro][i], i + 1]);
@@ -74,11 +78,12 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localh
 
     console.log('\n=== CLIENTE CREADO ===');
     console.log(`Negocio: ${a.negocio}  (sucursal #${sucursalId})`);
-    console.log(`Usuario dueño: ${a.usuario}   (la contraseña es la que escribiste)`);
+    console.log(`Usuario: ${a.usuario} (${totalSucursales > 1 ? 'jefe_general: ve todas las sucursales' : 'dueño'}) - la contraseña es la que escribiste`);
+    if (totalSucursales > 1) console.log(`Sucursal #1 creada. Las otras ${totalSucursales - 1} se crean desde el sistema (Sucursales) con este usuario.`);
     console.log('\n--- Variables de entorno para el backend en Render ---');
     console.log('DATABASE_URL=' + process.env.DATABASE_URL);
     console.log('JWT_SECRET=' + crypto.randomBytes(32).toString('hex'));
-    console.log('MAX_SUCURSALES=1   (sube el número si contrata el plan Multisucursal)');
+    console.log('MAX_SUCURSALES=' + totalSucursales);
     console.log('\n--- frontend/js/config.js ---');
     console.log("const API_URL = 'https://NOMBRE-DEL-BACKEND-DEL-CLIENTE.onrender.com/api';");
   } catch (e) {
