@@ -58,6 +58,13 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localh
     await c.query('BEGIN');
     await c.query(fs.readFileSync(schemaPath, 'utf8'));
 
+    // Columnas nuevas que pueden faltar si la base de la que se copió el
+    // esquema aún no tenía aplicada alguna migración (es idempotente).
+    await c.query(`ALTER TABLE configuracion
+      ADD COLUMN IF NOT EXISTS etiqueta_modo TEXT NOT NULL DEFAULT 'auto',
+      ADD COLUMN IF NOT EXISTS ancho_etiqueta TEXT NOT NULL DEFAULT '50mm',
+      ADD COLUMN IF NOT EXISTS bascula_tipo_dato TEXT NOT NULL DEFAULT 'peso'`);
+
     const suc = await c.query('INSERT INTO sucursales (nombre, direccion, telefono, activo) VALUES ($1,$2,$3,true) RETURNING id',
       [a.negocio, a.direccion || null, a.telefono || null]);
     const sucursalId = suc.rows[0].id;
