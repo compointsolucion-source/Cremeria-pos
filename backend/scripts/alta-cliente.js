@@ -1,0 +1,89 @@
+// Da de alta un cliente NUEVO en una base de datos Neon VACÍA:
+//   1) crea la estructura (scripts/schema.sql)
+//   2) crea la sucursal, su configuración y el usuario dueño
+//   3) opcionalmente crea los departamentos típicos del giro
+//   4) imprime las variables para Render y la línea de config.js
+//
+// Uso:
+//   DATABASE_URL="postgresql://(base NUEVA del cliente)" node scripts/alta-cliente.js \
+//     --negocio "Cremería La Esperanza" --dueno "Juan Pérez" --usuario juan \
+//     --password "Clave-segura-123" [--giro cremeria] [--direccion "..."] [--telefono "..."]
+require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const { Pool } = require('pg');
+
+const GIROS = {
+  cremeria: ['Quesos', 'Cremas y yogurt', 'Embutidos', 'Carnes', 'Lácteos', 'Abarrotes'],
+  carniceria: ['Res', 'Cerdo', 'Pollo', 'Embutidos', 'Menudencias', 'Abarrotes'],
+  abarrotes: ['Abarrotes', 'Bebidas', 'Botanas', 'Lácteos', 'Limpieza', 'Dulces'],
+  fruteria: ['Frutas', 'Verduras', 'Chiles y hierbas', 'Semillas', 'Abarrotes'],
+  polleria: ['Pollo', 'Huevo', 'Menudencias', 'Abarrotes'],
+  tortilleria: ['Tortilla', 'Masa', 'Totopos y tostadas', 'Abarrotes'],
+  panaderia: ['Pan dulce', 'Pan blanco', 'Pasteles', 'Bebidas', 'Abarrotes'],
+  dulceria: ['Dulces', 'Chocolates', 'Botanas', 'Bebidas', 'Piñatas y fiesta'],
+  rosticeria: ['Pollo rostizado', 'Guarniciones', 'Salsas', 'Bebidas']
+};
+
+function args() {
+  const a = {};
+  const v = process.argv.slice(2);
+  for (let i = 0; i < v.length; i++) if (v[i].startsWith('--')) a[v[i].slice(2)] = v[i + 1] && !v[i + 1].startsWith('--') ? v[++i] : true;
+  return a;
+}
+const a = args();
+const falta = ['negocio', 'dueno', 'usuario', 'password'].filter(k => !a[k]);
+if (!process.env.DATABASE_URL || falta.length) {
+  console.error('Faltan datos: ' + [!process.env.DATABASE_URL && 'DATABASE_URL', ...falta.map(f => '--' + f)].filter(Boolean).join(', '));
+  console.error('Ejemplo: DATABASE_URL="postgresql://..." node scripts/alta-cliente.js --negocio "Mi Negocio" --dueno "Nombre" --usuario admin --password "Clave123"');
+  process.exit(1);
+}
+if (String(a.password).length < 8) { console.error('La contraseña debe tener al menos 8 caracteres.'); process.exit(1); }
+if (a.giro && a.giro !== true && !GIROS[a.giro]) { console.error('Giro no válido. Opciones: ' + Object.keys(GIROS).join(', ')); process.exit(1); }
+
+const schemaPath = path.join(__dirname, 'schema.sql');
+if (!fs.existsSync(schemaPath)) { console.error('No existe scripts/schema.sql. Primero corre exportar-esquema.js contra tu base actual.'); process.exit(1); }
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL) ? false : { rejectUnauthorized: false } });
+
+(async () => {
+  const c = await pool.connect();
+  try {
+    const existentes = await c.query("SELECT count(*)::int n FROM information_schema.tables WHERE table_schema = 'public'");
+    if (existentes.rows[0].n > 0) throw new Error('La base de datos NO está vacía (ya tiene tablas). Usa una base nueva para cada cliente.');
+
+    await c.query('BEGIN');
+    await c.query(fs.readFileSync(schemaPath, 'utf8'));
+
+    const suc = await c.query('INSERT INTO sucursales (nombre, direccion, telefono, activo) VALUES ($1,$2,$3,true) RETURNING id',
+      [a.negocio, a.direccion || null, a.telefono || null]);
+    const sucursalId = suc.rows[0].id;
+
+    await c.query('INSERT INTO configuracion (sucursal_id, direccion, telefono) VALUES ($1,$2,$3)', [sucursalId, a.direccion || null, a.telefono || null]);
+
+    const hash = await bcrypt.hash(String(a.password), 10);
+    await c.query('INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo) VALUES ($1,$2,$3,$4,$5,true)',
+      [sucursalId, a.dueno, a.usuario, hash, 'dueno']);
+
+    if (a.giro && GIROS[a.giro]) {
+      for (let i = 0; i < GIROS[a.giro].length; i++) await c.query('INSERT INTO categorias (nombre, orden) VALUES ($1,$2)', [GIROS[a.giro][i], i + 1]);
+    }
+    await c.query('COMMIT');
+
+    console.log('\n=== CLIENTE CREADO ===');
+    console.log(`Negocio: ${a.negocio}  (sucursal #${sucursalId})`);
+    console.log(`Usuario dueño: ${a.usuario}   (la contraseña es la que escribiste)`);
+    console.log('\n--- Variables de entorno para el backend en Render ---');
+    console.log('DATABASE_URL=' + process.env.DATABASE_URL);
+    console.log('JWT_SECRET=' + crypto.randomBytes(32).toString('hex'));
+    console.log('MAX_SUCURSALES=1   (sube el número si contrata el plan Multisucursal)');
+    console.log('\n--- frontend/js/config.js ---');
+    console.log("const API_URL = 'https://NOMBRE-DEL-BACKEND-DEL-CLIENTE.onrender.com/api';");
+  } catch (e) {
+    await c.query('ROLLBACK').catch(() => {});
+    console.error('\nError (no se guardó nada): ' + e.message);
+    process.exitCode = 1;
+  } finally { c.release(); await pool.end(); }
+})();

@@ -1,0 +1,16 @@
+ALTA DE CLIENTE NUEVO - Compoint Punto
+
+UNA SOLA VEZ (sacar la estructura de tu base actual):
+  cd backend
+  DATABASE_URL="(la URL de tu Neon actual)" node scripts/exportar-esquema.js
+  -> crea backend/scripts/schema.sql (solo estructura, sin datos de tu negocio)
+
+POR CADA CLIENTE:
+  1) Neon: crear proyecto nuevo, copiar su connection string.
+  2) cd backend
+     DATABASE_URL="(la URL del cliente)" node scripts/alta-cliente.js \
+       --negocio "Nombre" --dueno "Nombre del dueño" --usuario admin \
+       --password "ClaveSegura123" --giro cremeria --telefono "33..." --direccion "..."
+     Giros: cremeria, carniceria, abarrotes, fruteria, polleria, tortilleria, panaderia, dulceria, rosticeria
+  3) Render: Web Service (Root Directory backend) con las variables que imprime el script.
+  4) Render: Static Site (Root Directory frontend), con js/config.js apuntando al backend del cliente.
