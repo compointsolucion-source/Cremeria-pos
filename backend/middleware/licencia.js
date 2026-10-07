@@ -53,7 +53,7 @@ async function verificarLicencia(req, res, next) {
   if (!est) return next();
   if (est.dias < 0) {
     return res.status(402).json({
-      error: 'Licencia vencida el ' + est.vence + '. Para renovar, comunícate con Compoint al 33 25 90 70 90.',
+      error: 'Licencia vencida el ' + est.vence + '. Para renovar, comunícate con Compoint: WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx',
       licencia_vencida: true
     });
   }

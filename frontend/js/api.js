@@ -55,7 +55,7 @@ function mostrarAvisoLicencia(dias, vence) {
     d.id = 'aviso-licencia';
     d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#F9A825;color:#1A1A1A;text-align:center;padding:8px 12px;font:600 14px sans-serif';
     const txt = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias} días`;
-    d.textContent = `Tu licencia vence ${txt} (${vence}). Para renovar comunícate con Compoint: 33 25 90 70 90`;
+    d.textContent = `Tu licencia vence ${txt} (${vence}). Para renovar comunícate con Compoint: WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx`;
     d.onclick = () => d.remove();
     document.body.appendChild(d);
   };
@@ -110,7 +110,7 @@ async function apiFetch(endpoint, options = {}) {
   // Licencia vencida: se bloquea la pantalla completa.
   if (response.status === 402) {
     const d402 = await response.json().catch(() => ({}));
-    const msg402 = d402.error || 'Licencia vencida. Comunícate con Compoint: 33 25 90 70 90';
+    const msg402 = d402.error || 'Licencia vencida. Comunícate con Compoint: WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx';
     if (!document.getElementById('error')) bloquearPorLicencia(msg402); // en login se muestra en el mensaje de error
     throw new Error(msg402);
   }
