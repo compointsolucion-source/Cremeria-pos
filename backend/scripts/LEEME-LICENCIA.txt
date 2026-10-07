@@ -1,0 +1,28 @@
+LICENCIA (RENTA ANUAL) - COMO FUNCIONA
+======================================
+- Cada cliente tiene UNA fila en la tabla "licencia" de SU base de datos (Neon).
+- 7 dias antes de vencer: barra amarilla arriba en todas las pantallas.
+- Al pasar la fecha de vencimiento: pantalla "Licencia vencida" y el login se
+  bloquea. Los datos NO se borran.
+- Hasta 1 minuto despues de renovar/cambiar la fecha ya funciona de nuevo.
+- Sin fila en la tabla = sin control (tu sistema propio y el demo).
+
+Todo se maneja en el SQL Editor de Neon del cliente:
+
+VER ESTADO
+  SELECT * FROM licencia;
+
+RENOVAR 1 ANO MAS (suma 12 meses a la fecha de vencimiento actual)
+  UPDATE licencia SET fecha_vencimiento = fecha_vencimiento + INTERVAL '12 months', actualizado_en = NOW();
+
+  Si ya estaba vencida hace tiempo y quieres contar desde hoy:
+  UPDATE licencia SET fecha_inicio = CURRENT_DATE, fecha_vencimiento = CURRENT_DATE + INTERVAL '12 months', actualizado_en = NOW();
+
+SUSPENDER AHORA (por falta de pago)
+  UPDATE licencia SET fecha_vencimiento = CURRENT_DATE - 1, actualizado_en = NOW();
+
+QUITAR EL CONTROL
+  DELETE FROM licencia;
+
+CLIENTE NUEVO: alta-cliente.js crea la licencia de 12 meses automaticamente
+(o --licencia-meses N; con 0 queda sin control).
