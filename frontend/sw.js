@@ -7,7 +7,7 @@
 // versión más nueva (y se actualiza la copia de respaldo de paso) — la
 // copia guardada solo se usa cuando de verdad no hay conexión. Esto evita
 // quedarse con una versión vieja por olvidar subir CACHE_VERSION.
-const CACHE_VERSION = 'compoint-punto-v5';
+const CACHE_VERSION = 'compoint-punto-v6';
 
 const ARCHIVOS_A_GUARDAR = [
   '/mostrador.html',
@@ -27,7 +27,8 @@ const ARCHIVOS_A_GUARDAR = [
   '/js/caja.js',
   '/manifest.json',
   '/iconos/icono-192.png',
-  '/iconos/icono-512.png'
+  '/iconos/icono-512.png',
+  '/iconos/icono-maskable-512.png'
 ];
 
 self.addEventListener('install', (evento) => {
