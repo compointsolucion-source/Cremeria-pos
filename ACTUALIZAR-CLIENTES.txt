@@ -28,3 +28,4 @@ CLIENTE NUEVO (una sola vez por cliente)
 
 LICENCIA
   Ver backend/scripts/LEEME-LICENCIA.txt (renovar, suspender).
+ 
