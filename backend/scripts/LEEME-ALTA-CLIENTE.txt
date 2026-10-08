@@ -12,5 +12,10 @@ POR CADA CLIENTE:
        --negocio "Nombre" --dueno "Nombre del dueño" --usuario admin \
        --password "ClaveSegura123" --giro cremeria --telefono "33..." --direccion "..."
      Giros: cremeria, carniceria, abarrotes, fruteria, polleria, tortilleria, panaderia, dulceria, rosticeria
-  3) Render: Web Service (Root Directory backend) con las variables que imprime el script.
-  4) Render: Static Site (Root Directory frontend), con js/config.js apuntando al backend del cliente.
+     (agrega --sucursales 2 si contrato 2 sucursales; --licencia-meses 12 es el valor por defecto)
+  3) Render: Web Service  nombre NOMBRE-pos  (Root Directory backend, Branch estable)
+     con las variables que imprime el script.
+  4) Render: Static Site  nombre NOMBRE-pos-web  (Root Directory frontend, Publish Directory ., Branch estable).
+     Con el mismo NOMBRE, la pagina encuentra sola a su servidor: ya NO se edita config.js.
+
+Para actualizar a todos los clientes despues, ver ACTUALIZAR-CLIENTES.txt.

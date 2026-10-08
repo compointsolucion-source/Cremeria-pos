@@ -105,8 +105,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localh
     console.log('DATABASE_URL=' + process.env.DATABASE_URL);
     console.log('JWT_SECRET=' + crypto.randomBytes(32).toString('hex'));
     console.log('MAX_SUCURSALES=' + totalSucursales);
-    console.log('\n--- frontend/js/config.js ---');
-    console.log("const API_URL = 'https://NOMBRE-DEL-BACKEND-DEL-CLIENTE.onrender.com/api';");
+    console.log('\n--- Servicios en Render (rama "estable" en los dos) ---');
+    console.log('1) Web Service  nombre: NOMBRE-pos      Root Directory: backend   Branch: estable');
+    console.log('2) Static Site  nombre: NOMBRE-pos-web  Root Directory: frontend  Branch: estable  Publish Directory: .');
+    console.log('   (usa el mismo NOMBRE en los dos y el sistema se conecta solo; no hay que editar config.js)');
   } catch (e) {
     await c.query('ROLLBACK').catch(() => {});
     console.error('\nError (no se guardó nada): ' + e.message);

@@ -4,7 +4,8 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const pool = require('./db');
-const { verificarLicencia, asegurarTabla } = require('./middleware/licencia');
+const { verificarLicencia } = require('./middleware/licencia');
+const { migrar } = require('./utils/migrar');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,7 +40,6 @@ io.on('connection', (socket) => {
 
 // Licencia (renta anual): bloquea todo /api si venció y avisa 7 días antes.
 // Sin fila en la tabla "licencia" no hay control.
-asegurarTabla();
 app.use('/api', verificarLicencia);
 
 // Rutas
@@ -101,4 +101,8 @@ process.on('unhandledRejection', (razon) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+// Primero se ponen al día las migraciones de la base de datos de ESTA
+// instalación; si fallan, el servidor arranca igual (queda el aviso en los Logs).
+migrar()
+  .catch((e) => console.error(`[${new Date().toISOString()}] Arranque sin completar migraciones:`, e.message))
+  .finally(() => server.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`)));

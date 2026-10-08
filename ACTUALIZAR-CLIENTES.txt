@@ -1,0 +1,30 @@
+COMO ACTUALIZAR A TODOS LOS CLIENTES (Compoint Punto)
+=====================================================
+
+IDEA
+  main     = tu zona de pruebas (tu propio sistema, cremeria-pos, sigue main)
+  estable  = lo que usan TODOS los clientes (sus servidores y paginas siguen estable)
+
+DIA A DIA
+  1) Trabaja y prueba en main como siempre (Commit + Sync Changes).
+  2) Cuando todo este probado y quieras llevarlo a los clientes:
+       doble clic a  publicar-a-clientes.bat   (carpeta principal del proyecto)
+     o en la terminal de VS Code:   .\publicar-a-clientes.bat
+  3) Espera unos minutos: Render actualiza solo los servidores y paginas de
+     todos los clientes. Las bases de datos se ponen al dia solas (migraciones).
+
+CAMBIOS EN LA BASE DE DATOS
+  Nunca los hagas a mano en Neon. Crea un archivo nuevo en backend/migrations/
+  (ver backend/migrations/LEEME.txt). Cada cliente lo aplica solo al reiniciar.
+
+CLIENTE NUEVO (una sola vez por cliente)
+  1) Neon: proyecto nuevo.  2) node scripts/alta-cliente.js ... (ver LEEME-ALTA-CLIENTE.txt)
+  3) Render: dos servicios con el mismo NOMBRE, los dos con Branch = estable:
+       Web Service  NOMBRE-pos      Root Directory backend
+       Static Site  NOMBRE-pos-web  Root Directory frontend   Publish Directory .
+     La pagina encuentra sola a su servidor por el nombre. No se edita config.js.
+     (Con dominio propio o nombres distintos: agrega una linea en frontend/js/config.js,
+      en API_POR_DIRECCION, y publica.)
+
+LICENCIA
+  Ver backend/scripts/LEEME-LICENCIA.txt (renovar, suspender).

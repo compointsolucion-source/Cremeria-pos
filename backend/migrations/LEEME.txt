@@ -1,0 +1,16 @@
+MIGRACIONES (cambios de estructura de la base de datos)
+=======================================================
+Cuando un cambio necesite una columna o tabla nueva, NO la crees a mano en
+Neon: crea un archivo nuevo aquí, con el siguiente numero, por ejemplo
+   003_nombre_del_cambio.sql
+Al redesplegar, cada cliente aplica solo los archivos que le falten (queda
+registro en la tabla schema_migrations).
+
+REGLAS:
+- Nunca edites ni borres un archivo ya publicado: crea uno nuevo.
+- Escribelos para poder correrse dos veces sin error:
+    ALTER TABLE x ADD COLUMN IF NOT EXISTS ...
+    CREATE TABLE IF NOT EXISTS ...
+    CREATE INDEX IF NOT EXISTS ...
+- Cada archivo corre completo o no corre (transaccion). Si falla, el servidor
+  arranca igual, avisa en los Logs de Render y no aplica los siguientes.
