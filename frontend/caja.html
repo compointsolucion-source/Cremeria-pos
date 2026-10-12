@@ -63,8 +63,10 @@
     <div class="panel-bandeja">
       <h3>Tickets pendientes</h3>
       <div id="scanner"></div>
-      <input type="text" id="campoLectorCaja" inputmode="none" autocomplete="off" placeholder="🔎 Lector de código de barras: escanea aquí (o escribe el folio y Enter)" style="width:100%; margin-bottom:8px;">
-      <button class="btn btn-secondary" style="width:100%; margin-bottom:14px;" onclick="toggleScanner()">📷 Escanear código con la cámara</button>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <input type="text" id="campoLectorCaja" inputmode="none" autocomplete="off" placeholder="🔎 Escanea o escribe el folio y Enter" style="flex:1; min-width:0;">
+        <button class="btn btn-secondary" style="flex:none; width:48px; padding:0;" onclick="toggleScanner()" title="Escanear con la cámara" aria-label="Escanear con la cámara">📷</button>
+      </div>
       <div id="bandeja"></div>
     </div>
 
