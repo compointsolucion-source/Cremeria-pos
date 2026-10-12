@@ -722,6 +722,11 @@ async function cargarConfiguracion() {
     document.getElementById('telefono').value = config.telefono || '';
     document.getElementById('rfc').value = config.rfc || '';
     document.getElementById('anchoTicket').value = config.ancho_ticket || '80mm';
+    // Si este dispositivo aún no tiene ancho propio, el sistema usa el del
+    // negocio: se muestra ese mismo valor para que lo que ves sea lo que imprime.
+    if (!localStorage.getItem('ancho_ticket_dispositivo')) {
+      document.getElementById('anchoTicketDispositivo').value = config.ancho_ticket || '80mm';
+    }
     document.getElementById('terminos').value = config.terminos || '';
     document.getElementById('etiquetaModo').value = config.etiqueta_modo || 'auto';
     document.getElementById('anchoEtiqueta').value = config.ancho_etiqueta || '50mm';
