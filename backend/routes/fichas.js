@@ -97,6 +97,23 @@ router.get('/recientes', verificarToken, async (req, res) => {
   }
 });
 
+// Los próximos turnos en espera (más antiguos primero) — para el diseño de
+// la pantalla de turnos que muestra "Próximos".
+router.get('/proximas', verificarToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, numero FROM fichas
+       WHERE sucursal_id = $1 AND estado = 'esperando' AND fecha_creacion::date = CURRENT_DATE
+       ORDER BY fecha_creacion ASC LIMIT 6`,
+      [req.sucursalId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener los próximos turnos' });
+  }
+});
+
 // Cuántas fichas están esperando todavía (informativo, para el empleado)
 router.get('/pendientes-count', verificarToken, async (req, res) => {
   try {

@@ -13,63 +13,139 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: #1B1C1E;
-    color: white;
-    height: 100vh;
-    overflow: hidden;
+    background: #1B1C1E; color: white; height: 100vh; overflow: hidden;
+    --num: 26vh;
   }
-  .layout-principal { display: flex; width: 100vw; height: 100vh; }
-  .columna-principal {
-    flex: 1; min-width: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; text-align: center;
-  }
-  .etiqueta { font-size: 28px; color: #A0A3A8; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px; }
-  .numero-turno { font-size: 220px; font-weight: 800; line-height: 1; color: #74C95A; }
-  .mostrador-destino { font-size: 60px; font-weight: 700; margin-top: 10px; }
-  .flecha { font-size: 60px; margin: 0 20px; color: #F9A825; }
-  .fila-actual { display: flex; align-items: center; justify-content: center; margin-top: 20px; }
-  .historial { position: fixed; bottom: 0; left: 0; right: 0; background: #2A2B2E; padding: 16px; display: flex; gap: 30px; justify-content: center; overflow-x: auto; z-index: 2; }
+  .pantalla { display: grid; width: 100vw; height: 100vh; }
+  .zona { min-width: 0; min-height: 0; }
+  #zonaTurno { grid-area: turno; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  #panelPromos { grid-area: promo; }
+  #zonaProximos { grid-area: prox; display: none; }
+  #historial { grid-area: hist; }
+  #zonaMarquesina { grid-area: marq; display: none; }
+  #zonaReloj { grid-area: reloj; display: none; }
+
+  .etiqueta { font-size: calc(var(--num) * 0.13); color: #A0A3A8; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px; }
+  .numero-turno { font-size: var(--num); font-weight: 800; line-height: 1; color: #74C95A; }
+  .mostrador-destino { font-size: calc(var(--num) * 0.27); font-weight: 700; margin-top: 10px; }
+  .fila-actual { display: flex; align-items: center; justify-content: center; margin-top: 10px; }
+  .sin-turnos { font-size: 40px; color: #A0A3A8; padding: 20px; }
+
+  .historial { background: #2A2B2E; padding: 14px; display: flex; gap: 30px; justify-content: center; overflow: hidden; }
   .historial-item { text-align: center; opacity: 0.6; }
   .historial-item .num { font-size: 28px; font-weight: 700; }
   .historial-item .mostrador { font-size: 14px; color: #A0A3A8; }
-  .sin-turnos { font-size: 40px; color: #A0A3A8; }
-  .contador-esperando { position: fixed; top: 16px; left: 16px; font-size: 20px; color: #A0A3A8; background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 10px; z-index: 2; }
-  .pantalla-completa-btn {
-    position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.1);
-    border: none; color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 2;
-  }
 
-  /* Panel de anuncios/promociones — solo se muestra si el negocio configuró
-     al menos uno en Configuración → Anuncios y Promociones. */
+  .contador-esperando { position: fixed; top: 16px; left: 16px; font-size: 20px; color: #A0A3A8; background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 10px; z-index: 5; }
+  .controles { position: fixed; top: 16px; right: 16px; display: flex; gap: 8px; z-index: 5; opacity: .35; transition: opacity .2s; }
+  .controles:hover, .controles:focus-within { opacity: 1; }
+  .controles button { background: rgba(255,255,255,0.12); border: none; color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+
+  /* Anuncios/promociones: solo se ven si el negocio configuró al menos uno. */
   .panel-promos {
-    display: none;
-    width: 380px; flex-shrink: 0;
-    background: #242527; border-left: 1px solid rgba(255,255,255,0.08);
+    display: none; background: #242527; overflow: hidden;
     flex-direction: column; align-items: center; justify-content: center;
-    gap: 18px; padding: 32px; padding-bottom: 130px; text-align: center;
+    gap: 18px; padding: 28px; text-align: center; --promo-max: 380px;
   }
   .panel-promos.visible { display: flex; }
-  .promo-imagen { max-width: 100%; max-height: 380px; border-radius: 14px; object-fit: contain; }
-  .promo-video { max-width: 100%; max-height: 380px; border-radius: 14px; }
+  .promo-imagen, .promo-video { max-width: 100%; max-height: var(--promo-max); border-radius: 14px; object-fit: contain; min-height: 0; }
   .promo-qr-caja { background: #FFFFFF; padding: 18px; border-radius: 14px; }
-  .promo-qr-caja img { display: block; width: 220px; height: 220px; }
+  .promo-qr-caja img, .promo-qr-caja canvas { display: block; width: 220px; height: 220px; }
   .promo-titulo { font-size: 22px; font-weight: 700; color: #F0F0F0; }
+
+  .lista-proximos { display: flex; flex-direction: column; justify-content: center; gap: 10px; height: 100%; padding: 24px; background: #242527; }
+  .lista-proximos h4 { font-size: 20px; letter-spacing: 3px; color: #A0A3A8; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+  .proximo-item { font-size: 44px; font-weight: 700; text-align: center; color: #E8E8E8; background: rgba(255,255,255,.06); border-radius: 12px; padding: 6px; }
+  .proximo-vacio { color: #777; font-size: 22px; text-align: center; }
+
+  .marquesina { background: #2A2B2E; overflow: hidden; white-space: nowrap; padding: 14px 0; font-size: 30px; color: #F9A825; font-weight: 700; }
+  .marquesina span { display: inline-block; padding-left: 100vw; animation: marquesina 30s linear infinite; }
+  @keyframes marquesina { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+
+  .reloj { text-align: center; font-size: 40px; font-weight: 700; color: #A0A3A8; padding: 12px; background: #2A2B2E; }
+
+  /* ===== DISEÑOS ===== */
+  /* 1. Clásico (el de siempre): turno a la izquierda, anuncios a la derecha, historial abajo */
+  .L-clasico .pantalla { grid-template-columns: minmax(0,1fr) 380px; grid-template-rows: minmax(0,1fr) auto; grid-template-areas: "turno promo" "hist hist"; }
+  .L-clasico.sin-promos .pantalla { grid-template-columns: minmax(0,1fr); grid-template-areas: "turno" "hist"; }
+  .L-clasico .panel-promos { border-left: 1px solid rgba(255,255,255,0.08); }
+
+  /* 2. Modo oscuro corporativo */
+  .L-oscuro { background: #000; --num: 28vh; }
+  .L-oscuro .pantalla { grid-template-columns: minmax(0,1fr) 360px; grid-template-rows: minmax(0,1fr) auto; grid-template-areas: "turno promo" "hist hist"; }
+  .L-oscuro.sin-promos .pantalla { grid-template-columns: minmax(0,1fr); grid-template-areas: "turno" "hist"; }
+  .L-oscuro .panel-promos { background: #151515; margin: 28px; border-radius: 22px; border: 1px solid #262626; }
+  .L-oscuro .historial { background: #0D0D0D; border-top: 1px solid #222; }
+  .L-oscuro .numero-turno { color: #FFFFFF; }
+
+  /* 3. Cine y menú: anuncio arriba (60%), turno abajo (40%) */
+  .L-cine { --num: 17vh; }
+  .L-cine .pantalla { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,58fr) minmax(0,42fr) auto; grid-template-areas: "promo" "turno" "hist"; }
+  .L-cine.sin-promos .pantalla { grid-template-rows: minmax(0,1fr) auto; grid-template-areas: "turno" "hist"; --num: 26vh; }
+  .L-cine .panel-promos { --promo-max: 100%; background: #000; padding: 12px; }
+  .L-cine .panel-promos .promo-imagen, .L-cine .panel-promos .promo-video { height: 100%; width: 100%; }
+  .L-cine #zonaTurno { flex-direction: column; }
+
+  /* 4. Híbrido de tres columnas: turno | anuncio | próximos */
+  .L-tres { --num: 20vh; }
+  .L-tres .pantalla { grid-template-columns: minmax(0,1fr) minmax(0,1.1fr) minmax(0,.65fr); grid-template-rows: minmax(0,1fr) auto; grid-template-areas: "turno promo prox" "hist hist hist"; }
+  .L-tres.sin-promos .pantalla { grid-template-columns: minmax(0,1.3fr) minmax(0,.7fr); grid-template-areas: "turno prox" "hist hist"; }
+  .L-tres #zonaProximos { display: block; }
+  .L-tres .panel-promos { --promo-max: 100%; }
+
+  /* 5. Minimalista centrado: turno enorme + marquesina */
+  .L-minimal { --num: 36vh; }
+  .L-minimal .pantalla { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto auto; grid-template-areas: "turno" "hist" "marq"; }
+  .L-minimal #panelPromos { display: none !important; }
+  .L-minimal #zonaMarquesina { display: block; }
+
+  /* 6. Estilo kiosco informativo: turno + historial + reloj a la izquierda, anuncio vertical a la derecha */
+  .L-kiosco { --num: 20vh; }
+  .L-kiosco .pantalla { grid-template-columns: minmax(0,5fr) minmax(0,6fr); grid-template-rows: minmax(0,3fr) minmax(0,2fr) auto; grid-template-areas: "turno promo" "hist promo" "reloj promo"; }
+  .L-kiosco.sin-promos .pantalla { grid-template-columns: minmax(0,1fr); grid-template-areas: "turno" "hist" "reloj"; }
+  .L-kiosco #zonaReloj { display: block; }
+  .L-kiosco .historial { flex-direction: column; gap: 6px; align-items: flex-start; padding: 16px 28px; justify-content: flex-start; }
+  .L-kiosco .historial-item { display: flex; gap: 14px; align-items: baseline; text-align: left; opacity: .8; }
+  .L-kiosco .panel-promos { --promo-max: 100%; background: #202124; }
+  .L-kiosco .panel-promos .promo-imagen, .L-kiosco .panel-promos .promo-video { max-height: 85%; }
+
+  /* Selector de diseño */
+  .modal-layout { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 20; align-items: center; justify-content: center; }
+  .modal-layout.abierto { display: flex; }
+  .modal-layout .caja { background: #2A2B2E; border-radius: 16px; padding: 24px; width: min(92vw, 520px); }
+  .modal-layout h3 { margin-bottom: 14px; }
+  .opcion-layout { display: block; width: 100%; text-align: left; background: #1B1C1E; border: 2px solid transparent; color: white; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; font-size: 16px; }
+  .opcion-layout small { display: block; color: #A0A3A8; font-size: 13px; margin-top: 2px; }
+  .opcion-layout.activa { border-color: #74C95A; }
 </style>
 </head>
-<body>
-  <button class="pantalla-completa-btn" onclick="document.documentElement.requestFullscreen()">⛶ Pantalla completa</button>
+<body class="L-clasico">
+  <div class="controles">
+    <button onclick="abrirSelectorLayout()">🎨 Diseño</button>
+    <button onclick="document.documentElement.requestFullscreen()">⛶ Pantalla completa</button>
+  </div>
   <div class="contador-esperando" id="contadorEsperando">Esperando: —</div>
 
-  <div class="layout-principal">
-    <div class="columna-principal">
+  <div class="pantalla">
+    <div class="zona" id="zonaTurno">
       <div id="turnoActual">
         <div class="sin-turnos">Esperando el primer turno del día...</div>
       </div>
     </div>
-    <div class="panel-promos" id="panelPromos"></div>
+    <div class="zona panel-promos" id="panelPromos"></div>
+    <div class="zona" id="zonaProximos"><div class="lista-proximos" id="listaProximos"></div></div>
+    <div class="zona historial" id="historial"></div>
+    <div class="zona marquesina" id="zonaMarquesina"><span id="textoMarquesina"></span></div>
+    <div class="zona reloj" id="zonaReloj"></div>
   </div>
 
-  <div class="historial" id="historial"></div>
+  <div class="modal-layout" id="modalLayout" onclick="if(event.target===this) cerrarSelectorLayout()">
+    <div class="caja">
+      <h3>🎨 Diseño de esta pantalla</h3>
+      <div id="opcionesLayout"></div>
+      <button class="opcion-layout" style="text-align:center;" onclick="cerrarSelectorLayout()">Cerrar</button>
+    </div>
+  </div>
 
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
@@ -146,8 +222,8 @@ async function cargarContadorEsperando() {
   }
 }
 
-socket.on('nueva_ficha', cargarContadorEsperando);
-socket.on('ficha_llamada', cargarContadorEsperando);
+socket.on('nueva_ficha', () => { cargarContadorEsperando(); cargarProximos(); });
+socket.on('ficha_llamada', () => { cargarContadorEsperando(); cargarProximos(); });
 
 // ============ Panel de anuncios/promociones ============
 // Se carga una sola vez al abrir la pantalla (no cambia mientras la
@@ -179,6 +255,8 @@ async function cargarPromosTurnos() {
     promosTurnos = promos;
 
     const panel = document.getElementById('panelPromos');
+    document.body.classList.toggle('sin-promos', promosTurnos.length === 0);
+    actualizarMarquesina();
     if (promosTurnos.length === 0) {
       panel.classList.remove('visible');
       return;
@@ -220,6 +298,70 @@ function mostrarPromoActual() {
     });
   }
 }
+
+// ============ Diseños de la pantalla ============
+// Cada pantalla (TV/monitor) guarda su propio diseño en su navegador. También
+// se puede forzar con ?layout=oscuro en la dirección.
+const DISENOS_PANTALLA = [
+  { clave: 'clasico', nombre: 'Clásico', desc: 'El de siempre: turno grande, anuncios a la derecha, historial abajo' },
+  { clave: 'oscuro', nombre: 'Modo oscuro corporativo', desc: 'Fondo negro, el turno resalta; anuncios en tarjeta lateral' },
+  { clave: 'cine', nombre: 'Cine y menú', desc: 'Video o menú arriba (60%) y el turno abajo (40%)' },
+  { clave: 'tres', nombre: 'Tres columnas', desc: 'Turno actual · anuncio central · próximos turnos' },
+  { clave: 'minimal', nombre: 'Minimalista centrado', desc: 'Turno enorme y una marquesina con las ofertas' },
+  { clave: 'kiosco', nombre: 'Kiosco informativo', desc: 'Turno, historial y hora a la izquierda; anuncio vertical a la derecha' }
+];
+
+function aplicarLayout(clave) {
+  if (!DISENOS_PANTALLA.some(d => d.clave === clave)) clave = 'clasico';
+  document.body.className = document.body.className.replace(/\bL-\w+/g, '').trim();
+  document.body.classList.add('L-' + clave);
+  try { localStorage.setItem('layout_turnos', clave); } catch (e) {}
+  if (clave === 'tres') cargarProximos();
+  if (clave === 'kiosco') actualizarReloj();
+  const lista = document.getElementById('opcionesLayout');
+  if (lista) lista.querySelectorAll('.opcion-layout').forEach(b => b.classList.toggle('activa', b.dataset.clave === clave));
+}
+
+function abrirSelectorLayout() {
+  const actual = (document.body.className.match(/L-(\w+)/) || [])[1];
+  document.getElementById('opcionesLayout').innerHTML = DISENOS_PANTALLA.map(d =>
+    `<button class="opcion-layout ${d.clave === actual ? 'activa' : ''}" data-clave="${d.clave}" onclick="aplicarLayout('${d.clave}')">${d.nombre}<small>${d.desc}</small></button>`
+  ).join('');
+  document.getElementById('modalLayout').classList.add('abierto');
+}
+function cerrarSelectorLayout() { document.getElementById('modalLayout').classList.remove('abierto'); }
+
+async function cargarProximos() {
+  const cont = document.getElementById('listaProximos');
+  if (!cont || !document.body.classList.contains('L-tres')) return;
+  try {
+    const fichas = await apiFetch('/fichas/proximas');
+    cont.innerHTML = '<h4>Próximos</h4>' + (fichas.length
+      ? fichas.map(f => `<div class="proximo-item">${String(f.numero).padStart(3,'0')}</div>`).join('')
+      : '<div class="proximo-vacio">Sin turnos en espera</div>');
+  } catch (err) { console.error(err); }
+}
+
+function actualizarMarquesina() {
+  const el = document.getElementById('textoMarquesina');
+  if (!el) return;
+  const textos = promosTurnos.map(p => p.titulo).filter(Boolean);
+  el.textContent = (textos.length ? textos.join('   ✦   ') : 'Gracias por su preferencia') + '   ✦   ';
+}
+
+function actualizarReloj() {
+  const el = document.getElementById('zonaReloj');
+  if (el) el.textContent = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+}
+
+const layoutDeUrl = new URLSearchParams(window.location.search).get('layout');
+let layoutGuardado = null;
+try { layoutGuardado = localStorage.getItem('layout_turnos'); } catch (e) {}
+aplicarLayout(layoutDeUrl || layoutGuardado || 'clasico');
+actualizarMarquesina();
+actualizarReloj();
+setInterval(actualizarReloj, 10000);
+setInterval(cargarProximos, 15000);
 
 cargarTurnoActual();
 cargarHistorial();
