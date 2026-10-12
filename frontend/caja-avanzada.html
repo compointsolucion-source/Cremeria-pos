@@ -853,7 +853,10 @@ async function reimprimirUltimoTicketAvanzada() {
       })),
       total: parseFloat(ticket.total).toFixed(2),
       piePagina: `Pagado con ${ticket.metodo_pago.toUpperCase()} — REIMPRESIÓN`,
-      logoUrl: config.logo_url || null
+      lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
+      incluirPrecioUnitario: config.incluir_precio_unitario !== false,
+      descripcionCompleta: config.descripcion_completa !== false,
+      ...estiloTicketDesdeConfig(config, true)
     };
 
     const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
@@ -1021,7 +1024,10 @@ async function imprimirCopiaHistorial() {
     })),
     total: parseFloat(ticketSeleccionadoHistorial.total).toFixed(2),
     piePagina: 'COPIA',
-    logoUrl: config.logo_url || null
+    lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
+    incluirPrecioUnitario: config.incluir_precio_unitario !== false,
+    descripcionCompleta: config.descripcion_completa !== false,
+    ...estiloTicketDesdeConfig(config, true)
   };
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
   if (modoImpresion === 'sistema') await imprimirConDialogoDelSistema(datosTicket);
@@ -1323,10 +1329,7 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,
     descripcionCompleta: config.descripcion_completa !== false,
-    logoUrl: config.logo_url || null,
-    tamanoLetra: config.tamano_letra || 'normal',
-    negocioNegritas: config.negocio_negritas !== false,
-    totalNegritas: config.total_negritas !== false
+    ...estiloTicketDesdeConfig(config, true)
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';

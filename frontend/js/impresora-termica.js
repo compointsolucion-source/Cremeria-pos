@@ -445,12 +445,169 @@ const ESCPOS_NEGRITA_OFF = new Uint8Array([0x1B, 0x45, 0x00]);
 const ESCPOS_TAMANO_GRANDE = new Uint8Array([0x1D, 0x21, 0x11]); // doble alto y ancho
 const ESCPOS_TAMANO_NORMAL = new Uint8Array([0x1D, 0x21, 0x00]);
 
+// ============ Diseño del ticket (todo configurable desde Configuración) ============
+
+// Tabla de acentos para impresoras térmicas. Las impresoras NO entienden
+// UTF-8 (por eso salían "jeroglíficos"): hay que mandarles cada letra con
+// el número que ellas conocen (página de códigos CP858/CP850).
+const TICKET_CP858 = {
+  'á': 0xA0, 'í': 0xA1, 'ó': 0xA2, 'ú': 0xA3, 'ñ': 0xA4, 'Ñ': 0xA5,
+  'ª': 0xA6, 'º': 0xA7, '¿': 0xA8, '¡': 0xAD, 'é': 0x82, 'ü': 0x81,
+  'É': 0x90, 'Á': 0xB5, 'Í': 0xD6, 'Ó': 0xE0, 'Ú': 0xE9, 'Ü': 0x9A,
+  'ç': 0x87, '°': 0xF8, '€': 0xD5, '«': 0xAE, '»': 0xAF
+};
+
+// Modo vigente para los textos de ESTA impresión: 'quitar' | 'cp858' | 'cp850'.
+let ticketModoAcentos = 'quitar';
+
+// Deja solo letras que TODA impresora imprime bien (sin acentos ni símbolos raros).
+function ticketTextoSeguro(texto) {
+  return String(texto)
+    .replace(/¿/g, '?').replace(/¡/g, '!').replace(/…/g, '...')
+    .replace(/[–—]/g, '-').replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/€/g, 'EUR')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^\x20-\x7E\n]/g, '?');
+}
+
+// Convierte texto a los bytes que la impresora entiende según el modo elegido.
+function codificarTextoTicket(texto, modo) {
+  modo = modo || ticketModoAcentos;
+  if (modo !== 'cp858' && modo !== 'cp850') {
+    return new TextEncoder().encode(ticketTextoSeguro(texto));
+  }
+  let s = String(texto).replace(/…/g, '...').replace(/[–—]/g, '-')
+    .replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/•/g, '*');
+  if (modo === 'cp850') s = s.replace(/€/g, 'EUR');
+  const salida = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c < 0x80) { salida.push(c); continue; }
+    if (TICKET_CP858[ch] !== undefined) { salida.push(TICKET_CP858[ch]); continue; }
+    const base = ch.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    salida.push(base && base.charCodeAt(0) < 0x80 ? base.charCodeAt(0) : 0x3F);
+  }
+  return new Uint8Array(salida);
+}
+
+function escposComando(arr) { return new Uint8Array(arr); }
+// Tamaño de letra ESC/POS: ancho 1-8 veces, alto 1-8 veces.
+function escposTamano(ancho, alto) { return escposComando([0x1D, 0x21, ((ancho - 1) << 4) | (alto - 1)]); }
+const ESCPOS_CENTRAR = escposComando([0x1B, 0x61, 1]);
+const ESCPOS_IZQUIERDA = escposComando([0x1B, 0x61, 0]);
+const ESCPOS_FUENTE_A = escposComando([0x1B, 0x4D, 0]);
+const ESCPOS_FUENTE_B = escposComando([0x1B, 0x4D, 1]);
+
+// Cuántos caracteres caben por renglón según papel y tamaño de letra.
+function columnasTicket(ancho, letra, paraDialogo) {
+  const e58 = ancho === '58mm';
+  if (letra === 'pequena') return e58 ? 42 : 64;
+  if (letra === 'grande') return paraDialogo ? (e58 ? 24 : 32) : (e58 ? 32 : 48);
+  return e58 ? 32 : 48;
+}
+
+// Valores por defecto de todo lo que se puede configurar en el ticket.
+const TICKET_DEFECTOS = {
+  mensajeSuperior: '', logoTamano: 'mediano', tamanoLetra: 'normal',
+  nombreTamano: 'grande', totalTamano: 'grande', acentos: 'quitar',
+  negocioNegritas: true, totalNegritas: true, tipoFuente: 'monospace',
+  qrPromo: null, textoLegal: '', lineasSuperiores: 0, lineasInferiores: 3,
+  incluirPrecioUnitario: true, descripcionCompleta: true
+};
+
+function completarDatosTicket(d) {
+  const r = { ...TICKET_DEFECTOS };
+  Object.keys(d).forEach(k => { if (d[k] !== undefined) r[k] = d[k]; });
+  r.negocio = r.negocio || {};
+  return r;
+}
+
+// Convierte la configuración guardada del negocio (tabla "configuracion") en
+// las opciones de estilo que usan las funciones de impresión. Lo usan Mostrador,
+// Caja y la pantalla de Configuración — así TODOS los tickets salen igual.
+//   esFinal = true  → comprobante ya pagado (lleva logo y QR de promoción)
+//   esFinal = false → ticket de mostrador (solo si se activó en la configuración)
+function estiloTicketDesdeConfig(config, esFinal) {
+  config = config || {};
+  const nombre = (config.nombre_negocio === null || config.nombre_negocio === undefined)
+    ? 'Compoint Punto de Soluciones' : config.nombre_negocio;
+  const mostrarQr = config.qr_promo_activo && config.qr_promo_contenido &&
+    (esFinal || config.qr_promo_en_mostrador);
+  return {
+    negocio: { nombre, direccion: config.direccion, telefono: config.telefono, rfc: config.rfc },
+    mensajeSuperior: config.mensaje_superior || '',
+    logoUrl: (esFinal || config.ticket_logo_en_mostrador) ? (config.logo_url || null) : null,
+    logoTamano: config.ticket_logo_tamano || 'mediano',
+    tamanoLetra: config.ticket_letra || (config.tamano_letra === 'grande' ? 'grande' : 'normal'),
+    nombreTamano: config.ticket_nombre_tamano || 'grande',
+    totalTamano: config.ticket_total_tamano || 'grande',
+    acentos: config.ticket_acentos || 'quitar',
+    negocioNegritas: config.negocio_negritas !== false,
+    totalNegritas: config.total_negritas !== false,
+    tipoFuente: config.tipo_fuente || 'monospace',
+    qrPromo: mostrarQr ? {
+      contenido: config.qr_promo_contenido,
+      texto: config.qr_promo_texto || '',
+      tamano: config.qr_promo_tamano || 'mediano'
+    } : null,
+    textoLegal: esFinal ? (config.terminos || '') : ''
+  };
+}
+
+// Pasa un canvas a blanco y negro puro con "tramado" (puntitos) para que un
+// logotipo a color o en grises se vea bien en papel térmico.
+function tramarCanvasBlancoNegro(canvas) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const img = ctx.getImageData(0, 0, w, h);
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    g[i] = 0.299 * img.data[i * 4] + 0.587 * img.data[i * 4 + 1] + 0.114 * img.data[i * 4 + 2];
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const viejo = g[i];
+      const nuevo = viejo < 128 ? 0 : 255;
+      const err = viejo - nuevo;
+      g[i] = nuevo;
+      if (x + 1 < w) g[i + 1] += err * 7 / 16;
+      if (y + 1 < h) {
+        if (x > 0) g[i + w - 1] += err * 3 / 16;
+        g[i + w] += err * 5 / 16;
+        if (x + 1 < w) g[i + w + 1] += err * 1 / 16;
+      }
+    }
+  }
+  for (let i = 0; i < w * h; i++) {
+    const v = g[i] < 128 ? 0 : 255;
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+function anchoLogoTicketPx(ancho, tamano) {
+  const total = ancho === '58mm' ? 384 : 576;
+  const pct = tamano === 'chico' ? 0.25 : (tamano === 'grande' ? 0.7 : 0.45);
+  return Math.max(8, Math.round(total * pct / 8) * 8);
+}
+
+function anchoQrPromoPx(ancho, tamano) {
+  const tabla = ancho === '58mm' ? { chico: 160, mediano: 224, grande: 288 } : { chico: 200, mediano: 280, grande: 360 };
+  return tabla[tamano] || tabla.mediano;
+}
+
+function escaparHtmlTicket(t) {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function bytesConEstilo(texto, { negrita = false, grande = false } = {}) {
-  const encoder = new TextEncoder();
   const partes = [];
   if (negrita) partes.push(ESCPOS_NEGRITA_ON);
   if (grande) partes.push(ESCPOS_TAMANO_GRANDE);
-  partes.push(encoder.encode(texto + '\n'));
+  partes.push(codificarTextoTicket(texto + '\n'));
   if (grande) partes.push(ESCPOS_TAMANO_NORMAL);
   if (negrita) partes.push(ESCPOS_NEGRITA_OFF);
   return bytesJuntos(partes);
@@ -471,7 +628,7 @@ function generarCanvasLogo(imagenSrc, anchoMaximoPx) {
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas);
+      resolve(tramarCanvasBlancoNegro(canvas));
     };
     img.onerror = () => reject(new Error('No se pudo cargar el logotipo'));
     img.src = imagenSrc;
@@ -482,10 +639,9 @@ function generarCanvasLogo(imagenSrc, anchoMaximoPx) {
 function construirComandosTexto(lineas) {
   const ESC = 0x1B, GS = 0x1D;
   const partes = [new Uint8Array([ESC, 0x40])]; // inicializar impresora
-  const encoder = new TextEncoder();
 
   lineas.forEach(linea => {
-    partes.push(encoder.encode(linea + '\n'));
+    partes.push(codificarTextoTicket(linea + '\n'));
   });
 
   partes.push(new Uint8Array([0x0A, 0x0A, 0x0A])); // espacio antes de cortar
@@ -574,8 +730,7 @@ function bytesJuntos(listaDeArrays) {
 }
 
 function bytesDeLineas(lineas) {
-  const encoder = new TextEncoder();
-  return bytesJuntos(lineas.map(l => encoder.encode(l + '\n')));
+  return bytesJuntos(lineas.map(l => codificarTextoTicket(l + '\n')));
 }
 
 // Arma un ticket de texto plano, ajustado al ancho de papel (32 caracteres para
@@ -599,8 +754,8 @@ function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
   return lineas;
 }
 
-function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null }) {
-  const columnas = ancho_ticket === '58mm' ? 32 : 48;
+function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items, total, piePagina, textoLegal = '', incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null }) {
+  const columnas = columnasForzadas || (ancho_ticket === '58mm' ? 32 : 48);
   const centrar = (texto) => {
     const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
     return ' '.repeat(espacios) + texto;
@@ -612,13 +767,18 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirP
     return etiqueta + ' '.repeat(espacios) + montoTexto;
   };
   // Corta un texto largo en varios renglones de máximo "columnas" caracteres,
-  // sin partir palabras a la mitad cuando es posible.
-  const envolverTexto = (texto) => {
-    if (texto.length <= columnas) return [texto];
-    const palabras = texto.split(' ');
+  // sin partir palabras a la mitad cuando es posible. Respeta los saltos de
+  // línea que el usuario escribió.
+  const envolverTexto = (texto) => String(texto).split('\n').flatMap(parte => {
+    if (parte.length <= columnas) return [parte];
     const renglones = [];
     let actual = '';
-    palabras.forEach(palabra => {
+    parte.split(' ').forEach(palabra => {
+      while (palabra.length > columnas) {
+        if (actual) { renglones.push(actual); actual = ''; }
+        renglones.push(palabra.slice(0, columnas));
+        palabra = palabra.slice(columnas);
+      }
       if ((actual + ' ' + palabra).trim().length > columnas) {
         if (actual) renglones.push(actual.trim());
         actual = palabra;
@@ -628,7 +788,7 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirP
     });
     if (actual) renglones.push(actual);
     return renglones;
-  };
+  });
 
   const lineas = [''];
 
@@ -642,9 +802,9 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirP
     if (descripcionCompleta) {
       envolverTexto(item.nombre_producto).forEach(renglon => lineas.push(renglon));
     } else {
-      lineas.push(item.nombre_producto.length > columnas ? item.nombre_producto.slice(0, columnas - 1) + '…' : item.nombre_producto);
+      lineas.push(item.nombre_producto.length > columnas ? item.nombre_producto.slice(0, columnas - 1) + '.' : item.nombre_producto);
     }
-    if (incluirPrecioUnitario) {
+    if (incluirPrecioUnitario && item.detalle) {
       lineas.push(filaMonto(`  ${item.detalle}`, item.subtotal));
     } else {
       lineas.push(filaMonto('  ', item.subtotal));
@@ -652,13 +812,8 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirP
   });
 
   lineas.push(separador);
-  // No se usa filaMonto() aquí a propósito: esa función calcula espacios
-  // asumiendo que cada letra mide lo mismo, pero esta línea se imprime en
-  // negritas — en varias impresoras térmicas, las negritas usan letras más
-  // anchas, y ese cálculo empujaba el monto fuera del ancho físico del
-  // papel (por eso "TOTAL" se veía pero el número desaparecía). Un formato
-  // simple y corto como este cabe siempre, sin importar el ancho real de
-  // la letra en negritas.
+  // Esta línea la reconocen las funciones de impresión (empieza con "TOTAL")
+  // para imprimirla con el tamaño y negritas que se eligieron.
   lineas.push(`TOTAL: $${total}`);
   // El efectivo recibido y el cambio solo tienen sentido en pagos en
   // efectivo — si no se mandan (tarjeta, transferencia, etc.), no se
@@ -667,7 +822,11 @@ function formatearCuerpoTicket({ ancho_ticket, items, total, piePagina, incluirP
   if (cambio !== null) lineas.push(`Cambio: $${cambio}`);
   lineas.push(separador);
 
-  if (piePagina) lineas.push(centrar(piePagina));
+  if (piePagina) envolverTexto(piePagina).forEach(r => lineas.push(centrar(r)));
+  if (textoLegal) {
+    lineas.push('');
+    envolverTexto(textoLegal).forEach(r => lineas.push(centrar(r)));
+  }
   lineas.push('');
   return lineas;
 }
@@ -678,9 +837,10 @@ function formatearTicket(datosTicket) {
   return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket)];
 }
 
-// Imprime un ticket completo, incluyendo QR y/o código de barras escaneable
-// según la configuración. Lanza error si no hay impresora conectada — quien
-// llama debe mostrar el banner de "Reconectar" en ese caso.
+// Imprime un ticket completo (logo, nombre, datos, código del folio, productos,
+// total, QR de promoción) con todo el diseño elegido en Configuración. Lanza
+// error si no hay impresora conectada — quien llama debe mostrar el banner de
+// "Reconectar" en ese caso.
 async function imprimirTicketBLE(datosTicket) {
   if (!impresoraConectada()) {
     await reconectarSiEsPosible();
@@ -689,85 +849,132 @@ async function imprimirTicketBLE(datosTicket) {
     throw new Error('No hay impresora conectada. Toca "Conectar impresora" primero.');
   }
 
+  const d = completarDatosTicket(datosTicket);
+  ticketModoAcentos = d.acentos;
   const ESC = 0x1B;
-  const inicializar = new Uint8Array([ESC, 0x40]);
+  const columnas = columnasTicket(d.ancho_ticket, d.tamanoLetra, false);
+  const linea = (t) => codificarTextoTicket(t + '\n', d.acentos);
+  const salto = escposComando([0x0A]);
+  const negritaOn = ESCPOS_NEGRITA_ON, negritaOff = ESCPOS_NEGRITA_OFF;
 
-  const lineasSuperiores = datosTicket.lineasSuperiores || 0;
-  const lineasInferiores = datosTicket.lineasInferiores !== undefined ? datosTicket.lineasInferiores : 3;
-  const espacioArriba = bytesDeLineas(new Array(lineasSuperiores).fill(''));
+  // Parte un texto largo en renglones de máximo "ancho" caracteres.
+  const envolver = (texto, ancho) => String(texto).split('\n').flatMap(parte => {
+    if (parte.length <= ancho) return [parte];
+    const r = []; let actual = '';
+    parte.split(' ').forEach(p => {
+      while (p.length > ancho) { if (actual) { r.push(actual); actual = ''; } r.push(p.slice(0, ancho)); p = p.slice(ancho); }
+      if ((actual + ' ' + p).trim().length > ancho) { if (actual) r.push(actual.trim()); actual = p; }
+      else actual = (actual + ' ' + p).trim();
+    });
+    if (actual) r.push(actual);
+    return r;
+  });
 
-  // Logotipo (si se configuró uno en Configuración) — se imprime antes que todo.
-  let comandosLogo = new Uint8Array(0);
-  if (datosTicket.logoUrl) {
+  const partes = [escposComando([ESC, 0x40])]; // inicializar
+  if (d.acentos === 'cp858') partes.push(escposComando([ESC, 0x74, 19]));
+  else if (d.acentos === 'cp850') partes.push(escposComando([ESC, 0x74, 2]));
+
+  partes.push(bytesDeLineas(new Array(d.lineasSuperiores || 0).fill('')));
+
+  // ---- Encabezado centrado: logo, nombre, mensaje, dirección, teléfono, RFC ----
+  partes.push(ESCPOS_CENTRAR, ESCPOS_FUENTE_A);
+
+  if (d.logoUrl) {
     try {
-      const anchoLogoPx = datosTicket.ancho_ticket === '58mm' ? 200 : 300;
-      const canvasLogo = await generarCanvasLogo(datosTicket.logoUrl, anchoLogoPx);
-      comandosLogo = bytesJuntos([canvasAComandosRaster(canvasLogo), new Uint8Array([0x0A])]);
+      const canvasLogo = await generarCanvasLogo(d.logoUrl, anchoLogoTicketPx(d.ancho_ticket, d.logoTamano));
+      partes.push(canvasAComandosRaster(canvasLogo), salto);
     } catch (err) {
       console.error('No se pudo imprimir el logotipo:', err.message);
     }
   }
 
-  // Encabezado: el nombre del negocio se imprime en negritas si está
-  // configurado así; el resto (dirección, teléfono, folio, fecha) normal.
-  const lineasEncabezado = formatearEncabezadoTicket(datosTicket);
-  const nombreEsPrimeraLinea = !!(datosTicket.negocio && datosTicket.negocio.nombre);
-  const encabezado = bytesJuntos(lineasEncabezado.map((linea, idx) => {
-    if (idx === 0 && nombreEsPrimeraLinea && datosTicket.negocioNegritas !== false) {
-      return bytesConEstilo(linea, { negrita: true });
-    }
-    return bytesConEstilo(linea);
-  }));
+  const nombre = d.negocio.nombre;
+  if (nombre) {
+    const grande = d.nombreTamano === 'grande';
+    if (d.negocioNegritas) partes.push(negritaOn);
+    if (grande) partes.push(escposTamano(2, 2));
+    envolver(nombre, grande ? Math.floor(columnasTicket(d.ancho_ticket, 'normal', false) / 2) : columnasTicket(d.ancho_ticket, 'normal', false))
+      .forEach(r => partes.push(linea(r)));
+    if (grande) partes.push(escposTamano(1, 1));
+    if (d.negocioNegritas) partes.push(negritaOff);
+  }
 
-  // Cuerpo: si "tamaño de letra" es "grande", todo el cuerpo se imprime al
-  // doble de tamaño. La línea de TOTAL además se pone en negritas si se
-  // configuró así (independiente del tamaño).
-  const letraGrande = datosTicket.tamanoLetra === 'grande';
-  const lineasCuerpo = formatearCuerpoTicket({
-    ...datosTicket,
-    incluirPrecioUnitario: datosTicket.incluirPrecioUnitario !== false,
-    descripcionCompleta: datosTicket.descripcionCompleta !== false,
-    cliente: datosTicket.imprimirDatosCliente ? datosTicket.cliente : null
-  });
-  const cuerpoPartes = [];
-  if (letraGrande) cuerpoPartes.push(ESCPOS_TAMANO_GRANDE);
-  lineasCuerpo.forEach(linea => {
-    const esLineaTotal = linea.trim().startsWith('TOTAL');
-    if (esLineaTotal && datosTicket.totalNegritas !== false) {
-      cuerpoPartes.push(ESCPOS_NEGRITA_ON, new TextEncoder().encode(linea + '\n'), ESCPOS_NEGRITA_OFF);
-    } else {
-      cuerpoPartes.push(new TextEncoder().encode(linea + '\n'));
-    }
-  });
-  if (letraGrande) cuerpoPartes.push(ESCPOS_TAMANO_NORMAL);
-  const cuerpo = bytesJuntos(cuerpoPartes);
+  partes.push(d.tamanoLetra === 'pequena' ? ESCPOS_FUENTE_B : ESCPOS_FUENTE_A);
+  const datosNegocio = [];
+  if (d.mensajeSuperior) datosNegocio.push(d.mensajeSuperior);
+  if (d.negocio.direccion) datosNegocio.push(d.negocio.direccion);
+  if (d.negocio.telefono) datosNegocio.push(`Tel: ${d.negocio.telefono}`);
+  if (d.negocio.rfc) datosNegocio.push(`RFC: ${d.negocio.rfc}`);
+  datosNegocio.forEach(t => envolver(t, columnas).forEach(r => partes.push(linea(r))));
 
-  const cierre = bytesJuntos([
-    bytesDeLineas(new Array(lineasInferiores).fill('')),
-    new Uint8Array([0x1D, 0x56, 0x00]) // cortar papel (si la impresora lo soporta)
-  ]);
+  // ---- Folio y fecha (alineados a la izquierda) ----
+  const separador = '-'.repeat(columnas);
+  partes.push(ESCPOS_IZQUIERDA, linea(separador), linea(`Folio: ${d.folio}`), linea(`Fecha: ${d.fecha}`), linea(separador));
 
-  const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'ninguno';
-  let comandosCodigo = new Uint8Array(0);
+  // ---- Código del folio (QR y/o barras) para que Caja lo escanee ----
   try {
-    const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
+    const tipoCodigo = d.tipoCodigoEscaneo || 'ninguno';
+    const anchoPx = d.ancho_ticket === '58mm' ? 240 : 350;
     const partesCodigo = [];
-
     if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
-      const canvasQR = await generarCanvasQR(datosTicket.folio, anchoPx);
-      partesCodigo.push(canvasAComandosRaster(canvasQR), new Uint8Array([0x0A]));
+      partesCodigo.push(canvasAComandosRaster(await generarCanvasQR(d.folio, anchoPx)), salto);
     }
     if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
-      const canvasBarras = generarCanvasBarras(datosTicket.folio, anchoPx);
-      partesCodigo.push(canvasAComandosRaster(canvasBarras), new Uint8Array([0x0A]));
+      partesCodigo.push(canvasAComandosRaster(generarCanvasBarras(d.folio, anchoPx)), salto);
     }
-    comandosCodigo = bytesJuntos(partesCodigo);
+    if (partesCodigo.length) partes.push(ESCPOS_CENTRAR, ...partesCodigo, ESCPOS_IZQUIERDA);
   } catch (err) {
     console.error('No se pudo generar el código escaneable, se imprime solo el folio en texto:', err.message);
   }
 
-  const comandosFinales = bytesJuntos([inicializar, comandosLogo, espacioArriba, encabezado, comandosCodigo, cuerpo, cierre]);
-  await enviarBytes(comandosFinales);
+  // ---- Productos, total, pie ----
+  const lineasCuerpo = formatearCuerpoTicket({
+    ...d, columnas,
+    cliente: d.imprimirDatosCliente ? d.cliente : null
+  });
+  const bodyGrande = d.tamanoLetra === 'grande';
+  const tamanoCuerpo = bodyGrande ? escposTamano(1, 2) : escposTamano(1, 1);
+  partes.push(tamanoCuerpo);
+  lineasCuerpo.forEach(l => {
+    if (l.trim().startsWith('TOTAL')) {
+      const etiqueta = 'TOTAL', monto = `$${d.total}`;
+      const grande = d.totalTamano === 'grande';
+      // Letra doble (ancho y alto) si cabe; si no, solo doble alto.
+      const dobleAncho = grande && (etiqueta.length + monto.length + 1) <= Math.floor(columnas / 2);
+      const anchoReal = dobleAncho ? Math.floor(columnas / 2) : columnas;
+      const texto = etiqueta + ' '.repeat(Math.max(1, anchoReal - etiqueta.length - monto.length)) + monto;
+      if (d.totalNegritas) partes.push(negritaOn);
+      partes.push(grande ? escposTamano(dobleAncho ? 2 : 1, 2) : escposTamano(1, 1), linea(texto), tamanoCuerpo);
+      if (d.totalNegritas) partes.push(negritaOff);
+    } else {
+      partes.push(linea(l));
+    }
+  });
+  partes.push(escposTamano(1, 1), ESCPOS_FUENTE_A);
+
+  // ---- QR de promoción (ej. descuentos, redes sociales, catálogo) ----
+  if (d.qrPromo && d.qrPromo.contenido && typeof QRCode !== 'undefined') {
+    try {
+      const canvasPromo = await generarCanvasQR(d.qrPromo.contenido, anchoQrPromoPx(d.ancho_ticket, d.qrPromo.tamano));
+      partes.push(ESCPOS_CENTRAR);
+      if (d.qrPromo.texto) {
+        partes.push(negritaOn);
+        envolver(d.qrPromo.texto, columnasTicket(d.ancho_ticket, 'normal', false)).forEach(r => partes.push(linea(r)));
+        partes.push(negritaOff);
+      }
+      partes.push(canvasAComandosRaster(canvasPromo), salto, ESCPOS_IZQUIERDA);
+    } catch (err) {
+      console.error('No se pudo imprimir el QR de promoción:', err.message);
+    }
+  }
+
+  // ---- Cierre: espacio y corte ----
+  partes.push(
+    bytesDeLineas(new Array(d.lineasInferiores !== undefined ? d.lineasInferiores : 3).fill('')),
+    escposComando([0x1D, 0x56, 0x00]) // cortar papel (si la impresora lo soporta)
+  );
+
+  await enviarBytes(bytesJuntos(partes));
 }
 
 // Respaldo cuando no hay impresora BLE conectada o el navegador no la soporta:
@@ -785,64 +992,106 @@ async function compartirTicketComoTexto(datosTicket) {
   }
 }
 
+// Arma el HTML del ticket (el mismo para el diálogo de impresión del sistema
+// y para la vista previa de Configuración). Devuelve { css, html } — el CSS
+// va con la clase ".tk" para no chocar con el resto de la página.
+async function construirHtmlTicket(datosTicket) {
+  const d = completarDatosTicket(datosTicket);
+  const e58 = d.ancho_ticket === '58mm';
+  const columnas = columnasTicket(d.ancho_ticket, d.tamanoLetra, true);
+  const utilPx = e58 ? 204 : 287; // ancho útil del papel en pixeles
+  const fuentePx = Math.floor((utilPx / (columnas * 0.6)) * 10) / 10;
+  const familia = d.tipoFuente === 'sans-serif' ? "'Segoe UI', Arial, sans-serif" : "'Courier New', monospace";
+  const esc = escaparHtmlTicket;
+
+  const css = `
+    .tk { font-family: ${familia}; font-size: ${fuentePx}px; line-height: 1.25; color: #000; background: #fff; }
+    .tk .c { text-align: center; }
+    .tk .l { white-space: pre; }
+    .tk .nombre { font-weight: ${d.negocioNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.nombreTamano === 'grande' ? 1.9 : 1)).toFixed(1)}px; line-height: 1.15; margin: 2px 0; }
+    .tk .total { display: flex; justify-content: space-between; font-weight: ${d.totalNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.totalTamano === 'grande' ? 1.6 : 1)).toFixed(1)}px; margin: 2px 0; }
+    .tk img { display: block; margin: 4px auto; max-width: 100%; }
+  `;
+
+  const partes = [];
+
+  if (d.logoUrl) {
+    const pct = d.logoTamano === 'chico' ? 28 : (d.logoTamano === 'grande' ? 75 : 50);
+    partes.push(`<img src="${d.logoUrl}" style="width:${pct}%;">`);
+  }
+  if (d.negocio.nombre) partes.push(`<div class="c nombre">${esc(d.negocio.nombre)}</div>`);
+  const datosNegocio = [];
+  if (d.mensajeSuperior) datosNegocio.push(d.mensajeSuperior);
+  if (d.negocio.direccion) datosNegocio.push(d.negocio.direccion);
+  if (d.negocio.telefono) datosNegocio.push(`Tel: ${d.negocio.telefono}`);
+  if (d.negocio.rfc) datosNegocio.push(`RFC: ${d.negocio.rfc}`);
+  datosNegocio.forEach(t => partes.push(`<div class="c">${esc(t)}</div>`));
+
+  const sep = '-'.repeat(columnas);
+  partes.push(`<div class="l">${sep}\nFolio: ${esc(d.folio)}\nFecha: ${esc(d.fecha)}\n${sep}</div>`);
+
+  // Código del folio (QR y/o barras)
+  try {
+    const tipoCodigo = d.tipoCodigoEscaneo || 'ninguno';
+    if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
+      partes.push(`<img src="${(await generarCanvasQR(d.folio, 240)).toDataURL()}" style="width:55%;">`);
+    }
+    if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
+      partes.push(`<img src="${generarCanvasBarras(d.folio, 350).toDataURL()}">`);
+    }
+  } catch (err) {
+    console.error('No se pudo generar el código escaneable:', err.message);
+  }
+
+  // Productos, total y pie
+  const lineasCuerpo = formatearCuerpoTicket({ ...d, columnas, cliente: d.imprimirDatosCliente ? d.cliente : null });
+  let buffer = [];
+  const vaciar = () => { if (buffer.length) { partes.push(`<div class="l">${esc(buffer.join('\n'))}</div>`); buffer = []; } };
+  lineasCuerpo.forEach(l => {
+    if (l.trim().startsWith('TOTAL')) {
+      vaciar();
+      partes.push(`<div class="total"><span>TOTAL</span><span>$${esc(d.total)}</span></div>`);
+    } else {
+      buffer.push(l);
+    }
+  });
+  vaciar();
+
+  // QR de promoción
+  if (d.qrPromo && d.qrPromo.contenido && typeof QRCode !== 'undefined') {
+    try {
+      const pct = d.qrPromo.tamano === 'chico' ? 40 : (d.qrPromo.tamano === 'grande' ? 80 : 60);
+      if (d.qrPromo.texto) partes.push(`<div class="c" style="font-weight:700; margin-top:6px;">${esc(d.qrPromo.texto).replace(/\n/g, '<br>')}</div>`);
+      partes.push(`<img src="${(await generarCanvasQR(d.qrPromo.contenido, 360)).toDataURL()}" style="width:${pct}%;">`);
+    } catch (err) {
+      console.error('No se pudo generar el QR de promoción:', err.message);
+    }
+  }
+
+  return { css, html: `<div class="tk">${partes.join('')}</div>` };
+}
+
 // Imprime usando el diálogo normal de impresión del navegador — funciona con
 // CUALQUIER impresora que Windows/Mac ya tenga instalada (USB, red, la que
 // sea), porque el sistema operativo maneja la comunicación, no el navegador.
-// No corta el papel automáticamente, pero SÍ incluye el QR/código de barras
-// como imagen (a diferencia de la versión anterior, que solo imprimía texto).
+// No corta el papel automáticamente. Aquí los acentos siempre salen bien
+// (los maneja Windows, no la impresora).
 async function imprimirConDialogoDelSistema(datosTicket) {
   const anchoMM = datosTicket.ancho_ticket === '58mm' ? '58mm' : '80mm';
-  const lineas = formatearTicket(datosTicket);
-  const nombreEsPrimeraLinea = !!(datosTicket.negocio && datosTicket.negocio.nombre);
-  const tamanoFuente = datosTicket.tamanoLetra === 'grande' ? '18px' : '11px';
-
-  // Cada línea se envuelve individualmente para poder poner en negritas
-  // solo el nombre del negocio y el TOTAL, igual que en la impresión directa.
-  const lineasHtml = lineas.map((linea, idx) => {
-    const esNombre = idx === 0 && nombreEsPrimeraLinea && datosTicket.negocioNegritas !== false;
-    const esTotal = linea.trim().startsWith('TOTAL') && datosTicket.totalNegritas !== false;
-    const contenido = linea.replace(/ /g, '&nbsp;') || '&nbsp;';
-    return (esNombre || esTotal) ? `<b>${contenido}</b>` : contenido;
-  }).join('<br>');
-
-  let htmlCodigo = '';
-  try {
-    const anchoPx = datosTicket.ancho_ticket === '58mm' ? 240 : 350;
-    const tipoCodigo = datosTicket.tipoCodigoEscaneo || 'ninguno';
-    const imagenes = [];
-
-    if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
-      const canvasQR = await generarCanvasQR(datosTicket.folio, anchoPx);
-      imagenes.push(canvasQR.toDataURL());
-    }
-    if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
-      const canvasBarras = generarCanvasBarras(datosTicket.folio, anchoPx);
-      imagenes.push(canvasBarras.toDataURL());
-    }
-    htmlCodigo = imagenes.map(src => `<img src="${src}" style="display:block; margin:6px auto; max-width:100%;">`).join('');
-  } catch (err) {
-    console.error('No se pudo generar el código escaneable para el diálogo del sistema:', err.message);
-  }
-
-  let htmlLogo = '';
-  if (datosTicket.logoUrl) {
-    htmlLogo = `<img src="${datosTicket.logoUrl}" style="display:block; margin:0 auto 6px; max-width:80%;">`;
-  }
-
-  const familiaFuente = datosTicket.tipoFuente === 'sans-serif' ? "'Segoe UI', Arial, sans-serif" : "'Courier New', monospace";
-
-  const html = `
+  const { css, html } = await construirHtmlTicket(datosTicket);
+  const pagina = `
     <!DOCTYPE html>
     <html lang="es">
     <head>
     <meta charset="UTF-8">
-    <title>Ticket ${datosTicket.folio}</title>
+    <title>Ticket ${escaparHtmlTicket(datosTicket.folio)}</title>
     <style>
       @page { size: ${anchoMM} auto; margin: 2mm; }
-      body { font-family: ${familiaFuente}; font-size: ${tamanoFuente}; margin: 0; }
+      body { margin: 0; }
+      ${css}
     </style>
     </head>
-    <body>${htmlLogo}${htmlCodigo}${lineasHtml}<script>window.onload = () => window.print(); window.onafterprint = () => window.close();<\/script></body>
+    <body>${html}<script>window.onload = () => window.print(); window.onafterprint = () => window.close();<\/script></body>
     </html>
   `;
 
@@ -850,6 +1099,6 @@ async function imprimirConDialogoDelSistema(datosTicket) {
   if (!ventana) {
     throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
   }
-  ventana.document.write(html);
+  ventana.document.write(pagina);
   ventana.document.close();
 }

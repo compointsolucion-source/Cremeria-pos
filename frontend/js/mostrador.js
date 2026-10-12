@@ -627,12 +627,8 @@ async function imprimirTicket(ticket) {
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,
     descripcionCompleta: config.descripcion_completa !== false,
     tipoCodigoEscaneo: config.tipo_codigo_escaneo || 'qr',
-    // Sin logotipo aquí a propósito: el ticket de Mostrador es interno (antes
-    // de pagar), imprimirlo con logo solo gastaría papel sin necesidad.
-    negocioNegritas: config.negocio_negritas !== false,
-    totalNegritas: config.total_negritas !== false,
-    tamanoLetra: config.tamano_letra || 'normal',
-    tipoFuente: config.tipo_fuente || 'monospace'
+    // El logo y el QR de promoción solo salen aquí si se activaron en Configuración.
+    ...estiloTicketDesdeConfig(config, false)
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';

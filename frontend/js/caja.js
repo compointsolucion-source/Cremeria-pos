@@ -516,13 +516,10 @@ async function imprimirComprobante(ticket, metodoPagoUsado, montoRecibido = null
     // El comprobante final (ya pagado) NO lleva QR/código de barras — ese
     // código es solo para que Caja localice el pedido antes de cobrar; una
     // vez cobrado, ya no hay nada que escanear.
-    logoUrl: config.logo_url || null,
-    negocioNegritas: config.negocio_negritas !== false,
-    totalNegritas: config.total_negritas !== false,
-    tamanoLetra: config.tamano_letra || 'normal',
-    tipoFuente: config.tipo_fuente || 'monospace',
     imprimirDatosCliente: !!config.imprimir_datos_cliente,
-    cliente: clienteSeleccionado ? { nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null
+    cliente: clienteSeleccionado ? { nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null,
+    // Logo, tamaños de letra, acentos y QR de promoción (Configuración → Diseñador de ticket)
+    ...estiloTicketDesdeConfig(config, true)
   };
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';

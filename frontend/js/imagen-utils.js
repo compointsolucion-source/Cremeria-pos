@@ -18,6 +18,9 @@ function comprimirImagen(file, maxAncho = 500, calidad = 0.7) {
         canvas.width = ancho;
         canvas.height = alto;
         const ctx = canvas.getContext('2d');
+        // Fondo blanco: un PNG con fondo transparente se vería negro al pasar a JPEG.
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, ancho, alto);
         ctx.drawImage(img, 0, 0, ancho, alto);
 
         // JPEG comprimido: reduce drásticamente el peso vs. el archivo original
