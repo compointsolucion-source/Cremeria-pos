@@ -1,0 +1,40 @@
+INTERMEDIARIO DE IMPRESION POR RED - Compoint Punto / Cremeria POS
+===================================================================
+
+INSTALACION (una sola vez por computadora)
+1. Copia esta carpeta a la computadora (o solo IntermediarioImpresion.exe).
+2. Haz doble clic en IntermediarioImpresion.exe.
+3. Si Windows muestra "Windows protegio su PC": clic en "Mas informacion"
+   y luego en "Ejecutar de todas formas" (aparece porque el programa no
+   tiene firma digital de paga; es normal).
+4. Si pregunta si permites cambios (permiso de administrador), di que SI:
+   es para abrir el puerto 3500 en el firewall y asi otros equipos de la
+   red puedan imprimir.
+5. Aparece un mensaje "Intermediario de impresion instalado" con las
+   direcciones. Listo.
+
+A partir de ahi funciona SOLO: corre en segundo plano, sin ventana, y se
+inicia cada vez que prendes Windows. No hay que volver a abrirlo.
+
+QUE DIRECCION PONER EN EL SISTEMA
+Configuracion -> Impresora de fichas -> "fichas por red (IP)":
+- En la MISMA computadora donde se instalo:  http://localhost:3500
+- En otros equipos / celulares / tablets:    http://IP-DE-ESA-PC:3500
+  (la IP aparece en el mensaje de instalacion; ej. http://192.168.1.50:3500)
+Tip: reserva esa IP en el router para que no cambie.
+
+COMPROBAR QUE ESTA ACTIVO
+Abre en el navegador  http://localhost:3500  -> debe decir "activo".
+
+OTROS ARCHIVOS
+- Detener.bat       detiene el programa (vuelve a iniciar al prender Windows)
+- Desinstalar.bat   lo quita por completo (arranque, firewall y archivos)
+- Para actualizar: vuelve a abrir el nuevo IntermediarioImpresion.exe.
+- Se instala en: %LOCALAPPDATA%\CompointIntermediario (ahi esta log.txt).
+- fuente\ trae el codigo por si hay que modificarlo o reconstruir el .exe.
+
+SI NO FUNCIONA
+- Revisa que la PC y la impresora esten en la MISMA red y que la IP de la
+  impresora este en el mismo rango (ej. 192.168.1.X).
+- Si tu antivirus bloquea el .exe, agregalo como excepcion.
+- Windows 10 u 11 de 64 bits requerido.

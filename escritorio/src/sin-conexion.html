@@ -1,0 +1,7 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Sin conexión</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="estilos.css"></head><body><div class="caja" style="text-align:center">
+<h1>📡 Sin conexión</h1>
+<p>No se pudo abrir el sistema. Revisa que haya internet. Se intentará de nuevo automáticamente.</p>
+<button id="r">Reintentar ahora</button></div>
+<script>document.getElementById('r').onclick=()=>compoint.reintentar();setInterval(()=>compoint.reintentar(),8000);</script></body></html>

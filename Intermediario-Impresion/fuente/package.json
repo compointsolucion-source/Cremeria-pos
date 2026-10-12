@@ -1,0 +1,18 @@
+{
+  "name": "cremeria-pos-intermediario-impresion",
+  "version": "2.0.0",
+  "description": "Intermediario local para imprimir por red/IP desde Cremer\u00eda POS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "construir-exe.bat"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "esbuild": "*",
+    "postject": "*"
+  }
+}

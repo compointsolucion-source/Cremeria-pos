@@ -1,0 +1,63 @@
+COMPOINT PUNTO PARA ESCRITORIO (Windows 10 y 11)
+================================================
+
+QUE ES
+Un programa instalable (.exe) que abre el sistema del negocio en su propia
+ventana, con el icono de Compoint, sin barra de direcciones. Ademas:
+- Arranca solo al prender Windows.
+- Si cierras la ventana se queda en segundo plano (icono junto al reloj).
+- Trae adentro el intermediario de impresion por red (puerto 3500):
+  ya no hay que instalarlo aparte en esa computadora.
+- Imprime por USB, Bluetooth o red igual que en Chrome.
+- Como carga el sistema desde internet, SIEMPRE esta en la ultima version que
+  publiques en "estable": no hay que reinstalar para actualizar.
+
+COMO GENERAR EL INSTALADOR DE UN CLIENTE (lo haces tu, en GitHub)
+1. Entra a tu repositorio en GitHub -> pestana "Actions".
+2. A la izquierda elige "Instalador de escritorio (Windows)".
+3. Clic en "Run workflow" y llena:
+   - Direccion del sistema del cliente (ej. https://cliente1.onrender.com/login.html)
+   - Nombre del negocio
+4. Espera ~5 minutos. Al terminar, abre esa ejecucion y baja el archivo de
+   "Artifacts" (Instalar-CompointPunto-<Negocio>.exe, viene dentro de un zip).
+   Esos archivos se conservan 30 dias.
+5. Pasale ese instalador al cliente.
+
+COMO LO INSTALA EL CLIENTE
+1. Doble clic en el instalador. Si Windows dice "Windows protegio su PC":
+   "Mas informacion" -> "Ejecutar de todas formas" (aparece porque no tiene
+   firma digital de paga; es normal).
+2. En unos segundos se instala solo (sin permisos de administrador), crea el
+   icono en el escritorio y abre el sistema.
+3. Listo. Desde ese momento abre solo al prender Windows.
+
+Si generas el instalador SIN direccion, la primera vez pide la direccion del
+sistema (y opcionalmente un usuario para entrar automatico).
+
+USO DIARIO
+- F11: pantalla completa.   Ctrl+R / F5: recargar.   Ctrl +/-/0: zoom.
+- Icono junto al reloj (clic derecho): Abrir, Pantalla completa, Recargar,
+  Iniciar con Windows, Cambiar direccion o usuario, Salir por completo.
+- Cerrar la ventana con la X NO cierra el programa (sigue en segundo plano
+  para que otros equipos puedan imprimir fichas por red). Para cerrarlo del
+  todo: clic derecho en el icono -> "Salir por completo".
+- Impresoras USB/Bluetooth: se elige la impresora en una ventanita la primera
+  vez; despues reconecta sola.
+- Dirección para fichas por red en Configuracion del sistema:
+  en esa misma PC  http://localhost:3500
+  desde otros equipos  http://IP-DE-ESA-PC:3500
+
+ENTRAR AUTOMATICO
+En "Cambiar direccion o usuario" se puede guardar un usuario y contrasena.
+Se guardan cifrados con la cuenta de Windows y entran solos UNA vez al abrir
+el programa. Si alguien cierra sesion, la siguiente persona escribe la suya.
+Usalo solo en equipos de una sola persona (cada cajero debe usar su usuario
+para que su corte de caja sea suyo).
+
+DESINSTALAR
+Configuracion de Windows -> Aplicaciones -> Compoint Punto -> Desinstalar.
+
+DESARROLLO
+- Probar en tu PC:  cd escritorio, npm install, npm start
+- Archivos: src/main.js (ventana, bandeja, impresoras), src/intermediario.js,
+  src/setup.html (primera configuracion), config-cliente.json (direccion).
