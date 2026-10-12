@@ -646,6 +646,25 @@ async function agregarProductoPesadoPorEtiquetaCaja({ plu, valor, tipoDato }) {
 // una etiqueta de báscula (ver procesarCodigoEscaneadoCaja arriba).
 activarLectorFisico(procesarCodigoEscaneadoCaja);
 
+// Campo visible para el lector: lo que se escanee (o escriba) aquí y termine
+// en Enter se procesa igual que el escaneo con cámara. Se detiene la
+// propagación para que el lector global no lo procese dos veces.
+const campoLectorCaja = document.getElementById('campoLectorCaja');
+if (campoLectorCaja) {
+  campoLectorCaja.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') return;
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const codigo = campoLectorCaja.value.trim();
+      campoLectorCaja.value = '';
+      if (codigo) procesarCodigoEscaneadoCaja(codigo);
+    }
+  });
+  // En computadora queda listo para escanear sin hacer clic (en celular no, para que no salga el teclado).
+  if (window.innerWidth >= 900) campoLectorCaja.focus();
+}
+
 cargarBandeja();
 setInterval(cargarBandeja, 15000);
 

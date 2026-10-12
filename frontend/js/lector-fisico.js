@@ -7,7 +7,7 @@
 function activarLectorFisico(callback, opcionesDeConfiguracion) {
   const opciones = opcionesDeConfiguracion || {};
   const longitudMinima = opciones.longitudMinima || 4;
-  const umbralVelocidadMs = opciones.umbralVelocidadMs || 40;
+  const umbralVelocidadMs = opciones.umbralVelocidadMs || 60;
 
   let buffer = '';
   let ultimaTecla = 0;
@@ -24,6 +24,10 @@ function activarLectorFisico(callback, opcionesDeConfiguracion) {
       buffer = '';
       return;
     }
+
+    // Shift/Mayús/Ctrl/Alt NO rompen el escaneo: el lector manda Shift antes de
+    // cada letra mayúscula (ej. folio M1-K3J9A2) y antes se borraba el código a la mitad.
+    if (['Shift', 'CapsLock', 'Control', 'Alt', 'AltGraph', 'Meta'].includes(e.key)) return;
 
     if (e.key.length === 1) {
       // Si pasó mucho tiempo desde la última tecla, es tecleo humano normal — se reinicia.
