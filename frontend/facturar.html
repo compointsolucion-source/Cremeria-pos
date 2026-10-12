@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Solicita tu factura</title>
+<link rel="stylesheet" href="css/app-theme.css">
+<style>
+  body { min-height: 100vh; }
+  .envoltura { max-width: 520px; margin: 0 auto; padding: 18px 14px 40px; }
+  .encabezado { text-align: center; padding: 22px 8px 14px; }
+  .encabezado h1 { font-size: 24px; }
+  .encabezado p { color: var(--muted); margin: 6px 0 0; font-size: 14.5px; line-height: 1.45; }
+  .pestanas { display: flex; background: #E9EBEE; border-radius: 12px; padding: 4px; margin: 6px 0 14px; }
+  .pestanas button { flex: 1; border: 0; background: transparent; padding: 10px; border-radius: 9px; font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer; min-height: 42px; }
+  .pestanas button.activa { background: white; color: var(--text); box-shadow: var(--shadow); }
+  .panel { display: none; } .panel.activo { display: block; }
+  .form { display: grid; gap: 12px; }
+  .campo { display: grid; gap: 5px; font-size: 14px; font-weight: 600; color: #333; }
+  .campo small { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .pasos { display: flex; gap: 6px; margin-bottom: 14px; }
+  .pasos span { flex: 1; height: 5px; border-radius: 3px; background: #DADDE1; }
+  .pasos span.hecho { background: var(--primary); }
+  .error { background: #FDECEA; color: #8E1B1B; border: 1px solid #F5C2BE; padding: 10px 12px; border-radius: 10px; font-size: 14px; display: none; line-height: 1.4; }
+  .aviso { background: #EEF7EA; border: 1px solid #CFE6C6; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; color: #2F5F22; line-height: 1.4; }
+  .archivo-zona { border: 2px dashed #C9CDD3; border-radius: 12px; padding: 14px; text-align: center; background: #FAFBFC; }
+  .archivo-zona input { border: 0; padding: 4px 0; min-height: 0; background: transparent; }
+  .archivo-nombre { font-size: 13px; color: #555; margin-top: 6px; word-break: break-all; }
+  .resumen-ticket { display: flex; justify-content: space-between; background: #F3F4F6; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.4; font-weight: 400; }
+  .check input { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; }
+  .exito { text-align: center; padding: 10px 4px; }
+  .exito .icono { font-size: 54px; }
+  .exito h2 { margin: 8px 0; }
+  .estado-caja { text-align: center; padding: 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; display: none; }
+  .estado-pendiente { background: #FFF6E0; border: 1px solid #F1DDA3; }
+  .estado-facturada { background: #EEF7EA; border: 1px solid #CFE6C6; }
+  .estado-rechazada { background: #FDECEA; border: 1px solid #F5C2BE; }
+  #rfc, #cRfc, #folio, #cFolio { text-transform: uppercase; }
+  .pie { text-align: center; font-size: 12px; color: var(--muted); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="envoltura">
+  <div class="encabezado">
+    <div style="font-size:38px;">🧾</div>
+    <h1>Solicita tu factura</h1>
+    <p>Ten a la mano tu <b>ticket de compra</b> y tu <b>Constancia de Situación Fiscal</b> (PDF o foto).</p>
+  </div>
+
+  <div class="pestanas">
+    <button id="tabPedir" class="activa" onclick="cambiarPestana('pedir')">Pedir factura</button>
+    <button id="tabConsultar" onclick="cambiarPestana('consultar')">Consultar mi solicitud</button>
+  </div>
+
+  <!-- ============ PEDIR FACTURA ============ -->
+  <div class="panel activo" id="panelPedir">
+    <div class="card">
+      <div class="pasos"><span id="p1" class="hecho"></span><span id="p2"></span><span id="p3"></span></div>
+
+      <!-- Paso 1 -->
+      <form class="form" id="paso1" onsubmit="validarTicket(event)" autocomplete="off">
+        <h3>1. Datos de tu ticket</h3>
+        <label class="campo">Folio del ticket
+          <input type="text" id="folio" placeholder="Ej. S1-ABC123" autocapitalize="characters" required>
+          <small>Está impreso en tu ticket, junto a "Folio".</small>
+        </label>
+        <label class="campo">Total del ticket
+          <input type="text" id="total" inputmode="decimal" placeholder="Ej. 215.00" required>
+          <small>Escribe el total tal como aparece en tu ticket.</small>
+        </label>
+        <div class="error" id="error1"></div>
+        <button class="btn btn-primary" id="btnPaso1" type="submit">Continuar</button>
+      </form>
+
+      <!-- Paso 2 -->
+      <form class="form" id="paso2" onsubmit="enviarSolicitud(event)" style="display:none;" autocomplete="on">
+        <h3>2. Tus datos fiscales</h3>
+        <div class="resumen-ticket"><span>Ticket <b id="resFolio"></b></span><span>Total <b id="resTotal"></b></span></div>
+        <div class="aviso">Escribe los datos <b>exactamente como aparecen en tu Constancia de Situación Fiscal</b>, para que tu factura salga correcta.</div>
+
+        <label class="campo">RFC
+          <input type="text" id="rfc" maxlength="13" autocapitalize="characters" placeholder="12 o 13 caracteres" required>
+        </label>
+        <label class="campo">Nombre o razón social
+          <input type="text" id="razon" maxlength="200" placeholder="Tal como aparece en tu constancia" required>
+        </label>
+        <label class="campo">Régimen fiscal
+          <select id="regimen" required><option value="">Elige tu régimen…</option></select>
+        </label>
+        <label class="campo">Código postal fiscal
+          <input type="text" id="cp" inputmode="numeric" maxlength="5" placeholder="5 números" required>
+        </label>
+        <label class="campo">Uso de la factura
+          <select id="uso" required><option value="">Elige el uso…</option></select>
+        </label>
+        <label class="campo">Correo electrónico
+          <input type="email" id="correo" maxlength="150" placeholder="Aquí te enviaremos tu factura" required>
+        </label>
+        <label class="campo">Teléfono <small>(opcional)</small>
+          <input type="tel" id="telefono" maxlength="20" placeholder="Para aclaraciones">
+        </label>
+
+        <div class="campo">Constancia de Situación Fiscal <small>PDF, JPG o PNG — máximo 3 MB (recomendado)</small>
+          <div class="archivo-zona">
+            <input type="file" id="constancia" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onchange="archivoElegido()">
+            <div class="archivo-nombre" id="archivoNombre"></div>
+          </div>
+        </div>
+
+        <label class="check"><input type="checkbox" id="acepto"> <span>Confirmo que mis datos son correctos y que son los de mi constancia fiscal.</span></label>
+
+        <div class="error" id="error2"></div>
+        <button class="btn btn-primary" id="btnPaso2" type="submit">Enviar solicitud</button>
+        <button class="btn btn-secondary" type="button" onclick="volverPaso1()">← Cambiar ticket</button>
+      </form>
+
+      <!-- Paso 3 -->
+      <div class="exito" id="paso3" style="display:none;">
+        <div class="icono">✅</div>
+        <h2>¡Solicitud enviada!</h2>
+        <p>Recibimos tu solicitud <b id="numSolicitud"></b> del ticket <b id="exFolio"></b>.</p>
+        <p style="color:var(--muted); font-size:14px;">Revisaremos tus datos y te enviaremos la factura a tu correo. Puedes ver cómo va en <b>"Consultar mi solicitud"</b>.</p>
+        <button class="btn btn-secondary" style="margin-top:8px;" onclick="reiniciar()">Pedir otra factura</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CONSULTAR ============ -->
+  <div class="panel" id="panelConsultar">
+    <div class="card">
+      <form class="form" onsubmit="consultarEstado(event)" autocomplete="off">
+        <h3>Consulta tu solicitud</h3>
+        <label class="campo">Folio del ticket
+          <input type="text" id="cFolio" autocapitalize="characters" required>
+        </label>
+        <label class="campo">Tu RFC
+          <input type="text" id="cRfc" maxlength="13" autocapitalize="characters" required>
+        </label>
+        <div class="error" id="errorC"></div>
+        <button class="btn btn-primary" type="submit">Consultar</button>
+        <div class="estado-caja" id="estadoCaja"></div>
+      </form>
+    </div>
+  </div>
+
+  <p class="pie">Tus datos se usan únicamente para emitir tu factura.</p>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+const API = API_URL + '/facturacion/publico';
+let ticketValidado = null;
+let archivoBase64 = null, archivoNombre = '';
+
+function $(id) { return document.getElementById(id); }
+function mostrarError(id, msg) { const e = $(id); e.textContent = msg; e.style.display = msg ? 'block' : 'none'; }
+
+async function llamar(ruta, cuerpo) {
+  let r;
+  try {
+    r = await fetch(API + ruta, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+  } catch (e) {
+    throw new Error('No se pudo conectar. Revisa tu internet e intenta de nuevo (si el sistema estaba inactivo puede tardar hasta un minuto en despertar).');
+  }
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(datos.error || 'Ocurrió un error. Intenta de nuevo.');
+  return datos;
+}
+
+function cambiarPestana(cual) {
+  $('tabPedir').classList.toggle('activa', cual === 'pedir');
+  $('tabConsultar').classList.toggle('activa', cual === 'consultar');
+  $('panelPedir').classList.toggle('activo', cual === 'pedir');
+  $('panelConsultar').classList.toggle('activo', cual === 'consultar');
+}
+
+function marcarPaso(n) {
+  ['p1', 'p2', 'p3'].forEach((id, i) => $(id).classList.toggle('hecho', i < n));
+  $('paso1').style.display = n === 1 ? 'grid' : 'none';
+  $('paso2').style.display = n === 2 ? 'grid' : 'none';
+  $('paso3').style.display = n === 3 ? 'block' : 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function cargarCatalogos() {
+  try {
+    const r = await fetch(API + '/catalogos');
+    const c = await r.json();
+    $('regimen').innerHTML = '<option value="">Elige tu régimen…</option>' + Object.entries(c.regimenes).map(([k, v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
+    $('uso').innerHTML = '<option value="">Elige el uso…</option>' + Object.entries(c.usos).map(([k, v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
+  } catch (e) {
+    // Se reintenta al pasar al paso 2 (el servidor pudo estar despertando).
+  }
+}
+
+async function validarTicket(ev) {
+  ev.preventDefault();
+  mostrarError('error1', '');
+  const boton = $('btnPaso1'); boton.disabled = true; boton.textContent = 'Revisando…';
+  try {
+    const r = await llamar('/validar', { folio: $('folio').value.trim(), total: $('total').value.trim() });
+    ticketValidado = { folio: r.folio, total: r.total };
+    $('resFolio').textContent = r.folio;
+    $('resTotal').textContent = '$' + Number(r.total).toFixed(2);
+    if ($('regimen').options.length < 2) await cargarCatalogos();
+    marcarPaso(2);
+  } catch (e) {
+    mostrarError('error1', e.message);
+  } finally {
+    boton.disabled = false; boton.textContent = 'Continuar';
+  }
+}
+
+function volverPaso1() { marcarPaso(1); }
+
+// Las fotos grandes se reducen para no pasar de 3 MB (los PDF no se tocan).
+function reducirImagen(archivo) {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const tope = 1800; const escala = Math.min(1, tope / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * escala); c.height = Math.round(img.height * escala);
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      img.src = lector.result;
+    };
+    lector.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    lector.readAsDataURL(archivo);
+  });
+}
+
+async function archivoElegido() {
+  const f = $('constancia').files[0];
+  archivoBase64 = null; archivoNombre = '';
+  $('archivoNombre').textContent = '';
+  if (!f) return;
+  try {
+    if (f.type.startsWith('image/') && f.size > 2.2 * 1024 * 1024) {
+      archivoBase64 = await reducirImagen(f);
+    } else {
+      if (f.size > 3 * 1024 * 1024) { mostrarError('error2', 'La constancia pesa más de 3 MB. Sube un archivo más ligero.'); $('constancia').value = ''; return; }
+      archivoBase64 = await new Promise((ok, mal) => { const l = new FileReader(); l.onload = () => ok(l.result); l.onerror = () => mal(new Error('No se pudo leer el archivo')); l.readAsDataURL(f); });
+    }
+    archivoNombre = f.name;
+    $('archivoNombre').textContent = '📎 ' + f.name;
+    mostrarError('error2', '');
+  } catch (e) {
+    mostrarError('error2', e.message);
+  }
+}
+
+async function enviarSolicitud(ev) {
+  ev.preventDefault();
+  mostrarError('error2', '');
+  if (!$('acepto').checked) { mostrarError('error2', 'Marca la casilla para confirmar que tus datos son correctos.'); return; }
+  const boton = $('btnPaso2'); boton.disabled = true; boton.textContent = 'Enviando…';
+  try {
+    const r = await llamar('/solicitar', {
+      folio: ticketValidado.folio, total: ticketValidado.total,
+      rfc: $('rfc').value, razon_social: $('razon').value, regimen_fiscal: $('regimen').value,
+      codigo_postal: $('cp').value, uso_cfdi: $('uso').value, correo: $('correo').value, telefono: $('telefono').value,
+      constancia: archivoBase64 ? { nombre: archivoNombre, base64: archivoBase64 } : null
+    });
+    $('numSolicitud').textContent = '#' + r.solicitud;
+    $('exFolio').textContent = r.folio;
+    $('cFolio').value = r.folio; $('cRfc').value = $('rfc').value.toUpperCase();
+    marcarPaso(3);
+  } catch (e) {
+    mostrarError('error2', e.message);
+  } finally {
+    boton.disabled = false; boton.textContent = 'Enviar solicitud';
+  }
+}
+
+function reiniciar() {
+  ticketValidado = null; archivoBase64 = null; archivoNombre = '';
+  $('paso2').reset(); $('paso1').reset(); $('archivoNombre').textContent = '';
+  marcarPaso(1);
+}
+
+async function consultarEstado(ev) {
+  ev.preventDefault();
+  mostrarError('errorC', ''); $('estadoCaja').style.display = 'none';
+  try {
+    const r = await llamar('/estado', { folio: $('cFolio').value.trim(), rfc: $('cRfc').value.trim() });
+    const caja = $('estadoCaja');
+    const textos = {
+      pendiente: ['estado-pendiente', '⏳ <b>En revisión</b><br>Recibimos tu solicitud. En cuanto esté lista te llegará a tu correo.'],
+      facturada: ['estado-facturada', '✅ <b>¡Factura emitida!</b><br>Revisa tu correo (y la carpeta de spam).'],
+      rechazada: ['estado-rechazada', '⚠️ <b>Necesitamos que corrijas algo</b><br>' + (r.nota ? String(r.nota).replace(/[<>&]/g, '') : '') + '<br><small>Puedes volver a pedirla en "Pedir factura".</small>']
+    };
+    const [clase, html] = textos[r.estado];
+    caja.className = 'estado-caja ' + clase; caja.innerHTML = html; caja.style.display = 'block';
+  } catch (e) {
+    mostrarError('errorC', e.message);
+  }
+}
+
+// Si el ticket trae un QR con ?folio=..., se llena solo.
+const parametros = new URLSearchParams(location.search);
+if (parametros.get('folio')) { $('folio').value = parametros.get('folio'); $('cFolio').value = parametros.get('folio'); }
+cargarCatalogos();
+</script>
+</body>
+</html>

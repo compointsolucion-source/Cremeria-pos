@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Facturación - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tabs button { border: 1px solid var(--border); background: white; border-radius: 999px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 40px; color: var(--text); }
+  .tabs button.activa { background: var(--text); color: white; border-color: var(--text); }
+  .tabs .n { background: #E9EBEE; color: #333; border-radius: 999px; padding: 1px 8px; margin-left: 6px; font-size: 12px; }
+  .tabs button.activa .n { background: #fff; }
+  .barra { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .barra input { flex: 1; min-width: 200px; }
+  .fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: white; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .fila:hover { border-color: var(--primary); }
+  .fila .nombre { font-weight: 700; font-size: 15px; }
+  .fila .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .tag { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .tag.pendiente { background: #FFF1CC; color: #8A5A00; }
+  .tag.facturada { background: #DDF2D4; color: #2F6B1F; }
+  .tag.rechazada { background: #FBD9D6; color: #8E1B1B; }
+  .vacio { text-align: center; color: var(--muted); padding: 40px 10px; }
+  .ajustes { margin-bottom: 14px; }
+  .ajustes summary { cursor: pointer; font-weight: 700; }
+  .ajustes .grid { display: grid; gap: 10px; margin-top: 12px; }
+  .opcion { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+  .opcion input[type=checkbox] { width: 22px; height: 22px; }
+  .enlace { display: flex; gap: 8px; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: flex-start; justify-content: center; z-index: 100; overflow-y: auto; padding: 20px 10px; }
+  .modal-overlay.abierto { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 20px; width: 100%; max-width: 560px; }
+  .modal h3 { margin-bottom: 4px; }
+  .seccion { margin-top: 16px; }
+  .seccion h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 6px; }
+  .dato { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #F0F1F3; font-size: 14px; }
+  .dato .et { color: var(--muted); font-size: 12.5px; }
+  .dato .val { font-weight: 600; word-break: break-word; }
+  .copiar { border: 1px solid var(--border); background: white; border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; flex-shrink: 0; }
+  .items { font-size: 13px; color: #444; }
+  .items div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .acciones { display: grid; gap: 8px; margin-top: 10px; }
+  .acciones .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>🧾 Solicitudes de Factura</h1></div>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <details class="card ajustes">
+      <summary>⚙️ Ajustes y enlace para tus clientes</summary>
+      <div class="grid">
+        <div>
+          <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">Enlace de la página donde tus clientes piden su factura:</div>
+          <div class="enlace">
+            <input type="text" id="enlacePublico" readonly>
+            <button class="btn btn-secondary" onclick="copiarTexto(document.getElementById('enlacePublico').value, 'Enlace copiado')">Copiar</button>
+          </div>
+        </div>
+        <label class="opcion"><span>Recibir solicitudes de factura en línea</span><input type="checkbox" id="ajActiva"></label>
+        <label class="opcion"><span>Días permitidos para facturar un ticket (0 = sin límite)</span><input type="number" id="ajDias" min="0" max="365" style="width:90px;"></label>
+        <label class="opcion"><span>Imprimir en el ticket final: "Solicita tu factura en…" con un QR</span><input type="checkbox" id="ajLeyenda"></label>
+        <button class="btn btn-primary" onclick="guardarAjustes()">Guardar ajustes</button>
+      </div>
+    </details>
+
+    <div class="tabs" id="tabs"></div>
+    <div class="barra">
+      <input type="text" id="buscar" placeholder="Buscar por folio, RFC, nombre o correo…" oninput="buscarConRetraso()">
+      <button class="btn btn-secondary" onclick="cargar()">🔄 Actualizar</button>
+      <button class="btn btn-secondary" onclick="exportarCsv()">⬇️ Exportar CSV</button>
+    </div>
+    <div id="lista"></div>
+  </div>
+
+  <div class="modal-overlay" id="modal" onclick="if(event.target===this) cerrarModal()">
+    <div class="modal" id="contenidoModal"></div>
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/sidebar-nav.js"></script>
+<script>
+requiereLogin();
+
+let filtroEstado = 'pendiente';
+let solicitudes = [];
+let resumen = { pendiente: 0, facturada: 0, rechazada: 0 };
+let catalogos = { regimenes: {}, usos: {} };
+let temporizadorBusqueda = null;
+let abierta = null;
+
+const esc = (t) => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fechaCorta = (f) => f ? new Date(f).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+function copiarTexto(texto, mensaje) {
+  const listo = () => mostrarToast(mensaje || 'Copiado', 'exito', 1500);
+  if (navigator.clipboard) navigator.clipboard.writeText(texto).then(listo, () => mostrarToast('No se pudo copiar', 'error'));
+  else { const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); listo(); }
+}
+
+function pintarTabs() {
+  const defs = [['pendiente', 'Pendientes'], ['facturada', 'Facturadas'], ['rechazada', 'Rechazadas'], ['', 'Todas']];
+  const total = resumen.pendiente + resumen.facturada + resumen.rechazada;
+  document.getElementById('tabs').innerHTML = defs.map(([k, t]) =>
+    `<button class="${filtroEstado === k ? 'activa' : ''}" onclick="filtroEstado='${k}'; cargar()">${t}<span class="n">${k ? resumen[k] : total}</span></button>`).join('');
+}
+
+function pintarLista() {
+  const cont = document.getElementById('lista');
+  if (!solicitudes.length) {
+    cont.innerHTML = `<div class="vacio">${filtroEstado === 'pendiente' ? '🎉 No hay solicitudes pendientes.' : 'No hay solicitudes para mostrar.'}</div>`;
+    return;
+  }
+  cont.innerHTML = solicitudes.map(s => `
+    <div class="fila" onclick="abrirDetalle(${s.id})">
+      <div style="min-width:0;">
+        <div class="nombre">${esc(s.razon_social)}</div>
+        <div class="sub">${esc(s.rfc)} · Folio ${esc(s.folio)} · ${dinero(s.total)} · ${fechaCorta(s.creado_en)}${s.tiene_constancia ? ' · 📎' : ''}</div>
+      </div>
+      <span class="tag ${s.estado}">${{ pendiente: 'Pendiente', facturada: 'Facturada', rechazada: 'Rechazada' }[s.estado]}</span>
+    </div>`).join('');
+}
+
+async function cargar() {
+  try {
+    const q = document.getElementById('buscar').value.trim();
+    const params = new URLSearchParams();
+    if (filtroEstado) params.set('estado', filtroEstado);
+    if (q) params.set('q', q);
+    const r = await apiFetch('/facturacion?' + params.toString());
+    solicitudes = r.solicitudes; resumen = r.resumen;
+    pintarTabs(); pintarLista();
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+function buscarConRetraso() { clearTimeout(temporizadorBusqueda); temporizadorBusqueda = setTimeout(cargar, 300); }
+
+function filaDato(etiqueta, valor, copiable = true) {
+  const v = valor === null || valor === undefined || valor === '' ? '—' : String(valor);
+  return `<div class="dato"><div><div class="et">${esc(etiqueta)}</div><div class="val">${esc(v)}</div></div>${copiable && v !== '—' ? `<button class="copiar" onclick="copiarTexto(${esc(JSON.stringify(v)).replace(/'/g, '&#39;')}, '${esc(etiqueta)} copiado')">Copiar</button>` : ''}</div>`;
+}
+
+async function abrirDetalle(id) {
+  try {
+    const s = await apiFetch('/facturacion/' + id);
+    abierta = s;
+    const t = s.ticket || {};
+    document.getElementById('contenidoModal').innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+        <div><h3>${esc(s.razon_social)}</h3><span class="tag ${s.estado}">${{ pendiente: 'Pendiente', facturada: 'Facturada', rechazada: 'Rechazada' }[s.estado]}</span></div>
+        <button class="btn btn-secondary" onclick="cerrarModal()">✕</button>
+      </div>
+
+      <div class="seccion"><h4>Datos fiscales</h4>
+        ${filaDato('RFC', s.rfc)}
+        ${filaDato('Nombre o razón social', s.razon_social)}
+        ${filaDato('Régimen fiscal', s.regimen_fiscal + ' — ' + (catalogos.regimenes[s.regimen_fiscal] || ''), false)}
+        ${filaDato('Código postal fiscal', s.codigo_postal)}
+        ${filaDato('Uso de la factura', s.uso_cfdi + ' — ' + (catalogos.usos[s.uso_cfdi] || ''), false)}
+        ${filaDato('Correo', s.correo)}
+        ${filaDato('Teléfono', s.telefono)}
+      </div>
+
+      <div class="seccion"><h4>Ticket</h4>
+        ${filaDato('Folio', s.folio)}
+        ${filaDato('Total', dinero(s.total), false)}
+        ${filaDato('Pagado el', fechaCorta(t.fecha_pago), false)}
+        ${filaDato('Forma de pago', t.metodo_pago, false)}
+        <div class="items" style="margin-top:6px;">${(s.items || []).map(i => `<div><span>${Number(i.cantidad)} × ${esc(i.nombre_producto)}</span><span>${dinero(i.subtotal)}</span></div>`).join('')}</div>
+      </div>
+
+      <div class="seccion"><h4>Constancia de situación fiscal</h4>
+        ${s.tiene_constancia
+          ? `<button class="btn btn-secondary" onclick="verConstancia(${s.id})">📎 Ver ${esc(s.constancia_nombre || 'constancia')}</button>`
+          : '<div style="color:var(--muted); font-size:14px;">El cliente no adjuntó constancia.</div>'}
+      </div>
+
+      <div class="seccion"><h4>Atención</h4>
+        <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">Folio fiscal / UUID de la factura (opcional)</div>
+        <input type="text" id="mUuid" maxlength="60" value="${esc(s.uuid_factura || '')}" placeholder="Ej. 6F2B…">
+        <div style="font-size:12.5px; color:var(--muted); margin:8px 0 4px;">Nota (si rechazas, el cliente verá este motivo)</div>
+        <textarea id="mNota" rows="2" maxlength="500" placeholder="Ej. El código postal no coincide con la constancia">${esc(s.nota_admin || '')}</textarea>
+        <div class="acciones">
+          <button class="btn btn-primary" onclick="cambiarEstado('facturada')">✅ Marcar como facturada</button>
+          <div class="dos">
+            <button class="btn btn-danger" onclick="cambiarEstado('rechazada')">❌ Rechazar</button>
+            <button class="btn btn-secondary" onclick="cambiarEstado('pendiente')">↩️ Dejar pendiente</button>
+          </div>
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-top:8px;">Recibida ${fechaCorta(s.creado_en)} · Última actualización ${fechaCorta(s.actualizado_en)}</div>
+      </div>`;
+    document.getElementById('modal').classList.add('abierto');
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+function cerrarModal() { document.getElementById('modal').classList.remove('abierto'); abierta = null; }
+
+async function verConstancia(id) {
+  try {
+    const r = await fetch(`${API_URL}/facturacion/${id}/constancia`, {
+      headers: { Authorization: 'Bearer ' + getToken(), 'X-Sucursal-Id': sucursalSeleccionada() }
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo abrir la constancia');
+    const url = URL.createObjectURL(await r.blob());
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+async function cambiarEstado(estado) {
+  if (!abierta) return;
+  const nota = document.getElementById('mNota').value.trim();
+  if (estado === 'rechazada' && !nota) { mostrarToast('Escribe el motivo del rechazo para que el cliente sepa qué corregir', 'error'); return; }
+  try {
+    await apiFetch('/facturacion/' + abierta.id, {
+      method: 'PUT',
+      body: JSON.stringify({ estado, nota_admin: nota, uuid_factura: document.getElementById('mUuid').value.trim() })
+    });
+    mostrarToast({ facturada: 'Marcada como facturada', rechazada: 'Solicitud rechazada', pendiente: 'Regresada a pendientes' }[estado], 'exito');
+    cerrarModal(); cargar();
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+function exportarCsv() {
+  if (!solicitudes.length) { mostrarToast('No hay solicitudes para exportar', 'error'); return; }
+  const cols = ['Fecha', 'Estado', 'Folio', 'Total', 'RFC', 'Razon social', 'Regimen', 'CP', 'Uso CFDI', 'Correo', 'Telefono', 'UUID'];
+  const celda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const filas = solicitudes.map(s => [fechaCorta(s.creado_en), s.estado, s.folio, s.total, s.rfc, s.razon_social, s.regimen_fiscal, s.codigo_postal, s.uso_cfdi, s.correo, s.telefono, s.uuid_factura].map(celda).join(','));
+  const blob = new Blob(['﻿' + [cols.join(','), ...filas].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `solicitudes-factura-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+async function cargarAjustes() {
+  document.getElementById('enlacePublico').value = location.origin + '/facturar.html';
+  try {
+    const c = await apiFetch('/configuracion');
+    document.getElementById('ajActiva').checked = c.facturacion_activa !== false;
+    document.getElementById('ajDias').value = c.facturacion_dias_limite === undefined || c.facturacion_dias_limite === null ? 30 : c.facturacion_dias_limite;
+    document.getElementById('ajLeyenda').checked = !!c.facturacion_leyenda_ticket;
+  } catch (err) { /* los ajustes quedan con sus valores por defecto */ }
+}
+
+async function guardarAjustes() {
+  try {
+    await apiFetch('/configuracion', {
+      method: 'PUT',
+      body: JSON.stringify({
+        facturacion_activa: document.getElementById('ajActiva').checked,
+        facturacion_dias_limite: parseInt(document.getElementById('ajDias').value || 0, 10),
+        facturacion_leyenda_ticket: document.getElementById('ajLeyenda').checked
+      })
+    });
+    mostrarToast('Ajustes guardados', 'exito');
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+async function iniciar() {
+  try { catalogos = await (await fetch(`${API_URL}/facturacion/publico/catalogos`)).json(); } catch (e) { /* se muestran solo las claves */ }
+  cargarAjustes();
+  cargar();
+  setInterval(() => { if (!abierta && document.visibilityState === 'visible') cargar(); }, 60000);
+}
+iniciar();
+</script>
+</body>
+</html>

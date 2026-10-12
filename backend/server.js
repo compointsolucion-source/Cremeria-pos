@@ -66,6 +66,8 @@ app.use('/api/imagenes', require('./routes/imagenes'));
 app.use('/api/fichas', require('./routes/fichas'));
 app.use('/api/sistema', require('./routes/sistema'));
 app.use('/api/sucursales', require('./routes/sucursales'));
+// Facturación: página pública para que el cliente pida su factura (+ administración de solicitudes).
+app.use('/api/facturacion', require('./routes/facturacion'));
 // Recargas y pago de servicios: estructura lista, pendiente de conectar a un
 // proveedor real (ver backend/utils/proveedorRecargas.js).
 app.use('/api/recargas', require('./routes/recargas'));

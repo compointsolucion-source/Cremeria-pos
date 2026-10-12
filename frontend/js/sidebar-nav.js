@@ -89,7 +89,8 @@ const GRUPOS_SIDEBAR = [
   {
     titulo: 'Clientes',
     items: [
-      { icono: 'usuarios', texto: 'Clientes/Créditos', href: 'clientes.html' }
+      { icono: 'usuarios', texto: 'Clientes/Créditos', href: 'clientes.html' },
+      { icono: 'portapapeles', texto: 'Facturación', href: 'facturacion.html' }
     ]
   },
   {

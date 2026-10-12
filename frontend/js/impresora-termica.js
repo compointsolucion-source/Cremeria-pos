@@ -511,7 +511,7 @@ const TICKET_DEFECTOS = {
   mensajeSuperior: '', logoTamano: 'mediano', tamanoLetra: 'normal',
   nombreTamano: 'grande', totalTamano: 'grande', acentos: 'quitar',
   negocioNegritas: true, totalNegritas: true, tipoFuente: 'monospace',
-  qrPromo: null, textoLegal: '', lineasSuperiores: 0, lineasInferiores: 3,
+  qrPromo: null, textoLegal: '', facturaUrl: null, lineasSuperiores: 0, lineasInferiores: 3,
   incluirPrecioUnitario: true, descripcionCompleta: true
 };
 
@@ -550,7 +550,10 @@ function estiloTicketDesdeConfig(config, esFinal) {
       texto: config.qr_promo_texto || '',
       tamano: config.qr_promo_tamano || 'mediano'
     } : null,
-    textoLegal: esFinal ? (config.terminos || '') : ''
+    textoLegal: esFinal ? (config.terminos || '') : '',
+    // Leyenda + QR para pedir factura en línea (solo en el ticket final)
+    facturaUrl: (esFinal && config.facturacion_activa !== false && config.facturacion_leyenda_ticket && typeof location !== 'undefined' && location.origin)
+      ? location.origin + '/facturar.html' : null
   };
 }
 
@@ -968,6 +971,21 @@ async function imprimirTicketBLE(datosTicket) {
     }
   }
 
+  // ---- Facturación en línea: leyenda + QR con el folio ya escrito ----
+  if (d.facturaUrl && typeof QRCode !== 'undefined') {
+    try {
+      const enlaceCorto = d.facturaUrl.replace(/^https?:\/\//, '');
+      const canvasFactura = await generarCanvasQR(`${d.facturaUrl}?folio=${encodeURIComponent(d.folio)}`, anchoQrPromoPx(d.ancho_ticket, 'mediano'));
+      const colsN = columnasTicket(d.ancho_ticket, 'normal', false);
+      partes.push(ESCPOS_CENTRAR, negritaOn, linea('SOLICITA TU FACTURA'), negritaOff);
+      envolver(`Escanea el codigo o entra a ${enlaceCorto}`, colsN).forEach(r => partes.push(linea(r)));
+      envolver(`Folio: ${d.folio}   Total: $${d.total}`, colsN).forEach(r => partes.push(linea(r)));
+      partes.push(canvasAComandosRaster(canvasFactura), salto, ESCPOS_IZQUIERDA);
+    } catch (err) {
+      console.error('No se pudo imprimir el QR de facturación:', err.message);
+    }
+  }
+
   // ---- Cierre: espacio y corte ----
   partes.push(
     bytesDeLineas(new Array(d.lineasInferiores !== undefined ? d.lineasInferiores : 3).fill('')),
@@ -1065,6 +1083,18 @@ async function construirHtmlTicket(datosTicket) {
       partes.push(`<img src="${(await generarCanvasQR(d.qrPromo.contenido, 360)).toDataURL()}" style="width:${pct}%;">`);
     } catch (err) {
       console.error('No se pudo generar el QR de promoción:', err.message);
+    }
+  }
+
+  // Facturación en línea: leyenda + QR con el folio ya escrito
+  if (d.facturaUrl && typeof QRCode !== 'undefined') {
+    try {
+      const enlaceCorto = d.facturaUrl.replace(/^https?:\/\//, '');
+      partes.push(`<div class="c" style="font-weight:700; margin-top:8px;">SOLICITA TU FACTURA</div>`);
+      partes.push(`<div class="c" style="word-break:break-all;">Escanea el código o entra a ${esc(enlaceCorto)}<br>Folio: ${esc(d.folio)} &nbsp; Total: $${esc(d.total)}</div>`);
+      partes.push(`<img src="${(await generarCanvasQR(`${d.facturaUrl}?folio=${encodeURIComponent(d.folio)}`, 360)).toDataURL()}" style="width:55%;">`);
+    } catch (err) {
+      console.error('No se pudo generar el QR de facturación:', err.message);
     }
   }
 
