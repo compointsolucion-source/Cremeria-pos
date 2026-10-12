@@ -8,7 +8,9 @@ ventana, con el icono de Compoint, sin barra de direcciones. Ademas:
 - Si cierras la ventana se queda en segundo plano (icono junto al reloj).
 - Trae adentro el intermediario de impresion por red (puerto 3500):
   ya no hay que instalarlo aparte en esa computadora.
-- Imprime por USB, Bluetooth o red igual que en Chrome.
+- Imprime por USB, Bluetooth o red igual que en Chrome, y ademas DIRECTO (sin
+  dialogo) en cualquier impresora instalada en Windows (Configuracion del
+  sistema -> Impresion de este dispositivo -> Impresoras de Windows).
 - Como carga el sistema desde internet, SIEMPRE esta en la ultima version que
   publiques en "estable": no hay que reinstalar para actualizar.
 

@@ -247,6 +247,50 @@ ipcMain.handle('reintentar', async (e) => {
   } catch (err) { /* sigue sin conexión */ }
 });
 
+// ------------------------------------------------------------ impresoras instaladas en Windows
+// Solo las páginas del sistema configurado pueden listar impresoras e imprimir.
+const esDelSistema = (evento) => { try { return new URL(evento.senderFrame.url).origin === origenConfigurado(); } catch (e) { return false; } };
+
+ipcMain.handle('listar-impresoras', async (e) => {
+  if (!esDelSistema(e)) return [];
+  const lista = await e.sender.getPrintersAsync();
+  return lista.map(p => ({ nombre: p.name, predeterminada: !!p.isDefault, descripcion: p.description || '' }));
+});
+
+// Imprime un HTML directo en una impresora instalada, sin diálogo.
+// opciones: { impresora: 'nombre exacto' | '' (predeterminada), anchoMM: 58 | 80 }
+ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
+  if (!esDelSistema(e)) throw new Error('No permitido');
+  const anchoMM = parseInt(opciones.anchoMM, 10) === 58 ? 58 : 80;
+  const nombre = String(opciones.impresora || '');
+  if (nombre) {
+    const instaladas = await e.sender.getPrintersAsync();
+    if (!instaladas.some(p => p.name === nombre)) throw new Error(`La impresora "${nombre}" no está instalada en esta computadora.`);
+  }
+  // Se quitan los scripts: el que trae el HTML llamaría al diálogo de impresión.
+  const limpio = String(html).replace(/<script[\s\S]*?<\/script>/gi, '');
+  const anchoPx = Math.round(anchoMM * 96 / 25.4);
+  const oculta = new BrowserWindow({
+    show: false, width: anchoPx, height: 900, useContentSize: true,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }
+  });
+  try {
+    await oculta.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(limpio));
+    const altoPx = await oculta.webContents.executeJavaScript('Math.ceil(document.documentElement.scrollHeight)');
+    const alturaMicrones = Math.max(30000, Math.ceil(altoPx * 264.583) + 4000); // rollo: alto = contenido
+    await new Promise((resolver, rechazar) => {
+      oculta.webContents.print({
+        silent: true, deviceName: nombre, printBackground: true,
+        margins: { marginType: 'none' },
+        pageSize: { width: anchoMM * 1000, height: alturaMicrones }
+      }, (exito, motivo) => exito ? resolver() : rechazar(new Error(motivo || 'No se pudo imprimir')));
+    });
+  } finally {
+    if (!oculta.isDestroyed()) oculta.destroy();
+  }
+  return { ok: true };
+});
+
 // ------------------------------------------------------------ arranque
 app.on('second-instance', () => { if (ventana) { if (ventana.isMinimized()) ventana.restore(); ventana.show(); ventana.focus(); } else crearVentana(); });
 app.on('before-quit', () => { saliendo = true; intermediario.detener(); });

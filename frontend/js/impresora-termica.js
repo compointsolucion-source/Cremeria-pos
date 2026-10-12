@@ -399,6 +399,47 @@ async function imprimirEtiquetaPeso({ nombreProducto, peso, precioUnitario, subt
   }
 }
 
+// ---------- Impresoras instaladas en Windows (programa de escritorio) ----------
+// Dentro del programa de escritorio de Compoint Punto se puede imprimir DIRECTO
+// (sin diálogo) en cualquier impresora instalada en Windows. La elección se
+// guarda por equipo: 'impresora_windows_ticket' / 'impresora_windows_ficha'
+// = nombre exacto de la impresora, o '__predeterminada__'. Sin elección =
+// se abre el diálogo de impresión como siempre.
+function escritorioDisponible() {
+  return typeof window !== 'undefined' && !!(window.compointDesktop && window.compointDesktop.esEscritorio);
+}
+function usaImpresionSilenciosa(canal) {
+  try { return escritorioDisponible() && localStorage.getItem('impresora_windows_' + canal) !== null; } catch (e) { return false; }
+}
+async function imprimirHtmlSilencioso(html, canal, anchoMM) {
+  const nombre = localStorage.getItem('impresora_windows_' + canal);
+  await window.compointDesktop.imprimirHTML(html, {
+    impresora: nombre === '__predeterminada__' ? '' : nombre,
+    anchoMM: parseInt(anchoMM, 10) === 58 ? 58 : 80
+  });
+}
+// Abre el diálogo de impresión del navegador con el HTML (método de siempre).
+function abrirVentanaImpresion(html) {
+  const ventana = window.open('', '_blank');
+  if (!ventana) {
+    throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
+  }
+  ventana.document.write(html);
+  ventana.document.close();
+}
+// Intenta imprimir sin diálogo; si no se puede (o no está configurado), devuelve false.
+async function intentarImpresionSilenciosa(html, canal, anchoMM) {
+  if (!usaImpresionSilenciosa(canal)) return false;
+  try {
+    await imprimirHtmlSilencioso(html, canal, anchoMM);
+    return true;
+  } catch (err) {
+    console.error('Impresión directa en Windows falló:', err);
+    if (typeof mostrarToast === 'function') mostrarToast('No se pudo imprimir directo (' + (err.message || err) + '). Se abre el diálogo de impresión.', 'error', 6000);
+    return false;
+  }
+}
+
 // Respaldo de ficha usando el diálogo de impresión del navegador (para
 // cuando el dispositivo está configurado en modo "impresora del sistema").
 function imprimirFichaConDialogoDelSistema(numero, ancho_ticket) {
@@ -429,12 +470,11 @@ function imprimirFichaConDialogoDelSistema(numero, ancho_ticket) {
     </html>
   `;
 
-  const ventana = window.open('', '_blank');
-  if (!ventana) {
-    throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
+  // En el programa de escritorio con impresora de Windows elegida: imprime directo.
+  if (usaImpresionSilenciosa('ficha')) {
+    return intentarImpresionSilenciosa(html, 'ficha', anchoMM).then((ok) => { if (!ok) abrirVentanaImpresion(html); });
   }
-  ventana.document.write(html);
-  ventana.document.close();
+  abrirVentanaImpresion(html);
 }
 
 // Comandos ESC/POS para negritas y tamaño de letra. Se usan para envolver
@@ -1148,12 +1188,8 @@ async function imprimirConDialogoDelSistema(datosTicket) {
     </html>
   `;
 
-  const ventana = window.open('', '_blank');
-  if (!ventana) {
-    throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
-  }
-  ventana.document.write(pagina);
-  ventana.document.close();
+  if (await intentarImpresionSilenciosa(pagina, 'ticket', anchoMM)) return;
+  abrirVentanaImpresion(pagina);
 }
 
 // Imprime líneas de texto plano (cortes de caja, reportes) respetando el método
@@ -1180,10 +1216,8 @@ async function imprimirTextoPlanoTicket(lineas, { titulo = 'Documento', ancho_ti
       .l { white-space: pre; } .g { text-align: center; font-size: 1.4em; font-weight: 800; margin: 2px 0; }</style>
       </head><body>${cuerpo}
       <script>window.onload = () => window.print(); window.onafterprint = () => window.close();<\/script></body></html>`;
-    const ventana = window.open('', '_blank');
-    if (!ventana) throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
-    ventana.document.write(pagina);
-    ventana.document.close();
+    if (await intentarImpresionSilenciosa(pagina, 'ticket', ancho)) return;
+    abrirVentanaImpresion(pagina);
     return;
   }
 
