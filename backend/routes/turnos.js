@@ -131,12 +131,16 @@ function esperadoPorForma(resumen) {
   };
 }
 
-// Obtener turno abierto actual de la sucursal
+// Dueño, gerente y jefe general ven y cierran los turnos de todos los cajeros;
+// los demás roles solo trabajan con su propio turno (cada cajero su caja).
+const esSupervisor = (u) => ['jefe_general', 'dueno', 'gerente'].includes(u.rol);
+
+// Obtener el turno abierto del usuario que consulta (cada cajero tiene su propio turno)
 router.get('/actual', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM turnos WHERE sucursal_id = $1 AND estado = 'abierto' ORDER BY fecha_apertura DESC LIMIT 1`,
-      [req.sucursalId]
+      `SELECT * FROM turnos WHERE sucursal_id = $1 AND usuario_id = $2 AND estado = 'abierto' ORDER BY fecha_apertura DESC LIMIT 1`,
+      [req.sucursalId, req.usuario.id]
     );
     res.json(result.rows[0] || null);
   } catch (err) {
@@ -151,11 +155,11 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
     const { fondo_inicial } = req.body;
 
     const abierto = await pool.query(
-      `SELECT * FROM turnos WHERE sucursal_id = $1 AND estado = 'abierto'`,
-      [req.sucursalId]
+      `SELECT * FROM turnos WHERE sucursal_id = $1 AND usuario_id = $2 AND estado = 'abierto'`,
+      [req.sucursalId, req.usuario.id]
     );
     if (abierto.rows.length > 0) {
-      return res.status(400).json({ error: 'Ya hay un turno abierto en esta sucursal' });
+      return res.status(400).json({ error: 'Ya tienes un turno abierto' });
     }
 
     const result = await pool.query(
@@ -209,6 +213,10 @@ router.post('/:id/cerrar', verificarToken, requierePermiso('CAJA_CERRAR'), async
     if (turnoActual.rows[0].estado !== 'abierto') {
       await cliente.query('ROLLBACK');
       return res.status(400).json({ error: 'Este turno ya fue cerrado anteriormente' });
+    }
+    if (!esSupervisor(req.usuario) && turnoActual.rows[0].usuario_id !== req.usuario.id) {
+      await cliente.query('ROLLBACK');
+      return res.status(403).json({ error: 'Solo el cajero de este turno (o un gerente) puede cerrarlo' });
     }
 
     const resumenAntes = await construirResumenTurno(cliente, turnoActual.rows[0]);
@@ -283,6 +291,9 @@ router.get('/:id/resumen', verificarToken, async (req, res) => {
   try {
     const turnoResult = await pool.query('SELECT * FROM turnos WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
     if (turnoResult.rows.length === 0) return res.status(404).json({ error: 'Turno no encontrado' });
+    if (!esSupervisor(req.usuario) && turnoResult.rows[0].usuario_id !== req.usuario.id) {
+      return res.status(403).json({ error: 'Este turno es de otro cajero' });
+    }
     res.json(await construirResumenTurno(pool, turnoResult.rows[0]));
   } catch (err) {
     console.error(err);
@@ -293,11 +304,23 @@ router.get('/:id/resumen', verificarToken, async (req, res) => {
 // Historial de turnos
 router.get('/historial', verificarToken, async (req, res) => {
   try {
+    // Filtros opcionales (buscador de cortes): desde, hasta (YYYY-MM-DD), usuario_id, estado
+    const params = [req.sucursalId];
+    const filtros = ['t.sucursal_id = $1'];
+    const fechaLocal = "(t.fecha_apertura AT TIME ZONE 'America/Mexico_City')::date";
+    const esFecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+    if (esFecha(req.query.desde)) { params.push(req.query.desde); filtros.push(`${fechaLocal} >= $${params.length}`); }
+    if (esFecha(req.query.hasta)) { params.push(req.query.hasta); filtros.push(`${fechaLocal} <= $${params.length}`); }
+    // Cajero: solo ve sus turnos. Supervisor: todos, o el que elija en el filtro.
+    const usuarioFiltro = esSupervisor(req.usuario) ? parseInt(req.query.usuario_id, 10) : req.usuario.id;
+    if (usuarioFiltro > 0) { params.push(usuarioFiltro); filtros.push(`t.usuario_id = $${params.length}`); }
+    if (['abierto', 'cerrado'].includes(req.query.estado)) { params.push(req.query.estado); filtros.push(`t.estado = $${params.length}`); }
+    const limite = Math.min(parseInt(req.query.limite, 10) || 50, 500);
     const result = await pool.query(
       `SELECT t.*, u.nombre AS usuario_nombre FROM turnos t
        JOIN usuarios u ON t.usuario_id = u.id
-       WHERE t.sucursal_id = $1 ORDER BY t.fecha_apertura DESC LIMIT 50`,
-      [req.sucursalId]
+       WHERE ${filtros.join(' AND ')} ORDER BY t.fecha_apertura DESC LIMIT ${limite}`,
+      params
     );
     res.json(result.rows);
   } catch (err) {

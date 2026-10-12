@@ -273,10 +273,11 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
 }
 
 // Imprime el corte de un turno (abierto o cerrado). Lanza error si falla la impresión.
-async function imprimirCorteTurno(turnoId) {
+async function imprimirCorteTurno(turnoId, opts = {}) {
   const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${turnoId}/resumen`), configNegocioTurno()]);
-  const ancho = obtenerAnchoTicketDispositivo(cfg);
-  const columnas = columnasCorte(ancho);
+  // opts.columnas (buscador de cortes) fuerza el ancho en columnas; si no, el del dispositivo.
+  const ancho = opts.columnas ? (opts.columnas <= 34 ? '58mm' : '80mm') : obtenerAnchoTicketDispositivo(cfg);
+  const columnas = opts.columnas || columnasCorte(ancho);
   const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '' });
   await imprimirTextoPlanoTicket(lineas, { titulo: `Corte de caja - turno ${corte.turno.id}`, ancho_ticket: ancho });
   return corte;

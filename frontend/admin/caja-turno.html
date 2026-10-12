@@ -28,6 +28,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📊 Corte de Caja</h1></div>
+    <button class="btn btn-secondary" onclick="abrirBuscadorCortes()">🔍 Buscar corte</button>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
@@ -65,7 +66,7 @@
       <button class="btn btn-danger" style="width:100%; margin-top:10px;" onclick="realizarCorte()">🔒 Realizar Corte de Turno</button>
     </div>
 
-    <h4 style="margin-top:26px;">Cortes anteriores</h4>
+    <h4 style="margin-top:26px;" id="tituloCortes">Cortes anteriores</h4>
     <div id="listaCortes" style="font-size:14px;"></div>
   </div>
 
@@ -188,7 +189,8 @@ async function realizarCorte() {
 
 async function cargarCortes() {
   try {
-    const turnos = (await apiFetch('/turnos/historial')).filter(t => t.estado === 'cerrado').slice(0, 8);
+    if (!esSupervisorUI()) document.getElementById('tituloCortes').textContent = 'Mis cortes anteriores';
+    const turnos = (await apiFetch('/turnos/historial')).filter(t => t.estado === 'cerrado').slice(0, 5);
     const cont = document.getElementById('listaCortes');
     if (turnos.length === 0) { cont.innerHTML = '<p style="color:#888;">Aún no hay cortes.</p>'; return; }
     cont.innerHTML = turnos.map(t => {
@@ -206,6 +208,118 @@ async function cargarCortes() {
 
 async function reimprimirCorte(id) {
   try { await imprimirCorteTurno(id); } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+// ===== Buscador de cortes (estilo Soft Restaurant) =====
+function esSupervisorUI() {
+  const u = getUsuario();
+  return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol);
+}
+
+function abrirBuscadorCortes() {
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const colsGuardadas = localStorage.getItem('corte_columnas') || '40';
+  const ov = document.createElement('div');
+  ov.id = 'ovBuscarCorte';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:18px;width:100%;max-width:440px;max-height:92vh;overflow:auto;">
+    <h3 style="margin:0 0 12px;">Corte de Caja — Buscar</h3>
+    <label>Fecha desde</label><input type="date" id="bcDesde" value="${hoy}" style="margin-bottom:8px;">
+    <label>Fecha hasta</label><input type="date" id="bcHasta" value="${hoy}" style="margin-bottom:8px;">
+    ${esSupervisorUI() ? '<label>Cajero</label><select id="bcCajero" style="margin-bottom:8px;"><option value="">Todos</option></select>' : '<select id="bcCajero" style="display:none;"><option value=""></option></select>'}
+    <label>Turno</label><select id="bcTurno" style="margin-bottom:8px;"><option value="">— Busca primero —</option></select>
+    <button class="btn btn-secondary" style="width:100%;margin-bottom:10px;" onclick="buscarTurnosCorte()">🔍 Buscar turnos</button>
+    <label>Destino</label>
+    <select id="bcDestino" style="margin-bottom:8px;">
+      <option value="impresora">Impresora</option><option value="pantalla">Pantalla</option><option value="excel">Excel (CSV)</option>
+    </select>
+    <label>Ancho de ticket</label>
+    <select id="bcCols" style="margin-bottom:14px;">
+      ${[32, 40, 48].map(n => `<option value="${n}" ${String(n) === colsGuardadas ? 'selected' : ''}>${n} columnas</option>`).join('')}
+    </select>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="ejecutarBusquedaCorte()">Ejecutar</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('ovBuscarCorte').remove()">Cerrar</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  buscarTurnosCorte();
+}
+
+async function buscarTurnosCorte() {
+  const d = document.getElementById('bcDesde').value, h = document.getElementById('bcHasta').value;
+  const cajero = document.getElementById('bcCajero');
+  const sel = document.getElementById('bcTurno');
+  try {
+    const q = new URLSearchParams({ limite: 200 });
+    if (d) q.set('desde', d);
+    if (h) q.set('hasta', h);
+    if (cajero.value) q.set('usuario_id', cajero.value);
+    const turnos = await apiFetch('/turnos/historial?' + q.toString());
+    if (cajero.options.length === 1) {
+      const vistos = {};
+      turnos.forEach(t => { vistos[t.usuario_id] = t.usuario_nombre; });
+      Object.entries(vistos).forEach(([id, n]) => cajero.add(new Option(n, id)));
+    }
+    window._turnosBusqueda = turnos;
+    sel.innerHTML = turnos.length
+      ? turnos.map(t => `<option value="${t.id}">Turno ${t.id} · ${new Date(t.fecha_apertura).toLocaleString()} · ${t.usuario_nombre}${t.estado === 'abierto' ? ' (abierto)' : ''}</option>`).join('')
+      : '<option value="">Sin turnos en ese rango</option>';
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+async function ejecutarBusquedaCorte() {
+  const id = document.getElementById('bcTurno').value;
+  if (!id) { mostrarToast('Elige un turno primero', 'error'); return; }
+  const destino = document.getElementById('bcDestino').value;
+  const columnas = parseInt(document.getElementById('bcCols').value, 10);
+  localStorage.setItem('corte_columnas', String(columnas));
+  try {
+    if (destino === 'impresora') {
+      await imprimirCorteTurno(id, { columnas });
+    } else if (destino === 'pantalla') {
+      const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${id}/resumen`), configNegocioTurno()]);
+      const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '' })
+        .map(l => typeof l === 'string' ? l : l.t).join('\n');
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:12px;';
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'font:13px/1.35 monospace;white-space:pre;margin:0 0 12px;overflow:auto;';
+      pre.textContent = lineas;
+      const caja = document.createElement('div');
+      caja.style.cssText = 'background:#fff;border-radius:12px;padding:16px;max-width:96vw;max-height:92vh;overflow:auto;';
+      const cerrar = document.createElement('button');
+      cerrar.className = 'btn btn-secondary'; cerrar.style.width = '100%'; cerrar.textContent = 'Cerrar';
+      cerrar.onclick = () => ov.remove();
+      caja.append(pre, cerrar); ov.appendChild(caja); document.body.appendChild(ov);
+    } else {
+      const corte = await apiFetch(`/turnos/${id}/resumen`);
+      descargarCorteCSV(corte);
+    }
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+function descargarCorteCSV(c) {
+  const f = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  const filas = [['Concepto', 'Importe']];
+  filas.push(['Turno', c.turno.id], ['Estado', c.turno.estado], ['Cajero', c.turno.cajero],
+    ['Apertura', c.turno.fecha_apertura], ['Cierre', c.turno.fecha_cierre || '']);
+  filas.push(['', ''], ['CAJA', '']);
+  Object.entries(c.caja).forEach(([k, v]) => filas.push([k, v]));
+  filas.push(['', ''], ['FORMAS DE PAGO', '']);
+  Object.entries(c.formas).forEach(([k, v]) => filas.push([k, v]));
+  filas.push(['Total formas', c.total_formas], ['', ''], ['VENTAS', '']);
+  filas.push(['Subtotal', c.ventas.subtotal], ['Descuentos', c.ventas.descuentos], ['Venta neta', c.ventas.venta_neta]);
+  (c.ventas.por_departamento || []).forEach(d => filas.push(['Depto: ' + (d.nombre || ''), d.monto]));
+  if (c.declaracion) {
+    filas.push(['', ''], ['DECLARACION', '']);
+    Object.entries(c.declaracion.importes || {}).forEach(([k, v]) => filas.push(['Declarado ' + k, v]));
+    filas.push(['Total declarado', c.declaracion.total_declarado], ['Total esperado', c.declaracion.total_esperado], ['Diferencia', c.declaracion.diferencia]);
+  }
+  const csv = '\ufeff' + filas.map(r => r.map(f).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `corte-turno-${c.turno.id}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 cargarCortes();
