@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 echo ============================================
 echo   PUBLICAR ACTUALIZACION A TODOS LOS CLIENTES
 echo   (pasa lo probado en main a la rama estable)
