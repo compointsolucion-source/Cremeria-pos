@@ -527,13 +527,20 @@ function completarDatosTicket(d) {
 // Caja y la pantalla de Configuración — así TODOS los tickets salen igual.
 //   esFinal = true  → comprobante ya pagado (lleva logo y QR de promoción)
 //   esFinal = false → ticket de mostrador (solo si se activó en la configuración)
-function estiloTicketDesdeConfig(config, esFinal) {
+// Ajustes del ticket que son SOLO de este dispositivo (se guardan en el propio
+// navegador/equipo, nunca se comparten): así el celular con impresora de 58 mm
+// y la computadora con impresora de 80 mm no se pisan entre sí.
+function leerDisenoDispositivo() {
+  try { return JSON.parse(localStorage.getItem('ticket_diseno_dispositivo') || '{}') || {}; } catch (e) { return {}; }
+}
+
+function estiloTicketDesdeConfig(config, esFinal, sinDispositivo) {
   config = config || {};
   const nombre = (config.nombre_negocio === null || config.nombre_negocio === undefined)
     ? 'Compoint Punto de Soluciones' : config.nombre_negocio;
   const mostrarQr = config.qr_promo_activo && config.qr_promo_contenido &&
     (esFinal || config.qr_promo_en_mostrador);
-  return {
+  const estilo = {
     negocio: { nombre, direccion: config.direccion, telefono: config.telefono, rfc: config.rfc },
     mensajeSuperior: config.mensaje_superior || '',
     logoUrl: (esFinal || config.ticket_logo_en_mostrador) ? (config.logo_url || null) : null,
@@ -555,6 +562,18 @@ function estiloTicketDesdeConfig(config, esFinal) {
     facturaUrl: (esFinal && config.facturacion_activa !== false && config.facturacion_leyenda_ticket && typeof location !== 'undefined' && location.origin)
       ? location.origin + '/facturar.html' : null
   };
+
+  // Lo que se haya guardado en ESTE dispositivo manda sobre el valor general del negocio.
+  if (!sinDispositivo) {
+    const dv = leerDisenoDispositivo();
+    ['tamanoLetra', 'nombreTamano', 'totalTamano', 'acentos', 'logoTamano', 'tipoFuente'].forEach(k => { if (dv[k]) estilo[k] = dv[k]; });
+    if (typeof dv.incluirPrecioUnitario === 'boolean') estilo.incluirPrecioUnitario = dv.incluirPrecioUnitario;
+    if (typeof dv.descripcionCompleta === 'boolean') estilo.descripcionCompleta = dv.descripcionCompleta;
+    if (estilo.qrPromo && dv.qrTamano) estilo.qrPromo.tamano = dv.qrTamano;
+    const lin = esFinal ? dv.lineasFinal : dv.lineasMostrador;
+    if (lin && Number.isFinite(lin.sup) && Number.isFinite(lin.inf)) { estilo.lineasSuperiores = lin.sup; estilo.lineasInferiores = lin.inf; }
+  }
+  return estilo;
 }
 
 // Pasa un canvas a blanco y negro puro con "tramado" (puntitos) para que un

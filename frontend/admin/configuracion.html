@@ -37,6 +37,9 @@
   .hoja-ticket-fondo { background: #E4E6EA; border-radius: 10px; padding: 12px 8px; display: flex; justify-content: center; overflow: auto; max-height: 340px; }
   #hojaTicket { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); padding: 6px 8px; box-sizing: content-box; min-height: 60px; }
   #previewLogo:not([src]) { visibility: hidden; }
+  .bloque-config { border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
+  .bloque-config h4 { font-size: 15px; } .bloque-config h4 small { font-weight: 400; color: #888; }
+  .bloque-negocio { background: #FAFBFC; } .bloque-dispositivo { background: #F4FAF1; border-color: #CFE6C6; }
   .fila-plantillas { display: flex; gap: 8px; flex-wrap: wrap; }
   .campo-etiqueta { display: grid; gap: 4px; font-size: 14px; color: #444; }
 </style>
@@ -253,121 +256,130 @@
             <p class="nota-pequena">La vista previa es aproximada: la impresora térmica puede variar un poco.</p>
           </div>
           <div class="form-config">
-            <p class="card-subtexto">Cambia lo que quieras y mira el resultado en la <b>vista previa</b>. Cuando te guste, pulsa <b>Guardar diseño</b>.</p>
+            <p class="card-subtexto">Este diseño tiene <b>dos partes</b>: lo que es igual en <b>todo el negocio</b> (nombre, logo, textos, QR) y lo que se ajusta <b>solo en este dispositivo</b> (tamaño de letra, acentos, márgenes). Así tu celular y tu computadora pueden imprimir distinto sin pisarse.</p>
 
-            <p class="subtitulo-seccion">⚡ Plantillas rápidas (un clic y listo)</p>
-            <div class="fila-plantillas">
-              <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('clasico')">Clásico</button>
-              <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('compacto')">Compacto (ahorra papel)</button>
-              <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('legible')">Letra grande</button>
+            <div class="bloque-config bloque-negocio">
+              <h4>🏪 Del negocio <small>— igual en todos los dispositivos</small></h4>
+
+              <p class="subtitulo-seccion">Encabezado</p>
+              <input type="text" id="nombreNegocio" maxlength="60" placeholder="Nombre de tu negocio (aparece arriba del ticket)">
+              <input type="text" id="mensajeSuperior" maxlength="80" placeholder="Mensaje debajo del nombre (ej. Carnes frías y lácteos)">
+              <p class="nota-pequena">La dirección, el teléfono y el RFC se escriben en "Datos del negocio" (más abajo).</p>
+
+              <p class="subtitulo-seccion">🖼️ Logotipo</p>
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <img id="previewLogo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;">
+                <input type="file" id="logoInput" accept="image/*">
+                <button type="button" class="btn btn-secondary" onclick="quitarLogoTicket()">Quitar logo</button>
+              </div>
+              <p class="nota-pequena">Para mejores resultados usa un logo en blanco y negro, con letras gruesas y fondo blanco.</p>
+              <label class="opcion-check">
+                <span>Imprimir el logo también en el ticket de Mostrador (gasta más papel)</span>
+                <input type="checkbox" id="logoEnMostrador">
+              </label>
+
+              <p class="subtitulo-seccion">Negritas</p>
+              <label class="opcion-check">
+                <span>Nombre del negocio en negritas</span>
+                <input type="checkbox" id="negocioNegritas">
+              </label>
+              <label class="opcion-check">
+                <span>Total en negritas</span>
+                <input type="checkbox" id="totalNegritas">
+              </label>
+
+              <p class="subtitulo-seccion">Texto al final (opcional)</p>
+              <textarea id="terminos" maxlength="400" rows="2" placeholder="Ej. No hay devoluciones sin ticket. Gracias por su preferencia." style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
+              <p class="nota-pequena">Sale en el ticket final (ya pagado).</p>
+
+              <p class="subtitulo-seccion">Código QR de promoción</p>
+              <label class="opcion-check">
+                <span>Imprimir un QR de promoción al final del ticket</span>
+                <input type="checkbox" id="qrPromoActivo">
+              </label>
+              <input type="text" id="qrPromoContenido" maxlength="300" placeholder="Lo que abre el QR: una página, Facebook, WhatsApp (https://wa.me/52...)">
+              <input type="text" id="qrPromoTexto" maxlength="80" placeholder="Texto sobre el QR (ej. Escanea y recibe 10% de descuento)">
+              <label class="opcion-check">
+                <span>Imprimirlo también en el ticket de Mostrador</span>
+                <input type="checkbox" id="qrPromoEnMostrador">
+              </label>
+
+              <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarDisenoNegocio()">💾 Guardar para todo el negocio</button>
             </div>
 
-            <p class="subtitulo-seccion">1️⃣ Encabezado</p>
-            <input type="text" id="nombreNegocio" maxlength="60" placeholder="Nombre de tu negocio (aparece arriba del ticket)">
-            <input type="text" id="mensajeSuperior" maxlength="80" placeholder="Mensaje debajo del nombre (ej. Carnes frías y lácteos)">
-            <p class="nota-pequena">La dirección, el teléfono y el RFC se escriben en "Datos del negocio" (más abajo).</p>
+            <div class="bloque-config bloque-dispositivo">
+              <h4>📱 De ESTE dispositivo <small>— solo cambia aquí</small></h4>
+              <p class="nota-pequena" id="infoDispositivoTicket" style="margin:0;"></p>
 
-            <p class="subtitulo-seccion">🖼️ Logotipo</p>
-            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-              <img id="previewLogo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;">
-              <input type="file" id="logoInput" accept="image/*">
-              <button type="button" class="btn btn-secondary" onclick="quitarLogoTicket()">Quitar logo</button>
+              <p class="subtitulo-seccion">⚡ Plantillas rápidas (un clic y listo)</p>
+              <div class="fila-plantillas">
+                <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('clasico')">Clásico</button>
+                <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('compacto')">Compacto (ahorra papel)</button>
+                <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('legible')">Letra grande</button>
+              </div>
+
+              <label class="campo-etiqueta">Tamaño de letra de los productos
+                <select id="tamanoLetra">
+                  <option value="pequena">Pequeña (cabe más texto, ahorra papel)</option>
+                  <option value="normal">Normal</option>
+                  <option value="grande">Grande (más alta, fácil de leer)</option>
+                </select>
+              </label>
+              <label class="campo-etiqueta">Tamaño del nombre del negocio
+                <select id="nombreTamano">
+                  <option value="normal">Normal</option>
+                  <option value="grande">Grande</option>
+                </select>
+              </label>
+              <label class="campo-etiqueta">Tamaño del TOTAL
+                <select id="totalTamano">
+                  <option value="normal">Normal</option>
+                  <option value="grande">Grande</option>
+                </select>
+              </label>
+              <label class="campo-etiqueta">Tamaño del logo
+                <select id="logoTamano">
+                  <option value="chico">Chico</option>
+                  <option value="mediano">Mediano</option>
+                  <option value="grande">Grande</option>
+                </select>
+              </label>
+              <label class="campo-etiqueta">Tamaño del QR de promoción
+                <select id="qrPromoTamano">
+                  <option value="chico">Chico</option>
+                  <option value="mediano">Mediano</option>
+                  <option value="grande">Grande</option>
+                </select>
+              </label>
+              <label class="campo-etiqueta">Tipo de fuente (solo con "Impresora ya instalada")
+                <select id="tipoFuente">
+                  <option value="monospace">Clásica (recomendada, alinea mejor las columnas)</option>
+                  <option value="sans-serif">Moderna (las columnas pueden no alinear perfecto)</option>
+                </select>
+              </label>
+              <label class="campo-etiqueta">Acentos y ñ (si salen símbolos raros, deja "Quitar acentos")
+                <select id="ticketAcentos">
+                  <option value="quitar">Quitar acentos — siempre se ve bien (recomendada)</option>
+                  <option value="cp858">Mostrar acentos y ñ (la mayoría de impresoras)</option>
+                  <option value="cp850">Mostrar acentos y ñ — opción alterna</option>
+                </select>
+              </label>
+              <p class="nota-pequena">Los acentos solo aplican con impresión directa (Bluetooth/USB); con "Impresora ya instalada" siempre salen bien.</p>
+              <label class="opcion-check">
+                <span>Incluir precio unitario por producto</span>
+                <input type="checkbox" id="incluirPrecioUnitario">
+              </label>
+              <label class="opcion-check">
+                <span>Descripción completa (varios renglones si el nombre es largo)</span>
+                <input type="checkbox" id="descripcionCompleta">
+              </label>
+              <p class="nota-pequena">El ancho de papel (58 u 80 mm) y los márgenes en blanco de este equipo se eligen en "Método de impresión" y en las tarjetas de Mostrador y Comprobante.</p>
+
+              <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarDisenoDispositivo()">💾 Guardar solo en este dispositivo</button>
+              <button class="btn btn-secondary" onclick="restablecerDisenoDispositivo()">↺ Volver al diseño general</button>
+              <button class="btn btn-secondary" onclick="probarImpresionCaja()">🖨️ Probar impresión (ticket final)</button>
             </div>
-            <p class="nota-pequena">Para mejores resultados usa un logo en blanco y negro, con letras gruesas y fondo blanco.</p>
-            <label class="campo-etiqueta">Tamaño del logo
-              <select id="logoTamano">
-                <option value="chico">Chico</option>
-                <option value="mediano">Mediano</option>
-                <option value="grande">Grande</option>
-              </select>
-            </label>
-            <label class="opcion-check">
-              <span>Imprimir el logo también en el ticket de Mostrador (gasta más papel)</span>
-              <input type="checkbox" id="logoEnMostrador">
-            </label>
-
-            <p class="subtitulo-seccion">2️⃣ Letras</p>
-            <label class="campo-etiqueta">Tamaño de letra de los productos
-              <select id="tamanoLetra">
-                <option value="pequena">Pequeña (cabe más texto, ahorra papel)</option>
-                <option value="normal">Normal</option>
-                <option value="grande">Grande (más alta, fácil de leer)</option>
-              </select>
-            </label>
-            <label class="campo-etiqueta">Tamaño del nombre del negocio
-              <select id="nombreTamano">
-                <option value="normal">Normal</option>
-                <option value="grande">Grande</option>
-              </select>
-            </label>
-            <label class="campo-etiqueta">Tamaño del TOTAL
-              <select id="totalTamano">
-                <option value="normal">Normal</option>
-                <option value="grande">Grande</option>
-              </select>
-            </label>
-            <label class="opcion-check">
-              <span>Nombre del negocio en negritas</span>
-              <input type="checkbox" id="negocioNegritas">
-            </label>
-            <label class="opcion-check">
-              <span>Total en negritas</span>
-              <input type="checkbox" id="totalNegritas">
-            </label>
-            <label class="campo-etiqueta">Tipo de fuente (solo con "Impresora ya instalada")
-              <select id="tipoFuente">
-                <option value="monospace">Clásica (recomendada, alinea mejor las columnas)</option>
-                <option value="sans-serif">Moderna (las columnas pueden no alinear perfecto)</option>
-              </select>
-            </label>
-            <p class="nota-pequena">Con impresión directa (Bluetooth/USB) la impresora usa su propia letra: aquí se cambia el tamaño, no el tipo.</p>
-
-            <label class="campo-etiqueta">Acentos y ñ (si salen símbolos raros, deja "Quitar acentos")
-              <select id="ticketAcentos">
-                <option value="quitar">Quitar acentos — siempre se ve bien (recomendada)</option>
-                <option value="cp858">Mostrar acentos y ñ (la mayoría de impresoras)</option>
-                <option value="cp850">Mostrar acentos y ñ — opción alterna</option>
-              </select>
-            </label>
-            <p class="nota-pequena">Prueba con "Probar impresión". Solo aplica con impresión directa; con "Impresora ya instalada" los acentos siempre salen bien.</p>
-
-            <p class="subtitulo-seccion">3️⃣ Productos</p>
-            <label class="opcion-check">
-              <span>Incluir precio unitario por producto</span>
-              <input type="checkbox" id="incluirPrecioUnitario">
-            </label>
-            <label class="opcion-check">
-              <span>Descripción completa (varios renglones si el nombre es largo)</span>
-              <input type="checkbox" id="descripcionCompleta">
-            </label>
-
-            <p class="subtitulo-seccion">4️⃣ Texto al final (opcional)</p>
-            <textarea id="terminos" maxlength="400" rows="2" placeholder="Ej. No hay devoluciones sin ticket. Gracias por su preferencia." style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
-            <p class="nota-pequena">Sale en el ticket final (ya pagado).</p>
-
-            <p class="subtitulo-seccion">5️⃣ Código QR de promoción</p>
-            <label class="opcion-check">
-              <span>Imprimir un QR de promoción al final del ticket</span>
-              <input type="checkbox" id="qrPromoActivo">
-            </label>
-            <input type="text" id="qrPromoContenido" maxlength="300" placeholder="Lo que abre el QR: una página, Facebook, WhatsApp (https://wa.me/52...)">
-            <input type="text" id="qrPromoTexto" maxlength="80" placeholder="Texto sobre el QR (ej. Escanea y recibe 10% de descuento)">
-            <label class="campo-etiqueta">Tamaño del QR
-              <select id="qrPromoTamano">
-                <option value="chico">Chico</option>
-                <option value="mediano">Mediano</option>
-                <option value="grande">Grande</option>
-              </select>
-            </label>
-            <label class="opcion-check">
-              <span>Imprimirlo también en el ticket de Mostrador</span>
-              <input type="checkbox" id="qrPromoEnMostrador">
-            </label>
-
-            <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarPersonalizacionTicket()">💾 Guardar diseño</button>
-            <button class="btn btn-secondary" onclick="probarImpresionCaja()">🖨️ Probar impresión (ticket final)</button>
           </div>
-
         </div>
       </div>
     </div>
@@ -880,6 +892,7 @@ async function cargarConfiguracion() {
     document.getElementById('qrPromoTexto').value = config.qr_promo_texto || '';
     document.getElementById('qrPromoTamano').value = config.qr_promo_tamano || 'mediano';
     document.getElementById('qrPromoEnMostrador').checked = !!config.qr_promo_en_mostrador;
+    cargarDisenoDispositivoUI(config);
     refrescarVistaPreviaTicket();
 
     promosTurnosState = Array.isArray(config.promos_pantalla_turnos) ? config.promos_pantalla_turnos : [];
@@ -959,6 +972,8 @@ function guardarNombreMostrador() {
 function guardarAnchoTicketDispositivo() {
   localStorage.setItem('ancho_ticket_dispositivo', document.getElementById('anchoTicketDispositivo').value);
   mostrarToast('Ancho de papel guardado para este dispositivo', 'exito');
+  actualizarInfoDispositivoTicket();
+  refrescarVistaPreviaTicket();
 }
 
 // Mismo criterio de tamaño que usa Mostrador para elegir el acomodo
@@ -997,44 +1012,96 @@ function cargarColorTema() {
 // dos tarjetas para que sea claro qué controla cada una, pero al guardar
 // desde cualquiera de las dos, se usa el mismo campo. Si más adelante quieres
 // que sean completamente independientes, es una fase aparte.
-async function guardarPersonalizacionTicket() {
+// Lo del NEGOCIO se guarda en la base de datos (igual en todos los dispositivos).
+async function guardarDisenoNegocio() {
   try {
     await apiFetch('/configuracion', {
       method: 'PUT',
       body: JSON.stringify({
         nombre_negocio: document.getElementById('nombreNegocio').value.trim(),
         mensaje_superior: document.getElementById('mensajeSuperior').value.trim(),
-        ticket_letra: document.getElementById('tamanoLetra').value,
-        // Compatibilidad: el campo anterior solo conocía "normal" y "grande"
-        tamano_letra: document.getElementById('tamanoLetra').value === 'grande' ? 'grande' : 'normal',
-        ticket_nombre_tamano: document.getElementById('nombreTamano').value,
-        ticket_total_tamano: document.getElementById('totalTamano').value,
-        ticket_acentos: document.getElementById('ticketAcentos').value,
-        ticket_logo_tamano: document.getElementById('logoTamano').value,
+        negocio_negritas: document.getElementById('negocioNegritas').checked,
+        total_negritas: document.getElementById('totalNegritas').checked,
+        terminos: document.getElementById('terminos').value.trim(),
         ticket_logo_en_mostrador: document.getElementById('logoEnMostrador').checked,
         qr_promo_activo: document.getElementById('qrPromoActivo').checked,
         qr_promo_contenido: document.getElementById('qrPromoContenido').value.trim() || null,
         qr_promo_texto: document.getElementById('qrPromoTexto').value.trim() || null,
-        qr_promo_tamano: document.getElementById('qrPromoTamano').value,
         qr_promo_en_mostrador: document.getElementById('qrPromoEnMostrador').checked,
-        terminos: document.getElementById('terminos').value.trim(),
-        tipo_fuente: document.getElementById('tipoFuente').value,
-        negocio_negritas: document.getElementById('negocioNegritas').checked,
-        total_negritas: document.getElementById('totalNegritas').checked,
-        incluir_precio_unitario: document.getElementById('incluirPrecioUnitario').checked,
-        descripcion_completa: document.getElementById('descripcionCompleta').checked,
         tipo_codigo_escaneo: document.getElementById('tipoCodigoEscaneo').value,
         imprimir_datos_cliente: document.getElementById('imprimirDatosCliente').checked,
-        lineas_superiores: parseInt(document.getElementById('lineasSuperioresMostrador').value || 0),
-        lineas_inferiores: parseInt(document.getElementById('lineasInferioresMostrador').value || 3),
         logo_url: logoBase64 || null
       })
     });
-    mostrarToast('Diseño guardado correctamente', 'exito');
-    cargarConfiguracion();
+    mostrarToast('Guardado para todo el negocio', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+}
+
+// Lo de ESTE DISPOSITIVO se guarda solo en este equipo (no toca a los demás).
+function guardarDisenoDispositivo(avisar = true) {
+  const v = (id) => document.getElementById(id).value;
+  const n = (id, defecto) => { const x = parseInt(v(id), 10); return Number.isFinite(x) ? Math.min(10, Math.max(0, x)) : defecto; };
+  localStorage.setItem('ticket_diseno_dispositivo', JSON.stringify({
+    tamanoLetra: v('tamanoLetra'),
+    nombreTamano: v('nombreTamano'),
+    totalTamano: v('totalTamano'),
+    logoTamano: v('logoTamano'),
+    qrTamano: v('qrPromoTamano'),
+    tipoFuente: v('tipoFuente'),
+    acentos: v('ticketAcentos'),
+    incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
+    descripcionCompleta: document.getElementById('descripcionCompleta').checked,
+    lineasMostrador: { sup: n('lineasSuperioresMostrador', 0), inf: n('lineasInferioresMostrador', 3) },
+    lineasFinal: { sup: n('lineasSuperioresCaja', 0), inf: n('lineasInferioresCaja', 3) }
+  }));
+  actualizarInfoDispositivoTicket();
+  if (avisar) mostrarToast('Guardado solo en este dispositivo', 'exito');
+}
+
+function restablecerDisenoDispositivo() {
+  localStorage.removeItem('ticket_diseno_dispositivo');
+  cargarConfiguracion();
+  mostrarToast('Este dispositivo vuelve a usar el diseño general del negocio', 'info');
+}
+
+// Compatibilidad: los botones de las tarjetas de Mostrador y Comprobante guardan ambas partes.
+async function guardarPersonalizacionTicket() {
+  await guardarDisenoNegocio();
+  guardarDisenoDispositivo(false);
+}
+
+function actualizarInfoDispositivoTicket() {
+  const el = document.getElementById('infoDispositivoTicket');
+  if (!el) return;
+  const propio = !!localStorage.getItem('ticket_diseno_dispositivo');
+  const papel = localStorage.getItem('ancho_ticket_dispositivo') || 'sin elegir (se usa el del negocio)';
+  el.textContent = `Este dispositivo se detecta como ${detectarTipoDispositivoTexto()} (pantalla de ${window.innerWidth}px) · papel: ${papel}. ` +
+    (propio ? 'Usa su propio diseño guardado.' : 'Todavía usa el diseño general del negocio; al guardar aquí, solo este equipo cambia.');
+}
+
+// Muestra en el formulario lo que realmente usa ESTE dispositivo:
+// su valor guardado, y si no tiene, el valor general del negocio.
+function cargarDisenoDispositivoUI(config) {
+  const dv = leerDisenoDispositivo();
+  const set = (id, valor) => { document.getElementById(id).value = valor; };
+  set('tamanoLetra', dv.tamanoLetra || config.ticket_letra || (config.tamano_letra === 'grande' ? 'grande' : 'normal'));
+  set('nombreTamano', dv.nombreTamano || config.ticket_nombre_tamano || 'grande');
+  set('totalTamano', dv.totalTamano || config.ticket_total_tamano || 'grande');
+  set('logoTamano', dv.logoTamano || config.ticket_logo_tamano || 'mediano');
+  set('qrPromoTamano', dv.qrTamano || config.qr_promo_tamano || 'mediano');
+  set('tipoFuente', dv.tipoFuente || config.tipo_fuente || 'monospace');
+  set('ticketAcentos', dv.acentos || config.ticket_acentos || 'quitar');
+  document.getElementById('incluirPrecioUnitario').checked = typeof dv.incluirPrecioUnitario === 'boolean' ? dv.incluirPrecioUnitario : config.incluir_precio_unitario !== false;
+  document.getElementById('descripcionCompleta').checked = typeof dv.descripcionCompleta === 'boolean' ? dv.descripcionCompleta : config.descripcion_completa !== false;
+  const sup = config.lineas_superiores !== undefined ? config.lineas_superiores : 0;
+  const inf = config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3;
+  set('lineasSuperioresMostrador', dv.lineasMostrador ? dv.lineasMostrador.sup : sup);
+  set('lineasInferioresMostrador', dv.lineasMostrador ? dv.lineasMostrador.inf : inf);
+  set('lineasSuperioresCaja', dv.lineasFinal ? dv.lineasFinal.sup : sup);
+  set('lineasInferioresCaja', dv.lineasFinal ? dv.lineasFinal.inf : inf);
+  actualizarInfoDispositivoTicket();
 }
 
 // ============ Anuncios / Promociones (Pantalla de Turnos) ============
@@ -1210,7 +1277,7 @@ function estiloDesdeFormulario(esFinal) {
     qr_promo_tamano: v('qrPromoTamano'),
     qr_promo_en_mostrador: c('qrPromoEnMostrador'),
     terminos: v('terminos').trim()
-  }, esFinal);
+  }, esFinal, true);
 }
 
 function datosBaseTicketPrueba(esFinal = true) {
