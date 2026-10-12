@@ -1155,3 +1155,38 @@ async function imprimirConDialogoDelSistema(datosTicket) {
   ventana.document.write(pagina);
   ventana.document.close();
 }
+
+// Imprime líneas de texto plano (cortes de caja, reportes) respetando el método
+// de impresión de ESTE dispositivo: directo (Bluetooth/USB, con corte de papel)
+// o el diálogo de la impresora instalada en Windows/Mac.
+async function imprimirTextoPlanoTicket(lineas, { titulo = 'Documento', ancho_ticket } = {}) {
+  const modo = localStorage.getItem('modo_impresion') || 'directo';
+  const ancho = ancho_ticket || localStorage.getItem('ancho_ticket_dispositivo') || '80mm';
+  const acentos = (leerDisenoDispositivo().acentos) || 'quitar';
+
+  if (modo === 'sistema') {
+    const columnas = columnasTicket(ancho, 'normal', false);
+    const utilPx = ancho === '58mm' ? 204 : 287;
+    const fuentePx = Math.floor((utilPx / (columnas * 0.6)) * 10) / 10;
+    const pagina = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${escaparHtmlTicket(titulo)}</title>
+      <style>@page { size: ${ancho} auto; margin: 2mm; } body { margin: 0; }
+      pre { font-family: 'Courier New', monospace; font-size: ${fuentePx}px; line-height: 1.25; margin: 0; white-space: pre; color: #000; }</style>
+      </head><body><pre>${escaparHtmlTicket(lineas.join('\n'))}</pre>
+      <script>window.onload = () => window.print(); window.onafterprint = () => window.close();<\/script></body></html>`;
+    const ventana = window.open('', '_blank');
+    if (!ventana) throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
+    ventana.document.write(pagina);
+    ventana.document.close();
+    return;
+  }
+
+  if (!impresoraConectada()) await reconectarSiEsPosible();
+  if (!impresoraConectada()) throw new Error('No hay impresora conectada. Conéctala en Configuración → Impresión de este dispositivo.');
+
+  ticketModoAcentos = acentos;
+  const partes = [escposComando([0x1B, 0x40])];
+  if (acentos === 'cp858') partes.push(escposComando([0x1B, 0x74, 19]));
+  else if (acentos === 'cp850') partes.push(escposComando([0x1B, 0x74, 2]));
+  partes.push(ESCPOS_FUENTE_A, ESCPOS_IZQUIERDA, bytesDeLineas(lineas), bytesDeLineas(['', '', '']), escposComando([0x1D, 0x56, 0x00]));
+  await enviarBytes(bytesJuntos(partes));
+}

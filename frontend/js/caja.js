@@ -384,8 +384,9 @@ async function cobrar() {
   if (boton) { boton.disabled = true; boton.textContent = 'Procesando...'; }
 
   try {
-    const turno = await apiFetch('/turnos/actual');
-    if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo desde el panel de administración.', 'error'); return; }
+    // Sin turno abierto: se abre una ventana para abrirlo y declarar el efectivo en caja.
+    const turno = await asegurarTurnoAbierto();
+    if (!turno) return;
 
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
     let recibidoEfectivoParaTicket = null, cambioParaTicket = null;

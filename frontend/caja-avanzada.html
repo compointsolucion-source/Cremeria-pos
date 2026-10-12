@@ -212,6 +212,7 @@
 <script src="js/estado-conexion.js"></script>
 <script src="js/ui-components.js"></script>
 <script src="js/impresora-termica.js"></script>
+<script src="js/turno-caja.js"></script>
 <script src="js/offline-db.js"></script>
 <script>
 requiereLogin();
@@ -1238,8 +1239,9 @@ async function confirmarCobroAvanzada() {
   if (boton) { boton.disabled = true; boton.textContent = 'Procesando...'; }
 
   try {
-    const turno = await apiFetch('/turnos/actual');
-    if (!turno) { mostrarToast('No hay un turno de caja abierto. Ábrelo desde el panel de administración.', 'error'); return; }
+    // Sin turno abierto: se abre una ventana para abrirlo y declarar el efectivo en caja.
+    const turno = await asegurarTurnoAbierto();
+    if (!turno) return;
 
     const total = parseFloat(ticketParaCobrarAvanzada.total);
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
