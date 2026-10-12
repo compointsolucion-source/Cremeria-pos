@@ -1,1 +1,41 @@
+name: Instalador de escritorio (Windows)
 
+on:
+  workflow_dispatch:
+    inputs:
+      cliente_url:
+        description: 'Dirección del sistema del cliente (ej. https://cliente1.onrender.com/login.html). Vacío = instalador genérico.'
+        required: false
+        default: ''
+      cliente_nombre:
+        description: 'Nombre del negocio (ej. Cremería La Vaquita)'
+        required: true
+        default: 'Compoint Punto'
+
+jobs:
+  construir:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: escritorio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Construir instalador
+        run: node scripts/construir.js
+        env:
+          CLIENTE_URL: ${{ inputs.cliente_url }}
+          CLIENTE_NOMBRE: ${{ inputs.cliente_nombre }}
+      - name: Subir instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: instalador-compoint-punto
+          path: escritorio/dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
