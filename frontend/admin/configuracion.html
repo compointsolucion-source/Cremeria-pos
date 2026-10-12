@@ -180,6 +180,10 @@
                   <option value="grande">Grande</option>
                 </select>
               </label>
+              <label class="opcion-check">
+                <span><b>Productos en negrita</b> (se lee mejor)</span>
+                <input type="checkbox" id="productosNegritas">
+              </label>
               <label class="campo-etiqueta">Nombre del negocio
                 <select id="nombreTamano">
                   <option value="normal">Normal</option>
@@ -960,6 +964,7 @@ function guardarImpresionDispositivo(avisar = true) {
     acentos: v('ticketAcentos'),
     incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
     descripcionCompleta: document.getElementById('descripcionCompleta').checked,
+    productosNegritas: document.getElementById('productosNegritas').checked,
     lineasMostrador: { sup: n('lineasSuperioresMostrador', 0), inf: n('lineasInferioresMostrador', 3) },
     lineasFinal: { sup: n('lineasSuperioresCaja', 0), inf: n('lineasInferioresCaja', 3) }
   }));
@@ -998,6 +1003,7 @@ function cargarDisenoDispositivoUI(config) {
   set('ticketAcentos', dv.acentos || config.ticket_acentos || 'quitar');
   document.getElementById('incluirPrecioUnitario').checked = typeof dv.incluirPrecioUnitario === 'boolean' ? dv.incluirPrecioUnitario : config.incluir_precio_unitario !== false;
   document.getElementById('descripcionCompleta').checked = typeof dv.descripcionCompleta === 'boolean' ? dv.descripcionCompleta : config.descripcion_completa !== false;
+  document.getElementById('productosNegritas').checked = typeof dv.productosNegritas === 'boolean' ? dv.productosNegritas : false;
   const sup = config.lineas_superiores !== undefined ? config.lineas_superiores : 0;
   const inf = config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3;
   set('lineasSuperioresMostrador', dv.lineasMostrador ? dv.lineasMostrador.sup : sup);
@@ -1197,6 +1203,7 @@ function datosBaseTicketPrueba(esFinal = true) {
     total: '215.00',
     incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
     descripcionCompleta: document.getElementById('descripcionCompleta').checked,
+    productosNegritas: document.getElementById('productosNegritas').checked,
     ...estiloDesdeFormulario(esFinal)
   };
 }
@@ -1240,9 +1247,9 @@ function quitarLogoTicket() {
 // Plantillas: llenan el formulario (no guardan hasta pulsar "Guardar en este dispositivo").
 function aplicarPlantillaTicket(nombre) {
   const plantillas = {
-    clasico: { letra: 'normal', nombre: 'grande', total: 'grande', precio: true, descripcion: true },
-    compacto: { letra: 'pequena', nombre: 'normal', total: 'normal', precio: false, descripcion: false },
-    legible: { letra: 'grande', nombre: 'grande', total: 'grande', precio: true, descripcion: true }
+    clasico: { letra: 'normal', nombre: 'grande', total: 'grande', precio: true, descripcion: true, negrita: false },
+    compacto: { letra: 'pequena', nombre: 'normal', total: 'normal', precio: false, descripcion: false, negrita: true },
+    legible: { letra: 'grande', nombre: 'grande', total: 'grande', precio: true, descripcion: true, negrita: true }
   };
   const p = plantillas[nombre];
   if (!p) return;
@@ -1253,6 +1260,7 @@ function aplicarPlantillaTicket(nombre) {
   document.getElementById('totalNegritas').checked = true;
   document.getElementById('incluirPrecioUnitario').checked = p.precio;
   document.getElementById('descripcionCompleta').checked = p.descripcion;
+  document.getElementById('productosNegritas').checked = p.negrita;
   refrescarVistaPreviaTicket();
   mostrarToast('Plantilla aplicada — revisa la vista previa y pulsa "Guardar en este dispositivo"', 'info');
 }

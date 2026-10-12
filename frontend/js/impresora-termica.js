@@ -510,7 +510,7 @@ function columnasTicket(ancho, letra, paraDialogo) {
 const TICKET_DEFECTOS = {
   mensajeSuperior: '', logoTamano: 'mediano', tamanoLetra: 'normal',
   nombreTamano: 'grande', totalTamano: 'grande', acentos: 'quitar',
-  negocioNegritas: true, totalNegritas: true, tipoFuente: 'monospace',
+  negocioNegritas: true, totalNegritas: true, productosNegritas: false, tipoFuente: 'monospace',
   qrPromo: null, textoLegal: '', facturaUrl: null, lineasSuperiores: 0, lineasInferiores: 3,
   incluirPrecioUnitario: true, descripcionCompleta: true
 };
@@ -569,6 +569,7 @@ function estiloTicketDesdeConfig(config, esFinal, sinDispositivo) {
     ['tamanoLetra', 'nombreTamano', 'totalTamano', 'acentos', 'logoTamano', 'tipoFuente'].forEach(k => { if (dv[k]) estilo[k] = dv[k]; });
     if (typeof dv.incluirPrecioUnitario === 'boolean') estilo.incluirPrecioUnitario = dv.incluirPrecioUnitario;
     if (typeof dv.descripcionCompleta === 'boolean') estilo.descripcionCompleta = dv.descripcionCompleta;
+    if (typeof dv.productosNegritas === 'boolean') estilo.productosNegritas = dv.productosNegritas;
     if (estilo.qrPromo && dv.qrTamano) estilo.qrPromo.tamano = dv.qrTamano;
     const lin = esFinal ? dv.lineasFinal : dv.lineasMostrador;
     if (lin && Number.isFinite(lin.sup) && Number.isFinite(lin.inf)) { estilo.lineasSuperiores = lin.sup; estilo.lineasInferiores = lin.inf; }
@@ -968,6 +969,8 @@ async function imprimirTicketBLE(datosTicket) {
       if (d.totalNegritas) partes.push(negritaOn);
       partes.push(grande ? escposTamano(dobleAncho ? 2 : 1, 2) : escposTamano(1, 1), linea(texto), tamanoCuerpo);
       if (d.totalNegritas) partes.push(negritaOff);
+    } else if (d.productosNegritas) {
+      partes.push(negritaOn, linea(l), negritaOff);
     } else {
       partes.push(linea(l));
     }
@@ -1045,6 +1048,7 @@ async function construirHtmlTicket(datosTicket) {
     .tk { font-family: ${familia}; font-size: ${fuentePx}px; line-height: 1.25; color: #000; background: #fff; }
     .tk .c { text-align: center; }
     .tk .l { white-space: pre; }
+    .tk .l.p { font-weight: ${d.productosNegritas ? 700 : 400}; }
     .tk .nombre { font-weight: ${d.negocioNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.nombreTamano === 'grande' ? 1.9 : 1)).toFixed(1)}px; line-height: 1.15; margin: 2px 0; }
     .tk .total { display: flex; justify-content: space-between; font-weight: ${d.totalNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.totalTamano === 'grande' ? 1.6 : 1)).toFixed(1)}px; margin: 2px 0; }
     .tk img { display: block; margin: 4px auto; max-width: 100%; }
@@ -1083,7 +1087,7 @@ async function construirHtmlTicket(datosTicket) {
   // Productos, total y pie
   const lineasCuerpo = formatearCuerpoTicket({ ...d, columnas, cliente: d.imprimirDatosCliente ? d.cliente : null });
   let buffer = [];
-  const vaciar = () => { if (buffer.length) { partes.push(`<div class="l">${esc(buffer.join('\n'))}</div>`); buffer = []; } };
+  const vaciar = () => { if (buffer.length) { partes.push(`<div class="l p">${esc(buffer.join('\n'))}</div>`); buffer = []; } };
   lineasCuerpo.forEach(l => {
     if (l.trim().startsWith('TOTAL')) {
       vaciar();
