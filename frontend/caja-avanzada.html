@@ -54,6 +54,8 @@
   }
   .pestana-ticket.activa { border-color: var(--primary, #5FAE46); color: var(--primary, #5FAE46); background: #E8F5E9; }
   .pestana-ticket .contador-pestana { background: #DDD; border-radius: 10px; padding: 1px 7px; font-size: 11px; }
+  .pestana-ticket .cerrar-pestana { border: none; background: transparent; color: #999; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; cursor: pointer; border-radius: 50%; width: 18px; height: 18px; }
+  .pestana-ticket .cerrar-pestana:hover { background: #C62828; color: white; }
   .pestana-ticket.activa .contador-pestana { background: var(--primary, #5FAE46); color: white; }
 </style>
 </head>
@@ -233,6 +235,7 @@ function renderPestanas() {
   barra.innerHTML = pestanas.map((p, idx) => `
     <div class="pestana-ticket ${idx === pestanaActivaIndex ? 'activa' : ''}" onclick="cambiarAPestana(${idx})" ondblclick="renombrarPestana(${idx})">
       ${p.nombre} <span class="contador-pestana">${p.carrito.length}</span>
+      <button type="button" class="cerrar-pestana" title="Cerrar pestaña" aria-label="Cerrar ${p.nombre}" onclick="event.stopPropagation(); cerrarPestana(${idx})">×</button>
     </div>
   `).join('');
 }
@@ -276,15 +279,26 @@ function ponerPendiente() {
 // Elimina la pestaña actual. Si es la única que queda, solo la vacía (no
 // tendría sentido quedarse sin ninguna pestaña abierta).
 async function eliminarPestanaActual() {
-  const confirmado = await confirmarAccion(`¿Eliminar "${pestanas[pestanaActivaIndex].nombre}"? Se perderá todo lo capturado en esta pestaña.`);
-  if (!confirmado) return;
+  await cerrarPestana(pestanaActivaIndex);
+}
+
+// Cierra una pestaña (la de la crucecita ×). Si tiene productos capturados
+// pide confirmación; si está vacía se cierra directo. La última pestaña
+// nunca desaparece: solo se vacía.
+async function cerrarPestana(idx) {
+  const p = pestanas[idx];
+  if (!p) return;
+  if (p.carrito.length > 0 && !p.ticketIdExistente) {
+    const confirmado = await confirmarAccion(`¿Cerrar "${p.nombre}"? Se perderá todo lo capturado en esta pestaña.`);
+    if (!confirmado) return;
+  }
 
   if (pestanas.length === 1) {
-    pestanas[0].carrito = [];
-    pestanas[0].clienteAsignado = null;
+    pestanas[0] = { id: pestanas[0].id, nombre: pestanas[0].nombre.replace('📥 ', ''), carrito: [], clienteAsignado: null, ticketIdExistente: null };
   } else {
-    pestanas.splice(pestanaActivaIndex, 1);
-    pestanaActivaIndex = Math.max(0, pestanaActivaIndex - 1);
+    pestanas.splice(idx, 1);
+    if (idx < pestanaActivaIndex) pestanaActivaIndex--;
+    else if (idx === pestanaActivaIndex) pestanaActivaIndex = Math.max(0, idx - 1);
   }
   filaSeleccionadaIndex = null;
   renderPestanas();
