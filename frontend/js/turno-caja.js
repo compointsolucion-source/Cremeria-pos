@@ -170,6 +170,13 @@ function _fechaCorte(f) {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(h)}:${p(d.getMinutes())}:${p(d.getSeconds())} ${ampm}`;
 }
 
+// Columnas con las que se arma el corte: en letra grande caben menos.
+function columnasCorte(ancho) {
+  const modo = localStorage.getItem('modo_impresion') || 'directo';
+  if (modo === 'sistema') return ancho === '58mm' ? 26 : 34;
+  return ancho === '58mm' ? 32 : 48;
+}
+
 // Arma el texto del corte (X si el turno sigue abierto, Z si ya cerró) con la
 // declaración del cajero y el sobrante/faltante cuando existe.
 function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
@@ -179,31 +186,38 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
   const fila = (izq, der) => { izq = String(izq); der = String(der); const esp = columnas - izq.length - der.length; return izq.slice(0, Math.max(0, columnas - der.length - 1)) + ' '.repeat(Math.max(1, esp)) + der; };
   const m = dineroTurno;
 
+  const corto = columnas < 40; // papel angosto o letra grande: etiquetas abreviadas
+  const t = (largo, abreviado) => (corto ? abreviado : largo);
+  const fecha2 = (f) => { const x = _fechaCorte(f); return corto ? [x.slice(0, 10), x.slice(11)] : [x]; };
+
   const cerrado = c.turno.estado === 'cerrado';
-  if (negocio) L.push(centrar(negocio));
-  L.push(centrar(cerrado ? 'CORTE DE CAJA Z (CIERRE)' : 'CORTE DE CAJA X (PARCIAL)'));
-  L.push('DEL ' + _fechaCorte(c.turno.fecha_apertura));
-  L.push('AL  ' + _fechaCorte(c.turno.fecha_cierre));
-  L.push(`TURNO: ${c.turno.id}  CAJERO: ${(c.turno.cajero || '').toUpperCase()}`);
+  if (negocio) L.push({ t: negocio, big: true });
+  L.push({ t: 'CORTE DE CAJA', big: true });
+  L.push({ t: cerrado ? 'Z - CIERRE' : 'X - PARCIAL', big: true });
+  const dRango = (rot, f) => corto ? [rot + ' ' + fecha2(f)[0], '   ' + fecha2(f)[1]] : [rot + ' ' + fecha2(f)[0]];
+  dRango('DEL', c.turno.fecha_apertura).forEach(x => L.push(x));
+  dRango('AL ', c.turno.fecha_cierre).forEach(x => L.push(x));
+  L.push(`TURNO: ${c.turno.id}`);
+  L.push(`CAJERO: ${(c.turno.cajero || '').toUpperCase()}`.slice(0, columnas));
   L.push(igual);
 
   L.push('CAJA');
-  L.push(fila('+EFECTIVO INICIAL:', m(c.caja.fondo_inicial)));
-  L.push(fila('+VENTAS EN EFECTIVO:', m(c.caja.efectivo_ventas)));
-  L.push(fila('+DEPOSITOS EFECTIVO:', m(c.caja.depositos)));
-  L.push(fila('-RETIROS EFECTIVO:', m(c.caja.retiros)));
+  L.push(fila(t('+EFECTIVO INICIAL:', '+EFEC. INICIAL:'), m(c.caja.fondo_inicial)));
+  L.push(fila(t('+VENTAS EN EFECTIVO:', '+VTA EFECTIVO:'), m(c.caja.efectivo_ventas)));
+  L.push(fila(t('+DEPOSITOS EFECTIVO:', '+DEPOSITOS:'), m(c.caja.depositos)));
+  L.push(fila(t('-RETIROS EFECTIVO:', '-RETIROS:'), m(c.caja.retiros)));
   L.push('_'.repeat(Math.min(columnas, 14)));
-  L.push(fila('=SALDO EFECTIVO:', m(c.caja.saldo_efectivo)));
+  L.push(fila(t('=SALDO EFECTIVO:', '=SALDO EFEC.:'), m(c.caja.saldo_efectivo)));
   L.push(igual);
 
-  L.push('FORMA DE PAGO VENTAS');
+  L.push(t('FORMA DE PAGO VENTAS', 'VENTAS POR PAGO'));
   L.push(guion);
-  const nombres = { efectivo: 'EFECTIVO', tarjeta: 'TARJETA', transferencia: 'TRANSFERENCIA', dolares: 'DOLARES', cheque: 'CHEQUE', vales: 'VALES', credito: 'CREDITO (FIADO)' };
+  const nombres = { efectivo: 'EFECTIVO', tarjeta: 'TARJETA', transferencia: t('TRANSFERENCIA', 'TRANSFER.'), dolares: 'DOLARES', cheque: 'CHEQUE', vales: 'VALES', credito: t('CREDITO (FIADO)', 'FIADO') };
   Object.keys(nombres).forEach(k => { if (k === 'efectivo' || k === 'tarjeta' || (c.formas[k] || 0) !== 0) L.push(fila(nombres[k] + ':', m(c.formas[k]))); });
-  L.push(fila('TOTAL FORMAS DE PAGO', m(c.total_formas)));
+  L.push(fila(t('TOTAL FORMAS DE PAGO', 'TOTAL:'), m(c.total_formas)));
   L.push(igual);
 
-  L.push('VENTA POR DEPARTAMENTO');
+  L.push(t('VENTA POR DEPARTAMENTO', 'POR DEPARTAMENTO'));
   if (c.ventas.por_departamento.length === 0) L.push('(sin ventas)');
   c.ventas.por_departamento.forEach(d => L.push(fila(String(d.nombre).toUpperCase() + ':', m(d.monto))));
   L.push('_'.repeat(Math.min(columnas, 14)));
@@ -212,10 +226,10 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
   L.push(fila('VENTA NETA:', m(c.ventas.venta_neta)));
   L.push(igual);
 
-  L.push(fila('TICKETS PAGADOS:', c.cuentas.normales));
-  L.push(fila('TICKETS CANCELADOS:', c.cuentas.canceladas));
-  L.push(fila('TICKETS CON DESCUENTO:', c.cuentas.con_descuento));
-  L.push(fila('TICKET PROMEDIO:', m(c.cuentas.promedio)));
+  L.push(fila(t('TICKETS PAGADOS:', 'PAGADOS:'), c.cuentas.normales));
+  L.push(fila(t('TICKETS CANCELADOS:', 'CANCELADOS:'), c.cuentas.canceladas));
+  L.push(fila(t('TICKETS CON DESCUENTO:', 'CON DESCUENTO:'), c.cuentas.con_descuento));
+  L.push(fila(t('TICKET PROMEDIO:', 'PROMEDIO:'), m(c.cuentas.promedio)));
   L.push(fila('FOLIO INICIAL:', c.cuentas.folio_inicial || '-'));
   L.push(fila('FOLIO FINAL:', c.cuentas.folio_final || '-'));
 
@@ -228,30 +242,33 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
   const d = c.declaracion;
   if (d) {
     L.push(igual);
-    L.push('DECLARACION DE CAJERO');
+    L.push(t('DECLARACION DE CAJERO', 'DECLARACION'));
     const decl = d.importes || {};
-    const etiqueta = { efectivo: 'EFECTIVO', tarjeta: 'TARJETA', transferencia: 'TRANSFERENCIA', dolares: 'DOLARES', cheque: 'CHEQUE', vales: 'VALES' };
+    const etiqueta = { efectivo: 'EFECTIVO', tarjeta: 'TARJETA', transferencia: t('TRANSFERENCIA', 'TRANSFER.'), dolares: 'DOLARES', cheque: 'CHEQUE', vales: 'VALES' };
     Object.keys(etiqueta).forEach(k => {
       const usd = k === 'dolares' && d.dolares_usd ? ` (US$${Number(d.dolares_usd).toFixed(2)})` : '';
       if (k === 'efectivo' || k === 'tarjeta' || (decl[k] || 0) !== 0 || ((d.esperado || {})[k] || 0) !== 0) L.push(fila(etiqueta[k] + usd + ':', m(decl[k])));
     });
     L.push('-'.repeat(Math.min(columnas, 15)));
-    L.push(fila('TOTAL DECLARADO:', m(d.total_declarado)));
-    L.push(fila('TOTAL ESPERADO:', m(d.total_esperado)));
-    L.push(fila('SOBRANTE/FALTANTE:', (d.diferencia >= 0 ? '+' : '-') + m(Math.abs(d.diferencia))));
+    L.push(fila(t('TOTAL DECLARADO:', 'DECLARADO:'), m(d.total_declarado)));
+    L.push(fila(t('TOTAL ESPERADO:', 'ESPERADO:'), m(d.total_esperado)));
+    L.push(fila(t('SOBRANTE/FALTANTE:', 'SOBRA/FALTA:'), (d.diferencia >= 0 ? '+' : '-') + m(Math.abs(d.diferencia))));
     const dif = Object.keys(etiqueta).filter(k => Math.abs((d.diferencias || {})[k] || 0) > 0.004);
     if (dif.length) {
-      L.push('DIFERENCIA POR FORMA DE PAGO:');
+      L.push(t('DIFERENCIA POR FORMA DE PAGO:', 'DIF. POR FORMA:'));
       dif.forEach(k => L.push(fila('  ' + etiqueta[k] + ':', (d.diferencias[k] >= 0 ? '+' : '-') + m(Math.abs(d.diferencias[k])))));
     }
   } else {
     L.push(igual);
-    L.push(centrar('(Corte parcial: aun sin declaracion)'));
+    L.push(centrar(t('(Corte parcial: aun sin declaracion)', '(Parcial: sin declarar)')));
   }
 
   L.push('', '');
-  L.push('_______________  _______________');
-  L.push(fila('    GERENTE', `CAJERO: ${(c.turno.cerrado_por || c.turno.cajero || '').toUpperCase()}`));
+  L.push('_'.repeat(Math.min(columnas, 24)));
+  L.push('GERENTE');
+  L.push('', '');
+  L.push('_'.repeat(Math.min(columnas, 24)));
+  L.push(('CAJERO: ' + (c.turno.cerrado_por || c.turno.cajero || '').toUpperCase()).slice(0, columnas));
   return L;
 }
 
@@ -259,7 +276,7 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
 async function imprimirCorteTurno(turnoId) {
   const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${turnoId}/resumen`), configNegocioTurno()]);
   const ancho = obtenerAnchoTicketDispositivo(cfg);
-  const columnas = columnasTicket(ancho, 'normal', false);
+  const columnas = columnasCorte(ancho);
   const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '' });
   await imprimirTextoPlanoTicket(lineas, { titulo: `Corte de caja - turno ${corte.turno.id}`, ancho_ticket: ancho });
   return corte;

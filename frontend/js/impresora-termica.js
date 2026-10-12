@@ -1158,20 +1158,27 @@ async function imprimirConDialogoDelSistema(datosTicket) {
 
 // Imprime líneas de texto plano (cortes de caja, reportes) respetando el método
 // de impresión de ESTE dispositivo: directo (Bluetooth/USB, con corte de papel)
-// o el diálogo de la impresora instalada en Windows/Mac.
+// o el diálogo de la impresora instalada en Windows/Mac. Todo sale en negritas
+// y en letra grande para que se lea bien. Cada línea es un texto, o
+// { t: 'TEXTO', big: true } para un título en letra doble.
 async function imprimirTextoPlanoTicket(lineas, { titulo = 'Documento', ancho_ticket } = {}) {
   const modo = localStorage.getItem('modo_impresion') || 'directo';
   const ancho = ancho_ticket || localStorage.getItem('ancho_ticket_dispositivo') || '80mm';
   const acentos = (leerDisenoDispositivo().acentos) || 'quitar';
+  const texto = (l) => (typeof l === 'string' ? l : l.t);
+  const esGrande = (l) => typeof l !== 'string' && l.big;
 
   if (modo === 'sistema') {
-    const columnas = columnasTicket(ancho, 'normal', false);
+    const columnas = ancho === '58mm' ? 26 : 34;
     const utilPx = ancho === '58mm' ? 204 : 287;
     const fuentePx = Math.floor((utilPx / (columnas * 0.6)) * 10) / 10;
+    const cuerpo = lineas.map(l => esGrande(l)
+      ? `<div class="g">${escaparHtmlTicket(texto(l).trim())}</div>`
+      : `<div class="l">${escaparHtmlTicket(texto(l)) || '&nbsp;'}</div>`).join('');
     const pagina = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${escaparHtmlTicket(titulo)}</title>
-      <style>@page { size: ${ancho} auto; margin: 2mm; } body { margin: 0; }
-      pre { font-family: 'Courier New', monospace; font-size: ${fuentePx}px; line-height: 1.25; margin: 0; white-space: pre; color: #000; }</style>
-      </head><body><pre>${escaparHtmlTicket(lineas.join('\n'))}</pre>
+      <style>@page { size: ${ancho} auto; margin: 2mm; } body { margin: 0; font-family: 'Courier New', monospace; font-size: ${fuentePx}px; font-weight: 700; line-height: 1.3; color: #000; }
+      .l { white-space: pre; } .g { text-align: center; font-size: 1.4em; font-weight: 800; margin: 2px 0; }</style>
+      </head><body>${cuerpo}
       <script>window.onload = () => window.print(); window.onafterprint = () => window.close();<\/script></body></html>`;
     const ventana = window.open('', '_blank');
     if (!ventana) throw new Error('El navegador bloqueó la ventana de impresión (popup). Permite ventanas emergentes para este sitio e intenta de nuevo.');
@@ -1184,9 +1191,21 @@ async function imprimirTextoPlanoTicket(lineas, { titulo = 'Documento', ancho_ti
   if (!impresoraConectada()) throw new Error('No hay impresora conectada. Conéctala en Configuración → Impresión de este dispositivo.');
 
   ticketModoAcentos = acentos;
+  const columnas = columnasTicket(ancho, 'normal', false);
   const partes = [escposComando([0x1B, 0x40])];
   if (acentos === 'cp858') partes.push(escposComando([0x1B, 0x74, 19]));
   else if (acentos === 'cp850') partes.push(escposComando([0x1B, 0x74, 2]));
-  partes.push(ESCPOS_FUENTE_A, ESCPOS_IZQUIERDA, bytesDeLineas(lineas), bytesDeLineas(['', '', '']), escposComando([0x1D, 0x56, 0x00]));
+  partes.push(ESCPOS_FUENTE_A, ESCPOS_IZQUIERDA, ESCPOS_NEGRITA_ON);
+  lineas.forEach(l => {
+    if (esGrande(l)) {
+      const t = texto(l).trim();
+      const doble = t.length * 2 <= columnas;
+      partes.push(ESCPOS_CENTRAR, escposTamano(doble ? 2 : 1, 2), codificarTextoTicket(t + '\n', acentos), escposTamano(1, 1), ESCPOS_IZQUIERDA);
+    } else {
+      // Letra de doble alto (mismo ancho de columnas) para que se lea mejor.
+      partes.push(escposTamano(1, 2), codificarTextoTicket(texto(l) + '\n', acentos), escposTamano(1, 1));
+    }
+  });
+  partes.push(ESCPOS_NEGRITA_OFF, bytesDeLineas(['', '', '']), escposComando([0x1D, 0x56, 0x00]));
   await enviarBytes(bytesJuntos(partes));
 }
