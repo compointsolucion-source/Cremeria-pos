@@ -268,7 +268,11 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
     if (!instaladas.some(p => p.name === nombre)) throw new Error(`La impresora "${nombre}" no está instalada en esta computadora.`);
   }
   // Se quitan los scripts: el que trae el HTML llamaría al diálogo de impresión.
-  const limpio = String(html).replace(/<script[\s\S]*?<\/script>/gi, '');
+  let limpio = String(html).replace(/<script[\s\S]*?<\/script>/gi, '');
+  // Fondo blanco explícito: algunas impresoras térmicas (sobre todo en 80 mm) imprimen
+  // en negro todo lo que es "transparente".
+  const cssBlanco = '<style>html,body{background:#fff !important;color:#000 !important;-webkit-print-color-adjust:economy;}</style>';
+  limpio = /<\/head>/i.test(limpio) ? limpio.replace(/<\/head>/i, cssBlanco + '</head>') : cssBlanco + limpio;
   const anchoPx = Math.round(anchoMM * 96 / 25.4);
   const oculta = new BrowserWindow({
     show: false, width: anchoPx, height: 900, useContentSize: true,
@@ -280,7 +284,7 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
     const alturaMicrones = Math.max(30000, Math.ceil(altoPx * 264.583) + 4000); // rollo: alto = contenido
     await new Promise((resolver, rechazar) => {
       oculta.webContents.print({
-        silent: true, deviceName: nombre, printBackground: true,
+        silent: true, deviceName: nombre, printBackground: false, color: false,
         margins: { marginType: 'none' },
         pageSize: { width: anchoMM * 1000, height: alturaMicrones }
       }, (exito, motivo) => exito ? resolver() : rechazar(new Error(motivo || 'No se pudo imprimir')));
