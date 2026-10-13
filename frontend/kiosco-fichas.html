@@ -52,9 +52,18 @@
   .mensaje-espera { font-size: 28px; margin-top: 20px; }
 
   .salir-discreto {
-    position: fixed; bottom: 10px; right: 10px; opacity: 0.15;
-    background: none; border: none; color: white; font-size: 12px; cursor: pointer; padding: 10px;
+    position: fixed; bottom: 12px; left: 12px; opacity: 0.45;
+    background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.4); border-radius: 20px;
+    color: white; font-size: 13px; cursor: pointer; padding: 8px 14px; user-select: none; -webkit-user-select: none;
+    touch-action: none;
   }
+  .salir-discreto.presionando { opacity: 1; background: rgba(0,0,0,.6); }
+  #menuPersonal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:50; align-items:center; justify-content:center; }
+  #menuPersonal .caja { background:#fff; color:#222; border-radius:14px; padding:24px; width:min(360px,90vw); text-align:center; }
+  #menuPersonal button { display:block; width:100%; margin-top:10px; padding:14px; font-size:16px; border:none; border-radius:8px; cursor:pointer; }
+  #menuPersonal .b1 { background:#2e7d32; color:#fff; }
+  #menuPersonal .b2 { background:#c62828; color:#fff; }
+  #menuPersonal .b3 { background:#e0e0e0; color:#222; }
 </style>
 </head>
 <body>
@@ -70,7 +79,16 @@
     <div class="mensaje-espera">Espere a ser llamado — gracias por su paciencia</div>
   </div>
 
-  <button class="salir-discreto" onclick="salirDeKiosco()">Salir (personal autorizado)</button>
+  <button class="salir-discreto" id="btnPersonal">⚙ Personal · mantén presionado</button>
+
+  <div id="menuPersonal">
+    <div class="caja">
+      <h3>Menú del personal</h3>
+      <button class="b1" onclick="volverAlSistema()">← Volver al sistema</button>
+      <button class="b2" onclick="cerrarSesion()">Cerrar sesión</button>
+      <button class="b3" onclick="cerrarMenuPersonal()">Seguir en el kiosco</button>
+    </div>
+  </div>
 
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
@@ -139,12 +157,25 @@ function volverAInicio() {
   actualizarContadorKiosco();
 }
 
-async function salirDeKiosco() {
-  const confirmar = await solicitarTexto('Escribe "SALIR" para cerrar el modo kiosco:');
-  if (confirmar === 'SALIR') {
-    cerrarSesion();
-  }
+function abrirMenuPersonal() { document.getElementById('menuPersonal').style.display = 'flex'; }
+function cerrarMenuPersonal() { document.getElementById('menuPersonal').style.display = 'none'; }
+function volverAlSistema() {
+  const u = (typeof getUsuario === 'function' && getUsuario()) || {};
+  if (u.rol === 'jefe_general') location.href = 'admin/sucursales.html';
+  else if (u.rol === 'mostrador') location.href = 'mostrador.html';
+  else location.href = 'admin/dashboard.html';
 }
+// Mantener presionado 2 segundos (evita que un cliente salga sin querer)
+(function () {
+  const b = document.getElementById('btnPersonal'); let t = null;
+  const ini = (e) => { e.preventDefault(); b.classList.add('presionando'); t = setTimeout(() => { b.classList.remove('presionando'); abrirMenuPersonal(); }, 2000); };
+  const fin = () => { clearTimeout(t); b.classList.remove('presionando'); };
+  b.addEventListener('pointerdown', ini);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, fin));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+})();
+// Atajo de teclado para el personal: Ctrl+Alt+S
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 's') abrirMenuPersonal(); });
 
 cargarConfiguracionKiosco();
 actualizarContadorKiosco();
