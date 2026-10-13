@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Ayuda y soporte - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 760px; margin: 20px auto; padding: 0 14px 40px; }
+  .card h3 { margin-top: 0; }
+  details.guia { border: 1px solid rgba(128,128,128,.3); border-radius: 12px; padding: 4px 14px; margin: 10px 0; }
+  details.guia > summary { cursor: pointer; font-weight: 600; padding: 10px 0; font-size: 15px; }
+  details.guia ol, details.guia ul { padding-left: 22px; line-height: 1.6; font-size: 14px; }
+  details.guia p { font-size: 14px; line-height: 1.55; }
+  .aviso { background: #FFF3E0; color: #7A5B00; padding: 10px 12px; border-radius: 10px; font-size: 13px; margin: 8px 0; }
+  .ok { background: #E8F5E1; color: #2E5E1E; padding: 10px 12px; border-radius: 10px; font-size: 13px; margin: 8px 0; }
+  code { background: rgba(128,128,128,.18); padding: 1px 6px; border-radius: 6px; font-size: 13px; }
+  .contacto { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 10px; }
+  .contacto a, .contacto div { display: block; padding: 12px; border-radius: 12px; border: 1px solid rgba(128,128,128,.3); text-decoration: none; color: inherit; font-size: 14px; }
+  .contacto b { display: block; font-size: 12px; opacity: .7; margin-bottom: 2px; font-weight: 600; }
+  .contacto a:hover { border-color: #5FAE46; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>❓ Ayuda y soporte</h1></div>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+
+    <div class="card">
+      <h3>🖨️ Impresoras</h3>
+      <p style="font-size:13px; opacity:.8;">Se configuran en <b>Configuración → Impresión</b>. Elige según cómo esté conectada tu impresora.</p>
+
+      <details class="guia">
+        <summary>Impresora USB instalada en Windows (programa de escritorio)</summary>
+        <ol>
+          <li>Instala la impresora en Windows con su driver y revisa que imprima una hoja de prueba.</li>
+          <li>Usa el programa de escritorio de Compoint Punto (no el navegador).</li>
+          <li>Ve a <b>Configuración → Impresión</b> y en "¿Cómo imprime este equipo?" elige <b>Impresora instalada en Windows/Mac</b>.</li>
+          <li>En "Impresoras de Windows" escoge la de <b>Tickets y cortes</b> y la de <b>Fichas de turno</b>, y pulsa <b>Guardar impresoras de Windows</b>.</li>
+          <li>Haz una venta de prueba. Imprime directo, sin abrir el diálogo de impresión.</li>
+        </ol>
+        <div class="aviso">Si el ticket sale en negro o muy grande, revisa el ancho de papel (58 mm u 80 mm) en la misma pantalla de Impresión.</div>
+      </details>
+
+      <details class="guia">
+        <summary>Impresora Bluetooth o USB directa (sin driver)</summary>
+        <ol>
+          <li>En <b>Configuración → Impresión</b>, elige <b>Directo (Bluetooth/USB)</b>.</li>
+          <li>Pulsa <b>🔵 Bluetooth</b> o <b>🔌 USB</b> en "Impresora de tickets" y selecciona tu impresora.</li>
+          <li>Repite el paso con "Impresora de fichas" si usas una para fichas.</li>
+        </ol>
+        <p>Esto se hace una vez por equipo. Solo funciona en el programa de escritorio o en un navegador Chrome/Edge abierto desde <code>https://</code> o <code>localhost</code>.</p>
+      </details>
+
+      <details class="guia">
+        <summary>Impresora de red por IP (WiFi o cable de red)</summary>
+        <ol>
+          <li>Averigua la <b>IP de la impresora</b> (normalmente imprimiendo su hoja de autodiagnóstico). Ejemplo: <code>192.168.1.100</code>. El puerto casi siempre es <b>9100</b>.</li>
+          <li>Conviene <b>fijar esa IP</b> en el router o en la impresora para que no cambie.</li>
+          <li>Una computadora de la red debe tener el <b>programa de escritorio</b> abierto: él hace de intermediario y escucha en el puerto <b>3500</b>.</li>
+          <li>En <b>Configuración → Impresión → 🌐 Avanzado: fichas por red (IP)</b> escribe:
+            <ul>
+              <li>URL del intermediario: <code>http://IP-DE-ESA-PC:3500</code> (en esa misma PC: <code>http://localhost:3500</code>)</li>
+              <li>IP de la impresora y puerto <code>9100</code></li>
+            </ul>
+          </li>
+          <li>Pulsa <b>Guardar</b> y luego <b>🔍 Probar</b>. Lo mismo aplica para etiquetas en la sección de etiquetas.</li>
+        </ol>
+        <div class="aviso">Si la prueba falla: revisa que la impresora y la PC estén en la misma red, que el programa de escritorio esté abierto y que el Firewall de Windows permita el acceso en red privada.</div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>☁️ Conexiones: nube y servidor local</h3>
+
+      <details class="guia">
+        <summary>Conectar un equipo al sistema en la nube</summary>
+        <ol>
+          <li>Instala el programa de escritorio (te lo da Compoint).</li>
+          <li>La primera vez, escribe la <b>Dirección del sistema</b> de tu negocio, por ejemplo <code>https://minegocio.onrender.com</code>.</li>
+          <li>Opcional: guarda un usuario para entrar automático (solo en equipos de una sola persona).</li>
+          <li>Para cambiarla después: clic derecho en el icono junto al reloj → <b>Cambiar dirección o usuario</b> (o Ctrl+Alt+C).</li>
+        </ol>
+      </details>
+
+      <details class="guia">
+        <summary>Trabajar sin internet: servidor local del negocio</summary>
+        <ol>
+          <li>En la computadora principal (debe estar encendida mientras vendes), abre <b>Cambiar dirección o usuario</b> y elige <b>"Esta computadora será el servidor del negocio"</b>.</li>
+          <li>Captura los datos del negocio. El sistema se guarda en <code>C:\CompointPunto</code> y funciona sin internet.</li>
+          <li>Cuando Windows pregunte por el Firewall, elige <b>Permitir acceso</b> en red privada.</li>
+          <li>Abre el panel con <b>Ctrl+Alt+S</b> (o clic derecho en el icono → Panel del servidor): ahí ves el <b>nombre del equipo</b> y la <b>IP</b> del servidor.</li>
+        </ol>
+        <div class="aviso">No borres la carpeta <code>C:\CompointPunto</code>: ahí está toda la información.</div>
+      </details>
+
+      <details class="guia">
+        <summary>Conectar otras cajas al servidor local</summary>
+        <ol>
+          <li>En cada caja instala el programa de escritorio.</li>
+          <li>En "Dirección del sistema" escribe el <b>nombre del servidor</b> (ej. <code>DESKTOP-ABC123</code>) o su <b>IP</b> (ej. <code>192.168.1.50</code>). Se completa solo con el puerto 3000.</li>
+          <li>O pulsa <b>"Buscar servidor en la red"</b> y elige el que aparezca.</li>
+          <li>Guarda y abre. Para impresoras USB o Bluetooth usa el programa de escritorio, no el navegador.</li>
+        </ol>
+      </details>
+
+      <details class="guia">
+        <summary>Respaldos y copia en la nube (Cloudinary)</summary>
+        <ul>
+          <li>El servidor guarda un respaldo <b>al cerrar</b> con "Salir por completo", <b>cada 12 horas</b> y cuando pulses "Respaldar ahora". Quedan en <code>C:\CompointPunto\Respaldos</code> (los últimos 30).</li>
+          <li>Además puede subir una copia a la nube y conservar los <b>últimos 10 días</b>.</li>
+        </ul>
+        <p><b>Para activar la copia en la nube:</b></p>
+        <ol>
+          <li>Crea una cuenta gratis en <code>cloudinary.com</code>.</li>
+          <li>En su panel (Dashboard) copia: <b>Cloud name</b>, <b>API Key</b> y <b>API Secret</b>.</li>
+          <li>En el panel del servidor (Ctrl+Alt+S) abre <b>Configurar Cloudinary</b>, pega los tres datos y guarda.</li>
+          <li>Pulsa <b>Probar conexión</b>. Si dice que está bien, ya quedó.</li>
+        </ol>
+        <p><b>Para recuperar información:</b> panel del servidor → <b>Restaurar desde un respaldo…</b> y elige el respaldo. Antes de restaurar se guarda uno del estado actual.</p>
+        <div class="aviso">Si no hay internet, la copia en la nube queda pendiente y se sube sola cuando regrese la conexión.</div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>🛟 Soporte y ayuda con Compoint</h3>
+      <p style="font-size:14px;">¿Algo no funciona o necesitas instalar otra caja? Escríbenos o llámanos.</p>
+      <div class="contacto">
+        <a href="https://wa.me/523325907090" target="_blank" rel="noopener"><b>WhatsApp</b>33 25 90 70 90</a>
+        <a href="tel:+523315970412"><b>Teléfono</b>33 15 97 04 12</a>
+        <a href="mailto:contacto@compoint.com.mx"><b>Correo</b>contacto@compoint.com.mx</a>
+        <a href="https://www.compoint.com.mx" target="_blank" rel="noopener"><b>Sitio web</b>www.compoint.com.mx</a>
+        <div><b>Dirección</b>Calle Fontaneros 527, Guadalajara, Jalisco</div>
+      </div>
+      <div class="ok" style="margin-top:12px;">Para atenderte más rápido, ten a la mano: el nombre de tu negocio, qué estabas haciendo y, si puedes, una captura de pantalla del mensaje de error.</div>
+    </div>
+
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>requiereLogin();</script>
+<script src="../js/sidebar-nav.js"></script>
+</body>
+</html>

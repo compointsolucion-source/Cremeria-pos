@@ -184,6 +184,7 @@ function crearBandeja() {
       { label: 'Panel del servidor y respaldos…', click: () => abrirPanel() },
       { label: 'Respaldar ahora', click: () => respaldarAhora() }
     ] : [{ label: 'Cambiar dirección o usuario…', click: () => abrirConfig() }]),
+    { label: 'Ayuda y soporte', click: () => { crearVentana(); try { const u = new URL('/admin/ayuda.html', configuracion().url); if (ventana) ventana.loadURL(u.href); } catch (e) {} } },
     { type: 'separator' },
     { label: 'Salir por completo (guarda un respaldo)', click: () => { saliendo = true; app.quit(); } }
   ]);
