@@ -250,6 +250,7 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
       `SELECT t.id, t.folio, t.total, u.nombre AS usuario,
               b.valor_nuevo->>'motivo' AS motivo,
               to_char(COALESCE(b.fecha, t.fecha_creacion), $4) AS clave,
+              to_char(COALESCE(b.fecha, t.fecha_creacion), 'HH24')::int AS hora,
               to_char(COALESCE(b.fecha, t.fecha_creacion), 'YYYY-MM-DD HH24:MI') AS fecha
        FROM tickets t
        LEFT JOIN LATERAL (
@@ -275,9 +276,19 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
     );
 
     const fichas = await pool.query(
-      `SELECT to_char(fecha_creacion, $4) AS clave, COUNT(*)::int AS n
+      `SELECT to_char(fecha_creacion, $4) AS clave,
+              COUNT(*) FILTER (WHERE estado = 'cancelado')::int AS n,
+              COUNT(*) FILTER (WHERE estado IN ('atendido','llamado'))::int AS atendidas
        FROM fichas
-       WHERE sucursal_id = $1 AND estado = 'cancelado' AND fecha_creacion >= $2 AND fecha_creacion < $3
+       WHERE sucursal_id = $1 AND estado IN ('cancelado','atendido','llamado') AND fecha_creacion >= $2 AND fecha_creacion < $3
+       GROUP BY 1`,
+      [sucursalId, desde, hasta, fmt]
+    );
+
+    const ventasSerie = await pool.query(
+      `SELECT to_char(fecha_pago, $4) AS clave, COALESCE(SUM(total),0) AS monto, COUNT(*)::int AS n
+       FROM tickets
+       WHERE estado = 'pagado' AND sucursal_id = $1 AND fecha_pago >= $2 AND fecha_pago < $3
        GROUP BY 1`,
       [sucursalId, desde, hasta, fmt]
     );
@@ -302,10 +313,10 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
     for (let d = new Date(ini); d < hasta && serie.length < 400; porMes ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
       const iso = d.toISOString();
       const clave = porMes ? iso.slice(0, 7) : iso.slice(0, 10);
-      const fila = { clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0 };
+      const fila = { clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0, fichas_atendidas: 0, ventas: 0, tickets_pagados: 0 };
       serie.push(fila); mapa[clave] = fila;
     }
-    const buscar = (clave) => mapa[clave] || (serie.length < 400 ? (mapa[clave] = serie[serie.push({ clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0 }) - 1]) : null);
+    const buscar = (clave) => mapa[clave] || (serie.length < 400 ? (mapa[clave] = serie[serie.push({ clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0, fichas_atendidas: 0, ventas: 0, tickets_pagados: 0 }) - 1]) : null);
 
     let montoCanc = 0, montoDevo = 0, totalFichas = 0;
     const porUsuario = {}, motivos = {};
@@ -329,7 +340,10 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
       const f = buscar(r.clave); if (f) { f.devoluciones++; f.monto_devuelto += m; }
       sumaMotivo(r.motivo, m, 'devoluciones'); sumaUsuario(r.usuario, m, 'devoluciones');
     }
-    for (const r of fichas.rows) { totalFichas += r.n; const f = buscar(r.clave); if (f) f.fichas += r.n; }
+    for (const r of fichas.rows) { totalFichas += r.n; const f = buscar(r.clave); if (f) { f.fichas += r.n; f.fichas_atendidas += r.atendidas; } }
+    for (const r of ventasSerie.rows) { const f = buscar(r.clave); if (f) { f.ventas += parseFloat(r.monto); f.tickets_pagados += r.n; } }
+    const porHora = Array.from({ length: 24 }, (_, h) => ({ hora: h, cancelaciones: 0, monto: 0 }));
+    for (const r of canc.rows) { porHora[r.hora].cancelaciones++; porHora[r.hora].monto += parseFloat(r.total); }
     serie.sort((a, b) => a.clave.localeCompare(b.clave));
 
     const totalVendido = parseFloat(vendido.rows[0].total);
@@ -344,6 +358,7 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
         porcentaje_sobre_ventas: (totalVendido + totalPerdido) > 0 ? (totalPerdido / (totalVendido + totalPerdido)) * 100 : 0
       },
       serie,
+      por_hora: porHora,
       por_usuario: Object.values(porUsuario).sort((a, b) => b.monto - a.monto).slice(0, 10),
       motivos: Object.values(motivos).sort((a, b) => b.monto - a.monto).slice(0, 10),
       top_productos: topProd.rows,

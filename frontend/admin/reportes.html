@@ -94,14 +94,32 @@
     <div id="seccionPerdidas" style="display:none;">
       <div class="tarjetas-resumen" id="tarjetasPerdidas"></div>
       <div class="grafica-caja">
+        <h3>Ventas cobradas vs. dinero perdido</h3>
+        <div class="leyenda"><span><i style="background:#5FAE46"></i>Ventas cobradas</span><span><i style="background:#D64545"></i>Perdido (cancelado + devuelto)</span></div>
+        <div id="graficaVentasVsPerdidas"></div>
+      </div>
+      <div class="grafica-caja">
         <h3>Dinero perdido por periodo</h3>
         <div class="leyenda"><span><i style="background:#D64545"></i>Tickets cancelados</span><span><i style="background:#F2A33A"></i>Devoluciones</span></div>
         <div id="graficaDinero"></div>
       </div>
       <div class="grafica-caja">
-        <h3>Clientes que se fueron sin ser atendidos</h3>
-        <div class="leyenda"><span><i style="background:#4A7FD6"></i>Fichas canceladas (no atendidas)</span></div>
+        <h3>Fichas: atendidas vs. canceladas (clientes que se fueron)</h3>
+        <div class="leyenda"><span><i style="background:#5FAE46"></i>Atendidas</span><span><i style="background:#4A7FD6"></i>Canceladas (no atendidas)</span></div>
         <div id="graficaFichas"></div>
+      </div>
+      <div class="grafica-caja">
+        <h3>¿A qué hora se cancela más?</h3>
+        <div class="leyenda"><span><i style="background:#D64545"></i>Tickets cancelados por hora del día</span></div>
+        <div id="graficaHoras"></div>
+      </div>
+      <div class="grafica-caja">
+        <h3>Motivos que más dinero cuestan</h3>
+        <div id="graficaMotivos"></div>
+      </div>
+      <div class="grafica-caja">
+        <h3>Dinero perdido por empleado</h3>
+        <div id="graficaEmpleados"></div>
       </div>
       <h3>Motivos más frecuentes</h3>
       <table class="tabla-reportes">
@@ -340,10 +358,10 @@ function etiquetaPeriodo(clave, gran) {
 }
 
 // Gráfica de barras en SVG. series: [{valores:[...], color, nombre}] (apiladas)
-function dibujarBarras(contenedor, etiquetas, series, formato) {
+function dibujarBarras(contenedor, etiquetas, series, formato, agrupado) {
   const W = 760, H = 260, mi = 52, md = 10, ms = 14, mb = 34;
   const n = etiquetas.length;
-  const totales = etiquetas.map((_, i) => series.reduce((s, x) => s + (x.valores[i] || 0), 0));
+  const totales = etiquetas.map((_, i) => agrupado ? Math.max(...series.map(x => x.valores[i] || 0)) : series.reduce((s, x) => s + (x.valores[i] || 0), 0));
   const max = Math.max(...totales, 0);
   if (!n || max === 0) {
     document.getElementById(contenedor).innerHTML = '<div style="padding:30px;text-align:center;color:#888;">Sin datos en este periodo 🎉</div>';
@@ -362,16 +380,35 @@ function dibujarBarras(contenedor, etiquetas, series, formato) {
   const cadaN = Math.ceil(n / 12);
   etiquetas.forEach((et, i) => {
     let acum = 0;
-    const x = mi + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7);
+    const base = mi + i * bw + bw * 0.15, wTot = Math.max(2, bw * 0.7);
+    const wBarra = agrupado ? wTot / series.length : wTot;
     let tip = et + '\n';
-    series.forEach(s => {
-      const v = s.valores[i] || 0; tip += s.nombre + ': ' + formato(v) + '\n';
-      if (v > 0) { g += `<rect x="${x}" y="${y(acum + v)}" width="${w}" height="${Math.max(1, y(acum) - y(acum + v))}" fill="${s.color}" rx="2"><title>${escHtml(tip)}</title></rect>`; }
+    series.forEach((sr, k) => {
+      const v = sr.valores[i] || 0; tip += sr.nombre + ': ' + formato(v) + '\n';
+    });
+    series.forEach((sr, k) => {
+      const v = sr.valores[i] || 0;
+      const x = agrupado ? base + k * wBarra : base;
+      const desde0 = agrupado ? 0 : acum;
+      if (v > 0) { g += `<rect x="${x}" y="${y(desde0 + v)}" width="${Math.max(1, wBarra - (agrupado ? 1 : 0))}" height="${Math.max(1, y(desde0) - y(desde0 + v))}" fill="${sr.color}" rx="2"><title>${escHtml(tip)}</title></rect>`; }
       acum += v;
     });
     if (i % cadaN === 0) g += `<text x="${mi + i * bw + bw / 2}" y="${H - 12}" text-anchor="middle">${escHtml(et)}</text>`;
   });
   document.getElementById(contenedor).innerHTML = `<svg class="grafica-svg" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+
+// Barras horizontales: filas [{nombre, valor}]
+function dibujarBarrasH(contenedor, filas, color, formato) {
+  const el = document.getElementById(contenedor);
+  const max = Math.max(...filas.map(f => f.valor), 0);
+  if (!filas.length || max === 0) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">Sin datos en este periodo</div>'; return; }
+  el.innerHTML = filas.map(f => `
+    <div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px;">
+      <div style="width:150px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(f.nombre)}">${escHtml(f.nombre)}</div>
+      <div style="flex:1;background:#F0F0F0;border-radius:4px;height:18px;"><div style="width:${(f.valor / max * 100).toFixed(1)}%;min-width:3px;height:18px;background:${color};border-radius:4px;"></div></div>
+      <div style="width:90px;flex:none;text-align:right;">${formato(f.valor)}</div>
+    </div>`).join('');
 }
 
 function renderPerdidas(data) {
@@ -388,9 +425,19 @@ function renderPerdidas(data) {
     { nombre: 'Cancelados', color: '#D64545', valores: data.serie.map(f => f.monto_cancelado) },
     { nombre: 'Devoluciones', color: '#F2A33A', valores: data.serie.map(f => f.monto_devuelto) }
   ], v => '$' + Math.round(v).toLocaleString('es-MX'));
+  dibujarBarras('graficaVentasVsPerdidas', et, [
+    { nombre: 'Ventas cobradas', color: '#5FAE46', valores: data.serie.map(f => f.ventas) },
+    { nombre: 'Perdido', color: '#D64545', valores: data.serie.map(f => f.monto_cancelado + f.monto_devuelto) }
+  ], v => '$' + Math.round(v).toLocaleString('es-MX'), true);
   dibujarBarras('graficaFichas', et, [
-    { nombre: 'Fichas canceladas', color: '#4A7FD6', valores: data.serie.map(f => f.fichas) }
+    { nombre: 'Atendidas', color: '#5FAE46', valores: data.serie.map(f => f.fichas_atendidas) },
+    { nombre: 'Canceladas', color: '#4A7FD6', valores: data.serie.map(f => f.fichas) }
   ], v => String(Math.round(v)));
+  dibujarBarras('graficaHoras', data.por_hora.map(h => h.hora + 'h'), [
+    { nombre: 'Cancelaciones', color: '#D64545', valores: data.por_hora.map(h => h.cancelaciones) }
+  ], v => String(Math.round(v)));
+  dibujarBarrasH('graficaMotivos', data.motivos.map(m => ({ nombre: m.motivo, valor: m.monto })), '#F2A33A', dinero);
+  dibujarBarrasH('graficaEmpleados', data.por_usuario.map(u => ({ nombre: u.usuario, valor: u.monto })), '#D64545', dinero);
 
   document.getElementById('tablaMotivos').innerHTML = data.motivos.map(m => `<tr><td>${escHtml(m.motivo)}</td><td>${m.cancelaciones}</td><td>${m.devoluciones}</td><td>${dinero(m.monto)}</td></tr>`).join('') || '<tr><td colspan="4">Sin datos</td></tr>';
   document.getElementById('tablaPerdidasEmpleado').innerHTML = data.por_usuario.map(u => `<tr><td>${escHtml(u.usuario)}</td><td>${u.cancelaciones}</td><td>${u.devoluciones}</td><td>${dinero(u.monto)}</td></tr>`).join('') || '<tr><td colspan="4">Sin datos</td></tr>';
