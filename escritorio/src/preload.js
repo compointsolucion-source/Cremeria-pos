@@ -3,7 +3,9 @@ contextBridge.exposeInMainWorld('compoint', {
   guardarConfig: (datos) => ipcRenderer.invoke('guardar-config', datos),
   leerConfig: () => ipcRenderer.invoke('leer-config'),
   reintentar: () => ipcRenderer.invoke('reintentar'),
-  cerrar: () => ipcRenderer.invoke('cerrar-ventana-config')
+  cerrar: () => ipcRenderer.invoke('cerrar-ventana-config'),
+  buscarServidores: () => ipcRenderer.invoke('buscar-servidores'),
+  probarServidor: (u) => ipcRenderer.invoke('probar-servidor', u)
 });
 
 // Funciones del programa de escritorio para el sistema web (solo el sitio configurado puede usarlas).

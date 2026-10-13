@@ -92,6 +92,7 @@ if (!FRONTEND_DIR) app.get('/', (req, res) => res.send('Cremería POS backend fu
 // "efecto dormido" del plan Free de Render.
 app.get('/health', async (req, res) => {
   const salud = { servidor: 'ok', base_de_datos: 'desconocido', timestamp: new Date().toISOString() };
+  if (process.env.COMPOINT_EQUIPO) salud.equipo = process.env.COMPOINT_EQUIPO; // solo en modo servidor local
   try {
     await pool.query('SELECT 1');
     salud.base_de_datos = 'ok';

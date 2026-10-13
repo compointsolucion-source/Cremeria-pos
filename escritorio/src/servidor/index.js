@@ -15,6 +15,8 @@ const PUERTO_PG = 54329;
 
 function direccionesRed(puerto) {
   const out = [];
+  const nombre = os.hostname();
+  if (nombre) out.push(`http://${nombre}:${puerto}`);
   for (const lista of Object.values(os.networkInterfaces())) {
     for (const i of lista || []) if (i.family === 'IPv4' && !i.internal) out.push(`http://${i.address}:${puerto}`);
   }
@@ -83,6 +85,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
   process.env.JWT_SECRET = cfg.jwt_secret;
   process.env.PORT = String(puertoWeb);
   process.env.HOST = '0.0.0.0';
+  process.env.COMPOINT_EQUIPO = os.hostname();
   process.env.FRONTEND_DIR = path.join(dirServidor, 'frontend');
   process.env.MAX_SUCURSALES = String(cfg.max_sucursales || 1);
   const nubeActual = () => { const n = cfg.nube || {}; let secreto = ''; try { secreto = n.api_secret_cifrado ? descifrar(n.api_secret_cifrado) : (n.api_secret || ''); } catch (e) { secreto = ''; } return { cloud_name: n.cloud_name || '', api_key: n.api_key || '', api_secret: secreto }; };

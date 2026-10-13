@@ -224,6 +224,39 @@ ipcMain.handle('leer-config', (e) => {
   return { url: c.url || '', nombre: c.nombre, usuario: c.usuario || '', configurado: !!c.url };
 });
 
+// Busca servidores del negocio en la red local (puerto 3000) y prueba una dirección escrita a mano.
+function consultarServidor(host, puerto, ms) {
+  return new Promise((ok) => {
+    const req = require('http').get({ host, port: puerto, path: '/health', timeout: ms }, (res) => {
+      let t = ''; res.on('data', (d) => { if (t.length < 2000) t += d; });
+      res.on('end', () => { try { const j = JSON.parse(t); ok(j && j.servidor === 'ok' ? { host, puerto, equipo: j.equipo || '' } : null); } catch (er) { ok(null); } });
+    });
+    req.on('timeout', () => { req.destroy(); ok(null); });
+    req.on('error', () => ok(null));
+  });
+}
+ipcMain.handle('buscar-servidores', async (e) => {
+  if (!esLocal(e)) return [];
+  const os = require('os'); const ips = [];
+  for (const lista of Object.values(os.networkInterfaces())) for (const i of lista || []) {
+    if (i.family === 'IPv4' && !i.internal) { const p = i.address.split('.'); for (let n = 1; n < 255; n++) ips.push(`${p[0]}.${p[1]}.${p[2]}.${n}`); }
+  }
+  const unicas = [...new Set(ips)]; const hallados = [];
+  for (let k = 0; k < unicas.length; k += 64) {
+    const r = await Promise.all(unicas.slice(k, k + 64).map((ip) => consultarServidor(ip, 3000, 700)));
+    r.forEach((x) => { if (x) hallados.push(x); });
+  }
+  return hallados.map((h) => ({ url: `http://${h.host}:${h.puerto}`, equipo: h.equipo }));
+});
+ipcMain.handle('probar-servidor', async (e, u) => {
+  if (!esLocal(e)) return { ok: false };
+  try {
+    const url = new URL(String(u));
+    const r = await consultarServidor(url.hostname, Number(url.port) || 80, 3000);
+    return { ok: !!r, equipo: r ? r.equipo : '' };
+  } catch (er) { return { ok: false }; }
+});
+
 ipcMain.handle('guardar-config', (e, datos) => {
   if (!esLocal(e)) return { error: 'No permitido' };
   try {

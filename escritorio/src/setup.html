@@ -5,6 +5,8 @@
 <p>Escribe la dirección del sistema de este negocio (te la da Compoint). Solo se hace una vez en este equipo.</p>
 <label>Dirección del sistema</label>
 <input id="url" placeholder="https://minegocio.onrender.com  (o la del servidor: http://192.168.1.10:3000)" autofocus>
+<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button class="sec" id="buscar" type="button" style="margin-top:0;width:auto;padding:8px 14px;font-size:13px">Buscar servidor en la red</button><span id="busq" style="font-size:12px;color:#666"></span></div>
+<div id="hallados" style="margin-top:6px"></div>
 <label>Nombre del negocio (opcional)</label>
 <input id="nombre" placeholder="Mi negocio">
 <details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px;color:#555">Entrar automáticamente con un usuario (opcional)</summary>
@@ -27,10 +29,26 @@
   if(c.configurado){const b=document.getElementById('cancelar');b.style.display='block';b.onclick=()=>compoint.cerrar();}
   document.getElementById('ok').onclick=async()=>{
     let url=document.getElementById('url').value.trim();
-    if(url&&!/^https?:\/\//i.test(url)) url='https://'+url;
+    if(url&&!/^https?:\/\//i.test(url)){
+      // Nombre de equipo o IP (sin punto de dominio, o numérica, o con puerto) = servidor local: http y puerto 3000
+      const local=/^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(url)||/^[^./:]+(:\d+)?(\/.*)?$/.test(url);
+      if(local){ const m=url.match(/^([^/:]+)(:\d+)?(\/.*)?$/); url='http://'+m[1]+(m[2]||':3000')+(m[3]||'/login.html'); }
+      else url='https://'+url;
+    }
     if(!url){document.getElementById('err').textContent='Escribe la dirección del sistema';return;}
     const r=await compoint.guardarConfig({url,nombre:document.getElementById('nombre').value.trim(),usuario:document.getElementById('usuario').value.trim(),password:document.getElementById('password').value});
     if(r&&r.error) document.getElementById('err').textContent=r.error;
+  };
+  document.getElementById('buscar').onclick=async()=>{
+    const b=document.getElementById('buscar'),s=document.getElementById('busq'),h=document.getElementById('hallados');
+    b.disabled=true;h.innerHTML='';s.textContent='Buscando en la red…';
+    const r=await compoint.buscarServidores();
+    b.disabled=false;
+    if(!r.length){s.textContent='No se encontró ninguno. Revisa que el servidor esté encendido y el Firewall permita el acceso.';return;}
+    s.textContent=r.length+' encontrado(s):';
+    r.forEach(x=>{const d=document.createElement('button');d.type='button';d.className='sec';d.style.cssText='margin-top:4px;text-align:left;font-size:13px';
+      d.textContent=(x.equipo?x.equipo+'  —  ':'')+x.url;
+      d.onclick=()=>{document.getElementById('url').value=x.url+'/login.html';};h.appendChild(d);});
   };
   document.addEventListener('keyup',e=>{if(e.key==='Enter')document.getElementById('ok').click();});
 })();
