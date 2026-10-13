@@ -18,6 +18,9 @@ if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
 let ventana = null, ventanaConfig = null, tray = null;
 let saliendo = false, avisoBandejaMostrado = false, autoLoginPendiente = true;
+// Modo servidor del negocio (base de datos + sistema dentro de esta app)
+let servidorLocal = null, ventanaPanel = null, ventanaAlta = null, ventanaEstado = null;
+let cierreListo = false, cerrandoServidor = false, resolverAlta = null;
 
 // ------------------------------------------------------------ configuración
 const archivoUsuario = () => path.join(app.getPath('userData'), 'config.json');
@@ -26,7 +29,11 @@ const archivoCliente = () => app.isPackaged
   : path.join(__dirname, '..', 'config-cliente.json');
 
 function leerJson(ruta) { try { return JSON.parse(fs.readFileSync(ruta, 'utf8')); } catch (e) { return {}; } }
-function configuracion() { return { nombre: 'Compoint Punto', intermediario: true, iniciarConWindows: true, ...leerJson(archivoCliente()), ...leerJson(archivoUsuario()) }; }
+function configuracion() {
+  const c = { nombre: 'Compoint Punto', intermediario: true, iniciarConWindows: true, ...leerJson(archivoCliente()), ...leerJson(archivoUsuario()) };
+  if (c.modo === 'servidor') c.url = servidorLocal ? servidorLocal.urlLocal + '/login.html' : '';
+  return c;
+}
 function guardarUsuario(cambios) {
   const actual = leerJson(archivoUsuario());
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
@@ -118,7 +125,8 @@ function crearVentana() {
     else if (ctrl && (k === '+' || k === '=')) { wc.setZoomLevel(wc.getZoomLevel() + 0.5); evento.preventDefault(); }
     else if (ctrl && (k === '-' || k === '_')) { wc.setZoomLevel(wc.getZoomLevel() - 0.5); evento.preventDefault(); }
     else if (ctrl && k === '0') { wc.setZoomLevel(0); evento.preventDefault(); }
-    else if (ctrl && i.alt && k.toLowerCase() === 'c') { abrirConfig(); evento.preventDefault(); }
+    else if (ctrl && i.alt && k.toLowerCase() === 'c' && configuracion().modo !== 'servidor') { abrirConfig(); evento.preventDefault(); }
+    else if (ctrl && i.alt && k.toLowerCase() === 's' && configuracion().modo === 'servidor') { abrirPanel(); evento.preventDefault(); }
     else if (k === 'Escape' && ventana.isFullScreen()) { ventana.setFullScreen(false); }
   });
 
@@ -161,21 +169,25 @@ function aplicarInicioConWindows() {
   try { app.setLoginItemSettings({ openAtLogin: activo, path: process.execPath }); } catch (e) { log('Inicio con Windows: ' + e.message); }
 }
 
+let menuBandeja = null;
 function crearBandeja() {
   tray = new Tray(nativeImage.createFromPath(iconoApp()).resize({ width: 16, height: 16 }));
   tray.setToolTip(configuracion().nombre);
-  const armar = () => Menu.buildFromTemplate([
+  menuBandeja = () => Menu.buildFromTemplate([
     { label: 'Abrir ' + configuracion().nombre, click: () => crearVentana() },
     { label: 'Pantalla completa (F11)', click: () => { crearVentana(); if (ventana) ventana.setFullScreen(!ventana.isFullScreen()); } },
     { label: 'Recargar', click: () => ventana && ventana.webContents.reloadIgnoringCache() },
     { type: 'separator' },
     { label: 'Iniciar con Windows', type: 'checkbox', checked: configuracion().iniciarConWindows !== false,
       click: (item) => { guardarUsuario({ iniciarConWindows: item.checked }); aplicarInicioConWindows(); } },
-    { label: 'Cambiar dirección o usuario…', click: () => abrirConfig() },
+    ...(configuracion().modo === 'servidor' ? [
+      { label: 'Panel del servidor y respaldos…', click: () => abrirPanel() },
+      { label: 'Respaldar ahora', click: () => respaldarAhora() }
+    ] : [{ label: 'Cambiar dirección o usuario…', click: () => abrirConfig() }]),
     { type: 'separator' },
-    { label: 'Salir por completo', click: () => { saliendo = true; app.quit(); } }
+    { label: 'Salir por completo (guarda un respaldo)', click: () => { saliendo = true; app.quit(); } }
   ]);
-  tray.setContextMenu(armar());
+  tray.setContextMenu(menuBandeja());
   tray.on('click', () => crearVentana());
 }
 
@@ -421,15 +433,203 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
   return { ok: true };
 });
 
+// ------------------------------------------------------------ MODO SERVIDOR DEL NEGOCIO
+// Esta computadora guarda la información (base de datos propia) y entrega el sistema a las demás
+// cajas por red local. Funciona sin internet y respalda automáticamente.
+function dirServidor() {
+  const empaquetado = path.join(__dirname, '..', 'servidor');
+  if (fs.existsSync(path.join(empaquetado, 'backend', 'server.js'))) return empaquetado;
+  return path.join(__dirname, '..', '..'); // desarrollo: carpeta del proyecto (backend/ y frontend/)
+}
+const secretos = {
+  cifrar: (t) => (safeStorage.isEncryptionAvailable() ? 'enc:' + safeStorage.encryptString(String(t)).toString('base64') : 'raw:' + t),
+  descifrar: (t) => (String(t).startsWith('enc:') ? safeStorage.decryptString(Buffer.from(String(t).slice(4), 'base64')) : String(t).replace(/^raw:/, ''))
+};
+
+function mostrarEstado(texto) {
+  const html = '<meta charset="utf-8"><body style="font-family:Segoe UI,Arial;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f4f6f8;color:#333"><div style="text-align:center;padding:20px"><div style="font-size:34px;margin-bottom:10px">⏳</div><div style="font-size:15px">' + String(texto).replace(/[<&]/g, '') + '</div></div>';
+  if (!ventanaEstado || ventanaEstado.isDestroyed()) {
+    ventanaEstado = new BrowserWindow({ width: 380, height: 180, resizable: false, frame: true, minimizable: false, closable: false, autoHideMenuBar: true, icon: iconoApp(), title: 'Compoint Punto',
+      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
+    ventanaEstado.setMenu(null);
+  }
+  ventanaEstado.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+}
+function cerrarEstado() { if (ventanaEstado && !ventanaEstado.isDestroyed()) { ventanaEstado.setClosable(true); ventanaEstado.destroy(); } ventanaEstado = null; }
+
+function pedirDatosNegocio() {
+  return new Promise((resolver) => {
+    cerrarEstado();
+    resolverAlta = resolver;
+    ventanaAlta = new BrowserWindow({
+      width: 520, height: 720, autoHideMenuBar: true, icon: iconoApp(), title: 'Preparar el servidor del negocio',
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
+    });
+    ventanaAlta.setMenu(null);
+    ventanaAlta.loadFile(path.join(__dirname, 'servidor-alta.html'));
+    ventanaAlta.on('closed', () => { ventanaAlta = null; if (resolverAlta) { const r = resolverAlta; resolverAlta = null; r(null); } });
+  });
+}
+
+async function iniciarModoServidor() {
+  mostrarEstado('Encendiendo el servidor del negocio… (la primera vez tarda un poco más)');
+  try {
+    const { crearServidor } = require('./servidor');
+    servidorLocal = await crearServidor({ app, dirServidor: dirServidor(), avisar: mostrarEstado, pedirDatosNegocio, secretos });
+  } catch (err) {
+    cerrarEstado();
+    log('No se pudo iniciar el servidor: ' + (err && err.stack || err));
+    if (String(err && err.message) === 'CANCELADO') { guardarUsuario({ modo: '' }); saliendo = true; app.quit(); return; }
+    dialog.showErrorBox('No se pudo iniciar el servidor del negocio', String(err && err.message || err) + '\n\nSi el problema continúa, avisa a Compoint. Detalle guardado en ' + path.join(app.getPath('userData'), 'log.txt'));
+    saliendo = true; app.quit(); return;
+  }
+  cerrarEstado();
+  log('Servidor del negocio listo: ' + servidorLocal.urlLocal + ' | red: ' + servidorLocal.direcciones().join(', '));
+  if (tray) tray.setContextMenu(menuBandeja());
+  programarRespaldos();
+  crearVentana();
+}
+
+function abrirPanel() {
+  if (!servidorLocal) return;
+  if (ventanaPanel && !ventanaPanel.isDestroyed()) { ventanaPanel.focus(); return; }
+  ventanaPanel = new BrowserWindow({
+    width: 700, height: 800, autoHideMenuBar: true, icon: iconoApp(), title: 'Panel del servidor',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
+  });
+  ventanaPanel.setMenu(null);
+  ventanaPanel.loadFile(path.join(__dirname, 'servidor-panel.html'));
+  ventanaPanel.on('closed', () => { ventanaPanel = null; });
+}
+
+async function respaldarAhora() {
+  if (!servidorLocal) return { ok: false, error: 'El servidor no está encendido.' };
+  const r = await servidorLocal.respaldos.hacerRespaldo('manual');
+  try { if (tray) tray.displayBalloon({ title: r.ok ? 'Respaldo listo' : 'No se pudo respaldar', content: r.ok ? 'Guardado en ' + servidorLocal.rutas.respaldos : String(r.error), iconType: r.ok ? 'info' : 'error' }); } catch (e) { /* ignorar */ }
+  return r;
+}
+
+// Respaldo automático: al salir del sistema y, por si la PC se apaga sin cerrarlo, cada 12 h.
+function programarRespaldos() {
+  const revisar = async () => {
+    if (!servidorLocal || cerrandoServidor) return;
+    try {
+      if (servidorLocal.respaldos.tocaRespaldo(12)) await servidorLocal.respaldos.hacerRespaldo('automatico');
+      else await servidorLocal.respaldos.reintentarNube();
+    } catch (e) { log('Revisión de respaldos: ' + e.message); }
+  };
+  setTimeout(revisar, 2 * 60 * 1000);
+  setInterval(revisar, 30 * 60 * 1000);
+}
+
+async function cerrarServidorConRespaldo() {
+  const sv = servidorLocal;
+  try {
+    mostrarEstado('Guardando el respaldo del negocio… no apagues la computadora');
+    const r = await Promise.race([sv.respaldos.hacerRespaldo('cierre'), new Promise((ok) => setTimeout(() => ok({ ok: false, error: 'tiempo agotado' }), 90000))]);
+    if (!r.ok) log('Respaldo al cerrar: ' + r.error);
+    mostrarEstado('Cerrando…');
+    await Promise.race([sv.detener(), new Promise((ok) => setTimeout(ok, 40000))]);
+  } catch (e) { log('Cierre del servidor: ' + e.message); }
+  cerrarEstado();
+}
+
+ipcMain.handle('srv-elegir-modo', (e) => {
+  if (!esLocal(e)) return;
+  guardarUsuario({ modo: 'servidor' });
+  if (ventanaConfig) { const v = ventanaConfig; ventanaConfig = null; v.destroy(); }
+  iniciarModoServidor();
+});
+
+ipcMain.handle('srv-alta-guardar', async (e, datos) => {
+  if (!esLocal(e) || !resolverAlta) return { error: 'No permitido' };
+  const { validar } = require('./servidor/negocio');
+  const errores = validar(datos);
+  if (errores.length) return { error: errores.join(' ') };
+  const r = resolverAlta; resolverAlta = null;
+  r(datos);
+  if (ventanaAlta) { const v = ventanaAlta; ventanaAlta = null; v.destroy(); }
+  mostrarEstado('Creando el negocio…');
+  return { ok: true };
+});
+ipcMain.handle('srv-alta-cancelar', (e) => { if (esLocal(e) && ventanaAlta) ventanaAlta.close(); });
+
+ipcMain.handle('srv-estado', (e) => {
+  if (!esLocal(e) || !servidorLocal) return null;
+  const c = servidorLocal.configuracion();
+  const n = servidorLocal.nube();
+  return {
+    negocio: c.negocio || '', urlLocal: servidorLocal.urlLocal, direcciones: servidorLocal.direcciones(),
+    carpeta: servidorLocal.rutas.respaldos, estado: servidorLocal.respaldos.estado(), locales: servidorLocal.respaldos.listarLocales(),
+    nube: { cloud_name: n.cloud_name, api_key: n.api_key, tieneSecreto: !!n.api_secret }
+  };
+});
+ipcMain.handle('srv-respaldar', async (e) => { if (!esLocal(e)) return { ok: false, error: 'No permitido' }; return respaldarAhora(); });
+ipcMain.handle('srv-abrir-carpeta', (e) => { if (esLocal(e) && servidorLocal) shell.openPath(servidorLocal.rutas.respaldos); });
+ipcMain.handle('srv-guardar-nube', (e, d) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  if (!String(d.cloud_name || '').trim() || !String(d.api_key || '').trim()) return { error: 'Escribe el Cloud name y la API key.' };
+  if (!String(d.api_secret || '').trim() && !servidorLocal.nube().api_secret) return { error: 'Escribe el API secret.' };
+  servidorLocal.guardarNube(d);
+  return { ok: true };
+});
+ipcMain.handle('srv-probar-nube', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { ok: false, error: 'No permitido' };
+  try { await require('./servidor/respaldos').probarNube(servidorLocal.nube()); return { ok: true }; }
+  catch (err) { return { ok: false, error: String(err && (err.message || (err.error && err.error.message)) || err).slice(0, 200) }; }
+});
+ipcMain.handle('srv-restaurar', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  const sel = await dialog.showOpenDialog(ventanaPanel || undefined, {
+    title: 'Elige el respaldo a restaurar', defaultPath: servidorLocal.rutas.respaldos,
+    filters: [{ name: 'Respaldo de Compoint Punto', extensions: ['gz'] }], properties: ['openFile']
+  });
+  if (sel.canceled || !sel.filePaths.length) return { ok: false };
+  const archivo = sel.filePaths[0];
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'warning', buttons: ['Restaurar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Restaurar respaldo',
+    message: 'Se reemplazará TODA la información actual por la de este respaldo.',
+    detail: path.basename(archivo) + '\n\nAntes de restaurar se guarda un respaldo de seguridad de lo que hay ahora. El programa se reiniciará.'
+  });
+  if (conf.response !== 0) return { ok: false };
+  try {
+    mostrarEstado('Restaurando el respaldo… no apagues la computadora');
+    const previo = await servidorLocal.respaldos.hacerRespaldo('antes-de-restaurar');
+    if (!previo.ok) throw new Error('No se pudo guardar el respaldo de seguridad previo: ' + previo.error);
+    await servidorLocal.restaurar(archivo);
+    log('Respaldo restaurado: ' + archivo);
+    cierreListo = true; servidorLocal = null;
+    intermediario.detener();
+    app.relaunch(); app.exit(0);
+  } catch (err) {
+    cerrarEstado();
+    log('Restauración falló: ' + (err && err.stack || err));
+    dialog.showErrorBox('No se pudo restaurar', String(err && err.message || err) + '\n\nReinicia el programa; tu información anterior no se perdió si el error ocurrió antes de restaurar.');
+    app.relaunch(); app.exit(1);
+  }
+  return { ok: true };
+});
+
 // ------------------------------------------------------------ arranque
 app.on('second-instance', () => { if (ventana) { if (ventana.isMinimized()) ventana.restore(); ventana.show(); ventana.focus(); } else crearVentana(); });
-app.on('before-quit', () => { saliendo = true; intermediario.detener(); });
+app.on('before-quit', (e) => {
+  saliendo = true;
+  if (servidorLocal && !cierreListo) {
+    e.preventDefault();
+    if (cerrandoServidor) return;
+    cerrandoServidor = true;
+    cerrarServidorConRespaldo().finally(() => { cierreListo = true; intermediario.detener(); app.quit(); });
+    return;
+  }
+  intermediario.detener();
+});
 app.on('window-all-closed', () => { /* se queda en la bandeja */ });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   configurarPermisos();
   crearBandeja();
   aplicarInicioConWindows();
   if (configuracion().intermediario !== false) intermediario.iniciar(PUERTO_INTERMEDIARIO, log);
+  if (configuracion().modo === 'servidor') { await iniciarModoServidor(); return; }
   crearVentana();
 });

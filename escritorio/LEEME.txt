@@ -56,6 +56,34 @@ el programa. Si alguien cierra sesion, la siguiente persona escribe la suya.
 Usalo solo en equipos de una sola persona (cada cajero debe usar su usuario
 para que su corte de caja sea suyo).
 
+MODO SERVIDOR (trabajar sin internet)
+- Instalar el MISMO instalador en la PC que sera el servidor y elegir
+  "Esta computadora sera el servidor del negocio". Pide los datos del negocio
+  y crea su propia base de datos local. No necesita internet para vender.
+- Todo se guarda en C:\CompointPunto  (datos\, Respaldos\, servidor.json,
+  servidor-log.txt). NO borrar esa carpeta.
+- Esa PC debe estar encendida mientras se use el sistema.
+- Las demas cajas: instalar el escritorio normal y poner la direccion que
+  muestra el panel del servidor, ejemplo  http://192.168.1.50:3000
+  (o abrirla en un navegador). Para impresoras USB/Bluetooth usar la app de
+  escritorio, no el navegador.
+- Al primer arranque Windows pregunta por el Firewall: elegir
+  "Permitir acceso" en red privada, si no las otras cajas no se conectan.
+- Panel del servidor: Ctrl+Alt+S o clic derecho en el icono junto al reloj.
+
+RESPALDOS
+- Al elegir "Salir por completo" se guarda un respaldo en
+  C:\CompointPunto\Respaldos (se conservan los ultimos 30).
+- Tambien hay respaldo automatico cada 12 horas y boton "Respaldar ahora".
+- Copia en la nube (Cloudinary): se configura en el panel con cloud name,
+  api key y api secret. Se conservan los 10 dias mas recientes.
+  Si no hay internet queda pendiente y se sube despues.
+- Restaurar: desde el panel, elegir un respaldo. Antes de restaurar se guarda
+  automaticamente un respaldo del estado actual.
+
+ACTUALIZAR EL SERVIDOR
+Instalar el instalador nuevo encima. Los datos de C:\CompointPunto se conservan.
+
 DESINSTALAR
 Configuracion de Windows -> Aplicaciones -> Compoint Punto -> Desinstalar.
 

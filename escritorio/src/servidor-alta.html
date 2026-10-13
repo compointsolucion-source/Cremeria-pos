@@ -1,0 +1,23 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Preparar el servidor del negocio</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="estilos.css"><style>body{align-items:flex-start;padding:16px 0}.caja{width:min(480px,94vw)}select{width:100%;padding:11px 12px;border:1px solid #ccc;border-radius:10px;font-size:15px;background:#fff}.fila{display:flex;gap:10px}.fila>div{flex:1}</style></head><body><div class="caja">
+<h1>Preparar el servidor del negocio</h1>
+<p>Esta computadora guardará la información del negocio y las demás cajas se conectarán a ella. Se hace una sola vez.</p>
+<label>Nombre del negocio</label><input id="negocio" placeholder="Cremería La Esperanza" autofocus>
+<label>Giro</label><select id="giro"><option value="cremeria">Cremería</option><option value="carniceria">Carnicería</option><option value="abarrotes">Abarrotes</option><option value="fruteria">Frutería</option><option value="polleria">Pollería</option><option value="tortilleria">Tortillería</option><option value="panaderia">Panadería</option><option value="dulceria">Dulcería</option><option value="rosticeria">Rosticería</option></select>
+<div class="fila"><div><label>Teléfono (opcional)</label><input id="telefono"></div><div><label>Dirección (opcional)</label><input id="direccion"></div></div>
+<label>Nombre del dueño</label><input id="dueno">
+<div class="fila"><div><label>Usuario para entrar</label><input id="usuario" autocomplete="off" placeholder="admin"></div><div><label>Contraseña (mín. 8)</label><input id="password" type="password" autocomplete="new-password"></div></div>
+<div class="nota">Anota la contraseña en un lugar seguro: es la del dueño del sistema.</div>
+<div class="err" id="err"></div>
+<button id="ok">Crear negocio y empezar</button><button class="sec" id="cancelar">Cancelar</button>
+</div><script>
+const $=id=>document.getElementById(id);
+$('ok').onclick=async()=>{
+  $('err').textContent='';$('ok').disabled=true;$('ok').textContent='Creando…';
+  const r=await compointServidor.altaGuardar({negocio:$('negocio').value,giro:$('giro').value,telefono:$('telefono').value,direccion:$('direccion').value,dueno:$('dueno').value,usuario:$('usuario').value,password:$('password').value});
+  if(r&&r.error){$('err').textContent=r.error;$('ok').disabled=false;$('ok').textContent='Crear negocio y empezar';}
+};
+$('cancelar').onclick=()=>compointServidor.altaCancelar();
+document.addEventListener('keyup',e=>{if(e.key==='Enter')$('ok').click();});
+</script></body></html>

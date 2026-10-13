@@ -4,7 +4,7 @@
 <h1>Configurar Compoint Punto</h1>
 <p>Escribe la dirección del sistema de este negocio (te la da Compoint). Solo se hace una vez en este equipo.</p>
 <label>Dirección del sistema</label>
-<input id="url" placeholder="https://minegocio.onrender.com" autofocus>
+<input id="url" placeholder="https://minegocio.onrender.com  (o la del servidor: http://192.168.1.10:3000)" autofocus>
 <label>Nombre del negocio (opcional)</label>
 <input id="nombre" placeholder="Mi negocio">
 <details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px;color:#555">Entrar automáticamente con un usuario (opcional)</summary>
@@ -13,12 +13,17 @@
 <div class="nota">Solo para equipos de una sola persona. La contraseña se guarda cifrada con tu cuenta de Windows y solo entra sola al abrir el programa; si cierras sesión, la siguiente vez la escribes tú.</div></details>
 <div class="err" id="err"></div>
 <button id="ok">Guardar y abrir</button><button class="sec" id="cancelar" style="display:none">Cancelar</button>
+<div id="bloqueServidor" style="display:none;margin-top:18px;border-top:1px solid #e5e5e5;padding-top:14px">
+<p style="margin-bottom:6px"><b>¿Es la computadora principal del negocio?</b> Instálala como servidor: guarda toda la información, sigue trabajando sin internet y hace respaldos automáticos. Las demás cajas se conectan a ella por la red local.</p>
+<button class="sec" id="esServidor" style="margin-top:0">Esta computadora será el servidor del negocio</button></div>
 </div><script>
 (async()=>{
   const c=await compoint.leerConfig();
   if(c.url) document.getElementById('url').value=c.url;
   if(c.nombre&&c.nombre!=='Compoint Punto') document.getElementById('nombre').value=c.nombre;
   if(c.usuario) document.getElementById('usuario').value=c.usuario;
+  if(!c.configurado&&window.compointServidor) document.getElementById('bloqueServidor').style.display='block';
+  document.getElementById('esServidor').onclick=()=>compointServidor.elegirModoServidor();
   if(c.configurado){const b=document.getElementById('cancelar');b.style.display='block';b.onclick=()=>compoint.cerrar();}
   document.getElementById('ok').onclick=async()=>{
     let url=document.getElementById('url').value.trim();

@@ -2,6 +2,8 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 const { archivo } = require('./generar-config');
+const prep = spawnSync(process.execPath, [path.join(__dirname, 'preparar-servidor.js')], { stdio: 'inherit' });
+if (prep.status !== 0) process.exit(prep.status || 1);
 const bin = path.join(__dirname, '..', 'node_modules', '.bin', process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder');
 const r = spawnSync(bin, ['--win', 'nsis', '--x64', '--publish', 'never'], {
   stdio: 'inherit', shell: process.platform === 'win32',

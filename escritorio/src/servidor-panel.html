@@ -1,0 +1,59 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Panel del servidor</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="estilos.css"><style>
+body{align-items:flex-start;padding:16px 0}.caja{width:min(640px,95vw)}h2{font-size:16px;margin:22px 0 6px}
+.dir{font-family:Consolas,monospace;background:#eef6ea;border:1px solid #cfe5c7;border-radius:8px;padding:8px 10px;margin:4px 0;font-size:15px;word-break:break-all}
+.ok{color:#2e7d32}.mal{color:#c62828}.aviso{color:#b26a00}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}
+.fila{display:flex;gap:8px;flex-wrap:wrap}.fila button{width:auto;flex:1;min-width:150px;margin-top:8px;font-size:14px}
+.peligro{background:#c62828}.nota{margin-top:4px}details{margin-top:6px}
+</style></head><body><div class="caja">
+<h1>Panel del servidor</h1><p id="negocio" style="margin-bottom:4px"></p>
+<h2>Direcciones para las demás cajas</h2>
+<div id="dirs"></div>
+<div class="nota">En la otra computadora: instala Compoint Punto y en «Dirección del sistema» escribe una de estas. Si Windows pregunta por el Firewall, elige «Permitir acceso» (red privada).</div>
+
+<h2>Respaldos</h2>
+<div id="estadoResp"></div>
+<div class="fila"><button id="respaldar">Respaldar ahora</button><button class="sec" id="carpeta">Abrir carpeta de respaldos</button></div>
+<table id="lista"></table>
+
+<h2>Copia en la nube (Cloudinary) — últimos 10 días</h2>
+<div id="estadoNube"></div>
+<details><summary style="cursor:pointer;font-size:13px">Configurar Cloudinary</summary>
+<label>Cloud name</label><input id="cn" autocomplete="off">
+<label>API key</label><input id="ak" autocomplete="off">
+<label>API secret</label><input id="as" type="password" autocomplete="off" placeholder="(déjalo vacío para conservar el actual)">
+<div class="fila"><button id="guardarNube">Guardar</button><button class="sec" id="probarNube">Probar conexión</button></div>
+<div class="nota">Las 3 claves están en tu cuenta de Cloudinary (Dashboard → API Keys). El plan gratuito acepta archivos de hasta 10 MB.</div></details>
+
+<h2>Recuperar información</h2>
+<p style="margin-bottom:0">Si algo sale mal, puedes volver a un respaldo. Esto reemplaza TODA la información actual por la del respaldo.</p>
+<div class="fila"><button class="peligro" id="restaurar">Restaurar desde un respaldo…</button></div>
+<div class="err" id="msg"></div>
+</div><script>
+const $=id=>document.getElementById(id);
+const fecha=(iso)=>iso?new Date(iso).toLocaleString('es-MX'):'—';
+const mb=(n)=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function cargar(){
+  const s=await compointServidor.estado();
+  $('negocio').textContent=s.negocio||'';
+  $('dirs').innerHTML=(s.direcciones.length?s.direcciones:['(sin red detectada)']).map(d=>`<div class="dir">${esc(d)}</div>`).join('')+`<div class="nota">En esta computadora: ${esc(s.urlLocal)}</div>`;
+  const l=s.estado.local||{};
+  $('estadoResp').innerHTML=l.ultimo_ok?`<span class="ok">Último respaldo: ${fecha(l.ultimo_ok)}</span> (${mb(l.tamano||0)})`+(l.error?`<br><span class="mal">Último intento con error: ${esc(l.error)}</span>`:''):`<span class="aviso">Aún no hay respaldos.</span>`+(l.error?`<br><span class="mal">${esc(l.error)}</span>`:'');
+  $('lista').innerHTML='<tr><th>Archivo</th><th>Fecha</th><th>Tamaño</th></tr>'+s.locales.slice(0,8).map(f=>`<tr><td>${esc(f.archivo)}</td><td>${fecha(f.fecha)}</td><td>${mb(f.tamano)}</td></tr>`).join('');
+  const n=s.estado.nube||{};
+  $('estadoNube').innerHTML=!s.nube.cloud_name?'<span class="aviso">No configurada: solo se guardan copias en esta computadora.</span>':(n.pendiente?`<span class="aviso">Pendiente de subir (sin internet o con error). Se reintenta sola.</span><br><span class="mal">${esc(n.error||'')}</span>`:(n.ultimo_ok?`<span class="ok">Última copia en la nube: ${fecha(n.ultimo_ok)}</span>`:'Configurada. Se subirá en el próximo respaldo.'));
+  $('cn').value=s.nube.cloud_name||'';$('ak').value=s.nube.api_key||'';
+  $('carpeta').title=s.carpeta;
+}
+$('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled=true;$('respaldar').textContent='Respaldando…';
+  const r=await compointServidor.respaldar();$('respaldar').disabled=false;$('respaldar').textContent='Respaldar ahora';
+  $('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?('Respaldo listo ('+r.archivo+')'+(r.nube&&r.nube.estado==='ok'?' y copia en la nube guardada.':(r.nube&&r.nube.estado==='pendiente'?'. La copia en la nube quedó pendiente.':'.'))):('No se pudo respaldar: '+r.error);cargar();};
+$('carpeta').onclick=()=>compointServidor.abrirCarpeta();
+$('guardarNube').onclick=async()=>{const r=await compointServidor.guardarNube({cloud_name:$('cn').value,api_key:$('ak').value,api_secret:$('as').value});$('as').value='';$('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?'Guardado.':r.error;cargar();};
+$('probarNube').onclick=async()=>{$('msg').className='';$('msg').textContent='Probando…';const r=await compointServidor.probarNube();$('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?'Conexión con Cloudinary correcta.':('No se pudo conectar: '+r.error);};
+$('restaurar').onclick=async()=>{const r=await compointServidor.restaurar();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}};
+cargar();setInterval(cargar,15000);
+</script></body></html>

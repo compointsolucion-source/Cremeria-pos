@@ -20,6 +20,19 @@ app.use(cors({ exposedHeaders: ['X-Licencia-Dias', 'X-Licencia-Vence'] }));
 app.use(express.json({ limit: '15mb' }));
 app.set('io', io);
 
+// Modo servidor del negocio (instalación local): el mismo servidor entrega las
+// páginas del sistema, para que las cajas entren por red local
+// (http://IP-DE-ESTA-PC:3000). En la nube esto no se usa (FRONTEND_DIR vacío).
+const FRONTEND_DIR = process.env.FRONTEND_DIR;
+if (FRONTEND_DIR) {
+  app.get('/js/config.js', (req, res) => {
+    res.type('application/javascript').set('Cache-Control', 'no-store')
+      .send("const API_URL = location.origin + '/api';\n");
+  });
+  app.get('/', (req, res) => res.redirect('/login.html'));
+  app.use(express.static(FRONTEND_DIR));
+}
+
 // Logging estructurado: método, ruta y tiempo de respuesta. NUNCA se registra
 // el body de la solicitud (evita loguear contraseñas, tokens u otros datos sensibles).
 app.use((req, res, next) => {
@@ -72,7 +85,7 @@ app.use('/api/facturacion', require('./routes/facturacion'));
 // proveedor real (ver backend/utils/proveedorRecargas.js).
 app.use('/api/recargas', require('./routes/recargas'));
 
-app.get('/', (req, res) => res.send('Cremería POS backend funcionando'));
+if (!FRONTEND_DIR) app.get('/', (req, res) => res.send('Cremería POS backend funcionando'));
 
 // Endpoint de salud: confirma que el servidor Y la base de datos responden,
 // sin exponer ningún dato sensible. Útil para diagnosticar caídas o el
@@ -107,4 +120,9 @@ const PORT = process.env.PORT || 3000;
 // instalación; si fallan, el servidor arranca igual (queda el aviso en los Logs).
 migrar()
   .catch((e) => console.error(`[${new Date().toISOString()}] Arranque sin completar migraciones:`, e.message))
-  .finally(() => server.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`)));
+  .finally(() => server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+  }));
+
+// Para el modo servidor local (la app de escritorio lo arranca y lo detiene).
+module.exports = { app, server, io, pool };

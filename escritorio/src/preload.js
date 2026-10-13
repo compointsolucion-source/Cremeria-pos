@@ -12,3 +12,16 @@ contextBridge.exposeInMainWorld('compointDesktop', {
   listarImpresoras: () => ipcRenderer.invoke('listar-impresoras'),
   imprimirHTML: (html, opciones) => ipcRenderer.invoke('imprimir-html', html, opciones)
 });
+
+// Modo servidor del negocio (solo las páginas del programa, no el sistema web).
+contextBridge.exposeInMainWorld('compointServidor', {
+  altaGuardar: (d) => ipcRenderer.invoke('srv-alta-guardar', d),
+  altaCancelar: () => ipcRenderer.invoke('srv-alta-cancelar'),
+  estado: () => ipcRenderer.invoke('srv-estado'),
+  respaldar: () => ipcRenderer.invoke('srv-respaldar'),
+  abrirCarpeta: () => ipcRenderer.invoke('srv-abrir-carpeta'),
+  guardarNube: (d) => ipcRenderer.invoke('srv-guardar-nube', d),
+  probarNube: () => ipcRenderer.invoke('srv-probar-nube'),
+  restaurar: () => ipcRenderer.invoke('srv-restaurar'),
+  elegirModoServidor: () => ipcRenderer.invoke('srv-elegir-modo')
+});
