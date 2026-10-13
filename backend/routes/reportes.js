@@ -232,4 +232,127 @@ router.get('/clientes', verificarToken, requierePermiso('REPORTES_VER'), async (
   }
 });
 
+// ---------------------------------------------------------------------------
+// Pérdidas: tickets cancelados, devoluciones y fichas (turnos) que se cancelaron
+// sin atenderse. Sirve para ver cuánto dinero y cuántos clientes se pierden.
+router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
+  try {
+    const { desde, hasta } = resolverRango(req.query);
+    const sucursalId = req.sucursalId;
+
+    // Granularidad: por día hasta ~3 meses; por mes si el periodo es más largo.
+    const dias = Math.max(1, Math.round((hasta - desde) / 86400000));
+    const porMes = dias > 92;
+    const fmt = porMes ? 'YYYY-MM' : 'YYYY-MM-DD';
+
+    // Tickets cancelados (la fecha es la de la cancelación; si no hay bitácora, la de creación)
+    const canc = await pool.query(
+      `SELECT t.id, t.folio, t.total, u.nombre AS usuario,
+              b.valor_nuevo->>'motivo' AS motivo,
+              to_char(COALESCE(b.fecha, t.fecha_creacion), $4) AS clave,
+              to_char(COALESCE(b.fecha, t.fecha_creacion), 'YYYY-MM-DD HH24:MI') AS fecha
+       FROM tickets t
+       LEFT JOIN LATERAL (
+         SELECT fecha, usuario_id, valor_nuevo FROM bitacora
+         WHERE accion = 'cancelar_ticket' AND modulo = 'tickets' AND referencia_id = t.id
+         ORDER BY fecha DESC LIMIT 1
+       ) b ON true
+       LEFT JOIN usuarios u ON u.id = b.usuario_id
+       WHERE t.estado = 'cancelado' AND t.sucursal_id = $1
+         AND COALESCE(b.fecha, t.fecha_creacion) >= $2 AND COALESCE(b.fecha, t.fecha_creacion) < $3
+       ORDER BY COALESCE(b.fecha, t.fecha_creacion) DESC`,
+      [sucursalId, desde, hasta, fmt]
+    );
+
+    const devo = await pool.query(
+      `SELECT d.monto_total, d.motivo, u.nombre AS usuario, t.folio,
+              to_char(d.fecha, $4) AS clave
+       FROM devoluciones d
+       JOIN tickets t ON t.id = d.ticket_id
+       LEFT JOIN usuarios u ON u.id = d.usuario_id
+       WHERE t.sucursal_id = $1 AND d.fecha >= $2 AND d.fecha < $3`,
+      [sucursalId, desde, hasta, fmt]
+    );
+
+    const fichas = await pool.query(
+      `SELECT to_char(fecha_creacion, $4) AS clave, COUNT(*)::int AS n
+       FROM fichas
+       WHERE sucursal_id = $1 AND estado = 'cancelado' AND fecha_creacion >= $2 AND fecha_creacion < $3
+       GROUP BY 1`,
+      [sucursalId, desde, hasta, fmt]
+    );
+
+    const vendido = await pool.query(
+      `SELECT COALESCE(SUM(total),0) AS total FROM tickets
+       WHERE estado = 'pagado' AND sucursal_id = $1 AND fecha_pago >= $2 AND fecha_pago < $3`,
+      [sucursalId, desde, hasta]
+    );
+
+    const topProd = canc.rows.length ? await pool.query(
+      `SELECT nombre_producto, COALESCE(SUM(cantidad),0) AS cantidad, COALESCE(SUM(subtotal),0) AS monto
+       FROM ticket_detalle WHERE ticket_id = ANY($1::int[])
+       GROUP BY nombre_producto ORDER BY monto DESC LIMIT 10`,
+      [canc.rows.map(r => r.id)]
+    ) : { rows: [] };
+
+    // Serie con todos los periodos (los vacíos en cero)
+    const serie = [];
+    const mapa = {};
+    const ini = new Date(Date.UTC(desde.getUTCFullYear(), desde.getUTCMonth(), porMes ? 1 : desde.getUTCDate()));
+    for (let d = new Date(ini); d < hasta && serie.length < 400; porMes ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
+      const iso = d.toISOString();
+      const clave = porMes ? iso.slice(0, 7) : iso.slice(0, 10);
+      const fila = { clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0 };
+      serie.push(fila); mapa[clave] = fila;
+    }
+    const buscar = (clave) => mapa[clave] || (serie.length < 400 ? (mapa[clave] = serie[serie.push({ clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0 }) - 1]) : null);
+
+    let montoCanc = 0, montoDevo = 0, totalFichas = 0;
+    const porUsuario = {}, motivos = {};
+    const sumaMotivo = (motivo, monto, tipo) => {
+      const k = (motivo || 'Sin motivo').trim() || 'Sin motivo';
+      const m = motivos[k] || (motivos[k] = { motivo: k, cancelaciones: 0, devoluciones: 0, monto: 0 });
+      m[tipo]++; m.monto += monto;
+    };
+    const sumaUsuario = (nombre, monto, tipo) => {
+      const k = nombre || 'Sin registro';
+      const u = porUsuario[k] || (porUsuario[k] = { usuario: k, cancelaciones: 0, devoluciones: 0, monto: 0 });
+      u[tipo]++; u.monto += monto;
+    };
+    for (const r of canc.rows) {
+      const m = parseFloat(r.total); montoCanc += m;
+      const f = buscar(r.clave); if (f) { f.cancelaciones++; f.monto_cancelado += m; }
+      sumaMotivo(r.motivo, m, 'cancelaciones'); sumaUsuario(r.usuario, m, 'cancelaciones');
+    }
+    for (const r of devo.rows) {
+      const m = parseFloat(r.monto_total); montoDevo += m;
+      const f = buscar(r.clave); if (f) { f.devoluciones++; f.monto_devuelto += m; }
+      sumaMotivo(r.motivo, m, 'devoluciones'); sumaUsuario(r.usuario, m, 'devoluciones');
+    }
+    for (const r of fichas.rows) { totalFichas += r.n; const f = buscar(r.clave); if (f) f.fichas += r.n; }
+    serie.sort((a, b) => a.clave.localeCompare(b.clave));
+
+    const totalVendido = parseFloat(vendido.rows[0].total);
+    const totalPerdido = montoCanc + montoDevo;
+    res.json({
+      granularidad: porMes ? 'mes' : 'dia',
+      resumen: {
+        cancelaciones: canc.rows.length, monto_cancelado: montoCanc,
+        devoluciones: devo.rows.length, monto_devuelto: montoDevo,
+        fichas_canceladas: totalFichas,
+        total_perdido: totalPerdido, total_vendido: totalVendido,
+        porcentaje_sobre_ventas: (totalVendido + totalPerdido) > 0 ? (totalPerdido / (totalVendido + totalPerdido)) * 100 : 0
+      },
+      serie,
+      por_usuario: Object.values(porUsuario).sort((a, b) => b.monto - a.monto).slice(0, 10),
+      motivos: Object.values(motivos).sort((a, b) => b.monto - a.monto).slice(0, 10),
+      top_productos: topProd.rows,
+      ultimas_cancelaciones: canc.rows.slice(0, 15).map(r => ({ folio: r.folio, fecha: r.fecha, total: parseFloat(r.total), usuario: r.usuario, motivo: r.motivo }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al generar el reporte de pérdidas' });
+  }
+});
+
 module.exports = router;

@@ -19,6 +19,14 @@
   .tarjeta-metrica .valor { font-size: 22px; font-weight: 700; }
   .tarjeta-metrica .etiqueta { font-size: 12px; color: #666; margin-top: 4px; }
   .tarjeta-ganancia { background: #E8F5E9; }
+  .tarjeta-perdida { background: #FDECEA; }
+  .tarjeta-perdida .valor { color: #C62828; }
+  .grafica-caja { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); margin-bottom: 20px; }
+  .grafica-caja h3 { margin: 0 0 4px; font-size: 16px; }
+  .leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #555; margin-bottom: 8px; }
+  .leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .grafica-svg { width: 100%; height: auto; display: block; }
+  .grafica-svg text { font-size: 11px; fill: #666; }
   .tarjeta-ganancia .valor { color: #5FAE46; }
   .tabla-reportes { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
   .tabla-reportes th, .tabla-reportes td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
@@ -41,6 +49,7 @@
       <button class="btn btn-secondary" id="tabVentas" onclick="cambiarTabReporte('ventas')">Ventas</button>
       <button class="btn btn-secondary" id="tabCompras" onclick="cambiarTabReporte('compras')">Compras</button>
       <button class="btn btn-secondary" id="tabClientes" onclick="cambiarTabReporte('clientes')">Clientes</button>
+      <button class="btn btn-secondary" id="tabPerdidas" onclick="cambiarTabReporte('perdidas')">📉 Pérdidas y cancelaciones</button>
     </div>
 
     <div class="filtros">
@@ -50,6 +59,7 @@
       <button class="btn btn-secondary" onclick="filtroRapido('hoy')">Hoy</button>
       <button class="btn btn-secondary" onclick="filtroRapido('semana')">Últimos 7 días</button>
       <button class="btn btn-secondary" onclick="filtroRapido('mes')">Este mes</button>
+      <button class="btn btn-secondary" onclick="filtroRapido('anio')">Este año</button>
       <button class="btn btn-secondary" onclick="exportarCSV()">⬇️ Exportar CSV</button>
     </div>
 
@@ -79,6 +89,40 @@
       <thead><tr><th>Producto</th><th>Cantidad</th><th>Monto</th></tr></thead>
       <tbody id="tablaProductos"></tbody>
     </table>
+    </div>
+
+    <div id="seccionPerdidas" style="display:none;">
+      <div class="tarjetas-resumen" id="tarjetasPerdidas"></div>
+      <div class="grafica-caja">
+        <h3>Dinero perdido por periodo</h3>
+        <div class="leyenda"><span><i style="background:#D64545"></i>Tickets cancelados</span><span><i style="background:#F2A33A"></i>Devoluciones</span></div>
+        <div id="graficaDinero"></div>
+      </div>
+      <div class="grafica-caja">
+        <h3>Clientes que se fueron sin ser atendidos</h3>
+        <div class="leyenda"><span><i style="background:#4A7FD6"></i>Fichas canceladas (no atendidas)</span></div>
+        <div id="graficaFichas"></div>
+      </div>
+      <h3>Motivos más frecuentes</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Motivo</th><th>Cancelaciones</th><th>Devoluciones</th><th>Monto</th></tr></thead>
+        <tbody id="tablaMotivos"></tbody>
+      </table>
+      <h3>Por empleado</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Empleado</th><th>Cancelaciones</th><th>Devoluciones</th><th>Monto</th></tr></thead>
+        <tbody id="tablaPerdidasEmpleado"></tbody>
+      </table>
+      <h3>Productos de tickets cancelados</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Monto</th></tr></thead>
+        <tbody id="tablaPerdidasProductos"></tbody>
+      </table>
+      <h3>Últimas cancelaciones</h3>
+      <table class="tabla-reportes">
+        <thead><tr><th>Folio</th><th>Fecha</th><th>Empleado</th><th>Motivo</th><th>Total</th></tr></thead>
+        <tbody id="tablaUltimasCanc"></tbody>
+      </table>
     </div>
 
     <div id="seccionCompras" style="display:none;">
@@ -119,7 +163,9 @@
 requiereLogin();
 
 function formatearFechaInput(fecha) {
-  return fecha.toISOString().split('T')[0];
+  // Fecha LOCAL (con toISOString de noche se adelantaba un día)
+  const p = n => String(n).padStart(2, '0');
+  return fecha.getFullYear() + '-' + p(fecha.getMonth() + 1) + '-' + p(fecha.getDate());
 }
 
 function filtroRapido(tipo) {
@@ -127,6 +173,7 @@ function filtroRapido(tipo) {
   let desde = new Date(hoy);
   if (tipo === 'semana') desde.setDate(hoy.getDate() - 6);
   if (tipo === 'mes') desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  if (tipo === 'anio') desde = new Date(hoy.getFullYear(), 0, 1);
 
   document.getElementById('fechaDesde').value = formatearFechaInput(desde);
   document.getElementById('fechaHasta').value = formatearFechaInput(hoy);
@@ -139,8 +186,8 @@ function construirQueryFechas() {
   if (!desde || !hasta) return '';
 
   // El backend espera "hasta" como límite exclusivo del día siguiente para incluir todo el día
-  const hastaFin = new Date(hasta);
-  hastaFin.setDate(hastaFin.getDate() + 1);
+  const [a, m, d] = hasta.split('-').map(Number);
+  const hastaFin = new Date(a, m - 1, d + 1);
   return `?desde=${desde}&hasta=${formatearFechaInput(hastaFin)}`;
 }
 
@@ -151,7 +198,8 @@ function cambiarTabReporte(tab) {
   document.getElementById('seccionVentas').style.display = tab === 'ventas' ? 'block' : 'none';
   document.getElementById('seccionCompras').style.display = tab === 'compras' ? 'block' : 'none';
   document.getElementById('seccionClientes').style.display = tab === 'clientes' ? 'block' : 'none';
-  ['Ventas','Compras','Clientes'].forEach(nombre => {
+  document.getElementById('seccionPerdidas').style.display = tab === 'perdidas' ? 'block' : 'none';
+  ['Ventas','Compras','Clientes','Perdidas'].forEach(nombre => {
     document.getElementById('tab' + nombre).classList.toggle('activo', nombre.toLowerCase() === tab);
   });
   cargarReporte();
@@ -168,6 +216,9 @@ async function cargarReporte() {
     } else if (tabReporteActual === 'clientes') {
       const data = await apiFetch(`/reportes/clientes${construirQueryFechas()}`);
       renderClientes(data);
+    } else if (tabReporteActual === 'perdidas') {
+      const data = await apiFetch(`/reportes/perdidas${construirQueryFechas()}`);
+      renderPerdidas(data);
     }
   } catch (err) {
     mostrarToast(err.message, 'error');
@@ -277,6 +328,74 @@ function renderResumen(data) {
   nota.className = 'nota';
   nota.textContent = '* ' + g.nota;
   document.getElementById('tarjetasResumen').after(nota);
+}
+
+// ============ Pérdidas y cancelaciones ============
+function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function dinero(n) { return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function etiquetaPeriodo(clave, gran) {
+  const [a, m, d] = clave.split('-');
+  return gran === 'mes' ? MESES_CORTOS[parseInt(m, 10) - 1] + ' ' + a.slice(2) : parseInt(d, 10) + ' ' + MESES_CORTOS[parseInt(m, 10) - 1];
+}
+
+// Gráfica de barras en SVG. series: [{valores:[...], color, nombre}] (apiladas)
+function dibujarBarras(contenedor, etiquetas, series, formato) {
+  const W = 760, H = 260, mi = 52, md = 10, ms = 14, mb = 34;
+  const n = etiquetas.length;
+  const totales = etiquetas.map((_, i) => series.reduce((s, x) => s + (x.valores[i] || 0), 0));
+  const max = Math.max(...totales, 0);
+  if (!n || max === 0) {
+    document.getElementById(contenedor).innerHTML = '<div style="padding:30px;text-align:center;color:#888;">Sin datos en este periodo 🎉</div>';
+    return;
+  }
+  // Eje Y con números "redondos"
+  const paso0 = max / 4, mag = Math.pow(10, Math.floor(Math.log10(paso0)));
+  const paso = [1, 2, 2.5, 5, 10].map(f => f * mag).find(v => v >= paso0);
+  const tope = Math.ceil(max / paso) * paso;
+  const alto = H - ms - mb, ancho = W - mi - md, bw = ancho / n;
+  const y = v => ms + alto - (v / tope) * alto;
+  let g = '';
+  for (let v = 0; v <= tope + 1e-9; v += paso) {
+    g += `<line x1="${mi}" x2="${W - md}" y1="${y(v)}" y2="${y(v)}" stroke="#E6E6E6"/><text x="${mi - 6}" y="${y(v) + 4}" text-anchor="end">${formato(v)}</text>`;
+  }
+  const cadaN = Math.ceil(n / 12);
+  etiquetas.forEach((et, i) => {
+    let acum = 0;
+    const x = mi + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7);
+    let tip = et + '\n';
+    series.forEach(s => {
+      const v = s.valores[i] || 0; tip += s.nombre + ': ' + formato(v) + '\n';
+      if (v > 0) { g += `<rect x="${x}" y="${y(acum + v)}" width="${w}" height="${Math.max(1, y(acum) - y(acum + v))}" fill="${s.color}" rx="2"><title>${escHtml(tip)}</title></rect>`; }
+      acum += v;
+    });
+    if (i % cadaN === 0) g += `<text x="${mi + i * bw + bw / 2}" y="${H - 12}" text-anchor="middle">${escHtml(et)}</text>`;
+  });
+  document.getElementById(contenedor).innerHTML = `<svg class="grafica-svg" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+
+function renderPerdidas(data) {
+  const r = data.resumen, gran = data.granularidad;
+  document.getElementById('tarjetasPerdidas').innerHTML = `
+    <div class="tarjeta-metrica tarjeta-perdida"><div class="valor">${dinero(r.total_perdido)}</div><div class="etiqueta">Total perdido (cancelado + devuelto)</div></div>
+    <div class="tarjeta-metrica"><div class="valor">${r.cancelaciones}</div><div class="etiqueta">Tickets cancelados · ${dinero(r.monto_cancelado)}</div></div>
+    <div class="tarjeta-metrica"><div class="valor">${r.devoluciones}</div><div class="etiqueta">Devoluciones · ${dinero(r.monto_devuelto)}</div></div>
+    <div class="tarjeta-metrica"><div class="valor">${r.fichas_canceladas}</div><div class="etiqueta">Fichas canceladas (clientes no atendidos)</div></div>
+    <div class="tarjeta-metrica"><div class="valor">${r.porcentaje_sobre_ventas.toFixed(1)}%</div><div class="etiqueta">Pérdida sobre lo que se movió (vendido + perdido)</div></div>`;
+
+  const et = data.serie.map(f => etiquetaPeriodo(f.clave, gran));
+  dibujarBarras('graficaDinero', et, [
+    { nombre: 'Cancelados', color: '#D64545', valores: data.serie.map(f => f.monto_cancelado) },
+    { nombre: 'Devoluciones', color: '#F2A33A', valores: data.serie.map(f => f.monto_devuelto) }
+  ], v => '$' + Math.round(v).toLocaleString('es-MX'));
+  dibujarBarras('graficaFichas', et, [
+    { nombre: 'Fichas canceladas', color: '#4A7FD6', valores: data.serie.map(f => f.fichas) }
+  ], v => String(Math.round(v)));
+
+  document.getElementById('tablaMotivos').innerHTML = data.motivos.map(m => `<tr><td>${escHtml(m.motivo)}</td><td>${m.cancelaciones}</td><td>${m.devoluciones}</td><td>${dinero(m.monto)}</td></tr>`).join('') || '<tr><td colspan="4">Sin datos</td></tr>';
+  document.getElementById('tablaPerdidasEmpleado').innerHTML = data.por_usuario.map(u => `<tr><td>${escHtml(u.usuario)}</td><td>${u.cancelaciones}</td><td>${u.devoluciones}</td><td>${dinero(u.monto)}</td></tr>`).join('') || '<tr><td colspan="4">Sin datos</td></tr>';
+  document.getElementById('tablaPerdidasProductos').innerHTML = data.top_productos.map(p => `<tr><td>${escHtml(p.nombre_producto)}</td><td>${parseFloat(p.cantidad)}</td><td>${dinero(p.monto)}</td></tr>`).join('') || '<tr><td colspan="3">Sin datos</td></tr>';
+  document.getElementById('tablaUltimasCanc').innerHTML = data.ultimas_cancelaciones.map(c => `<tr><td>${escHtml(c.folio)}</td><td>${escHtml(c.fecha)}</td><td>${escHtml(c.usuario || '—')}</td><td>${escHtml(c.motivo || '—')}</td><td>${dinero(c.total)}</td></tr>`).join('') || '<tr><td colspan="5">Sin cancelaciones</td></tr>';
 }
 
 document.getElementById('tabVentas').classList.add('activo');
