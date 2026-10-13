@@ -22,7 +22,7 @@
   if(c.url) document.getElementById('url').value=c.url;
   if(c.nombre&&c.nombre!=='Compoint Punto') document.getElementById('nombre').value=c.nombre;
   if(c.usuario) document.getElementById('usuario').value=c.usuario;
-  if(!c.configurado&&window.compointServidor) document.getElementById('bloqueServidor').style.display='block';
+  if(window.compointServidor) document.getElementById('bloqueServidor').style.display='block';
   document.getElementById('esServidor').onclick=()=>compointServidor.elegirModoServidor();
   if(c.configurado){const b=document.getElementById('cancelar');b.style.display='block';b.onclick=()=>compoint.cerrar();}
   document.getElementById('ok').onclick=async()=>{
