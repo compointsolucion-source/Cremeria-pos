@@ -121,6 +121,7 @@
 </head>
 <body class="L-clasico">
   <div class="controles">
+    <button onclick="volverAlSistema()">← Volver al sistema</button>
     <button onclick="abrirSelectorLayout()">🎨 Diseño</button>
     <button onclick="document.documentElement.requestFullscreen()">⛶ Pantalla completa</button>
   </div>
@@ -152,6 +153,13 @@
 <script>
 requiereLogin();
 const usuario = getUsuario();
+
+function volverAlSistema() {
+  if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (_) {} }
+  if (usuario.rol === 'jefe_general') location.href = 'admin/sucursales.html';
+  else if (usuario.rol === 'mostrador') location.href = 'mostrador.html';
+  else location.href = 'admin/dashboard.html';
+}
 
 const socket = io(API_URL.replace('/api', ''));
 socket.emit('unirse_sucursal', usuario.sucursal_id);
