@@ -43,6 +43,21 @@ function log(texto) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'log.txt'), new Date().toISOString() + ' ' + texto + '\n'); } catch (e) { /* sin log */ }
 }
 const origenConfigurado = () => { try { return new URL(configuracion().url).origin; } catch (e) { return null; } };
+// En modo servidor la ventana puede abrirse por localhost, por el nombre del equipo o por su IP: todas son "el sistema".
+function origenEsDelSistema(origen) {
+  try {
+    const u = new URL(origen);
+    if (u.origin === origenConfigurado()) return true;
+    if (configuracion().modo === 'servidor' && servidorLocal) {
+      const puerto = new URL(servidorLocal.urlLocal).port;
+      if (u.port !== puerto) return false;
+      const h = u.hostname.toLowerCase();
+      if (h === 'localhost' || h === '127.0.0.1' || h === require('os').hostname().toLowerCase()) return true;
+      return Object.values(require('os').networkInterfaces()).some((l) => (l || []).some((i) => i.address === h));
+    }
+  } catch (e) { /* no es del sistema */ }
+  return false;
+}
 const esLocal = (evento) => { try { return String(evento.senderFrame.url).startsWith('file://'); } catch (e) { return false; } };
 
 // ------------------------------------------------------------ ventanas
@@ -87,7 +102,7 @@ function crearVentana() {
   wc.setWindowOpenHandler(({ url }) => {
     try {
       const destino = new URL(url);
-      if (url === 'about:blank' || destino.origin === origenConfigurado()) {
+      if (url === 'about:blank' || origenEsDelSistema(destino.origin)) {
         return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, width: 520, height: 760, icon: iconoApp() } };
       }
       if (/^https?:$/.test(destino.protocol)) shell.openExternal(url);
@@ -196,7 +211,7 @@ function crearBandeja() {
 function configurarPermisos() {
   const ses = session.defaultSession;
   const permitidos = new Set(['media', 'fullscreen', 'clipboard-sanitized-write', 'usb', 'bluetooth', 'serial', 'notifications']);
-  const origenOk = (url) => { try { return new URL(url).origin === origenConfigurado(); } catch (e) { return false; } };
+  const origenOk = (url) => origenEsDelSistema(url);
   ses.setPermissionRequestHandler((wc, permiso, cb) => cb(permitidos.has(permiso) && origenOk(wc.getURL())));
   ses.setPermissionCheckHandler((wc, permiso, origen) => permitidos.has(permiso) && origenOk(origen));
   // Una vez que se elige una impresora USB, se recuerda: reconecta sola sin volver a preguntar.
@@ -265,7 +280,7 @@ ipcMain.handle('guardar-config', (e, datos) => {
     if (!/^https?:$/.test(url.protocol)) throw new Error('x');
   } catch (err) { return { error: 'La dirección no es válida. Ejemplo: https://minegocio.onrender.com' }; }
 
-  const cambios = { url: String(datos.url).trim() };
+  const cambios = { url: String(datos.url).trim(), modo: 'cliente' };
   if (datos.nombre) cambios.nombre = String(datos.nombre).trim();
   const usuario = String(datos.usuario || '').trim();
   if (usuario) {
@@ -295,7 +310,10 @@ ipcMain.handle('reintentar', async (e) => {
 
 // ------------------------------------------------------------ impresoras instaladas en Windows
 // Solo las páginas del sistema configurado pueden listar impresoras e imprimir.
-const esDelSistema = (evento) => { try { return new URL(evento.senderFrame.url).origin === origenConfigurado(); } catch (e) { return false; } };
+const esDelSistema = (evento) => {
+  try { if (origenEsDelSistema(evento.senderFrame.url)) return true; log('Pedido rechazado desde ' + evento.senderFrame.url + ' (esperado ' + origenConfigurado() + ')'); } catch (e) { /* sin origen */ }
+  return false;
+};
 
 ipcMain.handle('listar-impresoras', async (e) => {
   if (!esDelSistema(e)) return [];
