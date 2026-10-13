@@ -630,6 +630,48 @@ ipcMain.handle('srv-probar-nube', async (e) => {
   try { await require('./servidor/respaldos').probarNube(servidorLocal.nube()); return { ok: true }; }
   catch (err) { return { ok: false, error: String(err && (err.message || (err.error && err.error.message)) || err).slice(0, 200) }; }
 });
+ipcMain.handle('srv-quitar-nube', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'question', buttons: ['Quitar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Quitar copia en la nube',
+    message: '¿Quitar la configuración de Cloudinary?',
+    detail: 'Dejarán de subirse copias a la nube. Las copias que ya están en tu cuenta de Cloudinary no se borran. Los respaldos en esta computadora siguen igual.'
+  });
+  if (conf.response !== 0) return { ok: false };
+  servidorLocal.quitarNube();
+  return { ok: true };
+});
+
+// Pasa esta computadora de servidor a caja conectada a un sistema en la nube.
+ipcMain.handle('srv-cambiar-a-cliente', async (e, urlTexto) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  let url;
+  try {
+    let t = String(urlTexto || '').trim();
+    if (t && !/^https?:\/\//i.test(t)) t = 'https://' + t;
+    url = new URL(t);
+    if (!/^https?:$/.test(url.protocol)) throw new Error('x');
+  } catch (err) { return { error: 'La dirección no es válida. Ejemplo: https://minegocio.onrender.com' }; }
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'warning', buttons: ['Cambiar a la nube', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Dejar de ser servidor',
+    message: 'Esta computadora dejará de ser el servidor del negocio.',
+    detail: 'Se guarda un respaldo y el programa se reinicia conectado a:\n' + url.href + '\n\nLas demás cajas que usan este servidor dejarán de conectar. Tu información local se conserva en C:\\CompointPunto y puedes volver al modo servidor desde "Cambiar dirección o usuario".'
+  });
+  if (conf.response !== 0) return { ok: false };
+  try {
+    await cerrarServidorConRespaldo();
+    cierreListo = true; servidorLocal = null;
+    guardarUsuario({ url: url.href, modo: 'cliente' });
+    intermediario.detener();
+    app.relaunch(); app.exit(0);
+  } catch (err) {
+    cerrarEstado();
+    log('Cambio a nube falló: ' + (err && err.stack || err));
+    return { error: String(err && err.message || err) };
+  }
+  return { ok: true };
+});
+
 ipcMain.handle('srv-restaurar', async (e) => {
   if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
   const sel = await dialog.showOpenDialog(ventanaPanel || undefined, {

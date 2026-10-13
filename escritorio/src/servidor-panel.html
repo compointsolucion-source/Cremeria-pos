@@ -13,6 +13,13 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{pa
 <div id="dirs"></div>
 <div class="nota">En la otra computadora: instala Compoint Punto y en «Dirección del sistema» escribe una de estas (por nombre o por IP) o pulsa «Buscar servidor en la red». Si Windows pregunta por el Firewall, elige «Permitir acceso» (red privada).</div>
 
+<h2>Conexión de esta computadora</h2>
+<div class="ok">Esta computadora es el <b>servidor del negocio</b> (funciona sin internet).</div>
+<details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px">Cambiar a un sistema en la nube…</summary>
+<div class="nota">Si prefieres que esta computadora trabaje conectada a tu sistema en internet (como una caja normal), escribe su dirección. Se guarda un respaldo antes de cambiar.</div>
+<label>Dirección del sistema en la nube</label><input id="urlNube" placeholder="https://minegocio.onrender.com">
+<div class="fila"><button class="sec" id="cambiarCliente">Cambiar a la nube</button></div></details>
+
 <h2>Respaldos</h2>
 <div id="estadoResp"></div>
 <div class="fila"><button id="respaldar">Respaldar ahora</button><button class="sec" id="carpeta">Abrir carpeta de respaldos</button></div>
@@ -20,11 +27,11 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{pa
 
 <h2>Copia en la nube (Cloudinary) — últimos 10 días</h2>
 <div id="estadoNube"></div>
-<details><summary style="cursor:pointer;font-size:13px">Configurar Cloudinary</summary>
+<details id="detNube"><summary style="cursor:pointer;font-size:13px">Configurar o cambiar Cloudinary</summary>
 <label>Cloud name</label><input id="cn" autocomplete="off">
 <label>API key</label><input id="ak" autocomplete="off">
 <label>API secret</label><input id="as" type="password" autocomplete="off" placeholder="(déjalo vacío para conservar el actual)">
-<div class="fila"><button id="guardarNube">Guardar</button><button class="sec" id="probarNube">Probar conexión</button></div>
+<div class="fila"><button id="guardarNube">Guardar</button><button class="sec" id="probarNube">Probar conexión</button><button class="sec" id="quitarNube">Quitar</button></div>
 <div class="nota">Las 3 claves están en tu cuenta de Cloudinary (Dashboard → API Keys). El plan gratuito acepta archivos de hasta 10 MB.</div></details>
 
 <h2>Recuperar información</h2>
@@ -45,7 +52,8 @@ async function cargar(){
   $('lista').innerHTML='<tr><th>Archivo</th><th>Fecha</th><th>Tamaño</th></tr>'+s.locales.slice(0,8).map(f=>`<tr><td>${esc(f.archivo)}</td><td>${fecha(f.fecha)}</td><td>${mb(f.tamano)}</td></tr>`).join('');
   const n=s.estado.nube||{};
   $('estadoNube').innerHTML=!s.nube.cloud_name?'<span class="aviso">No configurada: solo se guardan copias en esta computadora.</span>':(n.pendiente?`<span class="aviso">Pendiente de subir (sin internet o con error). Se reintenta sola.</span><br><span class="mal">${esc(n.error||'')}</span>`:(n.ultimo_ok?`<span class="ok">Última copia en la nube: ${fecha(n.ultimo_ok)}</span>`:'Configurada. Se subirá en el próximo respaldo.'));
-  $('cn').value=s.nube.cloud_name||'';$('ak').value=s.nube.api_key||'';
+  if(document.activeElement!==$('cn')&&document.activeElement!==$('ak')&&document.activeElement!==$('as')){$('cn').value=s.nube.cloud_name||'';$('ak').value=s.nube.api_key||'';}
+  if(!s.nube.cloud_name&&!window._abierto){$('detNube').open=true;window._abierto=true;}
   $('carpeta').title=s.carpeta;
 }
 $('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled=true;$('respaldar').textContent='Respaldando…';
@@ -54,6 +62,8 @@ $('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled
 $('carpeta').onclick=()=>compointServidor.abrirCarpeta();
 $('guardarNube').onclick=async()=>{const r=await compointServidor.guardarNube({cloud_name:$('cn').value,api_key:$('ak').value,api_secret:$('as').value});$('as').value='';$('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?'Guardado.':r.error;cargar();};
 $('probarNube').onclick=async()=>{$('msg').className='';$('msg').textContent='Probando…';const r=await compointServidor.probarNube();$('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?'Conexión con Cloudinary correcta.':('No se pudo conectar: '+r.error);};
+$('quitarNube').onclick=async()=>{const r=await compointServidor.quitarNube();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('cn').value='';$('ak').value='';$('msg').className='ok';$('msg').textContent='Configuración de Cloudinary quitada.';cargar();}};
+$('cambiarCliente').onclick=async()=>{const r=await compointServidor.cambiarACliente($('urlNube').value);if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}};
 $('restaurar').onclick=async()=>{const r=await compointServidor.restaurar();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}};
 cargar();setInterval(cargar,15000);
 </script></body></html>

@@ -25,5 +25,7 @@ contextBridge.exposeInMainWorld('compointServidor', {
   guardarNube: (d) => ipcRenderer.invoke('srv-guardar-nube', d),
   probarNube: () => ipcRenderer.invoke('srv-probar-nube'),
   restaurar: () => ipcRenderer.invoke('srv-restaurar'),
+  quitarNube: () => ipcRenderer.invoke('srv-quitar-nube'),
+  cambiarACliente: (url) => ipcRenderer.invoke('srv-cambiar-a-cliente', url),
   elegirModoServidor: () => ipcRenderer.invoke('srv-elegir-modo')
 });

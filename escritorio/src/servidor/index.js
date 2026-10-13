@@ -124,6 +124,10 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
       guardarCfg({ nube: { cloud_name: String(n.cloud_name || '').trim(), api_key: String(n.api_key || '').trim(), api_secret_cifrado: secreto ? cifrar(secreto) : '' } });
       process.env.CLOUDINARY_CLOUD_NAME = cfg.nube.cloud_name; process.env.CLOUDINARY_API_KEY = cfg.nube.api_key; process.env.CLOUDINARY_API_SECRET = secreto || '';
     },
+    quitarNube: () => {
+      guardarCfg({ nube: {} });
+      delete process.env.CLOUDINARY_CLOUD_NAME; delete process.env.CLOUDINARY_API_KEY; delete process.env.CLOUDINARY_API_SECRET;
+    },
     nube: nubeActual,
     async detener() { await apagarWeb(); await bd.detener(); },
     async restaurar(archivo) {
