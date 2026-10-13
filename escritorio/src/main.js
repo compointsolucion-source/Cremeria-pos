@@ -259,6 +259,79 @@ ipcMain.handle('listar-impresoras', async (e) => {
 
 // Imprime un HTML directo en una impresora instalada, sin diálogo.
 // opciones: { impresora: 'nombre exacto' | '' (predeterminada), anchoMM: 58 | 80 }
+// ---- Impresión RAW (ESC/POS) por el spooler de Windows: no pasa por el "dibujo" del driver,
+// que es lo que hacía salir todo en negro en algunas térmicas de 80 mm.
+const PS_RAW = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public class RawPrn {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+  public class DOCINFOA { [MarshalAs(UnmanagedType.LPStr)] public string pDocName; [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile; [MarshalAs(UnmanagedType.LPStr)] public string pDataType; }
+  [DllImport("winspool.Drv", EntryPoint="OpenPrinterA", SetLastError=true, CharSet=CharSet.Ansi)] public static extern bool OpenPrinter(string n, out IntPtr h, IntPtr d);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool ClosePrinter(IntPtr h);
+  [DllImport("winspool.Drv", EntryPoint="StartDocPrinterA", SetLastError=true, CharSet=CharSet.Ansi)] public static extern bool StartDocPrinter(IntPtr h, int l, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA d);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool EndDocPrinter(IntPtr h);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool StartPagePrinter(IntPtr h);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool EndPagePrinter(IntPtr h);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool WritePrinter(IntPtr h, IntPtr b, int c, out int w);
+  public static void Send(string printer, byte[] data) {
+    IntPtr h;
+    if (!OpenPrinter(printer, out h, IntPtr.Zero)) throw new Exception("No se pudo abrir la impresora (" + Marshal.GetLastWin32Error() + ")");
+    try {
+      DOCINFOA di = new DOCINFOA(); di.pDocName = "Compoint Punto"; di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("StartDoc fallo (" + Marshal.GetLastWin32Error() + ")");
+      try {
+        StartPagePrinter(h);
+        IntPtr p = Marshal.AllocCoTaskMem(data.Length);
+        try { Marshal.Copy(data, 0, p, data.Length); int w; if (!WritePrinter(h, p, data.Length, out w) || w != data.Length) throw new Exception("WritePrinter fallo (" + Marshal.GetLastWin32Error() + ")"); }
+        finally { Marshal.FreeCoTaskMem(p); }
+        EndPagePrinter(h);
+      } finally { EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+'@
+[RawPrn]::Send($env:COMPOINT_PRN, [System.IO.File]::ReadAllBytes($env:COMPOINT_FILE))
+`;
+
+function enviarRaw(nombreImpresora, bytes) {
+  return new Promise((resolver, rechazar) => {
+    if (process.platform !== 'win32') return rechazar(new Error('La impresión RAW solo existe en Windows'));
+    const base = path.join(app.getPath('temp'), 'compoint-raw-' + Date.now());
+    const archivoBin = base + '.bin', archivoPs = base + '.ps1';
+    fs.writeFileSync(archivoBin, bytes);
+    fs.writeFileSync(archivoPs, '﻿' + PS_RAW, 'utf8');
+    const { execFile } = require('child_process');
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', archivoPs],
+      { env: { ...process.env, COMPOINT_PRN: nombreImpresora, COMPOINT_FILE: archivoBin }, windowsHide: true, timeout: 30000 },
+      (err, _out, errOut) => {
+        try { fs.unlinkSync(archivoBin); fs.unlinkSync(archivoPs); } catch (_) {}
+        if (err) rechazar(new Error((String(errOut || '').trim() || err.message).split('\n')[0])); else resolver();
+      });
+  });
+}
+
+// Convierte el bitmap BGRA (ya en blanco/negro) a comandos ESC/POS de imagen + avance + corte.
+function bitmapAEscPos(buf, ancho, alto) {
+  const bytesFila = Math.ceil(ancho / 8);
+  const partes = [Buffer.from([0x1B, 0x40])]; // ESC @ (reiniciar)
+  const BANDA = 128;
+  for (let y0 = 0; y0 < alto; y0 += BANDA) {
+    const filas = Math.min(BANDA, alto - y0);
+    const datos = Buffer.alloc(bytesFila * filas);
+    for (let y = 0; y < filas; y++) {
+      for (let x = 0; x < ancho; x++) {
+        if (buf[((y0 + y) * ancho + x) * 4] === 0) datos[y * bytesFila + (x >> 3)] |= (0x80 >> (x & 7));
+      }
+    }
+    partes.push(Buffer.from([0x1D, 0x76, 0x30, 0x00, bytesFila & 0xFF, bytesFila >> 8, filas & 0xFF, filas >> 8]), datos);
+  }
+  partes.push(Buffer.from([0x1B, 0x64, 0x04]));       // avanzar 4 líneas
+  partes.push(Buffer.from([0x1D, 0x56, 0x42, 0x00])); // corte parcial (si la impresora lo tiene)
+  return Buffer.concat(partes);
+}
+
 ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
   if (!esDelSistema(e)) throw new Error('No permitido');
   const anchoMM = parseInt(opciones.anchoMM, 10) === 58 ? 58 : 80;
@@ -295,7 +368,7 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
 
     // Método principal: se convierte el ticket en una imagen en blanco y negro puro y se imprime
     // esa imagen. Así el driver de la impresora no puede "interpretar" el color y sacarlo en negro.
-    let png = null;
+    let png = null, bitmapBN = null;
     try {
       oculta.webContents.setZoomFactor(zoom);
       oculta.setContentSize(puntos, Math.ceil(altoPx * zoom) + 2);
@@ -313,12 +386,26 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
           const v = (lum * a + 255 * (1 - a)) < 160 ? 0 : 255;
           buf[p] = buf[p + 1] = buf[p + 2] = v; buf[p + 3] = 255;
         }
+        bitmapBN = { buf, ancho: t.width, alto: t.height };
         png = nativeImage.createFromBitmap(buf, { width: t.width, height: t.height }).toPNG();
         var altoImgPx = Math.ceil(t.height / zoom);
       }
     } catch (err) { log('No se pudo convertir a imagen, se imprime directo: ' + err.message); png = null; }
 
-    if (png) {
+    // 1.º intento: RAW ESC/POS (lo más compatible con térmicas). Si falla, se imprime la imagen por el driver.
+    let hechoRaw = false;
+    if (bitmapBN && opciones.raw !== false && process.platform === 'win32') {
+      try {
+        let destino = nombre;
+        if (!destino) { const lista = await e.sender.getPrintersAsync(); const d = lista.find(p => p.isDefault); destino = d ? d.name : ''; }
+        if (!destino) throw new Error('No hay impresora predeterminada');
+        await enviarRaw(destino, bitmapAEscPos(bitmapBN.buf, bitmapBN.ancho, bitmapBN.alto));
+        hechoRaw = true;
+      } catch (err) { log('Impresión RAW falló, se usa el driver: ' + err.message); }
+    }
+    if (hechoRaw) {
+      // listo
+    } else if (png) {
       ventanaImg = new BrowserWindow({ show: false, width: anchoPx, height: 400, useContentSize: true,
         webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
       const pagina = '<!doctype html><html><head><meta charset="utf-8"><style>@page{margin:0}html,body{margin:0;padding:0;background:#fff}img{display:block;width:' + anchoMM + 'mm;height:auto}</style></head><body><img src="data:image/png;base64,' + png.toString('base64') + '"></body></html>';
