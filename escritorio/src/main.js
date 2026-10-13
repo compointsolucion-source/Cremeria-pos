@@ -274,22 +274,61 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
   const cssBlanco = '<style>html,body{background:#fff !important;color:#000 !important;-webkit-print-color-adjust:economy;}</style>';
   limpio = /<\/head>/i.test(limpio) ? limpio.replace(/<\/head>/i, cssBlanco + '</head>') : cssBlanco + limpio;
   const anchoPx = Math.round(anchoMM * 96 / 25.4);
+  const puntos = anchoMM === 58 ? 384 : 576; // puntos reales de la cabeza térmica (203 dpi)
+  const zoom = puntos / anchoPx;
   const oculta = new BrowserWindow({
-    show: false, width: anchoPx, height: 900, useContentSize: true,
+    show: false, width: anchoPx, height: 50, useContentSize: true,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }
+  });
+  let ventanaImg = null;
+  const imprimir = (win, altoPx) => new Promise((resolver, rechazar) => {
+    const alturaMicrones = Math.max(30000, Math.ceil(altoPx * 264.583) + 4000); // rollo: alto = contenido
+    win.webContents.print({
+      silent: true, deviceName: nombre, printBackground: true, color: false,
+      margins: { marginType: 'none' },
+      pageSize: { width: anchoMM * 1000, height: alturaMicrones }
+    }, (exito, motivo) => exito ? resolver() : rechazar(new Error(motivo || 'No se pudo imprimir')));
   });
   try {
     await oculta.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(limpio));
     const altoPx = await oculta.webContents.executeJavaScript('Math.ceil(document.documentElement.scrollHeight)');
-    const alturaMicrones = Math.max(30000, Math.ceil(altoPx * 264.583) + 4000); // rollo: alto = contenido
-    await new Promise((resolver, rechazar) => {
-      oculta.webContents.print({
-        silent: true, deviceName: nombre, printBackground: false, color: false,
-        margins: { marginType: 'none' },
-        pageSize: { width: anchoMM * 1000, height: alturaMicrones }
-      }, (exito, motivo) => exito ? resolver() : rechazar(new Error(motivo || 'No se pudo imprimir')));
-    });
+
+    // Método principal: se convierte el ticket en una imagen en blanco y negro puro y se imprime
+    // esa imagen. Así el driver de la impresora no puede "interpretar" el color y sacarlo en negro.
+    let png = null;
+    try {
+      oculta.webContents.setZoomFactor(zoom);
+      oculta.setContentSize(puntos, Math.ceil(altoPx * zoom) + 2);
+      await new Promise(r => setTimeout(r, 250));
+      const cap = await oculta.webContents.capturePage();
+      const tam = cap.getSize();
+      if (tam.width > 0 && tam.height > 0) {
+        const img = tam.width === puntos ? cap : cap.resize({ width: puntos, quality: 'best' });
+        const t = img.getSize();
+        const buf = Buffer.from(img.toBitmap()); // BGRA
+        for (let p = 0; p < buf.length; p += 4) {
+          const a = buf[p + 3] / 255;
+          // se compone sobre blanco y se pasa a blanco/negro
+          const lum = 0.114 * buf[p] + 0.587 * buf[p + 1] + 0.299 * buf[p + 2];
+          const v = (lum * a + 255 * (1 - a)) < 160 ? 0 : 255;
+          buf[p] = buf[p + 1] = buf[p + 2] = v; buf[p + 3] = 255;
+        }
+        png = nativeImage.createFromBitmap(buf, { width: t.width, height: t.height }).toPNG();
+        var altoImgPx = Math.ceil(t.height / zoom);
+      }
+    } catch (err) { log('No se pudo convertir a imagen, se imprime directo: ' + err.message); png = null; }
+
+    if (png) {
+      ventanaImg = new BrowserWindow({ show: false, width: anchoPx, height: 400, useContentSize: true,
+        webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+      const pagina = '<!doctype html><html><head><meta charset="utf-8"><style>@page{margin:0}html,body{margin:0;padding:0;background:#fff}img{display:block;width:' + anchoMM + 'mm;height:auto}</style></head><body><img src="data:image/png;base64,' + png.toString('base64') + '"></body></html>';
+      await ventanaImg.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(pagina));
+      await imprimir(ventanaImg, altoImgPx);
+    } else {
+      await imprimir(oculta, altoPx);
+    }
   } finally {
+    if (ventanaImg && !ventanaImg.isDestroyed()) ventanaImg.destroy();
     if (!oculta.isDestroyed()) oculta.destroy();
   }
   return { ok: true };
