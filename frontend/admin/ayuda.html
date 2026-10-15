@@ -116,6 +116,18 @@
         </ol>
       </details>
 
+      <details class="guia" id="guiaHerramientasServidor" style="display:none;">
+        <summary>Herramientas para la computadora servidor (Firewall e IP fija)</summary>
+        <p>Descárgalos y ejecútalos <b>en la computadora que es el servidor</b> (la principal). Sirven para que las otras cajas puedan entrar.</p>
+        <ol>
+          <li><a href="../descargas/1-Permitir-acceso-Firewall.bat" download><b>1-Permitir-acceso-Firewall.bat</b></a> — abre el acceso en el Firewall de Windows y te muestra la dirección para las otras computadoras.</li>
+          <li><a href="../descargas/2-Fijar-IP-de-esta-computadora.bat" download><b>2-Fijar-IP-de-esta-computadora.bat</b></a> — deja la IP de esta computadora siempre igual.</li>
+          <li><a href="../descargas/3-Quitar-regla-Firewall.bat" download><b>3-Quitar-regla-Firewall.bat</b></a> — quita el permiso si ya no lo necesitas.</li>
+        </ol>
+        <p><b>Cómo usarlos:</b> descarga el archivo, ábrelo con doble clic y, cuando Windows pida permiso de administrador, di <b>Sí</b>. Si Windows muestra "protegió su PC", pulsa <b>Más información → Ejecutar de todas formas</b>.</p>
+        <div class="aviso">La computadora servidor debe quedar encendida y con Compoint Punto abierto para que las demás puedan trabajar.</div>
+      </details>
+
       <details class="guia">
         <summary>Sin internet: seguir vendiendo y subir todo a la nube al regresar</summary>
         <ul>
@@ -171,6 +183,12 @@
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
 <script>requiereLogin();</script>
+<script>
+  // Las herramientas del servidor solo se muestran dentro del programa de escritorio (.exe).
+  if (window.compointDesktop && window.compointDesktop.esEscritorio) {
+    document.getElementById('guiaHerramientasServidor').style.display = '';
+  }
+</script>
 <script src="../js/sidebar-nav.js"></script>
 </body>
 </html>
