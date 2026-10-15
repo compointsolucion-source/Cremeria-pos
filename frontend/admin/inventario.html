@@ -11,16 +11,103 @@
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
-  .tabla-inv { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
-  .tabla-inv th, .tabla-inv td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
-  .fila-baja { background: #FFEBEE; }
-  .form-ajuste { display: grid; gap: 10px; margin-bottom: 20px; }
-  .fila-doble { display: flex; gap: 10px; }
-  .fila-doble > * { flex: 1; }
-  .subtitulo-seccion { font-weight: 600; font-size: 13px; color: #555; }
-  .sugerencia-item { padding: 8px 14px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #F0F0F0; }
-  .sugerencia-item:hover { background: #F4F5F6; }
+  .contenido { max-width: 1400px; margin: 16px auto; padding: 0 14px 90px; }
+
+  /* ---- Totales ---- */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .kpi { background: var(--surface, #fff); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); border-left: 4px solid var(--primary, #5FAE46); }
+  .kpi b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+  .kpi span { color: var(--muted, #7A7D83); font-size: 12px; }
+  .kpi.margen { background: rgba(95,174,70,0.12); }
+  .kpi.margen b { color: #2E7D32; }
+  .kpi.amarillo { border-left-color: #F9A825; }
+  .kpi small { color: var(--muted, #7A7D83); font-weight: 600; font-size: 14px; }
+
+  /* ---- Dos columnas: lista y panel de movimiento ---- */
+  .columnas { display: grid; grid-template-columns: 1fr 400px; gap: 14px; align-items: start; }
+  .caja { background: var(--surface, #fff); border-radius: 12px; box-shadow: var(--shadow); }
+  .barra { padding: 10px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .barra .buscar { flex: 1 1 200px; position: relative; }
+  .barra .buscar input { width: 100%; padding-left: 36px !important; }
+  .barra .buscar::before { content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; }
+  .chip { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border, #E4E6E9); font-size: 13px; font-weight: 600; color: var(--muted, #7A7D83); background: var(--surface, #fff); cursor: pointer; white-space: nowrap; }
+  .chip i { font-style: normal; font-weight: 500; margin-left: 3px; }
+  .chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+  .chip.amarillo.activo { background: #F9A825; border-color: #F9A825; color: #222; }
+  .chip.rojo.activo { background: #E53935; border-color: #E53935; color: #fff; }
+
+  .tabla-scroll { max-height: calc(100vh - 290px); min-height: 300px; overflow: auto; }
+  .tabla-inv { width: 100%; border-collapse: collapse; }
+  .tabla-inv th { position: sticky; top: 0; z-index: 2; background: var(--surface, #fff); box-shadow: inset 0 -1px 0 var(--border, #E4E6E9); text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, #7A7D83); padding: 9px 12px; white-space: nowrap; }
+  .tabla-inv td { padding: 8px 12px; border-bottom: 1px solid var(--border, #E4E6E9); vertical-align: middle; font-size: 14px; }
+  .tabla-inv th.numero, .tabla-inv td.numero { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabla-inv tr.sel td { background: rgba(95,174,70,0.14); }
+  .nom { font-weight: 600; }
+  .cod { color: var(--muted, #7A7D83); font-size: 12px; font-family: Consolas, monospace; }
+  .estado { display: inline-block; min-width: 62px; text-align: center; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .estado.agotado { background: rgba(229,57,53,0.16); color: #D32F2F; }
+  .estado.bajo { background: rgba(249,168,37,0.22); color: #A86400; }
+  .estado.orden { background: rgba(95,174,70,0.18); color: #2E7D32; }
+  .medidor { display: inline-block; width: 60px; height: 7px; background: rgba(128,128,128,0.25); border-radius: 5px; overflow: hidden; vertical-align: middle; margin-left: 8px; }
+  .medidor i { display: block; height: 100%; }
+  .tabla-inv input.input-minimo { width: 76px !important; text-align: right; border: 1px dashed #B8C2CC; border-radius: 7px; padding: 4px 8px; background: transparent; color: inherit; font-size: 14px; }
+  .input-minimo:focus { border-style: solid; border-color: var(--primary, #5FAE46); outline: none; }
+  .acciones-fila { display: flex; gap: 6px; justify-content: flex-end; }
+  .mini { border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); border-radius: 8px; padding: 6px 10px; font-weight: 800; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .mini.entrada { color: #2E7D32; }
+  .mini.merma { color: #C62828; }
+  .mini:hover { background: rgba(128,128,128,0.12); }
+  .tarjetas { display: none; }
+  .vacio { text-align: center; color: #888; padding: 24px; }
+
+  /* ---- Panel de movimiento ---- */
+  .panel-mov { position: sticky; top: 12px; overflow: hidden; }
+  .pestanas { display: flex; }
+  .pestana { flex: 1; text-align: center; padding: 12px; font-weight: 700; background: rgba(128,128,128,0.12); color: var(--muted, #7A7D83); border: none; border-bottom: 3px solid transparent; cursor: pointer; font-size: 14px; }
+  .pestana.activa { background: var(--surface, #fff); color: #2E7D32; border-bottom-color: var(--primary, #5FAE46); }
+  .pestana.activa.resta { color: #C62828; border-bottom-color: #C62828; }
+  .cuerpo-mov { padding: 14px; display: grid; gap: 10px; }
+  .cuerpo-mov input, .cuerpo-mov select { width: 100%; }
+  .ayuda-mov { font-size: 12px; color: var(--muted, #7A7D83); }
+  .buscar-mov { position: relative; }
+  .buscar-mov::before { content: "🔍"; position: absolute; left: 11px; top: 11px; font-size: 14px; }
+  .cuerpo-mov .buscar-mov input { padding-left: 36px !important; }
+  .sugerencias { display: none; background: var(--surface, #fff); border: 1px solid var(--border, #E4E6E9); border-radius: 10px; max-height: 190px; overflow-y: auto; margin-top: 4px; }
+  .sugerencia-item { padding: 8px 14px; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .sugerencia-item:hover { background: rgba(128,128,128,0.12); }
+  .ficha { background: rgba(128,128,128,0.10); border-radius: 10px; padding: 10px 12px; }
+  .ficha b.n { font-size: 15px; }
+  .ficha .datos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; text-align: center; }
+  .ficha .datos div { background: var(--surface, #fff); border-radius: 8px; padding: 6px 2px; font-size: 11px; color: var(--muted, #7A7D83); }
+  .ficha .datos b { display: block; font-size: 14px; color: var(--text, #1F2023); }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+  details.precios { border: 1px dashed var(--border, #E4E6E9); border-radius: 10px; padding: 10px; }
+  details.precios summary { font-weight: 700; font-size: 13px; color: var(--muted, #7A7D83); cursor: pointer; }
+  .comparacion { font-size: 11px; margin-top: 2px; min-height: 14px; }
+  .btn-grande { padding: 13px; font-size: 15px; font-weight: 800; width: 100%; }
+  .cerrar-hoja, .fondo-hoja, .boton-flotante { display: none; }
+
+  /* ---- Celular / pantallas angostas ---- */
+  @media (max-width: 1000px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpi b { font-size: 19px; }
+    .contenido { padding: 0 10px 90px; }
+    .columnas { grid-template-columns: 1fr; }
+    .tabla-scroll { display: none; }
+    .tarjetas { display: block; }
+    .tarjeta-prod { padding: 11px 12px; border-bottom: 1px solid var(--border, #E4E6E9); display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; align-items: center; }
+    .tarjeta-prod.sel { background: rgba(95,174,70,0.14); }
+    .tarjeta-prod .grande { font-size: 20px; font-weight: 800; text-align: right; }
+    .tarjeta-prod .sub { display: flex; gap: 8px; color: var(--muted, #7A7D83); font-size: 12px; align-items: center; flex-wrap: wrap; }
+    .tarjeta-prod .acciones-fila { grid-column: 1 / 3; justify-content: flex-start; margin-top: 6px; }
+    .panel-mov { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 90; border-radius: 18px 18px 0 0; max-height: 92vh; overflow-y: auto; box-shadow: 0 -8px 24px rgba(0,0,0,0.35); }
+    .panel-mov.abierto { display: block; }
+    .fondo-hoja { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 80; }
+    .fondo-hoja.abierto { display: block; }
+    .cerrar-hoja { display: block; }
+    .boton-flotante { display: block; position: fixed; right: 16px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
+  }
 </style>
 </head>
 <body>
@@ -35,76 +122,94 @@
   </div>
 
   <div class="contenido">
-    <div class="card form-ajuste" style="border-left: 4px solid #5FAE46;">
-      <h3>➕ Agregar Inventario</h3>
-      <p style="font-size:13px; color:#666; margin-top:-6px;">Usa esto cuando recibiste mercancía sin registrar una compra, o cuando el conteo físico dio MÁS de lo que el sistema tenía.</p>
-
-      <input type="text" id="buscadorEntrada" placeholder="🔍 Buscar producto por nombre o código de barras..." oninput="buscarProductoEntrada()">
-      <div id="sugerenciasEntrada" style="display:none; background:white; border:1px solid #DDD; border-radius:10px; margin-top:-4px; max-height:160px; overflow-y:auto;"></div>
-      <div id="productoEntradaInfo" style="display:none; background:#F4F5F6; border-radius:10px; padding:10px 14px; font-size:14px;">
-        <b id="nombreProductoEntrada"></b><br>
-        <span style="color:#666;">Hay actualmente: <b id="existenciaProductoEntrada"></b></span><br>
-        <span style="color:#666; font-size:13px;">
-          Costo anterior: <b id="costoAnteriorEntrada"></b> ·
-          Venta anterior: <b id="ventaAnteriorEntrada"></b> ·
-          Mayoreo anterior: <b id="mayoreoAnteriorEntrada"></b>
-        </span>
-      </div>
-
-      <div class="fila-doble">
-        <input type="number" id="cantidadEntrada" placeholder="Cantidad a agregar" step="0.01">
-        <input type="text" id="motivoEntrada" placeholder="Motivo (ej. Conteo físico, mercancía sin factura)">
-      </div>
-
-      <p class="subtitulo-seccion" style="margin:4px 0 0;">Actualizar precios (opcional — déjalos en blanco si no cambiaron)</p>
-      <div class="fila-triple" style="display:flex; gap:10px;">
-        <div style="flex:1;">
-          <input type="number" id="costoEntrada" placeholder="Precio costo" step="0.01" style="width:100%;" oninput="compararPrecio('costo')">
-          <div id="comparacionCosto" style="font-size:12px; margin-top:2px;"></div>
-        </div>
-        <div style="flex:1;">
-          <input type="number" id="ventaEntrada" placeholder="Precio venta" step="0.01" style="width:100%;" oninput="compararPrecio('venta')">
-          <div id="comparacionVenta" style="font-size:12px; margin-top:2px;"></div>
-        </div>
-        <div style="flex:1;">
-          <input type="number" id="mayoreoEntrada" placeholder="Precio mayoreo" step="0.01" style="width:100%;" oninput="compararPrecio('mayoreo')">
-          <div id="comparacionMayoreo" style="font-size:12px; margin-top:2px;"></div>
-        </div>
-      </div>
-
-      <button class="btn btn-primary" onclick="registrarEntradaManual()">Agregar al inventario</button>
+    <div class="kpis">
+      <div class="kpi"><b id="kpiCosto">$0.00</b><span>Valor de costo</span></div>
+      <div class="kpi"><b id="kpiVenta">$0.00</b><span>Valor potencial de venta</span></div>
+      <div class="kpi margen"><b id="kpiMargen">$0.00</b><span>Margen potencial</span></div>
+      <div class="kpi amarillo"><b><span id="kpiBajos" style="font-size:inherit; color:inherit;">0</span> <small>bajos</small> · <span id="kpiAgotados" style="font-size:inherit; color:inherit;">0</span> <small>agotados</small></b><span>Productos por surtir</span></div>
     </div>
 
-    <div class="card form-ajuste" style="border-left: 4px solid #C62828;">
-      <h3>➖ Registrar Merma o Ajuste (resta)</h3>
-      <p style="font-size:13px; color:#666; margin-top:-6px;">Usa esto para descontar por caducidad, desperdicio, o cuando el conteo físico dio MENOS de lo esperado.</p>
-
-      <input type="text" id="buscadorAjuste" placeholder="🔍 Buscar producto por nombre o código de barras..." oninput="buscarProductoAjuste()">
-      <div id="sugerenciasAjuste" style="display:none; background:white; border:1px solid #DDD; border-radius:10px; margin-top:-4px; max-height:160px; overflow-y:auto;"></div>
-      <div id="productoAjusteInfo" style="display:none; background:#F4F5F6; border-radius:10px; padding:10px 14px; font-size:14px;">
-        <b id="nombreProductoAjuste"></b> — Hay actualmente: <b id="existenciaProductoAjuste"></b>
+    <div class="columnas">
+      <!-- Lista de existencias -->
+      <div class="caja">
+        <div class="barra">
+          <div class="buscar"><input type="text" id="buscadorLista" placeholder="Buscar producto o código…" oninput="aplicarFiltrosLista()"></div>
+          <span class="chip activo" data-estado="todos" onclick="elegirEstado('todos')">Todos<i id="cntTodos"></i></span>
+          <span class="chip amarillo" data-estado="bajo" onclick="elegirEstado('bajo')">⚠ Bajo<i id="cntBajo"></i></span>
+          <span class="chip rojo" data-estado="agotado" onclick="elegirEstado('agotado')">⛔ Agotados<i id="cntAgotado"></i></span>
+        </div>
+        <div class="tabla-scroll">
+          <table class="tabla-inv">
+            <thead><tr><th>Producto</th><th class="numero">Existencia</th><th>Estado</th><th class="numero">Mínimo</th><th class="numero">Movimiento</th></tr></thead>
+            <tbody id="tablaInventario"></tbody>
+          </table>
+        </div>
+        <div class="tarjetas" id="tarjetasInventario"></div>
+        <div style="padding:8px 12px; font-size:12px; color:var(--muted,#7A7D83);" id="pieLista"></div>
       </div>
 
-      <div class="fila-doble">
-        <select id="tipoAjuste">
-          <option value="merma">Merma (caducidad/desperdicio)</option>
-          <option value="ajuste_manual">Ajuste manual (conteo físico dio menos)</option>
-        </select>
-        <input type="number" id="cantidadAjuste" placeholder="Cantidad a descontar" step="0.01">
+      <!-- Panel de movimiento (en celular sale desde abajo) -->
+      <div class="caja panel-mov" id="panelMov">
+        <div class="pestanas">
+          <button class="pestana activa" id="pestanaEntrada" onclick="elegirPestana('entrada')">➕ Agregar</button>
+          <button class="pestana" id="pestanaResta" onclick="elegirPestana('resta')">➖ Merma / Ajuste</button>
+        </div>
+        <div class="cuerpo-mov">
+          <div class="ayuda-mov" id="ayudaMov"></div>
+
+          <div>
+            <div class="buscar-mov"><input type="text" id="buscadorMov" placeholder="Buscar producto o escanear código…" autocomplete="off" oninput="buscarProductoMov()"></div>
+            <div class="sugerencias" id="sugerenciasMov"></div>
+          </div>
+
+          <div class="ficha" id="fichaProducto" style="display:none;">
+            <b class="n" id="fichaNombre"></b>
+            <div class="datos">
+              <div><b id="fichaExistencia"></b>Hay ahora</div>
+              <div><b id="fichaCosto"></b>Costo</div>
+              <div><b id="fichaVenta"></b>Venta</div>
+              <div><b id="fichaMayoreo"></b>Mayoreo</div>
+            </div>
+          </div>
+
+          <!-- Agregar -->
+          <div id="formEntrada" style="display:grid; gap:10px;">
+            <div class="dos">
+              <input type="number" id="cantidadEntrada" placeholder="Cantidad a agregar" step="0.01" inputmode="decimal">
+              <input type="text" id="motivoEntrada" placeholder="Motivo (ej. Conteo físico)">
+            </div>
+            <details class="precios">
+              <summary>Actualizar precios (opcional)</summary>
+              <div class="tres">
+                <div><input type="number" id="costoEntrada" placeholder="Costo" step="0.01" inputmode="decimal" oninput="compararPrecio('costo')"><div class="comparacion" id="comparacionCosto"></div></div>
+                <div><input type="number" id="ventaEntrada" placeholder="Venta" step="0.01" inputmode="decimal" oninput="compararPrecio('venta')"><div class="comparacion" id="comparacionVenta"></div></div>
+                <div><input type="number" id="mayoreoEntrada" placeholder="Mayoreo" step="0.01" inputmode="decimal" oninput="compararPrecio('mayoreo')"><div class="comparacion" id="comparacionMayoreo"></div></div>
+              </div>
+              <div class="ayuda-mov" style="margin-top:6px;">Déjalos en blanco si no cambiaron.</div>
+            </details>
+            <button class="btn btn-primary btn-grande" onclick="registrarEntradaManual()">Agregar al inventario</button>
+          </div>
+
+          <!-- Merma / ajuste -->
+          <div id="formResta" style="display:none; gap:10px;">
+            <div class="dos">
+              <select id="tipoAjuste">
+                <option value="merma">Merma (caducidad/desperdicio)</option>
+                <option value="ajuste_manual">Ajuste manual (conteo físico dio menos)</option>
+              </select>
+              <input type="number" id="cantidadAjuste" placeholder="Cantidad a descontar" step="0.01" inputmode="decimal">
+            </div>
+            <input type="text" id="motivoAjuste" placeholder="Motivo (ej. Caducó, se cayó al piso)">
+            <button class="btn btn-danger btn-grande" onclick="registrarAjuste()">Registrar resta</button>
+          </div>
+
+          <button class="btn btn-secondary cerrar-hoja" onclick="cerrarHoja()">Cerrar</button>
+        </div>
       </div>
-      <input type="text" id="motivoAjuste" placeholder="Motivo (ej. Caducó, se cayó al piso)">
-      <button class="btn btn-danger" onclick="registrarAjuste()">Registrar resta</button>
     </div>
-
-    <h3>Inventario Valorizado</h3>
-    <div class="tarjetas-valorizado" id="tarjetasValorizado" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px;"></div>
-
-    <h3>Existencias actuales</h3>
-    <table class="tabla-inv">
-      <thead><tr><th>Producto</th><th>Existencia</th><th>Mínimo</th><th>Ajustar mínimo</th></tr></thead>
-      <tbody id="tablaInventario"></tbody>
-    </table>
   </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
+  <button class="boton-flotante" onclick="abrirHoja()">＋ Movimiento</button>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -113,119 +218,250 @@
 <script>
 requiereLogin();
 
-async function cargarInventario() {
-  const inventario = await apiFetch('/inventario');
-  const tbody = document.getElementById('tablaInventario');
-  tbody.innerHTML = '';
-  inventario.forEach(i => {
-    const unidad = i.tipo_venta === 'unidad' ? 'pzas' : 'kg';
-    const bajo = parseFloat(i.existencia_actual) <= parseFloat(i.stock_minimo);
-    const tr = document.createElement('tr');
-    if (bajo) tr.className = 'fila-baja';
-    tr.innerHTML = `
-      <td>${i.nombre}${bajo ? ' ⚠️' : ''}</td>
-      <td>${parseFloat(i.existencia_actual).toFixed(2)} ${unidad}</td>
-      <td>${parseFloat(i.stock_minimo).toFixed(2)} ${unidad}</td>
-      <td><input type="number" value="${i.stock_minimo}" style="width:80px;" onchange="actualizarMinimo(${i.producto_id}, this.value)"></td>
-    `;
-    tbody.appendChild(tr);
-  });
+let catalogoInventarioCompleto = [];
+let productoSel = null;          // producto elegido en el panel
+let pestanaActual = 'entrada';   // entrada | resta
+let estadoFiltro = 'todos';
+const esAngosto = window.matchMedia('(max-width: 1000px)');
 
-  // Catálogo completo en memoria para el buscador de "Agregar Inventario"
-  catalogoInventarioCompleto = inventario;
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const unidadDe = (p) => p.tipo_venta === 'unidad' ? 'pzas' : 'kg';
+
+function estadoDe(p) {
+  const e = parseFloat(p.existencia_actual), m = parseFloat(p.stock_minimo);
+  if (e <= 0) return 'agotado';
+  if (e <= m) return 'bajo';
+  return 'orden';
+}
+const ROTULO = { agotado: 'Agotado', bajo: 'Bajo', orden: 'En orden' };
+const COLOR = { agotado: '#E53935', bajo: '#F9A825', orden: '#5FAE46' };
+
+// ---------- Carga ----------
+async function cargarInventario() {
+  try {
+    const inventario = await apiFetch('/inventario');
+    catalogoInventarioCompleto = inventario.map(p => ({ ...p, _estado: estadoDe(p) }));
+    const cuenta = (e) => catalogoInventarioCompleto.filter(p => p._estado === e).length;
+    document.getElementById('cntTodos').textContent = catalogoInventarioCompleto.length.toLocaleString('en-US');
+    document.getElementById('cntBajo').textContent = cuenta('bajo').toLocaleString('en-US');
+    document.getElementById('cntAgotado').textContent = cuenta('agotado').toLocaleString('en-US');
+    document.getElementById('kpiBajos').textContent = cuenta('bajo').toLocaleString('en-US');
+    document.getElementById('kpiAgotados').textContent = cuenta('agotado').toLocaleString('en-US');
+    // Si hay un producto elegido en el panel, se refresca con los datos nuevos
+    if (productoSel) {
+      const actualizado = catalogoInventarioCompleto.find(p => p.producto_id === productoSel.producto_id);
+      if (actualizado) { productoSel = actualizado; pintarFicha(); }
+    }
+    aplicarFiltrosLista();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
 }
 
-let catalogoInventarioCompleto = [];
-let productoEntradaSeleccionado = null;
+async function cargarValorizado() {
+  try {
+    const data = await apiFetch('/inventario/valorizado');
+    const t = data.totales;
+    document.getElementById('kpiCosto').textContent = dinero(t.valor_costo);
+    document.getElementById('kpiVenta').textContent = dinero(t.valor_venta_potencial);
+    document.getElementById('kpiMargen').textContent = dinero(t.margen_potencial);
+  } catch (err) {
+    console.error(err);
+  }
+}
 
-function buscarProductoEntrada() {
-  const texto = document.getElementById('buscadorEntrada').value.trim().toLowerCase();
-  const sugerencias = document.getElementById('sugerenciasEntrada');
-  productoEntradaSeleccionado = null;
-  document.getElementById('productoEntradaInfo').style.display = 'none';
+// ---------- Lista ----------
+function elegirEstado(estado) {
+  estadoFiltro = estado;
+  document.querySelectorAll('.chip[data-estado]').forEach(c => c.classList.toggle('activo', c.dataset.estado === estado));
+  aplicarFiltrosLista();
+}
+
+function aplicarFiltrosLista() {
+  const texto = sinAcentos(document.getElementById('buscadorLista').value.trim());
+  const lista = catalogoInventarioCompleto.filter(p => {
+    if (estadoFiltro !== 'todos' && p._estado !== estadoFiltro) return false;
+    if (texto && !(sinAcentos(p.nombre).includes(texto) || sinAcentos(p.codigo_barras).includes(texto))) return false;
+    return true;
+  });
+  renderLista(lista);
+}
+
+function renderLista(lista) {
+  const selId = productoSel ? productoSel.producto_id : null;
+  if (esAngosto.matches) {
+    document.getElementById('tarjetasInventario').innerHTML = lista.map(p => `
+      <div class="tarjeta-prod ${p.producto_id === selId ? 'sel' : ''}">
+        <div class="nom">${escapar(p.nombre)}</div>
+        <div class="grande" style="color:${p._estado === 'orden' ? 'inherit' : COLOR[p._estado]}">${parseFloat(p.existencia_actual).toFixed(2)}</div>
+        <div class="sub"><span class="cod">${escapar(p.codigo_barras || '—')}</span><span class="estado ${p._estado}">${ROTULO[p._estado]}</span><span>Mín ${parseFloat(p.stock_minimo).toFixed(2)} ${unidadDe(p)}</span></div>
+        <div class="acciones-fila">
+          <button class="mini entrada" onclick="abrirMovimiento('entrada', ${p.producto_id})">＋ Entrada</button>
+          <button class="mini merma" onclick="abrirMovimiento('resta', ${p.producto_id})">－ Merma</button>
+        </div>
+      </div>`).join('') || '<div class="vacio">Sin productos que coincidan</div>';
+    document.getElementById('tablaInventario').innerHTML = '';
+  } else {
+    document.getElementById('tablaInventario').innerHTML = lista.map(p => {
+      const e = parseFloat(p.existencia_actual), min = parseFloat(p.stock_minimo), max = parseFloat(p.stock_maximo);
+      const base = max > 0 ? max : (min > 0 ? min * 2 : 0);
+      const pct = base > 0 ? Math.max(0, Math.min(100, e / base * 100)) : 0;
+      return `
+        <tr class="${p.producto_id === selId ? 'sel' : ''}">
+          <td><div class="nom">${escapar(p.nombre)}</div><div class="cod">${escapar(p.codigo_barras || '—')}</div></td>
+          <td class="numero"><b style="color:${p._estado === 'orden' ? 'inherit' : COLOR[p._estado]}">${e.toFixed(2)}</b> <span class="cod">${unidadDe(p)}</span>${base > 0 ? `<span class="medidor"><i style="width:${pct}%; background:${COLOR[p._estado]}"></i></span>` : ''}</td>
+          <td><span class="estado ${p._estado}">${ROTULO[p._estado]}</span></td>
+          <td class="numero"><input type="number" class="input-minimo" value="${min}" step="0.01" title="Mínimo (clic para cambiarlo)" onchange="actualizarMinimo(${p.producto_id}, this.value)"></td>
+          <td><div class="acciones-fila">
+            <button class="mini entrada" onclick="abrirMovimiento('entrada', ${p.producto_id})">＋ Entrada</button>
+            <button class="mini merma" onclick="abrirMovimiento('resta', ${p.producto_id})">－ Merma</button>
+          </div></td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" class="vacio">Sin productos que coincidan</td></tr>';
+    document.getElementById('tarjetasInventario').innerHTML = '';
+  }
+  document.getElementById('pieLista').textContent = `Mostrando ${lista.length.toLocaleString('en-US')} de ${catalogoInventarioCompleto.length.toLocaleString('en-US')} productos`;
+}
+esAngosto.addEventListener('change', () => aplicarFiltrosLista());
+
+// Cambiar el mínimo ya no recarga toda la lista: solo se actualiza ese producto.
+async function actualizarMinimo(producto_id, valor) {
+  try {
+    const minimo = parseFloat(valor || 0);
+    await apiFetch(`/inventario/${producto_id}/minimo`, { method: 'PUT', body: JSON.stringify({ stock_minimo: minimo }) });
+    const p = catalogoInventarioCompleto.find(x => x.producto_id === producto_id);
+    if (p) { p.stock_minimo = minimo; p._estado = estadoDe(p); }
+    mostrarToast('Mínimo actualizado', 'exito');
+    cargarInventario();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    cargarInventario();
+  }
+}
+
+// ---------- Panel de movimiento ----------
+function elegirPestana(cual) {
+  pestanaActual = cual;
+  document.getElementById('pestanaEntrada').classList.toggle('activa', cual === 'entrada');
+  document.getElementById('pestanaResta').classList.toggle('activa', cual === 'resta');
+  document.getElementById('pestanaResta').classList.toggle('resta', true);
+  document.getElementById('formEntrada').style.display = cual === 'entrada' ? 'grid' : 'none';
+  document.getElementById('formResta').style.display = cual === 'resta' ? 'grid' : 'none';
+  document.getElementById('ayudaMov').textContent = cual === 'entrada'
+    ? 'Usa esto cuando recibiste mercancía sin registrar una compra, o cuando el conteo físico dio MÁS de lo que el sistema tenía.'
+    : 'Usa esto para descontar por caducidad, desperdicio, o cuando el conteo físico dio MENOS de lo esperado.';
+}
+
+function abrirHoja() {
+  document.getElementById('panelMov').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+}
+function cerrarHoja() {
+  document.getElementById('panelMov').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+}
+
+// Botón "＋ Entrada" / "－ Merma" de una fila: llena el panel con ese producto.
+function abrirMovimiento(cual, producto_id) {
+  const p = catalogoInventarioCompleto.find(x => x.producto_id === producto_id);
+  if (!p) return;
+  elegirPestana(cual);
+  seleccionarProducto(p);
+  if (esAngosto.matches) abrirHoja();
+  const campo = document.getElementById(cual === 'entrada' ? 'cantidadEntrada' : 'cantidadAjuste');
+  setTimeout(() => campo.focus(), 50);
+  aplicarFiltrosLista(); // marca la fila elegida
+}
+
+function buscarProductoMov() {
+  const texto = sinAcentos(document.getElementById('buscadorMov').value.trim());
+  const sugerencias = document.getElementById('sugerenciasMov');
+  productoSel = null;
+  document.getElementById('fichaProducto').style.display = 'none';
+  limpiarComparaciones();
 
   if (!texto) { sugerencias.style.display = 'none'; return; }
 
+  // Código de barras exacto (lector físico): se selecciona directo
+  const exacta = catalogoInventarioCompleto.find(p => p.codigo_barras && sinAcentos(p.codigo_barras) === texto);
+  if (exacta) { seleccionarProducto(exacta); sugerencias.style.display = 'none'; aplicarFiltrosLista(); return; }
+
   const coincidencias = catalogoInventarioCompleto.filter(p =>
-    p.nombre.toLowerCase().includes(texto) ||
-    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
+    sinAcentos(p.nombre).includes(texto) || (p.codigo_barras && sinAcentos(p.codigo_barras).includes(texto))
   ).slice(0, 8);
 
-  // Si el texto coincide exacto con un código de barras, selecciona directo
-  // (así al escanear con el lector físico no hace falta tocar nada más).
-  const coincidenciaExacta = catalogoInventarioCompleto.find(p => p.codigo_barras && p.codigo_barras.toLowerCase() === texto);
-  if (coincidenciaExacta) {
-    seleccionarProductoEntrada(coincidenciaExacta);
-    sugerencias.style.display = 'none';
-    return;
-  }
-
-  if (coincidencias.length === 0) {
-    sugerencias.innerHTML = '<div class="sugerencia-item" style="color:#888;">Sin coincidencias</div>';
-    sugerencias.style.display = 'block';
-    return;
-  }
-
-  sugerencias.innerHTML = coincidencias.map(p => `
-    <div class="sugerencia-item" onclick='seleccionarProductoEntradaPorId(${p.producto_id})'>${p.nombre}</div>
-  `).join('');
+  sugerencias.innerHTML = coincidencias.length
+    ? coincidencias.map(p => `<div class="sugerencia-item" onclick="elegirSugerencia(${p.producto_id})">${escapar(p.nombre)} <span class="cod">· ${parseFloat(p.existencia_actual).toFixed(2)} ${unidadDe(p)}</span></div>`).join('')
+    : '<div class="sugerencia-item" style="color:#888;">Sin coincidencias</div>';
   sugerencias.style.display = 'block';
 }
 
-function seleccionarProductoEntradaPorId(producto_id) {
-  const producto = catalogoInventarioCompleto.find(p => p.producto_id === producto_id);
-  if (producto) seleccionarProductoEntrada(producto);
+function elegirSugerencia(producto_id) {
+  const p = catalogoInventarioCompleto.find(x => x.producto_id === producto_id);
+  if (p) { seleccionarProducto(p); document.getElementById('sugerenciasMov').style.display = 'none'; aplicarFiltrosLista(); }
 }
 
-function seleccionarProductoEntrada(producto) {
-  productoEntradaSeleccionado = producto;
-  document.getElementById('buscadorEntrada').value = producto.nombre;
-  document.getElementById('sugerenciasEntrada').style.display = 'none';
-  document.getElementById('productoEntradaInfo').style.display = 'block';
-  document.getElementById('nombreProductoEntrada').textContent = producto.nombre;
-  const unidad = producto.tipo_venta === 'unidad' ? 'pzas' : 'kg';
-  document.getElementById('existenciaProductoEntrada').textContent = `${parseFloat(producto.existencia_actual).toFixed(2)} ${unidad}`;
+function seleccionarProducto(producto) {
+  productoSel = producto;
+  document.getElementById('buscadorMov').value = producto.nombre;
+  document.getElementById('sugerenciasMov').style.display = 'none';
+  limpiarComparaciones();
+  pintarFicha();
+}
 
-  document.getElementById('costoAnteriorEntrada').textContent = producto.precio_costo ? `$${parseFloat(producto.precio_costo).toFixed(2)}` : 'N/D';
-  document.getElementById('ventaAnteriorEntrada').textContent = producto.precio ? `$${parseFloat(producto.precio).toFixed(2)}` : 'N/D';
-  document.getElementById('mayoreoAnteriorEntrada').textContent = producto.precio_mayoreo ? `$${parseFloat(producto.precio_mayoreo).toFixed(2)}` : 'N/D';
+function pintarFicha() {
+  const p = productoSel;
+  if (!p) return;
+  document.getElementById('fichaProducto').style.display = 'block';
+  document.getElementById('fichaNombre').textContent = p.nombre;
+  document.getElementById('fichaExistencia').textContent = `${parseFloat(p.existencia_actual).toFixed(2)} ${unidadDe(p)}`;
+  document.getElementById('fichaCosto').textContent = p.precio_costo ? dinero(p.precio_costo) : 'N/D';
+  document.getElementById('fichaVenta').textContent = p.precio ? dinero(p.precio) : 'N/D';
+  document.getElementById('fichaMayoreo').textContent = p.precio_mayoreo ? dinero(p.precio_mayoreo) : 'N/D';
+}
 
-  // Limpia comparaciones de una selección anterior
+function limpiarComparaciones() {
   ['comparacionCosto', 'comparacionVenta', 'comparacionMayoreo'].forEach(id => document.getElementById(id).textContent = '');
 }
 
 // Muestra si el precio nuevo subió, bajó, o quedó igual respecto al anterior,
 // y por cuánto — para detectar aumentos o rebajas de proveedor de un vistazo.
 function compararPrecio(campo) {
-  if (!productoEntradaSeleccionado) return;
+  if (!productoSel) return;
   const mapaCampos = {
     costo: { input: 'costoEntrada', anterior: 'precio_costo', salida: 'comparacionCosto' },
     venta: { input: 'ventaEntrada', anterior: 'precio', salida: 'comparacionVenta' },
     mayoreo: { input: 'mayoreoEntrada', anterior: 'precio_mayoreo', salida: 'comparacionMayoreo' }
   };
   const { input, anterior, salida } = mapaCampos[campo];
-
   const nuevo = parseFloat(document.getElementById(input).value);
-  const anteriorValor = parseFloat(productoEntradaSeleccionado[anterior]);
+  const anteriorValor = parseFloat(productoSel[anterior]);
   const salidaEl = document.getElementById(salida);
-
   if (isNaN(nuevo) || isNaN(anteriorValor)) { salidaEl.textContent = ''; return; }
 
   const diferencia = nuevo - anteriorValor;
   const porcentaje = anteriorValor > 0 ? Math.abs((diferencia / anteriorValor) * 100).toFixed(1) : '0.0';
+  if (diferencia > 0) salidaEl.innerHTML = `<span style="color:#C62828;">▲ Subió $${diferencia.toFixed(2)} (${porcentaje}%)</span>`;
+  else if (diferencia < 0) salidaEl.innerHTML = `<span style="color:#5FAE46;">▼ Bajó $${Math.abs(diferencia).toFixed(2)} (${porcentaje}%)</span>`;
+  else salidaEl.innerHTML = `<span style="color:#888;">= Sin cambio</span>`;
+}
 
-  if (diferencia > 0) {
-    salidaEl.innerHTML = `<span style="color:#C62828;">▲ Subió $${diferencia.toFixed(2)} (${porcentaje}%)</span>`;
-  } else if (diferencia < 0) {
-    salidaEl.innerHTML = `<span style="color:#5FAE46;">▼ Bajó $${Math.abs(diferencia).toFixed(2)} (${porcentaje}%)</span>`;
-  } else {
-    salidaEl.innerHTML = `<span style="color:#888;">= Sin cambio</span>`;
-  }
+function terminarMovimiento() {
+  productoSel = null;
+  document.getElementById('buscadorMov').value = '';
+  document.getElementById('fichaProducto').style.display = 'none';
+  limpiarComparaciones();
+  cargarInventario();
+  cargarValorizado();
+  if (esAngosto.matches) cerrarHoja();
+  else setTimeout(() => document.getElementById('buscadorMov').focus(), 50);
 }
 
 async function registrarEntradaManual() {
-  if (!productoEntradaSeleccionado) { mostrarToast('Busca y selecciona un producto primero', 'error'); return; }
-  const producto_id = productoEntradaSeleccionado.producto_id;
+  if (!productoSel) { mostrarToast('Busca y selecciona un producto primero', 'error'); return; }
+  const producto_id = productoSel.producto_id;
   const cantidad = parseFloat(document.getElementById('cantidadEntrada').value || 0);
   const motivo = document.getElementById('motivoEntrada').value.trim();
   const precio_costo = parseFloat(document.getElementById('costoEntrada').value || 0) || null;
@@ -240,82 +476,16 @@ async function registrarEntradaManual() {
       body: JSON.stringify({ producto_id, cantidad, tipo: 'entrada_manual', motivo, precio_costo, precio, precio_mayoreo })
     });
     mostrarToast('Inventario agregado correctamente', 'exito');
-    document.getElementById('buscadorEntrada').value = '';
-    document.getElementById('cantidadEntrada').value = '';
-    document.getElementById('motivoEntrada').value = '';
-    document.getElementById('costoEntrada').value = '';
-    document.getElementById('ventaEntrada').value = '';
-    document.getElementById('mayoreoEntrada').value = '';
-    document.getElementById('productoEntradaInfo').style.display = 'none';
-    ['comparacionCosto', 'comparacionVenta', 'comparacionMayoreo'].forEach(id => document.getElementById(id).textContent = '');
-    productoEntradaSeleccionado = null;
-    cargarInventario();
+    ['cantidadEntrada', 'motivoEntrada', 'costoEntrada', 'ventaEntrada', 'mayoreoEntrada'].forEach(id => document.getElementById(id).value = '');
+    terminarMovimiento();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
-}
-
-async function actualizarMinimo(producto_id, valor) {
-  try {
-    await apiFetch(`/inventario/${producto_id}/minimo`, { method: 'PUT', body: JSON.stringify({ stock_minimo: parseFloat(valor || 0) }) });
-    cargarInventario();
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
-}
-
-let productoAjusteSeleccionado = null;
-
-function buscarProductoAjuste() {
-  const texto = document.getElementById('buscadorAjuste').value.trim().toLowerCase();
-  const sugerencias = document.getElementById('sugerenciasAjuste');
-  productoAjusteSeleccionado = null;
-  document.getElementById('productoAjusteInfo').style.display = 'none';
-
-  if (!texto) { sugerencias.style.display = 'none'; return; }
-
-  const coincidenciaExacta = catalogoInventarioCompleto.find(p => p.codigo_barras && p.codigo_barras.toLowerCase() === texto);
-  if (coincidenciaExacta) {
-    seleccionarProductoAjuste(coincidenciaExacta);
-    sugerencias.style.display = 'none';
-    return;
-  }
-
-  const coincidencias = catalogoInventarioCompleto.filter(p =>
-    p.nombre.toLowerCase().includes(texto) ||
-    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
-  ).slice(0, 8);
-
-  if (coincidencias.length === 0) {
-    sugerencias.innerHTML = '<div class="sugerencia-item" style="color:#888;">Sin coincidencias</div>';
-    sugerencias.style.display = 'block';
-    return;
-  }
-
-  sugerencias.innerHTML = coincidencias.map(p => `
-    <div class="sugerencia-item" onclick='seleccionarProductoAjustePorId(${p.producto_id})'>${p.nombre}</div>
-  `).join('');
-  sugerencias.style.display = 'block';
-}
-
-function seleccionarProductoAjustePorId(producto_id) {
-  const producto = catalogoInventarioCompleto.find(p => p.producto_id === producto_id);
-  if (producto) seleccionarProductoAjuste(producto);
-}
-
-function seleccionarProductoAjuste(producto) {
-  productoAjusteSeleccionado = producto;
-  document.getElementById('buscadorAjuste').value = producto.nombre;
-  document.getElementById('sugerenciasAjuste').style.display = 'none';
-  document.getElementById('productoAjusteInfo').style.display = 'block';
-  document.getElementById('nombreProductoAjuste').textContent = producto.nombre;
-  const unidad = producto.tipo_venta === 'unidad' ? 'pzas' : 'kg';
-  document.getElementById('existenciaProductoAjuste').textContent = `${parseFloat(producto.existencia_actual).toFixed(2)} ${unidad}`;
 }
 
 async function registrarAjuste() {
-  if (!productoAjusteSeleccionado) { mostrarToast('Busca y selecciona un producto primero', 'error'); return; }
-  const producto_id = productoAjusteSeleccionado.producto_id;
+  if (!productoSel) { mostrarToast('Busca y selecciona un producto primero', 'error'); return; }
+  const producto_id = productoSel.producto_id;
   const tipo = document.getElementById('tipoAjuste').value;
   const cantidad = parseFloat(document.getElementById('cantidadAjuste').value || 0);
   const motivo = document.getElementById('motivoAjuste').value.trim();
@@ -325,40 +495,22 @@ async function registrarAjuste() {
   try {
     await apiFetch('/inventario/ajuste', { method: 'POST', body: JSON.stringify({ producto_id, cantidad, tipo, motivo }) });
     mostrarToast('Movimiento registrado correctamente', 'exito');
-    document.getElementById('buscadorAjuste').value = '';
-    document.getElementById('cantidadAjuste').value = '';
-    document.getElementById('motivoAjuste').value = '';
-    document.getElementById('productoAjusteInfo').style.display = 'none';
-    productoAjusteSeleccionado = null;
-    cargarInventario();
+    ['cantidadAjuste', 'motivoAjuste'].forEach(id => document.getElementById(id).value = '');
+    terminarMovimiento();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-async function cargarValorizado() {
-  try {
-    const data = await apiFetch('/inventario/valorizado');
-    const t = data.totales;
-    document.getElementById('tarjetasValorizado').innerHTML = `
-      <div class="card" style="text-align:center;">
-        <div style="font-size:20px; font-weight:700;">$${t.valor_costo.toFixed(2)}</div>
-        <div style="font-size:12px; color:#666;">Valor de costo</div>
-      </div>
-      <div class="card" style="text-align:center;">
-        <div style="font-size:20px; font-weight:700;">$${t.valor_venta_potencial.toFixed(2)}</div>
-        <div style="font-size:12px; color:#666;">Valor potencial de venta</div>
-      </div>
-      <div class="card" style="text-align:center; background:#E8F5E9;">
-        <div style="font-size:20px; font-weight:700; color:#5FAE46;">$${t.margen_potencial.toFixed(2)}</div>
-        <div style="font-size:12px; color:#666;">Margen potencial</div>
-      </div>
-    `;
-  } catch (err) {
-    console.error(err);
-  }
-}
+// Enter en cantidad / motivo = confirmar el movimiento
+['cantidadEntrada', 'motivoEntrada', 'costoEntrada', 'ventaEntrada', 'mayoreoEntrada'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); registrarEntradaManual(); } }));
+['cantidadAjuste', 'motivoAjuste'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); registrarAjuste(); } }));
 
+// La sección de precios queda abierta en computadora y plegada en celular (para ahorrar espacio).
+document.querySelector('details.precios').open = !esAngosto.matches;
+elegirPestana('entrada');
 cargarInventario();
 cargarValorizado();
 </script>

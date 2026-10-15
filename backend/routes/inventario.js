@@ -10,8 +10,9 @@ router.use(verificarToken, requiereSucursalId);
 
 // Inventario valorizado: costo total, valor potencial de venta, margen potencial.
 // El "costo" usa el promedio de costo_unitario de las compras registradas de
-// cada producto — si un producto nunca se ha comprado (solo se dio de alta a
-// mano), no hay costo real y se indica "Costo no disponible" en vez de inventarlo.
+// cada producto; si un producto nunca se ha comprado (se dio de alta a mano o se
+// importó de Excel) se usa el costo capturado en el propio producto. Solo si no
+// hay ninguno de los dos, ese producto no aporta costo (no se inventa uno).
 router.get('/valorizado', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, res) => {
   try {
     const result = await pool.query(
@@ -26,8 +27,8 @@ router.get('/valorizado', verificarToken, requierePermiso('INVENTARIO_VER'), asy
          p.tipo_venta,
          p.precio,
          COALESCE(i.existencia_actual, 0) AS existencia_actual,
-         cp.costo_promedio,
-         CASE WHEN cp.costo_promedio IS NOT NULL THEN COALESCE(i.existencia_actual, 0) * cp.costo_promedio ELSE NULL END AS valor_costo,
+         COALESCE(cp.costo_promedio, p.precio_costo) AS costo_promedio,
+         CASE WHEN COALESCE(cp.costo_promedio, p.precio_costo) IS NOT NULL THEN COALESCE(i.existencia_actual, 0) * COALESCE(cp.costo_promedio, p.precio_costo) ELSE NULL END AS valor_costo,
          COALESCE(i.existencia_actual, 0) * p.precio AS valor_venta_potencial
        FROM productos p
        LEFT JOIN inventario i ON p.id = i.producto_id
@@ -93,7 +94,8 @@ router.get('/', verificarToken, requierePermiso('INVENTARIO_VER'), async (req, r
       `SELECT p.id AS producto_id, p.nombre, p.tipo_venta, p.imagen_url, p.codigo_barras,
               p.precio_costo, p.precio, p.precio_mayoreo,
               COALESCE(i.existencia_actual, 0) AS existencia_actual,
-              COALESCE(i.stock_minimo, 0) AS stock_minimo
+              COALESCE(i.stock_minimo, 0) AS stock_minimo,
+              COALESCE(i.stock_maximo, 0) AS stock_maximo
        FROM productos p
        LEFT JOIN inventario i ON p.id = i.producto_id
        WHERE p.sucursal_id = $1 AND p.activo = true
