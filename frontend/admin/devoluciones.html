@@ -9,20 +9,48 @@
 <title>Devoluciones - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 700px; margin: 20px auto; padding: 0 14px; }
-  .buscar-ticket { display: flex; gap: 8px; margin-bottom: 20px; }
-  .buscar-ticket input { flex: 1; }
-  .item-devolucion { background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .item-devolucion .nombre { font-weight: 700; margin-bottom: 6px; }
-  .item-devolucion .disponible { font-size: 12px; color: #888; margin-bottom: 8px; }
-  .fila-controles { display: flex; gap: 8px; align-items: center; }
-  .fila-controles input[type="number"] { width: 90px; }
-  .fila-controles label { display: flex; align-items: center; gap: 4px; font-size: 13px; flex: 1; }
-  .agotado-devolver { opacity: 0.5; }
-  .resumen-devolucion { background: white; border-radius: 12px; padding: 14px; margin-top: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .historial-item { background: white; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; justify-content: space-between; font-size: 14px; }
+  .columnas { --ancho-panel: 430px; }
+  .buscar-ticket { padding: 12px; display: flex; gap: 8px; align-items: center; }
+  .buscar-ticket .buscar { flex: 1; }
+  .ticket-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; background: rgba(95,174,70,.14); font-weight: 800; }
+  .ticket-datos { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border, #E4E6E9); font-size: 13px; color: var(--muted, #7A7D83); }
+  .ticket-datos b { color: var(--text, #1F2023); }
+  .item-dev { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .item-dev:last-child { border-bottom: none; }
+  .item-dev.con-cant { background: rgba(95,174,70,.12); background: color-mix(in srgb, var(--primary, #5FAE46) 13%, transparent); }
+  .item-dev.agotado { opacity: .5; }
+  .foto { width: 44px; height: 44px; border-radius: 10px; background: rgba(128,128,128,.14); display: flex; align-items: center; justify-content: center; font-size: 22px; overflow: hidden; flex: none; }
+  .foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .item-dev .info { flex: 1; min-width: 0; }
+  .item-dev .info b { display: block; font-size: 14.5px; }
+  .item-dev .info small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .item-dev .regresa { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 12px; color: var(--muted, #7A7D83); cursor: pointer; }
+  .item-dev .lado { display: grid; gap: 4px; justify-items: end; flex: none; }
+  .paso { display: flex; align-items: center; gap: 4px; }
+  .paso input { width: 62px !important; min-height: 32px !important; height: 32px; padding: 2px 4px !important; text-align: center; font-size: 14px; font-weight: 700; }
+  .item-dev .lado .importe { font-weight: 800; font-size: 14px; }
+  .opciones-metodo { display: grid; gap: 8px; }
+  .metodo { border: 2px solid var(--border, #E4E6E9); border-radius: 11px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; background: var(--surface, #fff); cursor: pointer; }
+  .metodo .punto { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #B8C1CB; flex: none; }
+  .metodo.activo { border-color: var(--primary, #5FAE46); background: rgba(95,174,70,.10); background: color-mix(in srgb, var(--primary, #5FAE46) 10%, transparent); }
+  .metodo.activo .punto { border: 6px solid var(--primary, #5FAE46); }
+  .metodo.apagado { opacity: .45; cursor: default; }
+  .metodo b { display: block; font-size: 14px; }
+  .metodo small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .total-reembolso { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(198,40,40,.10); border-radius: 11px; padding: 12px 14px; }
+  .total-reembolso b { font-size: 28px; color: #B71C1C; }
+  [data-tema="oscuro"] .total-reembolso b { color: #F28B8B; }
+  .barra-total { display: none; }
+  @media (max-width: 1000px) {
+    .item-dev { padding: 11px 12px; gap: 10px; }
+    .item-dev .lado .importe { font-size: 13px; }
+    .paso input { width: 52px !important; }
+    .barra-total.visible { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; background: var(--surface, #fff); border-top: 1px solid var(--border, #E4E6E9); padding: 10px 14px; box-shadow: 0 -4px 14px rgba(0,0,0,.18); }
+    .contenido { padding-bottom: 130px; }
+  }
 </style>
 </head>
 <body>
@@ -36,16 +64,44 @@
   </div>
 
   <div class="contenido">
-    <div class="buscar-ticket">
-      <input type="text" id="folioBusqueda" placeholder="Folio del ticket (ej. S1A2F91)">
-      <button class="btn btn-primary" onclick="buscarTicket()">Buscar</button>
+    <div class="pestanas suelta" id="tabs"></div>
+
+    <!-- ================= Nueva devolución ================= -->
+    <div id="vistaNueva">
+      <div class="columnas">
+        <div>
+          <div class="caja buscar-ticket" style="margin-bottom:12px;">
+            <div class="buscar"><input type="text" id="folioBusqueda" placeholder="Folio del ticket (ej. S1A2F91)" autocomplete="off" onkeydown="if (event.key === 'Enter') buscarTicket()"></div>
+            <button class="btn btn-primary" onclick="buscarTicket()">Buscar</button>
+          </div>
+          <div id="detalleTicket"></div>
+        </div>
+
+        <!-- Resumen (en celular sale desde abajo) -->
+        <div class="caja panel-form" id="panelForm">
+          <div class="panel-cab">
+            <h3>↩️ Resumen de la devolución</h3>
+            <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+          </div>
+          <div class="panel-cuerpo" id="panelCuerpo"></div>
+          <div class="panel-pie" id="panelPie" style="display:none;">
+            <button class="btn btn-danger btn-grande" id="btnProcesar" onclick="procesarDevolucion()">Procesar devolución</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="detalleTicket"></div>
-
-    <h3 style="margin-top:30px;">Historial de devoluciones</h3>
-    <div id="listaHistorial"></div>
+    <!-- ================= Historial ================= -->
+    <div id="vistaHistorial" style="display:none;">
+      <div class="caja recorta"><div id="listaHistorial"></div></div>
+    </div>
   </div>
+
+  <div class="barra-total" id="barraTotal">
+    <div class="entre" style="margin-bottom:8px;"><span class="conteo" id="barraResumen"></span><b style="font-size:20px; color:#B71C1C;" id="barraMonto">$0.00</b></div>
+    <button class="btn btn-danger btn-grande" onclick="abrirHoja()">Continuar →</button>
+  </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -53,88 +109,241 @@
 <script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
-let ticketEncontrado = null;
 
+let ticketEncontrado = null;
+let cantidades = new Map();      // id de línea -> cantidad a devolver
+let regresa = new Map();         // id de línea -> ¿regresa al inventario?
+let metodo = 'efectivo';
+let turnoAbierto;                // turno de caja abierto: undefined = aún no se sabe, null = no hay
+let historial = [];
+let pestana = 'nueva';
+const esAngosto = window.matchMedia('(max-width: 1000px)');
+const MOTIVOS = ['Producto dañado', 'Caducado', 'Error de cobro', 'Cliente no satisfecho', 'Otro'];
+
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const redondea = (n) => Math.round(n * 1000) / 1000;
+const NOMBRE_PAGO = { efectivo: 'efectivo', tarjeta: 'tarjeta', transferencia: 'transferencia', credito: 'crédito (fiado)', mixto: 'pago mixto', dolares: 'dólares', cheque: 'cheque', vale_despensa: 'vale de despensa' };
+const disponibleDe = (item) => redondea(parseFloat(item.cantidad) - parseFloat(item.cantidad_devuelta || 0));
+const esCredito = () => !!ticketEncontrado && ticketEncontrado.metodo_pago === 'credito';
+
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+}
+
+// ---------- Pestañas ----------
+function pintarTabs() {
+  document.getElementById('tabs').innerHTML = `
+    <button class="${pestana === 'nueva' ? 'activa' : ''}" onclick="irPestana('nueva')">↩️ Nueva devolución</button>
+    <button class="${pestana === 'historial' ? 'activa' : ''}" onclick="irPestana('historial')">🕘 Historial<i>${historial.length}</i></button>`;
+}
+function irPestana(p) {
+  pestana = p;
+  document.getElementById('vistaNueva').style.display = p === 'nueva' ? '' : 'none';
+  document.getElementById('vistaHistorial').style.display = p === 'historial' ? '' : 'none';
+  document.getElementById('barraTotal').style.display = p === 'nueva' ? '' : 'none';
+  document.body.classList.toggle('barra-fija', p === 'nueva' && !!ticketEncontrado);
+  pintarTabs();
+}
+
+// ---------- Buscar ticket ----------
 async function buscarTicket() {
   const folio = document.getElementById('folioBusqueda').value.trim();
   if (!folio) { mostrarToast('Ingresa un folio', 'error'); return; }
-
   try {
-    ticketEncontrado = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
-    if (ticketEncontrado.estado !== 'pagado') {
+    const t = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
+    if (t.estado !== 'pagado') {
       mostrarToast('Este ticket no está pagado, no se puede procesar una devolución', 'error');
-      document.getElementById('detalleTicket').innerHTML = '';
+      limpiarTicket();
       return;
     }
-    renderDetalleTicket();
+    ticketEncontrado = t;
+    cantidades = new Map();
+    regresa = new Map(t.items.map(i => [i.id, true]));
+    metodo = esCredito() ? 'ajuste_credito' : 'efectivo';
+    turnoAbierto = undefined;
+    renderTicket();
+    renderPanel();
+    // ¿Hay turno abierto? (hace falta para reembolsar en efectivo)
+    apiFetch('/turnos/actual').then(tu => { turnoAbierto = tu || null; renderPanel(); }).catch(() => {});
   } catch (err) {
     mostrarToast(err.message, 'error');
-    document.getElementById('detalleTicket').innerHTML = '';
+    limpiarTicket();
   }
 }
 
-function renderDetalleTicket() {
-  const t = ticketEncontrado;
-  const cont = document.getElementById('detalleTicket');
-
-  const filasItems = t.items.map(item => {
-    const disponible = parseFloat(item.cantidad) - parseFloat(item.cantidad_devuelta || 0);
-    if (disponible <= 0) {
-      return `<div class="item-devolucion agotado-devolver">
-        <div class="nombre">${item.nombre_producto}</div>
-        <div class="disponible">Ya se devolvió por completo</div>
-      </div>`;
-    }
-    return `
-      <div class="item-devolucion" data-item-id="${item.id}">
-        <div class="nombre">${item.nombre_producto}</div>
-        <div class="disponible">Disponible para devolver: ${disponible} (de ${item.cantidad} vendido)</div>
-        <div class="fila-controles">
-          <input type="number" class="cant-devolver" min="0" max="${disponible}" step="0.01" placeholder="0">
-          <label><input type="checkbox" class="regresa-inv" checked> Regresa a inventario</label>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const esCredito = t.metodo_pago === 'credito';
-
-  cont.innerHTML = `
-    <div class="card">
-      <h3>Ticket ${t.folio}</h3>
-      <p style="color:#666; font-size:13px;">Pagado con: ${t.metodo_pago} — Total original: $${parseFloat(t.total).toFixed(2)}</p>
-      ${filasItems}
-
-      <input type="text" id="motivoDevolucion" placeholder="Motivo de la devolución" style="margin-top:10px;">
-
-      <select id="metodoReembolso" style="margin-top:10px;">
-        <option value="efectivo">Reembolsar en efectivo (de la caja)</option>
-        ${esCredito ? '<option value="ajuste_credito">Reducir saldo del cliente (fiado)</option>' : ''}
-        <option value="sin_reembolso">Sin reembolso de dinero (solo ajuste de inventario)</option>
-      </select>
-
-      <button class="btn btn-danger" style="width:100%; margin-top:14px;" onclick="procesarDevolucion()">Procesar Devolución</button>
-    </div>
-  `;
+function limpiarTicket() {
+  ticketEncontrado = null;
+  cantidades = new Map();
+  document.getElementById('detalleTicket').innerHTML = '';
+  renderPanel();
 }
 
+// ---------- Líneas del ticket ----------
+function fotoItem(i) {
+  const emoji = i.tipo === 'kit' ? '📦' : '🛒';
+  return `<div class="foto">${i.imagen_url ? `<img src="${escapar(i.imagen_url)}" loading="lazy" onerror="this.parentNode.textContent='${emoji}'">` : emoji}</div>`;
+}
+
+function renderTicket() {
+  const t = ticketEncontrado;
+  const lineas = t.items.map(item => {
+    const disp = disponibleDe(item);
+    if (disp <= 0) {
+      return `<div class="item-dev agotado">${fotoItem(item)}<div class="info"><b>${escapar(item.nombre_producto)}</b><small>Ya se devolvió por completo</small></div><span class="pill verde">✓ Devuelto</span></div>`;
+    }
+    const entera = Number.isInteger(parseFloat(item.cantidad));
+    return `
+    <div class="item-dev" id="linea-${item.id}">
+      ${fotoItem(item)}
+      <div class="info">
+        <b>${escapar(item.nombre_producto)}</b>
+        <small>${dinero(item.precio_unitario)} c/u · vendido ${Number(item.cantidad)} · disponible ${disp}</small>
+        <label class="regresa"><input type="checkbox" class="interruptor" ${regresa.get(item.id) !== false ? 'checked' : ''} onchange="regresa.set(${item.id}, this.checked)"> Regresa a inventario</label>
+      </div>
+      <div class="lado">
+        <div class="paso">
+          <button class="mini" onclick="cambiarCant(${item.id}, -${entera ? 1 : 0.25})">−</button>
+          <input type="number" id="cant-${item.id}" min="0" max="${disp}" step="${entera ? 1 : 0.01}" inputmode="decimal" placeholder="0" oninput="escribirCant(${item.id}, this.value)">
+          <button class="mini" onclick="cambiarCant(${item.id}, ${entera ? 1 : 0.25})">＋</button>
+        </div>
+        <span class="importe" id="imp-${item.id}"></span>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('detalleTicket').innerHTML = `
+    <div class="caja recorta">
+      <div class="ticket-cab"><span>🧾 Ticket ${escapar(t.folio)}</span><span class="pill verde">Pagado</span></div>
+      <div class="ticket-datos"><span>Pagó con <b>${escapar(NOMBRE_PAGO[t.metodo_pago] || t.metodo_pago)}</b>${t.fecha_pago ? ' · ' + new Date(t.fecha_pago).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : ''}</span><span>Total original <b>${dinero(t.total)}</b></span></div>
+      <div class="entre" style="padding:10px 16px 0;"><b style="font-size:13px;">¿Qué se devuelve?</b><button class="btn btn-secondary btn-chico" onclick="devolverTodo()">Devolver todo</button></div>
+      ${lineas}
+    </div>`;
+  actualizarTotales();
+}
+
+function itemPorId(id) { return ticketEncontrado.items.find(i => i.id === id); }
+
+function ponerCantidad(id, valor, refrescarInput) {
+  const item = itemPorId(id);
+  const disp = disponibleDe(item);
+  let n = parseFloat(valor);
+  if (!(n > 0)) n = 0;
+  if (n > disp) n = disp;
+  n = redondea(n);
+  if (n > 0) cantidades.set(id, n); else cantidades.delete(id);
+  if (refrescarInput) document.getElementById('cant-' + id).value = n > 0 ? n : '';
+  actualizarTotales();
+}
+function escribirCant(id, valor) {
+  // Mientras escribe no se toca el campo; solo se recorta si se pasa del máximo.
+  const item = itemPorId(id);
+  const n = parseFloat(valor);
+  const pasa = n > disponibleDe(item);
+  ponerCantidad(id, valor, pasa);
+}
+function cambiarCant(id, delta) { ponerCantidad(id, (cantidades.get(id) || 0) + delta, true); }
+function devolverTodo() {
+  ticketEncontrado.items.forEach(i => { if (disponibleDe(i) > 0) ponerCantidad(i.id, disponibleDe(i), true); });
+}
+
+function totalReembolso() {
+  let total = 0;
+  cantidades.forEach((c, id) => { total += c * parseFloat(itemPorId(id).precio_unitario); });
+  return total;
+}
+
+// ---------- Resumen (panel derecho / hoja) ----------
+function renderPanel() {
+  const cuerpo = document.getElementById('panelCuerpo');
+  const pie = document.getElementById('panelPie');
+  if (!ticketEncontrado) {
+    cuerpo.innerHTML = '<div class="vacio-panel"><div class="gran">↩️</div>Busca un ticket por su folio para elegir qué productos se devuelven.</div>';
+    pie.style.display = 'none';
+    document.getElementById('barraTotal').classList.remove('visible');
+    document.body.classList.remove('barra-fija');
+    return;
+  }
+  const motivoPrevio = (document.getElementById('motivoDevolucion') || {}).value || '';
+  const credito = esCredito();
+  const sinTurno = metodo === 'efectivo' && turnoAbierto === null;
+  cuerpo.innerHTML = `
+    <div class="bloque blanco" style="gap:0;">
+      <h5 style="margin-bottom:6px;">Se devuelve</h5>
+      <div id="resLineas"></div>
+    </div>
+    <div class="total-reembolso"><span style="font-weight:700;">A reembolsar</span><b class="num" id="resMonto">$0.00</b></div>
+    <div class="campo"><label>Motivo</label>
+      <div class="chips">${MOTIVOS.map(m => `<button type="button" class="chip" onclick="elegirMotivo('${m}')">${m}</button>`).join('')}</div>
+      <input type="text" id="motivoDevolucion" placeholder="Motivo de la devolución" maxlength="200" value="${escapar(motivoPrevio)}">
+    </div>
+    <div class="campo"><label>¿Cómo se regresa el dinero?</label>
+      <div class="opciones-metodo">
+        <div class="metodo ${metodo === 'efectivo' ? 'activo' : ''}" onclick="elegirMetodo('efectivo')"><span class="punto"></span><div><b>💵 Efectivo de la caja</b><small>${turnoAbierto ? 'Se descuenta del turno abierto' : 'Se registra como egreso del turno abierto'}</small></div></div>
+        <div class="metodo ${metodo === 'ajuste_credito' ? 'activo' : ''} ${credito ? '' : 'apagado'}" onclick="${credito ? "elegirMetodo('ajuste_credito')" : ''}"><span class="punto"></span><div><b>📒 Reducir saldo del cliente</b><small>${credito ? 'Baja lo que el cliente debe (fiado)' : 'Solo para ventas a crédito'}</small></div></div>
+        <div class="metodo ${metodo === 'sin_reembolso' ? 'activo' : ''}" onclick="elegirMetodo('sin_reembolso')"><span class="punto"></span><div><b>📦 Sin reembolso de dinero</b><small>Solo ajusta el inventario</small></div></div>
+      </div>
+      ${sinTurno ? '<div class="aviso amarillo">⚠️ No hay un turno de caja abierto. Ábrelo en <a href="caja-turno.html"><b>Corte de caja</b></a> antes de reembolsar en efectivo.</div>' : ''}
+    </div>`;
+  pie.style.display = '';
+  actualizarTotales();
+}
+
+function elegirMotivo(m) {
+  const i = document.getElementById('motivoDevolucion');
+  i.value = m === 'Otro' ? '' : m;
+  i.focus();
+}
+function elegirMetodo(m) { metodo = m; renderPanel(); }
+
+function actualizarTotales() {
+  if (!ticketEncontrado) return;
+  // Importe junto a cada línea
+  ticketEncontrado.items.forEach(item => {
+    const el = document.getElementById('imp-' + item.id);
+    if (!el) return;
+    const c = cantidades.get(item.id) || 0;
+    el.textContent = c > 0 ? '−' + dinero(c * parseFloat(item.precio_unitario)) : '$0.00';
+    el.style.color = c > 0 ? '#C62828' : 'var(--muted)';
+    const fila = document.getElementById('linea-' + item.id);
+    if (fila) fila.classList.toggle('con-cant', c > 0);
+  });
+  // Resumen
+  const total = totalReembolso();
+  const lineas = [...cantidades.entries()].map(([id, c]) => {
+    const item = itemPorId(id);
+    return `<div class="linea"><span>${escapar(item.nombre_producto)} × ${c}</span><b class="num">${dinero(c * parseFloat(item.precio_unitario))}</b></div>`;
+  }).join('') || '<div class="conteo" style="padding:6px 0;">Todavía no eliges nada. Usa + en cada producto que regresa.</div>';
+  const rl = document.getElementById('resLineas'); if (rl) rl.innerHTML = lineas;
+  const rm = document.getElementById('resMonto'); if (rm) rm.textContent = dinero(total);
+  const btn = document.getElementById('btnProcesar');
+  if (btn) { btn.textContent = total > 0 ? `Procesar devolución · ${dinero(total)}` : 'Procesar devolución'; btn.disabled = cantidades.size === 0; btn.style.opacity = cantidades.size === 0 ? '.55' : '1'; }
+  // Barra fija de celular
+  const barra = document.getElementById('barraTotal');
+  barra.classList.add('visible');
+  document.body.classList.add('barra-fija');
+  document.getElementById('barraResumen').textContent = `${cantidades.size} ${cantidades.size === 1 ? 'artículo' : 'artículos'} · ${{ efectivo: 'efectivo de caja', ajuste_credito: 'saldo del cliente', sin_reembolso: 'sin reembolso' }[metodo]}`;
+  document.getElementById('barraMonto').textContent = dinero(total);
+}
+
+// ---------- Procesar ----------
 async function procesarDevolucion() {
   const items = [];
-  document.querySelectorAll('.item-devolucion[data-item-id]').forEach(div => {
-    const cantidad = parseFloat(div.querySelector('.cant-devolver').value || 0);
-    if (cantidad > 0) {
-      items.push({
-        ticket_detalle_id: parseInt(div.dataset.itemId),
-        cantidad_devuelta: cantidad,
-        regresa_inventario: div.querySelector('.regresa-inv').checked
-      });
-    }
+  cantidades.forEach((cantidad, id) => {
+    items.push({ ticket_detalle_id: id, cantidad_devuelta: cantidad, regresa_inventario: regresa.get(id) !== false });
   });
-
   if (items.length === 0) { mostrarToast('Ingresa al menos una cantidad a devolver', 'error'); return; }
 
-  const metodo_reembolso = document.getElementById('metodoReembolso').value;
-  const motivo = document.getElementById('motivoDevolucion').value.trim();
+  const metodo_reembolso = metodo;
+  const motivo = (document.getElementById('motivoDevolucion').value || '').trim();
 
   let turno_id = null;
   if (metodo_reembolso === 'efectivo') {
@@ -148,7 +357,7 @@ async function procesarDevolucion() {
     }
   }
 
-  const confirmado = await confirmarAccion('¿Confirmas procesar esta devolución? Esta acción ajusta inventario y caja/crédito automáticamente.');
+  const confirmado = await confirmarAccion(`¿Confirmas procesar esta devolución por ${dinero(totalReembolso())}? Esta acción ajusta inventario y caja/crédito automáticamente.`);
   if (!confirmado) return;
 
   try {
@@ -156,30 +365,43 @@ async function procesarDevolucion() {
       method: 'POST',
       body: JSON.stringify({ ticket_id: ticketEncontrado.id, items, metodo_reembolso, motivo, turno_id })
     });
-    mostrarToast(`Devolución registrada: $${parseFloat(resultado.monto_total).toFixed(2)}`, 'exito');
+    mostrarToast(`Devolución registrada: ${dinero(resultado.monto_total)}`, 'exito');
     document.getElementById('folioBusqueda').value = '';
-    document.getElementById('detalleTicket').innerHTML = '';
-    ticketEncontrado = null;
+    cerrarHoja();
+    limpiarTicket();
     cargarHistorial();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
+// ---------- Historial ----------
 async function cargarHistorial() {
   try {
-    const historial = await apiFetch('/devoluciones');
-    document.getElementById('listaHistorial').innerHTML = historial.map(d => `
-      <div class="historial-item">
-        <span>Ticket ${d.folio} — ${d.motivo || 'Sin motivo especificado'}</span>
-        <span>$${parseFloat(d.monto_total).toFixed(2)} (${new Date(d.fecha).toLocaleDateString()})</span>
-      </div>
-    `).join('') || '<p style="color:#888; font-size:13px;">Sin devoluciones registradas</p>';
+    historial = await apiFetch('/devoluciones');
   } catch (err) {
     console.error(err);
+    historial = [];
   }
+  pintarTabs();
+  const PILL = { efectivo: ['verde', 'Efectivo'], ajuste_credito: ['azul', 'A su cuenta'], sin_reembolso: ['gris', 'Sin reembolso'] };
+  document.getElementById('listaHistorial').innerHTML = historial.map(d => {
+    const [clase, texto] = PILL[d.metodo_reembolso] || ['gris', d.metodo_reembolso || '—'];
+    return `
+    <div class="fila" style="cursor:default;">
+      <div class="th foto">↩️</div>
+      <div class="info">
+        <b>Ticket ${escapar(d.folio)}</b>
+        <small>${escapar(d.motivo || 'Sin motivo especificado')}</small>
+        <small>${new Date(d.fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}${d.usuario_nombre ? ' · ' + escapar(d.usuario_nombre) : ''}</small>
+      </div>
+      <div class="der"><b class="num" style="font-size:16px; display:block;">${dinero(d.monto_total)}</b><span class="pill ${clase}">${texto}</span></div>
+    </div>`;
+  }).join('') || '<div class="vacio">Sin devoluciones registradas</div>';
 }
 
+pintarTabs();
+renderPanel();
 cargarHistorial();
 
 // Si se llegó desde Caja Avanzada (o cualquier otro lugar) con un folio en

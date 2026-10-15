@@ -9,17 +9,93 @@
 <title>Corte de Caja - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
-  .saldo-actual { background: #2A2B2E; color: white; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 16px; }
-  .saldo-actual .monto { font-size: 32px; font-weight: 700; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-  .tabs button { flex: 1; }
-  .tabs button.activo { background: #5FAE46; color: white; }
-  .movimiento-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #EEE; font-size: 14px; }
-  .ingreso { color: #5FAE46; }
-  .egreso { color: #C62828; }
+  .columnas { --ancho-panel: 430px; }
+  .columnas.una { grid-template-columns: minmax(0, 1fr); max-width: 900px; margin: 0 auto; }
+  .oculto { display: none !important; }
+
+  /* Banner del turno */
+  .banner { background: #2A2B2E; color: #fff; border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+  .banner .izq { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .banner .punto { width: 12px; height: 12px; border-radius: 50%; background: #5FAE46; box-shadow: 0 0 0 4px rgba(95,174,70,.28); flex: none; }
+  .banner.cerrado .punto { background: #8B9097; box-shadow: 0 0 0 4px rgba(139,144,151,.25); }
+  .banner small { display: block; font-size: 12px; opacity: .75; letter-spacing: .03em; text-transform: uppercase; }
+  .banner .grande { display: block; font-size: 18px; font-weight: 800; }
+  .banner .der { text-align: right; flex: none; }
+  .banner .der b { display: block; font-size: 28px; line-height: 1.1; }
+
+  /* Cifras */
+  .kpi .ic.verde { background: rgba(95,174,70,.18); }
+  .kpi .ic.rojo { background: rgba(198,40,40,.14); }
+  .kpi .ic.azul { background: rgba(21,101,192,.14); }
+  .kpis.tres { grid-template-columns: repeat(3, 1fr); }
+
+  .caja-titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 14px 16px 8px; }
+  .caja-titulo h3 { font-size: 16px; }
+
+  /* Movimientos */
+  .mov { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .mov:last-child { border-bottom: none; }
+  .mov .pill { min-width: 66px; text-align: center; }
+  .mov .info { flex: 1; min-width: 0; }
+  .mov .info b { display: block; font-size: 14.5px; overflow-wrap: anywhere; }
+  .mov .info small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .mov .importe { font-weight: 800; font-size: 15px; white-space: nowrap; }
+
+  /* Cortes anteriores */
+  .corte { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .corte:last-child { border-bottom: none; }
+  .corte .cuadro { background: rgba(128,128,128,.16); font-size: 20px; }
+  .corte .info { flex: 1; min-width: 0; }
+  .corte .info b { display: block; font-size: 14.5px; }
+  .corte .info small { color: var(--muted, #7A7D83); font-size: 12px; }
+
+  /* Formulario de movimiento */
+  .monto-grande { position: relative; }
+  .monto-grande span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 20px; font-weight: 800; color: var(--muted, #7A7D83); pointer-events: none; z-index: 1; }
+  .monto-grande input { width: 100%; padding-left: 32px !important; font-size: 22px !important; font-weight: 800; min-height: 52px !important; }
+  .seg button.activo.ing { color: #2E7D32; }
+  .seg button.activo.egr { color: #C62828; }
+  [data-tema="oscuro"] .seg button.activo.ing { color: #8BD97A; }
+  [data-tema="oscuro"] .seg button.activo.egr { color: #F28B8B; }
+  .titulo-seccion { font-size: 12px; font-weight: 800; color: var(--muted, #7A7D83); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* Barra de acciones fija (celular) */
+  .barra-acciones { display: none; }
+
+  /* Buscar corte */
+  .ov-corte { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 12px; }
+  .ov-corte .modal-corte { background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 14px; padding: 18px; width: 100%; max-width: 440px; max-height: 92vh; overflow: auto; display: grid; gap: 10px; box-shadow: var(--shadow); }
+  .ov-corte .modal-corte h3 { margin: 0; }
+  .ov-corte .modal-corte.ancho { max-width: 96vw; width: auto; }
+  .ov-corte pre { font: 13px/1.35 monospace; white-space: pre; margin: 0; overflow: auto; }
+  .botones-modal { display: flex; gap: 8px; }
+  .botones-modal .btn { flex: 1; }
+
+  @media (max-width: 1000px) {
+    .banner { padding: 14px 16px; }
+    .banner .der b { font-size: 24px; }
+    .kpis.tres { gap: 8px; }
+    .panel-form { top: auto; }
+    .barra-acciones.visible { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; background: var(--surface, #fff); border-top: 1px solid var(--border, #E4E6E9); padding: 10px; box-shadow: 0 -4px 14px rgba(0,0,0,.18); }
+    .barra-acciones .btn { padding: 11px 4px; font-weight: 800; }
+    .contenido { padding-bottom: 100px; }
+  }
+  @media (max-width: 600px) {
+    .kpis.tres { grid-template-columns: 1fr 1fr; }
+    .kpis.tres .kpi:last-child { display: none; }
+    .kpi { padding: 12px; gap: 10px; }
+    .kpi .ic { display: none; }
+    .kpi .v { font-size: 20px; }
+    .banner { flex-wrap: wrap; }
+    .banner .der { text-align: left; }
+    .corte .cuadro { display: none; }
+    .mov { padding: 10px 12px; gap: 10px; }
+    .corte { padding: 10px 12px; }
+    .caja-titulo { padding: 12px 12px 6px; }
+  }
 </style>
 </head>
 <body>
@@ -34,41 +110,57 @@
   </div>
 
   <div class="contenido">
-    <div id="sinTurno" style="display:none;">
-      <div class="card">
-        <h3>No hay turno abierto</h3>
-        <p style="font-size:13px; color:#777; margin:6px 0 10px;">Al abrir el turno declaras el efectivo que hay en caja.</p>
-        <button class="btn btn-primary" style="width:100%;" onclick="abrirTurno()">🔓 Abrir Turno</button>
+    <div class="banner cerrado oculto" id="banner"></div>
+
+    <div class="columnas una" id="columnas">
+      <div>
+        <!-- Solo con turno abierto -->
+        <div id="colTurno" class="oculto">
+          <div class="kpis tres" id="kpis"></div>
+          <div class="caja recorta separa">
+            <div class="caja-titulo"><h3>Movimientos del turno</h3></div>
+            <div id="listaMovimientos"></div>
+          </div>
+        </div>
+
+        <div class="caja recorta separa">
+          <div class="caja-titulo"><h3 id="tituloCortes">Cortes anteriores</h3><span class="conteo">últimos 5</span></div>
+          <div id="listaCortes"><div class="vacio">Cargando…</div></div>
+        </div>
+      </div>
+
+      <!-- Entradas y salidas (en celular sale desde abajo) -->
+      <div class="caja panel-form oculto" id="panelForm">
+        <div class="panel-cab">
+          <h3>💵 Entradas y salidas de efectivo</h3>
+          <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+        </div>
+        <div class="panel-cuerpo">
+          <div class="seg" id="segTipo">
+            <button class="activo ing" id="tabIngreso" onclick="cambiarTab('ingreso')">➕ Ingreso</button>
+            <button class="egr" id="tabEgreso" onclick="cambiarTab('egreso')">➖ Egreso</button>
+          </div>
+          <div class="monto-grande"><span>$</span><input type="number" id="montoMovimiento" placeholder="0.00" step="0.01" min="0" inputmode="decimal" onkeydown="if (event.key === 'Enter') document.getElementById('conceptoMovimiento').focus()"></div>
+          <input type="text" id="conceptoMovimiento" placeholder="Concepto (ej. compra de bolsas)" maxlength="120" autocomplete="off" onkeydown="if (event.key === 'Enter') registrarMovimiento()">
+          <div class="chips" id="chipsConcepto"></div>
+          <button class="btn btn-primary btn-grande" id="btnRegistrar" onclick="registrarMovimiento()">Registrar ingreso</button>
+        </div>
+        <div class="panel-pie solo-pc">
+          <div class="titulo-seccion">Acciones del turno</div>
+          <button class="btn btn-secondary btn-grande" onclick="imprimirCorteActual()">🖨️ Imprimir corte parcial (X)</button>
+          <button class="btn btn-danger btn-grande" onclick="realizarCorte()">🔒 Realizar corte de turno</button>
+          <div class="ayuda" style="text-align:center;">Al cerrar, declaras el efectivo contado.</div>
+        </div>
       </div>
     </div>
-
-    <div id="conTurno" style="display:none;">
-      <div class="saldo-actual">
-        <div>Turno abierto desde <span id="fechaApertura"></span></div>
-        <div class="monto">Fondo inicial: $<span id="fondoInicialLbl"></span></div>
-      </div>
-
-      <div class="tabs">
-        <button class="btn btn-secondary activo" id="tabIngreso" onclick="cambiarTab('ingreso')">➕ Ingreso</button>
-        <button class="btn btn-secondary" id="tabEgreso" onclick="cambiarTab('egreso')">➖ Egreso</button>
-      </div>
-
-      <div class="card" style="margin-bottom:16px;">
-        <input type="number" id="montoMovimiento" placeholder="Monto" style="margin-bottom:8px;">
-        <input type="text" id="conceptoMovimiento" placeholder="Concepto (ej. compra de bolsas)" style="margin-bottom:8px;">
-        <button class="btn btn-primary" style="width:100%;" onclick="registrarMovimiento()">Registrar</button>
-      </div>
-
-      <h4>Movimientos de hoy</h4>
-      <div id="listaMovimientos"></div>
-
-      <button class="btn btn-secondary" style="width:100%; margin-top:14px;" onclick="imprimirCorteActual()">🖨️ Imprimir corte parcial (X)</button>
-      <button class="btn btn-danger" style="width:100%; margin-top:10px;" onclick="realizarCorte()">🔒 Realizar Corte de Turno</button>
-    </div>
-
-    <h4 style="margin-top:26px;" id="tituloCortes">Cortes anteriores</h4>
-    <div id="listaCortes" style="font-size:14px;"></div>
   </div>
+
+  <div class="barra-acciones" id="barraAcciones">
+    <button class="btn btn-secondary" onclick="abrirHoja()">➕ Mov.</button>
+    <button class="btn btn-secondary" onclick="imprimirCorteActual()">🖨️ X</button>
+    <button class="btn btn-danger" onclick="realizarCorte()">🔒 Cortar</button>
+  </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -78,25 +170,92 @@
 <script src="../js/turno-caja.js"></script>
 <script>
 requiereLogin();
-let turnoActual = null;
-let tipoMovimiento = 'ingreso';
 
+let turnoActual;              // undefined = aún no se sabe (o falló), null = no hay turno abierto
+let tipoMovimiento = 'ingreso';
+let movimientos = [];
+let guardando = false;
+const esAngosto = window.matchMedia('(max-width: 1000px)');
+const CONCEPTOS = {
+  ingreso: ['Cambio de caja', 'Aportación del dueño'],
+  egreso: ['Compra de bolsas', 'Gas', 'Pago a proveedor', 'Retiro de efectivo']
+};
+
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function horaCorta(f) {
+  return new Date(f).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+function fechaCorta(f) {
+  const d = new Date(f);
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '') + ' · ' + horaCorta(f);
+}
+function desdeTexto(f) {
+  const d = new Date(f), hoy = new Date(), ayer = new Date(Date.now() - 86400000);
+  const hora = d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
+  let dia;
+  if (d.toDateString() === hoy.toDateString()) dia = 'hoy';
+  else if (d.toDateString() === ayer.toDateString()) dia = 'ayer';
+  else dia = 'el ' + d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '');
+  return `Desde ${dia}, ${hora}`;
+}
+
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+  setTimeout(() => { if (!esAngosto.matches) return; document.getElementById('montoMovimiento').focus(); }, 60);
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+}
+
+// ---------- Turno ----------
 async function cargarTurno() {
   try {
     turnoActual = await apiFetch('/turnos/actual');
-    if (!turnoActual) {
-      document.getElementById('sinTurno').style.display = 'block';
-      document.getElementById('conTurno').style.display = 'none';
-    } else {
-      document.getElementById('sinTurno').style.display = 'none';
-      document.getElementById('conTurno').style.display = 'block';
-      document.getElementById('fechaApertura').textContent = new Date(turnoActual.fecha_apertura).toLocaleString();
-      document.getElementById('fondoInicialLbl').textContent = parseFloat(turnoActual.fondo_inicial).toFixed(2);
-      cargarMovimientos();
-    }
   } catch (err) {
+    turnoActual = undefined;
     mostrarToast(err.message, 'error');
   }
+  if (turnoActual) await cargarMovimientos(); else movimientos = [];
+  pintarTodo();
+}
+
+function pintarBanner() {
+  const b = document.getElementById('banner');
+  b.classList.remove('oculto');
+  if (turnoActual) {
+    const u = getUsuario() || {};
+    b.classList.remove('cerrado');
+    b.innerHTML = `<div class="izq"><span class="punto"></span><div><small>Turno abierto · ${escapar(turnoActual.usuario_nombre || u.nombre || '')}</small><span class="grande">${escapar(desdeTexto(turnoActual.fecha_apertura))}</span></div></div>
+      <div class="der"><small>Fondo inicial</small><b class="num">${dinero(turnoActual.fondo_inicial)}</b></div>`;
+  } else if (turnoActual === null) {
+    b.classList.add('cerrado');
+    b.innerHTML = `<div class="izq"><span class="punto"></span><div><small>Sin turno abierto</small><span class="grande">Abre el turno para registrar movimientos y hacer el corte</span></div></div>
+      <button class="btn btn-primary" onclick="abrirTurno()">🔓 Abrir turno</button>`;
+  } else {
+    b.classList.add('cerrado');
+    b.innerHTML = `<div class="izq"><span class="punto"></span><div><small>No se pudo consultar el turno</small><span class="grande">Revisa tu conexión e intenta de nuevo</span></div></div>
+      <button class="btn btn-secondary" onclick="cargarTurno()">Reintentar</button>`;
+  }
+}
+
+function pintarTodo() {
+  const hay = !!turnoActual;
+  document.body.classList.toggle('barra-fija', hay);
+  pintarBanner();
+  document.getElementById('colTurno').classList.toggle('oculto', !hay);
+  document.getElementById('panelForm').classList.toggle('oculto', !hay);
+  document.getElementById('columnas').classList.toggle('una', !hay);
+  document.getElementById('barraAcciones').classList.toggle('visible', hay);
+  if (!hay) cerrarHoja();
+  pintarMovimientos();
+  pintarChips();
 }
 
 async function abrirTurno() {
@@ -104,17 +263,39 @@ async function abrirTurno() {
   if (turno) cargarTurno();
 }
 
+// ---------- Movimientos ----------
 function cambiarTab(tipo) {
   tipoMovimiento = tipo;
   document.getElementById('tabIngreso').classList.toggle('activo', tipo === 'ingreso');
   document.getElementById('tabEgreso').classList.toggle('activo', tipo === 'egreso');
+  const btn = document.getElementById('btnRegistrar');
+  btn.textContent = tipo === 'ingreso' ? 'Registrar ingreso' : 'Registrar egreso';
+  btn.className = 'btn btn-grande ' + (tipo === 'ingreso' ? 'btn-primary' : 'btn-danger');
+  pintarChips();
 }
 
+function pintarChips() {
+  document.getElementById('chipsConcepto').innerHTML = CONCEPTOS[tipoMovimiento]
+    .map((c) => `<button type="button" class="chip" data-concepto="${escapar(c)}">${escapar(c)}</button>`).join('');
+}
+document.getElementById('chipsConcepto').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const campo = document.getElementById('conceptoMovimiento');
+  campo.value = chip.dataset.concepto;
+  const monto = document.getElementById('montoMovimiento');
+  (parseFloat(monto.value) > 0 ? campo : monto).focus();
+});
+
 async function registrarMovimiento() {
+  if (guardando || !turnoActual) return;
   const monto = parseFloat(document.getElementById('montoMovimiento').value || 0);
   const concepto = document.getElementById('conceptoMovimiento').value.trim();
-  if (monto <= 0) { mostrarToast('Ingresa un monto válido', 'error'); return; }
+  if (!(monto > 0)) { mostrarToast('Ingresa un monto válido', 'error'); document.getElementById('montoMovimiento').focus(); return; }
 
+  guardando = true;
+  const btn = document.getElementById('btnRegistrar');
+  btn.disabled = true;
   try {
     await apiFetch('/movimientos', {
       method: 'POST',
@@ -122,32 +303,54 @@ async function registrarMovimiento() {
     });
     document.getElementById('montoMovimiento').value = '';
     document.getElementById('conceptoMovimiento').value = '';
-    cargarMovimientos();
+    mostrarToast(tipoMovimiento === 'ingreso' ? 'Ingreso registrado' : 'Egreso registrado', 'exito');
+    await cargarMovimientos();
+    pintarMovimientos();
+    if (esAngosto.matches) cerrarHoja();
   } catch (err) {
     mostrarToast(err.message, 'error');
+  } finally {
+    guardando = false;
+    btn.disabled = false;
   }
 }
 
 async function cargarMovimientos() {
   try {
-    const movs = await apiFetch(`/movimientos/turno/${turnoActual.id}`);
-    const cont = document.getElementById('listaMovimientos');
-    cont.innerHTML = '';
-    movs.forEach(m => {
-      const div = document.createElement('div');
-      div.className = 'movimiento-row';
-      div.innerHTML = `
-        <span>${m.concepto || '(sin concepto)'}</span>
-        <span class="${m.tipo}">${m.tipo === 'ingreso' ? '+' : '-'}$${parseFloat(m.monto).toFixed(2)}</span>
-      `;
-      cont.appendChild(div);
-    });
+    movimientos = await apiFetch(`/movimientos/turno/${turnoActual.id}`);
   } catch (err) {
     console.error(err);
+    mostrarToast('No se pudieron cargar los movimientos', 'error');
   }
 }
 
+function pintarMovimientos() {
+  const kp = document.getElementById('kpis');
+  const lista = document.getElementById('listaMovimientos');
+  if (!turnoActual) { kp.innerHTML = ''; lista.innerHTML = ''; return; }
+  const suma = (tipo) => movimientos.filter((m) => m.tipo === tipo).reduce((s, m) => s + parseFloat(m.monto || 0), 0);
+  kp.innerHTML = `
+    <div class="caja kpi"><div class="ic verde">➕</div><div><div class="v num verde-t">+${dinero(suma('ingreso'))}</div><div class="l">Ingresos del turno</div></div></div>
+    <div class="caja kpi"><div class="ic rojo">➖</div><div><div class="v num rojo-t">−${dinero(suma('egreso'))}</div><div class="l">Egresos del turno</div></div></div>
+    <div class="caja kpi"><div class="ic azul">🧾</div><div><div class="v num">${movimientos.length}</div><div class="l">Movimientos</div></div></div>`;
+  if (!movimientos.length) {
+    lista.innerHTML = '<div class="vacio">Todavía no hay movimientos en este turno.<br>Registra aquí el dinero que entra o sale de la caja.</div>';
+    return;
+  }
+  lista.innerHTML = movimientos.map((m) => {
+    const ing = m.tipo === 'ingreso';
+    const quien = m.usuario_nombre ? ' · ' + escapar(m.usuario_nombre) : '';
+    return `<div class="mov">
+      <span class="pill ${ing ? 'verde' : 'rojo'}">${ing ? 'Ingreso' : 'Egreso'}</span>
+      <div class="info"><b>${m.concepto ? escapar(m.concepto) : '(sin concepto)'}</b><small>${m.fecha ? horaCorta(m.fecha) + ' h' : ''}${quien}</small></div>
+      <b class="importe num ${ing ? 'verde-t' : 'rojo-t'}">${ing ? '+' : '−'}${dinero(m.monto)}</b>
+    </div>`;
+  }).join('');
+}
+
+// ---------- Impresión y corte ----------
 async function imprimirCorteActual() {
+  if (!turnoActual) return;
   try {
     await imprimirCorteTurno(turnoActual.id);
   } catch (err) {
@@ -156,6 +359,7 @@ async function imprimirCorteActual() {
 }
 
 async function realizarCorte() {
+  if (!turnoActual) return;
   const declarado = await declararImportes({
     titulo: '🔒 Corte de turno — declaración de caja',
     subtitulo: 'Cuenta lo que hay en caja y captura el importe de cada forma de pago.'
@@ -180,6 +384,7 @@ async function realizarCorte() {
     } catch (err) {
       mostrarToast('El corte se guardó, pero no se pudo imprimir: ' + err.message + ' — puedes reimprimirlo abajo en "Cortes anteriores".', 'error', 8000);
     }
+    cerrarHoja();
     cargarTurno();
     cargarCortes();
   } catch (err) {
@@ -187,22 +392,35 @@ async function realizarCorte() {
   }
 }
 
+// ---------- Cortes anteriores ----------
+function esSupervisorUI() {
+  const u = getUsuario();
+  return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol);
+}
+
 async function cargarCortes() {
+  const cont = document.getElementById('listaCortes');
   try {
     if (!esSupervisorUI()) document.getElementById('tituloCortes').textContent = 'Mis cortes anteriores';
-    const turnos = (await apiFetch('/turnos/historial')).filter(t => t.estado === 'cerrado').slice(0, 5);
-    const cont = document.getElementById('listaCortes');
-    if (turnos.length === 0) { cont.innerHTML = '<p style="color:#888;">Aún no hay cortes.</p>'; return; }
-    cont.innerHTML = turnos.map(t => {
-      const dif = t.declaracion ? t.declaracion.diferencia : (t.saldo_contado - t.saldo_teorico);
-      const txt = Math.abs(dif) < 0.005 ? 'cuadrada' : (dif > 0 ? `sobrante $${dif.toFixed(2)}` : `faltante $${Math.abs(dif).toFixed(2)}`);
-      return `<div class="movimiento-row">
-        <span>Turno ${t.id} · ${new Date(t.fecha_cierre).toLocaleString()}<br><small style="color:#888;">${t.usuario_nombre} · ${txt}</small></span>
-        <button class="btn btn-secondary" onclick="reimprimirCorte(${t.id})">🖨️</button>
+    const turnos = (await apiFetch('/turnos/historial')).filter((t) => t.estado === 'cerrado').slice(0, 5);
+    if (turnos.length === 0) { cont.innerHTML = '<div class="vacio">Aún no hay cortes.</div>'; return; }
+    cont.innerHTML = turnos.map((t) => {
+      const dif = t.declaracion ? Number(t.declaracion.diferencia) : (Number(t.saldo_contado) - Number(t.saldo_teorico));
+      let pill;
+      if (!isFinite(dif)) pill = '<span class="pill gris">sin declarar</span>';
+      else if (Math.abs(dif) < 0.005) pill = '<span class="pill verde">cuadrada</span>';
+      else if (dif > 0) pill = `<span class="pill amarillo">sobrante ${dinero(dif)}</span>`;
+      else pill = `<span class="pill rojo">faltante ${dinero(Math.abs(dif))}</span>`;
+      return `<div class="corte">
+        <div class="cuadro">🔒</div>
+        <div class="info"><b>Turno ${escapar(t.id)} · ${t.fecha_cierre ? fechaCorta(t.fecha_cierre) : ''}</b><small>${escapar(t.usuario_nombre)}</small></div>
+        ${pill}
+        <button class="mini" title="Reimprimir" onclick="reimprimirCorte(${Number(t.id)})">🖨️</button>
       </div>`;
     }).join('');
   } catch (err) {
     console.error(err);
+    cont.innerHTML = '<div class="vacio">No se pudieron cargar los cortes.</div>';
   }
 }
 
@@ -211,39 +429,41 @@ async function reimprimirCorte(id) {
 }
 
 // ===== Buscador de cortes (estilo Soft Restaurant) =====
-function esSupervisorUI() {
-  const u = getUsuario();
-  return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol);
-}
-
 function abrirBuscadorCortes() {
+  if (document.getElementById('ovBuscarCorte')) return;
   const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const colsGuardadas = localStorage.getItem('corte_columnas') || '40';
   const ov = document.createElement('div');
   ov.id = 'ovBuscarCorte';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
-  ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:18px;width:100%;max-width:440px;max-height:92vh;overflow:auto;">
-    <h3 style="margin:0 0 12px;">Corte de Caja — Buscar</h3>
-    <label>Fecha desde</label><input type="date" id="bcDesde" value="${hoy}" style="margin-bottom:8px;">
-    <label>Fecha hasta</label><input type="date" id="bcHasta" value="${hoy}" style="margin-bottom:8px;">
-    ${esSupervisorUI() ? '<label>Cajero</label><select id="bcCajero" style="margin-bottom:8px;"><option value="">Todos</option></select>' : '<select id="bcCajero" style="display:none;"><option value=""></option></select>'}
-    <label>Turno</label><select id="bcTurno" style="margin-bottom:8px;"><option value="">— Busca primero —</option></select>
-    <button class="btn btn-secondary" style="width:100%;margin-bottom:10px;" onclick="buscarTurnosCorte()">🔍 Buscar turnos</button>
-    <label>Destino</label>
-    <select id="bcDestino" style="margin-bottom:8px;">
-      <option value="impresora">Impresora</option><option value="pantalla">Pantalla</option><option value="excel">Excel (CSV)</option>
-    </select>
-    <label>Ancho de ticket</label>
-    <select id="bcCols" style="margin-bottom:14px;">
-      ${[32, 40, 48].map(n => `<option value="${n}" ${String(n) === colsGuardadas ? 'selected' : ''}>${n} columnas</option>`).join('')}
-    </select>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary" style="flex:1;" onclick="ejecutarBusquedaCorte()">Ejecutar</button>
-      <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('ovBuscarCorte').remove()">Cerrar</button>
+  ov.className = 'ov-corte';
+  ov.innerHTML = `<div class="modal-corte">
+    <h3>🔍 Corte de caja — Buscar</h3>
+    <div class="dos">
+      <div class="campo"><label>Fecha desde</label><input type="date" id="bcDesde" value="${hoy}"></div>
+      <div class="campo"><label>Fecha hasta</label><input type="date" id="bcHasta" value="${hoy}"></div>
+    </div>
+    ${esSupervisorUI() ? '<div class="campo"><label>Cajero</label><select id="bcCajero"><option value="">Todos</option></select></div>' : '<select id="bcCajero" style="display:none;"><option value=""></option></select>'}
+    <div class="campo"><label>Turno</label><select id="bcTurno"><option value="">— Busca primero —</option></select></div>
+    <button class="btn btn-secondary" onclick="buscarTurnosCorte()">🔍 Buscar turnos</button>
+    <div class="dos">
+      <div class="campo"><label>Destino</label>
+        <select id="bcDestino"><option value="impresora">Impresora</option><option value="pantalla">Pantalla</option><option value="excel">Excel (CSV)</option></select></div>
+      <div class="campo"><label>Ancho de ticket</label>
+        <select id="bcCols">${[32, 40, 48].map((n) => `<option value="${n}" ${String(n) === colsGuardadas ? 'selected' : ''}>${n} columnas</option>`).join('')}</select></div>
+    </div>
+    <div class="botones-modal">
+      <button class="btn btn-primary" onclick="ejecutarBusquedaCorte()">Ejecutar</button>
+      <button class="btn btn-secondary" onclick="cerrarBuscador()">Cerrar</button>
     </div></div>`;
+  ov.addEventListener('mousedown', (e) => { if (e.target === ov) cerrarBuscador(); });
   document.body.appendChild(ov);
   buscarTurnosCorte();
 }
+function cerrarBuscador() {
+  const ov = document.getElementById('ovBuscarCorte');
+  if (ov) ov.remove();
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarBuscador(); });
 
 async function buscarTurnosCorte() {
   const d = document.getElementById('bcDesde').value, h = document.getElementById('bcHasta').value;
@@ -257,12 +477,12 @@ async function buscarTurnosCorte() {
     const turnos = await apiFetch('/turnos/historial?' + q.toString());
     if (cajero.options.length === 1) {
       const vistos = {};
-      turnos.forEach(t => { vistos[t.usuario_id] = t.usuario_nombre; });
+      turnos.forEach((t) => { vistos[t.usuario_id] = t.usuario_nombre; });
       Object.entries(vistos).forEach(([id, n]) => cajero.add(new Option(n, id)));
     }
     window._turnosBusqueda = turnos;
     sel.innerHTML = turnos.length
-      ? turnos.map(t => `<option value="${t.id}">Turno ${t.id} · ${new Date(t.fecha_apertura).toLocaleString()} · ${t.usuario_nombre}${t.estado === 'abierto' ? ' (abierto)' : ''}</option>`).join('')
+      ? turnos.map((t) => `<option value="${escapar(t.id)}">Turno ${escapar(t.id)} · ${escapar(new Date(t.fecha_apertura).toLocaleString())} · ${escapar(t.usuario_nombre)}${t.estado === 'abierto' ? ' (abierto)' : ''}</option>`).join('')
       : '<option value="">Sin turnos en ese rango</option>';
   } catch (err) { mostrarToast(err.message, 'error'); }
 }
@@ -279,16 +499,16 @@ async function ejecutarBusquedaCorte() {
     } else if (destino === 'pantalla') {
       const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${id}/resumen`), configNegocioTurno()]);
       const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '' })
-        .map(l => typeof l === 'string' ? l : l.t).join('\n');
+        .map((l) => typeof l === 'string' ? l : l.t).join('\n');
       const ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:12px;';
+      ov.className = 'ov-corte';
+      ov.style.zIndex = 10000;
       const pre = document.createElement('pre');
-      pre.style.cssText = 'font:13px/1.35 monospace;white-space:pre;margin:0 0 12px;overflow:auto;';
       pre.textContent = lineas;
       const caja = document.createElement('div');
-      caja.style.cssText = 'background:#fff;border-radius:12px;padding:16px;max-width:96vw;max-height:92vh;overflow:auto;';
+      caja.className = 'modal-corte ancho';
       const cerrar = document.createElement('button');
-      cerrar.className = 'btn btn-secondary'; cerrar.style.width = '100%'; cerrar.textContent = 'Cerrar';
+      cerrar.className = 'btn btn-secondary'; cerrar.textContent = 'Cerrar';
       cerrar.onclick = () => ov.remove();
       caja.append(pre, cerrar); ov.appendChild(caja); document.body.appendChild(ov);
     } else {
@@ -309,19 +529,20 @@ function descargarCorteCSV(c) {
   Object.entries(c.formas).forEach(([k, v]) => filas.push([k, v]));
   filas.push(['Total formas', c.total_formas], ['', ''], ['VENTAS', '']);
   filas.push(['Subtotal', c.ventas.subtotal], ['Descuentos', c.ventas.descuentos], ['Venta neta', c.ventas.venta_neta]);
-  (c.ventas.por_departamento || []).forEach(d => filas.push(['Depto: ' + (d.nombre || ''), d.monto]));
+  (c.ventas.por_departamento || []).forEach((d) => filas.push(['Depto: ' + (d.nombre || ''), d.monto]));
   if (c.declaracion) {
     filas.push(['', ''], ['DECLARACION', '']);
     Object.entries(c.declaracion.importes || {}).forEach(([k, v]) => filas.push(['Declarado ' + k, v]));
     filas.push(['Total declarado', c.declaracion.total_declarado], ['Total esperado', c.declaracion.total_esperado], ['Diferencia', c.declaracion.diferencia]);
   }
-  const csv = '\ufeff' + filas.map(r => r.map(f).join(',')).join('\r\n');
+  const csv = '﻿' + filas.map((r) => r.map(f).join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = `corte-turno-${c.turno.id}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
 }
 
+pintarChips();
 cargarCortes();
 cargarTurno();
 </script>

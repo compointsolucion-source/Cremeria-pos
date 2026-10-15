@@ -153,4 +153,6 @@
   .solo-movil { display: initial; }
   .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer; }
   .solo-pc { display: none !important; }
+  /* Pantallas con barra fija abajo: se esconden los botones flotantes globales para no taparla */
+  body.barra-fija .boton-tema-flotante, body.barra-fija #indicadorConexion { display: none !important; }
 }

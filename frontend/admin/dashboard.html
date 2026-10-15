@@ -9,56 +9,91 @@
 <title>Panel de Administración - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  body { background: #F5F6F8; }
+  .saludo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .saludo h2 { font-size: 24px; line-height: 1.2; }
+  .saludo .fecha { font-size: 13px; color: var(--muted, #7A7D83); margin-top: 2px; }
+  .saludo .acciones { display: flex; align-items: center; gap: 8px; }
 
-  .contenido { max-width: 960px; margin: 0 auto; padding: 24px 20px 60px; }
+  .kpis { margin-bottom: 14px; grid-template-columns: repeat(4, 1fr); }
+  .kpi .ic.verde { background: rgba(95,174,70,.18); }
+  .kpi .ic.amarillo { background: rgba(249,168,37,.2); }
+  .kpi .ic.rojo { background: rgba(198,40,40,.14); }
+  .kpi .ic.azul { background: rgba(21,101,192,.14); }
+  .kpi .v.verde-t { color: #2E7D32; }
+  .kpi .v.naranja-t { color: #C77700; }
+  [data-tema="oscuro"] .kpi .v.verde-t { color: #8BD97A; }
+  [data-tema="oscuro"] .kpi .v.naranja-t { color: #F2B14C; }
+  .kpi.alerta { background: rgba(198,40,40,.08); }
 
-  /* ---------- Encabezados de sección: consistentes en todo el panel ---------- */
-  .titulo-seccion {
-    font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-    color: #8A8D93; margin: 0 0 10px; padding-left: 2px;
+  .tablero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .tablero > div { display: grid; gap: 14px; min-width: 0; }
+  .tarjeta-tit { padding: 14px 16px 4px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .tarjeta-tit h3 { font-size: 16px; }
+  .tarjeta-tit small { color: var(--muted, #7A7D83); font-size: 12.5px; }
+
+  /* Ventas por hora (barras verticales) */
+  .grafica-hora { display: flex; align-items: flex-end; gap: 6px; height: 170px; padding: 6px 16px 0; }
+  .grafica-hora .col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; }
+  .grafica-hora .barra { background: var(--primary, #5FAE46); border-radius: 6px 6px 0 0; min-height: 3px; transition: filter .15s; }
+  .grafica-hora .col.pico .barra { background: #2E7D32; }
+  .grafica-hora .col.sel .barra { outline: 2px solid var(--text, #1F2023); outline-offset: 1px; }
+  .grafica-hora .col:hover .barra { filter: brightness(1.12); }
+  .horas { display: flex; gap: 6px; padding: 4px 16px 14px; }
+  .horas span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--muted, #7A7D83); }
+
+  /* Atención */
+  .aviso-fila { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border, #E4E6E9); cursor: pointer; }
+  .aviso-fila:last-child { border-bottom: none; }
+  .aviso-fila .ic { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 21px; flex: none; }
+  .aviso-fila .ic.amarillo { background: rgba(249,168,37,.2); }
+  .aviso-fila .ic.rojo { background: rgba(198,40,40,.14); }
+  .aviso-fila .info { flex: 1; min-width: 0; }
+  .aviso-fila .info b { display: block; font-size: 14px; }
+  .aviso-fila .info small { display: block; color: var(--muted, #7A7D83); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detalle-aviso { display: none; padding: 2px 16px 10px 70px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .detalle-aviso.abierto { display: block; }
+  .detalle-aviso .linea { padding: 6px 0; font-size: 13px; }
+  .todo-bien { text-align: center; padding: 22px 14px; color: var(--muted, #7A7D83); font-size: 14px; }
+  .todo-bien .gran { font-size: 32px; display: block; margin-bottom: 4px; }
+
+  /* Actividad */
+  .act { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .act:last-child { border-bottom: none; }
+  .act .ic { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; flex: none; color: #fff; }
+  .act .info { flex: 1; min-width: 0; }
+  .act .info b { display: block; font-size: 14px; overflow-wrap: anywhere; }
+  .act .info small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .act .monto { font-weight: 800; font-size: 14px; white-space: nowrap; }
+  .ver-mas { display: block; width: 100%; padding: 11px; border: none; border-top: 1px solid var(--border, #E4E6E9); background: none; color: var(--primary-dark, #4C9439); font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+
+  /* Accesos rápidos */
+  .accesos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .acceso { padding: 14px 8px; text-align: center; font-weight: 700; font-size: 14px; color: var(--text, #1F2023); text-decoration: none; display: block; }
+  .acceso .em { display: block; font-size: 28px; margin-bottom: 4px; }
+  .acceso:hover { filter: brightness(.97); }
+
+  @media (max-width: 1000px) {
+    .kpis { grid-template-columns: 1fr 1fr; }
+    .tablero { grid-template-columns: 1fr; }
+    /* En celular lo más importante va primero: ventas, atención, accesos y al final la actividad */
+    .tablero > div { display: contents; }
+    #cardHora { order: 1; } #cardAtencion { order: 2; } .accesos { order: 3; } #cardActividad { order: 4; }
   }
-
-  /* ---------- Tarjetas de métricas (KPIs) ---------- */
-  .tarjetas-metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-  .tarjeta-metrica {
-    background: white; border-radius: 12px; padding: 16px 18px; border: 1px solid #EBECEF;
+  @media (max-width: 600px) {
+    .saludo h2 { font-size: 21px; }
+    .kpi { padding: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
+    .kpi .ic { display: none; }
+    .kpi .v { font-size: 21px; }
+    .grafica-hora, .horas { gap: 4px; padding-left: 12px; padding-right: 12px; }
+    .horas span { font-size: 10px; }
+    .aviso-fila { padding: 10px 12px; }
+    .detalle-aviso { padding-left: 12px; padding-right: 12px; }
+    .act { padding: 10px 12px; }
+    .tarjeta-tit { padding: 12px 12px 4px; }
   }
-  .tarjeta-metrica .valor { font-size: 22px; font-weight: 700; line-height: 1.2; color: #1F2023; }
-  .tarjeta-metrica .etiqueta { font-size: 12.5px; color: #7A7D83; margin-top: 4px; font-weight: 500; }
-  .tarjeta-utilidad .valor { color: #5FAE46; }
-  .tarjeta-fiado .valor { color: #C77700; }
-  .tarjeta-alerta { background: #FDF3F3; border-color: #F6D9D9; }
-  .tarjeta-alerta .valor { color: #C62828; }
-
-  .seccion-dashboard { margin-bottom: 22px; }
-
-  /* ---------- Contenedor blanco genérico (ventas por hora, alertas, actividad) ---------- */
-  .lista-alerta { background: white; border-radius: 12px; padding: 6px 16px; border: 1px solid #EBECEF; }
-
-  .barra-hora { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
-  .barra-hora .etiqueta-hora { width: 42px; color: #8A8D93; font-weight: 500; }
-  .barra-hora .barra-fondo { flex: 1; background: #F0F1F3; border-radius: 6px; height: 16px; overflow: hidden; }
-  .barra-hora .barra-relleno { background: #5FAE46; height: 100%; border-radius: 6px; }
-  .barra-hora .monto-hora { width: 74px; text-align: right; font-weight: 600; color: #1F2023; }
-
-  .fila-alerta { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #F2F3F5; font-size: 13.5px; }
-  .fila-alerta:last-child { border-bottom: none; }
-
-  .fila-actividad { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #F2F3F5; font-size: 13.5px; gap: 10px; }
-  .fila-actividad:last-child { border-bottom: none; }
-  .fila-actividad > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fila-actividad > span:last-child { color: #8A8D93; font-size: 12.5px; flex-shrink: 0; }
-  .tag-actividad { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 5px; color: white; flex-shrink: 0; }
-  .tag-venta { background: #5FAE46; }
-  .tag-compra { background: #1565C0; }
-  .tag-abono { background: #C77700; }
-  .tag-merma, .tag-ajuste_manual { background: #C62828; }
-
-  .sin-datos { color: #ABAEB3; font-size: 13px; text-align: center; padding: 16px 0; }
-
 </style>
 </head>
 <body>
@@ -67,183 +102,245 @@
       <button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>⚙️ Administración</h1>
+      <h1>🏠 Inicio</h1>
     </div>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <div class="tarjetas-metricas" id="tarjetasMetricas"></div>
-
-    <div class="seccion-dashboard">
-      <p class="titulo-seccion">Ventas de hoy por hora</p>
-      <div id="ventasPorHora" class="lista-alerta"></div>
+    <div class="saludo">
+      <div>
+        <h2 id="saludo">Hola 👋</h2>
+        <div class="fecha" id="fechaHoy"></div>
+      </div>
+      <div class="acciones">
+        <span class="pill gris" id="pillTurno" style="display:none;"></span>
+        <button class="btn btn-secondary" id="btnActualizar" onclick="cargarDashboard(true)">⟳ Actualizar</button>
+      </div>
     </div>
 
-    <div class="seccion-dashboard" id="seccionAlertas" style="display:none;">
-      <p class="titulo-seccion">⚠️ Alertas</p>
-      <div id="listaAlertas" class="lista-alerta"></div>
-    </div>
+    <div class="kpis" id="tarjetasMetricas"></div>
 
-    <div class="seccion-dashboard">
-      <p class="titulo-seccion">Actividad reciente</p>
-      <div id="listaActividad" class="lista-alerta"></div>
+    <div class="tablero">
+      <div>
+        <div class="caja recorta" id="cardHora">
+          <div class="tarjeta-tit"><h3>🕒 Ventas por hora</h3><small id="infoHora"></small></div>
+          <div id="ventasPorHora"><div class="vacio">Cargando…</div></div>
+        </div>
+        <div class="caja recorta" id="cardActividad">
+          <div class="tarjeta-tit"><h3>📋 Actividad reciente</h3></div>
+          <div id="listaActividad"><div class="vacio">Cargando…</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="caja recorta" id="cardAtencion">
+          <div class="tarjeta-tit"><h3>🔔 Atención</h3></div>
+          <div id="listaAlertas"><div class="vacio">Cargando…</div></div>
+        </div>
+        <div class="accesos">
+          <a class="caja acceso" href="../mostrador.html"><span class="em">🛒</span>Ir al mostrador</a>
+          <a class="caja acceso" href="devoluciones.html"><span class="em">↩️</span>Devoluciones</a>
+          <a class="caja acceso" href="productos.html"><span class="em">📦</span>Productos</a>
+          <a class="caja acceso" href="caja-turno.html"><span class="em">📊</span>Corte de caja</a>
+        </div>
+      </div>
     </div>
-
   </div>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
 
-const nombresTipoActividad = { venta: 'Venta', compra: 'Compra', abono: 'Abono', merma: 'Merma', ajuste_manual: 'Ajuste' };
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const num = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-async function cargarDashboard() {
+const TIPOS_ACTIVIDAD = {
+  venta: { icono: '🛒', color: '#5FAE46', titulo: (r) => 'Venta ' + r },
+  compra: { icono: '🚚', color: '#1565C0', titulo: (r) => 'Compra a ' + r },
+  abono: { icono: '💵', color: '#C77700', titulo: (r) => 'Abono de ' + r },
+  merma: { icono: '🗑️', color: '#C62828', titulo: (r) => 'Merma de ' + r },
+  ajuste_manual: { icono: '✏️', color: '#C62828', titulo: (r) => 'Ajuste de inventario: ' + r }
+};
+const LIMITE_ACTIVIDAD_INICIAL = 6;
+let ultimaActividad = [];
+let actividadCompleta = false;
+let datosHora = [];
+
+// ---------- Encabezado ----------
+function pintarSaludo() {
+  const h = new Date().getHours();
+  const saludo = h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches');
+  const u = getUsuario() || {};
+  const nombre = String(u.nombre || '').trim().split(/\s+/)[0];
+  document.getElementById('saludo').textContent = `${saludo}${nombre ? ', ' + nombre : ''} 👋`;
+  const f = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('fechaHoy').textContent = f.charAt(0).toUpperCase() + f.slice(1);
+}
+
+async function pintarTurno() {
+  const pill = document.getElementById('pillTurno');
+  try {
+    const t = await apiFetch('/turnos/actual');
+    pill.style.display = 'inline-block';
+    pill.className = 'pill ' + (t ? 'verde' : 'gris');
+    pill.textContent = t ? '● Turno abierto' : 'Sin turno abierto';
+  } catch (e) {
+    pill.style.display = 'none';
+  }
+}
+
+// ---------- Carga ----------
+async function cargarDashboard(manual) {
+  const btn = document.getElementById('btnActualizar');
+  btn.disabled = true;
   try {
     const data = await apiFetch('/dashboard/resumen');
     renderTarjetas(data);
     renderVentasPorHora(data.ventas_por_hora);
     renderAlertas(data);
     renderActividad(data.actividad_reciente);
+    pintarTurno();
+    if (manual) mostrarToast('Datos actualizados', 'exito');
   } catch (err) {
     console.error(err);
+    mostrarToast('No se pudo cargar el resumen: ' + err.message, 'error');
+    ['ventasPorHora', 'listaAlertas', 'listaActividad'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el.querySelector('.vacio') && el.textContent.trim() === 'Cargando…') el.innerHTML = '<div class="vacio">No se pudo cargar. Usa “Actualizar” para reintentar.</div>';
+    });
+  } finally {
+    btn.disabled = false;
   }
 }
 
+// ---------- Cifras ----------
 function renderTarjetas(data) {
-  const cont = document.getElementById('tarjetasMetricas');
-  cont.innerHTML = `
-    <div class="tarjeta-metrica">
-      <div class="valor">$${parseFloat(data.ventas_hoy.total).toFixed(2)}</div>
-      <div class="etiqueta">Ventas de Hoy</div>
-    </div>
-    <div class="tarjeta-metrica">
-      <div class="valor">${data.ventas_hoy.num_tickets}</div>
-      <div class="etiqueta">Tickets Hoy</div>
-    </div>
-    <div class="tarjeta-metrica tarjeta-utilidad">
-      <div class="valor">$${data.utilidad_hoy.ganancia.toFixed(2)}</div>
-      <div class="etiqueta">Utilidad Estimada*</div>
-    </div>
-    <div class="tarjeta-metrica tarjeta-fiado">
-      <div class="valor">$${data.fiado_total.toFixed(2)}</div>
-      <div class="etiqueta">Fiado Pendiente</div>
-    </div>
-    <div class="tarjeta-metrica ${data.stock_bajo.length > 0 ? 'tarjeta-alerta' : ''}">
-      <div class="valor">${data.stock_bajo.length}</div>
-      <div class="etiqueta">Stock Bajo</div>
-    </div>
-    <div class="tarjeta-metrica ${data.agotados.length > 0 ? 'tarjeta-alerta' : ''}">
-      <div class="valor">${data.agotados.length}</div>
-      <div class="etiqueta">Agotados</div>
-    </div>
-  `;
+  const bajos = data.stock_bajo.length, agot = data.agotados.length;
+  document.getElementById('tarjetasMetricas').innerHTML = `
+    <div class="caja kpi"><div class="ic verde">💰</div><div><div class="v num">${dinero(data.ventas_hoy.total)}</div><div class="l">Ventas de hoy · ${data.ventas_hoy.num_tickets} ${Number(data.ventas_hoy.num_tickets) === 1 ? 'ticket' : 'tickets'}</div></div></div>
+    <div class="caja kpi"><div class="ic amarillo">📈</div><div><div class="v num verde-t">${dinero(data.utilidad_hoy.ganancia)}</div><div class="l" title="Ganancia estimada con el costo registrado en cada producto">Utilidad estimada de hoy</div></div></div>
+    <div class="caja kpi"><div class="ic rojo">📒</div><div><div class="v num naranja-t">${dinero(data.fiado_total)}</div><div class="l">Fiado por cobrar</div></div></div>
+    <div class="caja kpi ${bajos + agot > 0 ? 'alerta' : ''}"><div class="ic azul">📦</div><div><div class="v num">${bajos} · ${agot}</div><div class="l">Stock bajo · Agotados</div></div></div>`;
 }
 
+// ---------- Ventas por hora ----------
 function renderVentasPorHora(porHora) {
   const cont = document.getElementById('ventasPorHora');
+  const info = document.getElementById('infoHora');
   if (!porHora || porHora.length === 0) {
-    cont.innerHTML = '<div class="sin-datos">Sin ventas registradas hoy todavía</div>';
+    datosHora = [];
+    info.textContent = '';
+    cont.innerHTML = '<div class="vacio">Sin ventas registradas hoy todavía</div>';
     return;
   }
-  const maxTotal = Math.max(...porHora.map(h => parseFloat(h.total)));
-  cont.innerHTML = porHora.map(h => {
-    const porcentaje = maxTotal > 0 ? (parseFloat(h.total) / maxTotal) * 100 : 0;
-    const horaTexto = `${String(h.hora).padStart(2, '0')}:00`;
-    return `
-      <div class="barra-hora">
-        <span class="etiqueta-hora">${horaTexto}</span>
-        <div class="barra-fondo"><div class="barra-relleno" style="width:${porcentaje}%"></div></div>
-        <span class="monto-hora">$${parseFloat(h.total).toFixed(2)}</span>
-      </div>
-    `;
-  }).join('');
+  const mapa = {};
+  porHora.forEach((h) => { mapa[Number(h.hora)] = parseFloat(h.total); });
+  const horas = Object.keys(mapa).map(Number);
+  const ini = Math.min(...horas), fin = Math.max(...horas);
+  datosHora = [];
+  for (let h = ini; h <= fin; h++) datosHora.push({ hora: h, total: mapa[h] || 0 });
+  const max = Math.max(...datosHora.map((d) => d.total));
+  const pico = datosHora.find((d) => d.total === max);
+
+  cont.innerHTML = `<div class="grafica-hora">${datosHora.map((d, i) =>
+    `<button class="col ${d === pico ? 'pico' : ''}" data-i="${i}" title="${String(d.hora).padStart(2, '0')}:00 — ${dinero(d.total)}" aria-label="${d.hora} horas: ${dinero(d.total)}">
+       <div class="barra" style="height:${max > 0 ? Math.max(2, d.total / max * 100) : 2}%"></div></button>`).join('')}</div>
+    <div class="horas">${datosHora.map((d) => `<span>${d.hora}h</span>`).join('')}</div>`;
+  mostrarHora(pico);
+  cont.querySelectorAll('.col').forEach((c) => c.addEventListener('click', () => {
+    cont.querySelectorAll('.col').forEach((x) => x.classList.remove('sel'));
+    c.classList.add('sel');
+    mostrarHora(datosHora[Number(c.dataset.i)]);
+  }));
+}
+function mostrarHora(d) {
+  const esPico = datosHora.length && d.total === Math.max(...datosHora.map((x) => x.total));
+  document.getElementById('infoHora').textContent = `${esPico ? 'Hora pico: ' : ''}${String(d.hora).padStart(2, '0')}:00 · ${dinero(d.total)}`;
 }
 
-const LIMITE_ALERTAS_INICIAL = 5;
-
-function filaAlertaHTML(a) {
-  if (a.tipo === 'agotado') return `<div class="fila-alerta"><span>🔴 ${a.nombre}</span><span>Agotado</span></div>`;
-  if (a.tipo === 'stock_bajo') return `<div class="fila-alerta"><span>🟡 ${a.nombre}</span><span>${parseFloat(a.existencia_actual).toFixed(2)} / mín. ${parseFloat(a.stock_minimo).toFixed(2)}</span></div>`;
-  return `<div class="fila-alerta"><span>💳 ${a.nombre}</span><span>$${parseFloat(a.saldo_actual).toFixed(2)} / $${parseFloat(a.limite_credito).toFixed(2)}</span></div>`;
+// ---------- Atención ----------
+function resumenNombres(lista, max = 2) {
+  const nombres = lista.slice(0, max).map((x) => x.nombre);
+  return nombres.join(', ') + (lista.length > max ? '…' : '');
 }
 
 function renderAlertas(data) {
-  const todas = [
-    ...data.agotados.map(p => ({ tipo: 'agotado', ...p })),
-    ...data.stock_bajo.map(p => ({ tipo: 'stock_bajo', ...p })),
-    ...data.creditos_cerca_limite.map(c => ({ tipo: 'credito', ...c }))
-  ];
+  const cont = document.getElementById('listaAlertas');
+  const grupos = [];
+  if (data.stock_bajo.length) grupos.push({
+    id: 'bajo', icono: '📉', color: 'amarillo', href: 'productos.html',
+    titulo: `${data.stock_bajo.length} ${data.stock_bajo.length === 1 ? 'producto con stock bajo' : 'productos con stock bajo'}`,
+    resumen: resumenNombres(data.stock_bajo),
+    detalle: data.stock_bajo.map((p) => `<div class="linea"><span>🟡 ${escapar(p.nombre)}</span><span class="num">${num(p.existencia_actual)} / mín. ${num(p.stock_minimo)}</span></div>`).join('')
+  });
+  if (data.agotados.length) grupos.push({
+    id: 'agotado', icono: '🚫', color: 'rojo', href: 'productos.html',
+    titulo: `${data.agotados.length} ${data.agotados.length === 1 ? 'producto agotado' : 'productos agotados'}`,
+    resumen: resumenNombres(data.agotados),
+    detalle: data.agotados.map((p) => `<div class="linea"><span>🔴 ${escapar(p.nombre)}</span><span>Agotado</span></div>`).join('')
+  });
+  if (data.creditos_cerca_limite.length) grupos.push({
+    id: 'credito', icono: '⚠️', color: 'rojo', href: 'clientes.html',
+    titulo: `${data.creditos_cerca_limite.length} ${data.creditos_cerca_limite.length === 1 ? 'cliente cerca de su límite' : 'clientes cerca de su límite'}`,
+    resumen: data.creditos_cerca_limite.slice(0, 2).map((c) => `${c.nombre} ${Math.round(parseFloat(c.saldo_actual) / parseFloat(c.limite_credito) * 100)}%`).join(', ') + (data.creditos_cerca_limite.length > 2 ? '…' : ''),
+    detalle: data.creditos_cerca_limite.map((c) => `<div class="linea"><span>💳 ${escapar(c.nombre)}</span><span class="num">${dinero(c.saldo_actual)} / ${dinero(c.limite_credito)}</span></div>`).join('')
+  });
 
-  document.getElementById('seccionAlertas').style.display = todas.length > 0 ? 'block' : 'none';
-  if (todas.length === 0) return;
-
-  const visibles = todas.slice(0, LIMITE_ALERTAS_INICIAL);
-  const ocultas = todas.slice(LIMITE_ALERTAS_INICIAL);
-
-  let html = visibles.map(filaAlertaHTML).join('');
-
-  if (ocultas.length > 0) {
-    html += `
-      <div id="filasAlertasOcultas" style="display:none;">${ocultas.map(filaAlertaHTML).join('')}</div>
-      <div style="padding:10px 0; text-align:center;">
-        <a href="#" onclick="event.preventDefault(); mostrarMasAlertas(this);" style="font-size:13px; color:var(--primary); font-weight:600; text-decoration:none;">
-          Ver ${ocultas.length} más
-        </a>
-      </div>
-    `;
+  if (!grupos.length) {
+    cont.innerHTML = '<div class="todo-bien"><span class="gran">✅</span>Todo en orden: no hay alertas por ahora.</div>';
+    return;
   }
-
-  document.getElementById('listaAlertas').innerHTML = html;
+  cont.innerHTML = grupos.map((g) => `
+    <div class="aviso-fila" onclick="alternarDetalle('${g.id}')" title="Toca para ver el detalle">
+      <div class="ic ${g.color}">${g.icono}</div>
+      <div class="info"><b>${g.titulo}</b><small>${escapar(g.resumen)}</small></div>
+      <a class="btn btn-secondary btn-chico" href="${g.href}" onclick="event.stopPropagation()">Ver</a>
+    </div>
+    <div class="detalle-aviso" id="detalle-${g.id}">${g.detalle}</div>`).join('');
+}
+function alternarDetalle(id) {
+  document.getElementById('detalle-' + id).classList.toggle('abierto');
 }
 
-function mostrarMasAlertas(enlace) {
-  document.getElementById('filasAlertasOcultas').style.display = 'block';
-  enlace.parentElement.remove();
+// ---------- Actividad ----------
+function horaActividad(f) {
+  const d = new Date(f);
+  if (isNaN(d)) return '';
+  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (d.toDateString() === new Date().toDateString()) return hora;
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '') + ' · ' + hora;
 }
-
-const LIMITE_ACTIVIDAD_INICIAL = 6;
 
 function filaActividadHTML(a) {
-  return `
-    <div class="fila-actividad">
-      <span><span class="tag-actividad tag-${a.tipo}">${nombresTipoActividad[a.tipo] || a.tipo}</span>${a.referencia}</span>
-      <span>${new Date(a.fecha).toLocaleString()}</span>
-    </div>
-  `;
+  const t = TIPOS_ACTIVIDAD[a.tipo] || { icono: '•', color: '#78909C', titulo: (r) => r };
+  const esDinero = ['venta', 'compra', 'abono'].includes(a.tipo);
+  const monto = a.monto == null ? '' : (esDinero ? dinero(a.monto) : num(Math.abs(a.monto)) + ' pzas');
+  return `<div class="act">
+    <div class="ic" style="background:${t.color}">${t.icono}</div>
+    <div class="info"><b>${escapar(t.titulo(a.referencia))}</b><small>${escapar(horaActividad(a.fecha))}</small></div>
+    ${monto ? `<div class="monto num">${monto}</div>` : ''}
+  </div>`;
 }
 
 function renderActividad(actividad) {
+  ultimaActividad = actividad || [];
+  actividadCompleta = false;
+  pintarActividad();
+}
+function pintarActividad() {
   const cont = document.getElementById('listaActividad');
-  if (!actividad || actividad.length === 0) {
-    cont.innerHTML = '<div class="sin-datos">Sin actividad reciente</div>';
-    return;
-  }
-
-  const visibles = actividad.slice(0, LIMITE_ACTIVIDAD_INICIAL);
-  const ocultos = actividad.slice(LIMITE_ACTIVIDAD_INICIAL);
-
-  cont.innerHTML = visibles.map(filaActividadHTML).join('');
-
-  if (ocultos.length > 0) {
-    cont.innerHTML += `
-      <div id="filasActividadOcultas" style="display:none;">${ocultos.map(filaActividadHTML).join('')}</div>
-      <div style="padding:10px 0; text-align:center;">
-        <a href="#" onclick="event.preventDefault(); mostrarMasActividad(this);" style="font-size:13px; color:var(--primary); font-weight:600; text-decoration:none;">
-          Ver ${ocultos.length} más
-        </a>
-      </div>
-    `;
-  }
+  if (!ultimaActividad.length) { cont.innerHTML = '<div class="vacio">Sin actividad reciente</div>'; return; }
+  const lista = actividadCompleta ? ultimaActividad : ultimaActividad.slice(0, LIMITE_ACTIVIDAD_INICIAL);
+  const faltan = ultimaActividad.length - lista.length;
+  cont.innerHTML = lista.map(filaActividadHTML).join('')
+    + (faltan > 0 ? `<button class="ver-mas" onclick="actividadCompleta = true; pintarActividad();">Ver ${faltan} más</button>` : '');
 }
 
-function mostrarMasActividad(enlace) {
-  document.getElementById('filasActividadOcultas').style.display = 'block';
-  enlace.parentElement.remove();
-}
-
+pintarSaludo();
 cargarDashboard();
 </script>
 <script src="../js/sidebar-nav.js"></script>
