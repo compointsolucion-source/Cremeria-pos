@@ -60,6 +60,12 @@
 
   /* ---- Teclado numérico del cobro ---- */
   #totalCobrarModal { font-size: 40px; font-weight: 800; color: var(--primary, #5FAE46); }
+  .cambio-grande { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 18px; border-radius: 14px; border: 3px solid transparent; }
+  .cambio-grande .cg-etiqueta { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+  .cambio-grande .cg-monto { font-size: 44px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .cambio-grande.vacio { background: #F4F5F6; color: #9AA0A6; border-color: #E3E5E8; }
+  .cambio-grande.ok { background: #E8F5E9; color: #1B5E20; border-color: #5FAE46; box-shadow: 0 0 14px rgba(95,174,70,0.45); }
+  .cambio-grande.falta { background: #FDECEA; color: #B71C1C; border-color: #E53935; box-shadow: 0 0 14px rgba(229,57,53,0.35); }
   .cobro-cols { display: flex; gap: 18px; align-items: flex-start; }
   .cobro-izq { flex: 1; min-width: 0; }
   .teclado-cobro { width: 270px; flex: 0 0 270px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -1273,7 +1279,7 @@ function setMetodoCobrarAvanzada(m) {
   if (m === 'efectivo') {
     campos.innerHTML = `
       <input type="text" inputmode="decimal" autocomplete="off" id="montoRecibidoCobrarAv" placeholder="Efectivo recibido" oninput="calcularCambioCobrarAvanzada()">
-      <p id="cambioCobrarAvTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+      <div id="cambioCobrarAvTexto" class="cambio-grande"></div>
     `;
   } else if (m === 'mixto') {
     campos.innerHTML = `
@@ -1292,7 +1298,7 @@ function setMetodoCobrarAvanzada(m) {
     campos.innerHTML = `
       <p style="font-size:14px; color:#666;">Tipo de cambio: $${tipoCambio.toFixed(4)} MXN/USD — Total: <b>$${totalDolares.toFixed(2)} USD</b></p>
       <input type="text" inputmode="decimal" autocomplete="off" id="dolaresRecibidosCobrarAv" placeholder="Dólares recibidos" oninput="calcularCambioDolaresCobrarAvanzada()">
-      <p id="cambioDolaresCobrarAvTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+      <div id="cambioDolaresCobrarAvTexto" class="cambio-grande"></div>
     `;
   } else if (m === 'tarjeta') {
     const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
@@ -1313,6 +1319,8 @@ function setMetodoCobrarAvanzada(m) {
   const tecladoEl = document.getElementById('tecladoCobro');
   if (tecladoEl) tecladoEl.style.display = ['efectivo', 'mixto', 'dolares'].includes(m) ? 'grid' : 'none';
   campoNumericoCobroAv = null;
+  if (m === 'efectivo') pintarCambioAv('cambioCobrarAvTexto', 0, 0, '');
+  if (m === 'dolares') pintarCambioAv('cambioDolaresCobrarAvTexto', 0, 0, ' USD');
   const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv' }[m];
   if (idCampoPrincipal) {
     setTimeout(() => {
@@ -1386,10 +1394,25 @@ function tecladoCobroAv(tecla) {
   campo.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+// Muestra el cambio (o lo que falta) grande y con color: verde = cambio a entregar, rojo = falta dinero.
+function pintarCambioAv(idElemento, recibido, cambio, sufijo) {
+  const el = document.getElementById(idElemento);
+  if (!el) return;
+  const redondeado = Math.round(cambio * 100) / 100;
+  if (!recibido) { el.className = 'cambio-grande vacio'; el.innerHTML = '<span class="cg-etiqueta">CAMBIO</span><span class="cg-monto">$0.00' + sufijo + '</span>'; return; }
+  if (redondeado >= 0) {
+    el.className = 'cambio-grande ok';
+    el.innerHTML = '<span class="cg-etiqueta">CAMBIO A ENTREGAR</span><span class="cg-monto">$' + redondeado.toFixed(2) + sufijo + '</span>';
+  } else {
+    el.className = 'cambio-grande falta';
+    el.innerHTML = '<span class="cg-etiqueta">FALTA</span><span class="cg-monto">$' + Math.abs(redondeado).toFixed(2) + sufijo + '</span>';
+  }
+}
+
 function calcularCambioCobrarAvanzada() {
   const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
   const cambio = recibido - totalNetoTicketAv(ticketParaCobrarAvanzada);
-  document.getElementById('cambioCobrarAvTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Falta: $${Math.abs(cambio).toFixed(2)}`;
+  pintarCambioAv('cambioCobrarAvTexto', recibido, cambio, '');
 }
 
 function calcularCambioDolaresCobrarAvanzada() {
@@ -1398,7 +1421,7 @@ function calcularCambioDolaresCobrarAvanzada() {
   const totalDolares = tipoCambio > 0 ? (totalNetoTicketAv(ticketParaCobrarAvanzada) / tipoCambio) : 0;
   const recibido = parseFloat(document.getElementById('dolaresRecibidosCobrarAv').value || 0);
   const cambio = recibido - totalDolares;
-  document.getElementById('cambioDolaresCobrarAvTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)} USD` : `Falta: $${Math.abs(cambio).toFixed(2)} USD`;
+  pintarCambioAv('cambioDolaresCobrarAvTexto', recibido, cambio, ' USD');
 }
 
 let debounceBusquedaCobrarAv;
