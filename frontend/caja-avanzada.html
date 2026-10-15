@@ -58,6 +58,21 @@
   .pestana-ticket .cerrar-pestana:hover { background: #C62828; color: white; }
   .pestana-ticket.activa .contador-pestana { background: var(--primary, #5FAE46); color: white; }
 
+  /* ---- Teclado numérico del cobro ---- */
+  #totalCobrarModal { font-size: 40px; font-weight: 800; color: var(--primary, #5FAE46); }
+  .cobro-cols { display: flex; gap: 18px; align-items: flex-start; }
+  .cobro-izq { flex: 1; min-width: 0; }
+  .teclado-cobro { width: 270px; flex: 0 0 270px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .teclado-cobro button { border: none; border-radius: 12px; background: #E8F5E9; color: #2E5E1E; font-size: 26px; font-weight: 800; padding: 16px 0; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .teclado-cobro button:active { background: #5FAE46; color: white; transform: scale(0.97); }
+  .teclado-cobro .tc-borrar { font-size: 14px; background: #FFE0B2; color: #7A4B00; }
+  .teclado-cobro .tc-exacto { grid-column: 1 / span 1; font-size: 14px; background: #E3F2FD; color: #0D47A1; }
+  .teclado-cobro .tc-enter { grid-column: 2 / span 2; background: #5FAE46; color: white; font-size: 22px; }
+  @media (max-width: 700px) {
+    .cobro-cols { flex-direction: column; }
+    .teclado-cobro { width: 100%; flex-basis: auto; }
+  }
+
   /* ---- Selector de vista ---- */
   .selector-vista { display: flex; background: rgba(255,255,255,0.14); border-radius: 12px; padding: 4px; gap: 4px; margin-left: auto; margin-right: 10px; }
   .selector-vista button { border: none; background: transparent; color: #DDD; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
@@ -239,16 +254,37 @@
   </div>
 
   <div class="modal-overlay" id="modalCobrarAvanzada" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:200;">
-    <div class="card" style="width:95%; max-width:700px;">
+    <div class="card" style="width:95%; max-width:820px; max-height:96vh; overflow-y:auto;">
       <h3>💰 COBRAR</h3>
       <div class="total-grande" id="totalCobrarModal" style="text-align:center; margin:10px 0;"></div>
 
-      <div id="metodosPagoModalCobrar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
-      <div id="camposPagoModalCobrar"></div>
+      <div class="cobro-cols">
+        <div class="cobro-izq">
+          <div id="metodosPagoModalCobrar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
+          <div id="camposPagoModalCobrar"></div>
 
-      <div style="display:flex; gap:10px; margin-top:16px;">
-        <button class="btn btn-primary" style="flex:1;" onclick="confirmarCobroAvanzada()">✅ Confirmar Pago</button>
-        <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalCobrarAvanzada()">Cancelar</button>
+          <div style="display:flex; gap:10px; margin-top:16px;">
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmarCobroAvanzada()">✅ Confirmar Pago</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalCobrarAvanzada()">Cancelar</button>
+          </div>
+        </div>
+
+        <div class="teclado-cobro" id="tecladoCobro" style="display:none;">
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('7')">7</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('8')">8</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('9')">9</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('4')">4</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('5')">5</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('6')">6</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('1')">1</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('2')">2</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('3')">3</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('0')">0</button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('.')">.</button>
+          <button type="button" class="tc-borrar" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('borrar')">Borrar</button>
+          <button type="button" class="tc-exacto" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('exacto')">Exacto</button>
+          <button type="button" class="tc-enter" onmousedown="event.preventDefault()" onclick="tecladoCobroAv('enter')">ENTER</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1235,13 +1271,13 @@ function setMetodoCobrarAvanzada(m) {
 
   if (m === 'efectivo') {
     campos.innerHTML = `
-      <input type="number" id="montoRecibidoCobrarAv" placeholder="Efectivo recibido" oninput="calcularCambioCobrarAvanzada()">
+      <input type="text" inputmode="decimal" autocomplete="off" id="montoRecibidoCobrarAv" placeholder="Efectivo recibido" oninput="calcularCambioCobrarAvanzada()">
       <p id="cambioCobrarAvTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
     `;
   } else if (m === 'mixto') {
     campos.innerHTML = `
-      <input type="number" id="montoEfectivoCobrarAv" placeholder="Monto en efectivo" style="margin-bottom:8px;">
-      <input type="number" id="montoTarjetaCobrarAv" placeholder="Monto en tarjeta">
+      <input type="text" inputmode="decimal" autocomplete="off" id="montoEfectivoCobrarAv" placeholder="Monto en efectivo" style="margin-bottom:8px;">
+      <input type="text" inputmode="decimal" autocomplete="off" id="montoTarjetaCobrarAv" placeholder="Monto en tarjeta">
     `;
   } else if (m === 'credito') {
     campos.innerHTML = `
@@ -1254,7 +1290,7 @@ function setMetodoCobrarAvanzada(m) {
     const totalDolares = tipoCambio > 0 ? (total / tipoCambio) : 0;
     campos.innerHTML = `
       <p style="font-size:14px; color:#666;">Tipo de cambio: $${tipoCambio.toFixed(4)} MXN/USD — Total: <b>$${totalDolares.toFixed(2)} USD</b></p>
-      <input type="number" id="dolaresRecibidosCobrarAv" placeholder="Dólares recibidos" step="0.01" oninput="calcularCambioDolaresCobrarAvanzada()">
+      <input type="text" inputmode="decimal" autocomplete="off" id="dolaresRecibidosCobrarAv" placeholder="Dólares recibidos" oninput="calcularCambioDolaresCobrarAvanzada()">
       <p id="cambioDolaresCobrarAvTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
     `;
   } else if (m === 'tarjeta') {
@@ -1273,6 +1309,9 @@ function setMetodoCobrarAvanzada(m) {
   // Enfoca el campo principal de cada método, para poder escribir de una
   // vez sin tener que darle clic primero — igual al abrir el modal, como
   // al cambiar de método con el teclado.
+  const tecladoEl = document.getElementById('tecladoCobro');
+  if (tecladoEl) tecladoEl.style.display = ['efectivo', 'mixto', 'dolares'].includes(m) ? 'grid' : 'none';
+  campoNumericoCobroAv = null;
   const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv' }[m];
   if (idCampoPrincipal) {
     setTimeout(() => {
@@ -1280,6 +1319,70 @@ function setMetodoCobrarAvanzada(m) {
       if (campo) campo.focus();
     }, 0);
   }
+}
+
+// ---------- Teclado numérico en pantalla (cobro) ----------
+// Escribe en el campo numérico que esté activo en la ventana de cobro (efectivo recibido,
+// montos del pago mixto o dólares). ENTER confirma el pago; "Exacto" pone el total justo.
+let campoNumericoCobroAv = null;
+
+(function () {
+  const cont = document.getElementById('camposPagoModalCobrar');
+  cont.addEventListener('focusin', (e) => { if (e.target.tagName === 'INPUT' && e.target.inputMode === 'decimal') campoNumericoCobroAv = e.target; });
+  // Solo números y un punto, escriba quien escriba (teclado físico o en pantalla)
+  cont.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.tagName !== 'INPUT' || el.inputMode !== 'decimal') return;
+    let v = el.value.replace(/[^0-9.]/g, '');
+    const i = v.indexOf('.');
+    if (i !== -1) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '');
+    if (v !== el.value) el.value = v;
+  }, true);
+  // Enter del teclado físico = ENTER del teclado en pantalla
+  cont.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.inputMode === 'decimal') { e.preventDefault(); tecladoCobroAv('enter'); }
+  });
+})();
+
+function tecladoCobroAv(tecla) {
+  if (!ticketParaCobrarAvanzada) return;
+  let campo = campoNumericoCobroAv && document.body.contains(campoNumericoCobroAv) ? campoNumericoCobroAv : null;
+  if (!campo) campo = document.querySelector('#camposPagoModalCobrar input[inputmode="decimal"]');
+
+  if (tecla === 'enter') {
+    // En pago mixto, ENTER en "efectivo" pasa a "tarjeta" y ENTER ahí confirma.
+    const efectivoMixto = document.getElementById('montoEfectivoCobrarAv');
+    const tarjetaMixto = document.getElementById('montoTarjetaCobrarAv');
+    if (efectivoMixto && tarjetaMixto && campo === efectivoMixto) {
+      if (!tarjetaMixto.value) {
+        const resto = totalNetoTicketAv(ticketParaCobrarAvanzada) - (parseFloat(efectivoMixto.value) || 0);
+        if (resto > 0) tarjetaMixto.value = resto.toFixed(2);
+      }
+      tarjetaMixto.focus();
+      return;
+    }
+    confirmarCobroAvanzada();
+    return;
+  }
+  if (!campo) return;
+
+  if (tecla === 'exacto') {
+    const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
+    if (campo.id === 'dolaresRecibidosCobrarAv') {
+      const tc = parseFloat((configuracionCobrarAvanzada || {}).tipo_cambio_dolar || 0);
+      campo.value = tc > 0 ? (total / tc).toFixed(2) : '';
+    } else {
+      campo.value = total.toFixed(2);
+    }
+  } else if (tecla === 'borrar') {
+    campo.value = campo.value.slice(0, -1);
+  } else if (tecla === '.') {
+    if (!campo.value.includes('.')) campo.value = (campo.value || '0') + '.';
+  } else {
+    campo.value += tecla;
+  }
+  campo.focus();
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function calcularCambioCobrarAvanzada() {

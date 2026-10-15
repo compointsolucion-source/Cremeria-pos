@@ -57,7 +57,8 @@ function totalesPestanaAv(p) {
 function totalNetoTicketAv(t) {
   const items = t.items || [];
   const descItems = items.reduce((s, i) => s + (parseFloat(i.descuento_monto || 0) || 0), 0);
-  return parseFloat(t.total) - (parseFloat(t.descuento_monto || 0) || 0) - descItems;
+  // Se redondea a centavos para que "Exacto" y las comparaciones del cobro no fallen por decimales flotantes.
+  return Math.round((parseFloat(t.total) - (parseFloat(t.descuento_monto || 0) || 0) - descItems) * 100) / 100;
 }
 
 // Quita lo que solo existe en pantalla antes de mandar el renglón al servidor.
