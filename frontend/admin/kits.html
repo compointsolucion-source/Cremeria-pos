@@ -11,16 +11,120 @@
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
-  .form-kit { display: grid; gap: 10px; margin-bottom: 20px; }
-  .selector-productos { max-height: 220px; overflow-y: auto; border: 1px solid #DDD; border-radius: 10px; padding: 8px; }
-  .fila-producto-select { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid #F0F0F0; }
-  .fila-producto-select input[type="number"] { width: 80px; }
-  .fila-producto-select label { flex: 1; font-size: 14px; }
-  .kit-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .kit-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
-  .kit-card .incluye { font-size: 13px; color: #666; margin-top: 6px; }
-  .preview-img { width: 70px; height: 70px; object-fit: cover; border-radius: 10px; background: #EEE; }
+  .contenido { max-width: 1400px; margin: 16px auto; padding: 0 14px 90px; }
+
+  /* ---- Dos columnas: kits y editor ---- */
+  .columnas { display: grid; grid-template-columns: 1fr 470px; gap: 14px; align-items: start; }
+  .caja { background: var(--surface, #fff); border-radius: 12px; box-shadow: var(--shadow); }
+  .barra { padding: 10px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .barra .buscar { flex: 1 1 200px; position: relative; }
+  .barra .buscar input, .buscar-prod input { width: 100%; padding-left: 36px !important; }
+  .barra .buscar::before, .buscar-prod::before { content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; }
+  .buscar-prod { position: relative; }
+  .conteo { font-size: 12px; color: var(--muted, #7A7D83); }
+
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .kit-card { padding: 14px; display: grid; gap: 10px; align-content: start; }
+  .kit-card.sel { outline: 2px solid var(--primary, #5FAE46); }
+  .kit-cab { display: flex; align-items: flex-start; gap: 12px; }
+  .kit-cab .datos { flex: 1; min-width: 0; }
+  .kit-cab .nombre { font-weight: 800; font-size: 16px; }
+  .kit-cab .precio { text-align: right; }
+  .kit-cab .precio b { display: block; font-size: 24px; font-weight: 800; }
+  .foto { width: 64px; height: 64px; border-radius: 12px; background: rgba(128,128,128,0.14); display: flex; align-items: center; justify-content: center; font-size: 32px; overflow: hidden; flex: none; }
+  .foto.chica { width: 32px; height: 32px; border-radius: 8px; font-size: 16px; }
+  .foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .chips-incluye { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chips-incluye span { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border, #E4E6E9); color: var(--muted, #7A7D83); }
+  .franja { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(128,128,128,0.10); border-radius: 9px; padding: 8px 10px; font-size: 12px; color: var(--muted, #7A7D83); flex-wrap: wrap; }
+  .franja b { color: var(--text, #1F2023); }
+  .acciones { display: flex; gap: 6px; }
+  .acciones .btn { padding: 6px 10px; min-height: 0; font-size: 12.5px; }
+  .acciones .btn.crece { flex: 1; }
+  .btn-peligro { color: #C62828; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 14px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+  .pill.verde { background: rgba(95,174,70,0.18); color: #2E7D32; }
+  .pill.azul { background: rgba(21,101,192,0.14); color: #1565C0; }
+  .pill.amarillo { background: rgba(249,168,37,0.22); color: #8A5A00; }
+  .pill.gris { background: rgba(128,128,128,0.16); color: var(--muted, #7A7D83); }
+  .filas-movil { display: none; }
+  .vacio { text-align: center; color: #888; padding: 24px; }
+
+  /* ---- Panel del editor ---- */
+  .panel-form { position: sticky; top: 12px; overflow: hidden; display: flex; flex-direction: column; max-height: calc(100vh - 92px); }
+  .panel-cab { background: rgba(128,128,128,0.12); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel-cab h3 { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel-cuerpo { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; overflow-y: auto; align-content: start; }
+  .panel-cuerpo > * { min-width: 0; }
+  .campo { display: grid; gap: 4px; align-content: start; }
+  .campo > label { font-size: 12px; font-weight: 700; color: var(--muted, #7A7D83); }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .bloque { background: rgba(128,128,128,0.08); border: 1px solid var(--border, #E4E6E9); border-radius: 11px; padding: 11px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .bloque > * { min-width: 0; }
+  .bloque h5 { font-size: 12px; color: var(--muted, #7A7D83); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+  .bloque.blanco { background: var(--surface, #fff); }
+  .resultados { background: var(--surface, #fff); border: 1px solid var(--border, #E4E6E9); border-radius: 10px; max-height: 150px; overflow-y: auto; }
+  .resultados .nada { padding: 10px; font-size: 12.5px; color: var(--muted, #7A7D83); }
+  .fila-prod { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .fila-prod:last-child { border-bottom: none; }
+  .fila-prod .izq { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+  .fila-prod .nom { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fila-prod .sub { font-size: 11.5px; color: var(--muted, #7A7D83); }
+  .mini { border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 8px; width: 30px; height: 30px; font-weight: 800; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .mini.agregar { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+  .mini:hover { filter: brightness(0.95); }
+  .paso { display: flex; align-items: center; gap: 4px; }
+  .paso input { width: 58px !important; min-height: 30px !important; height: 30px; padding: 2px 4px !important; text-align: center; font-size: 13px; }
+  .fila-prod .der { display: flex; align-items: center; gap: 10px; }
+  .fila-prod .subtotal { width: 56px; text-align: right; font-weight: 700; font-size: 13px; }
+  .quitar { background: none; border: none; color: #C62828; font-size: 16px; cursor: pointer; padding: 2px 4px; }
+  .resumen { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(95,174,70,0.12); border-radius: 11px; padding: 11px 12px; flex-wrap: wrap; }
+  .resumen .num { font-size: 17px; font-weight: 800; }
+  .resumen .peq { font-size: 11.5px; color: var(--muted, #7A7D83); }
+  .zona-foto { border: 2px dashed var(--border, #CFD6DD); border-radius: 11px; padding: 8px 10px; display: flex; align-items: center; gap: 10px; }
+  .zona-foto input[type="file"] { display: none; }
+  .preview-img { width: 44px; height: 44px; object-fit: cover; border-radius: 9px; background: rgba(128,128,128,0.14); flex: none; }
+  .preview-img:not([src]), .preview-img[src=""] { visibility: hidden; }
+  .btn-chico { padding: 7px 11px; min-height: 0; font-size: 13px; }
+  details.mas { border: 1px dashed var(--border, #CFD6DD); border-radius: 11px; padding: 10px 11px; }
+  details.mas summary { font-weight: 700; font-size: 13px; color: var(--muted, #7A7D83); cursor: pointer; }
+  details.mas[open] summary { margin-bottom: 10px; }
+  details.mas:not([open]) > div { display: none; }
+  details.mas > div { display: grid; gap: 10px; }
+  .panel-pie { border-top: 1px solid var(--border, #E4E6E9); padding: 10px 14px; background: var(--surface, #fff); }
+  .btn-grande { padding: 13px; font-size: 15px; font-weight: 800; width: 100%; }
+  .cerrar-hoja, .fondo-hoja, .boton-flotante { display: none; }
+
+  /* ---- Celular / pantallas angostas ---- */
+  @media (max-width: 1000px) {
+    .contenido { padding: 0 10px 90px; }
+    .columnas { grid-template-columns: 1fr; }
+    .rejilla { display: none; }
+    .filas-movil { display: block; }
+    .fila-movil { padding: 11px 12px; border-bottom: 1px solid var(--border, #E4E6E9); display: flex; align-items: center; gap: 11px; }
+    .fila-movil .info { flex: 1; min-width: 0; }
+    .fila-movil .info b { display: block; font-size: 14.5px; }
+    .fila-movil .info small { color: var(--muted, #7A7D83); font-size: 12px; }
+    .fila-movil .precio { font-size: 18px; font-weight: 800; }
+    .fila-movil .botones { display: grid; gap: 4px; }
+    .fila-movil .botones .mini { width: 34px; }
+    .paso input { width: 46px !important; }
+    .fila-prod .subtotal { width: 50px; }
+    .fila-prod .der { gap: 6px; }
+    .fila-prod .nom { white-space: normal; line-height: 1.15; }
+    .resumen { display: grid; grid-template-columns: 1fr 1fr; }
+    .resumen > div:nth-child(2) { grid-column: 1 / -1; order: 3; text-align: left !important; }
+    .resumen > div:nth-child(3) { text-align: right; }
+    .panel-form { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: 24px; z-index: 90; border-radius: 18px 18px 0 0; max-height: none; box-shadow: 0 -8px 24px rgba(0,0,0,0.35); }
+    .panel-form.abierto { display: flex; }
+    .panel-cuerpo { flex: 1; }
+    .fondo-hoja { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 80; }
+    .fondo-hoja.abierto { display: block; }
+    .cerrar-hoja { display: inline-flex; }
+    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
+    .btn-nuevo-escritorio { display: none !important; }
+    #btnCancelarEdicion { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -29,31 +133,74 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📦 Kits / Combos</h1></div>
+    <button class="btn btn-primary btn-nuevo-escritorio" onclick="nuevoKit()">＋ Nuevo kit</button>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <div class="card form-kit">
-      <h3>Nuevo kit</h3>
-      <input type="text" id="nombreKit" placeholder="Nombre del kit (ej. Combo desayuno)">
-      <input type="number" id="precioKit" placeholder="Precio fijo del kit ($)" step="0.01">
-      <input type="text" id="codigoBarrasKit" placeholder="Código de barras (opcional)">
+    <div class="columnas">
 
-      <div style="display:flex; align-items:center; gap:12px;">
-        <img id="previewImgKit" class="preview-img" src="">
-        <input type="file" id="imagenInputKit" accept="image/*">
+      <!-- ================= Lista de kits ================= -->
+      <div>
+        <div class="caja barra">
+          <div class="buscar"><input type="text" id="buscadorKits" placeholder="Buscar kit…" oninput="renderKits()"></div>
+          <span class="conteo" id="conteoKits"></span>
+        </div>
+        <div class="rejilla" id="rejillaKits"></div>
+        <div class="caja filas-movil" id="filasKits"></div>
       </div>
 
-      <p style="margin:6px 0 2px; font-weight:600;">Selecciona los productos que incluye:</p>
-      <div class="selector-productos" id="selectorProductos"></div>
+      <!-- ================= Editor (en celular sale desde abajo) ================= -->
+      <div class="caja panel-form" id="panelForm">
+        <div class="panel-cab">
+          <h3 id="tituloFormulario">＋ Nuevo kit</h3>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-secondary btn-chico" id="btnCancelarEdicion" style="display:none;" onclick="cancelarEdicion()">✕ Cancelar edición</button>
+            <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+          </div>
+        </div>
 
-      <button class="btn btn-primary" onclick="guardarKit()">Guardar Kit</button>
+        <div class="panel-cuerpo">
+          <div class="dos">
+            <div class="campo"><label>Nombre del kit *</label><input type="text" id="nombreKit" placeholder="Ej. Combo desayuno"></div>
+            <div class="campo"><label>Precio del kit *</label><input type="number" id="precioKit" placeholder="0.00" step="0.01" inputmode="decimal" oninput="pintarResumen()"></div>
+          </div>
+
+          <div class="bloque">
+            <h5>Agregar productos</h5>
+            <div class="buscar-prod"><input type="text" id="buscadorProd" placeholder="Buscar producto o escanear código…" autocomplete="off" oninput="pintarResultados()" onkeydown="teclaBuscador(event)"></div>
+            <div class="resultados" id="resultadosProd"></div>
+          </div>
+
+          <div class="bloque blanco">
+            <h5>En el kit (<span id="cuentaEnKit">0</span>)</h5>
+            <div id="listaEnKit"></div>
+          </div>
+
+          <div class="resumen" id="resumenKit"></div>
+
+          <details class="mas" id="detMas">
+            <summary>🖼️ Foto y código de barras</summary>
+            <div>
+              <div class="zona-foto">
+                <img id="previewImgKit" class="preview-img" src="" alt="">
+                <button type="button" class="btn btn-secondary btn-chico" onclick="document.getElementById('imagenInputKit').click()">📷 Foto del kit</button>
+                <input type="file" id="imagenInputKit" accept="image/*">
+              </div>
+              <div class="campo"><label>Código de barras (opcional)</label><input type="text" id="codigoBarrasKit" placeholder="Escanéalo o escríbelo"></div>
+            </div>
+          </details>
+        </div>
+
+        <div class="panel-pie">
+          <button class="btn btn-primary btn-grande" id="btnGuardarKit" onclick="guardarKit()">💾 Guardar kit</button>
+        </div>
+      </div>
     </div>
-
-    <h3>Kits actuales</h3>
-    <div id="listaKits"></div>
   </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
+  <button class="boton-flotante" onclick="nuevoKit()">＋ Nuevo kit</button>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -62,9 +209,35 @@
 <script src="../js/imagen-utils.js"></script>
 <script>
 requiereLogin();
-let productosDisponibles = [];
-let imagenKitBase64 = '';
 
+let productosDisponibles = [];   // catálogo (para buscar y para calcular precios sueltos)
+let productosPorId = new Map();
+let kits = [];
+let enKit = new Map();           // producto_id -> cantidad
+let kitEditandoId = null;
+let imagenKitBase64 = '';
+const esAngosto = window.matchMedia('(max-width: 1000px)');
+
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const entero = (n) => '$' + Math.round(Number(n || 0)).toLocaleString('en-US');
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const cantTxt = (c) => String(Number(c));      // "1.000" -> "1"
+const pasoDe = (p) => (p && p.tipo_venta === 'unidad') ? 1 : 0.25;
+
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+}
+
+// ---------- Foto ----------
 document.getElementById('imagenInputKit').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -78,45 +251,237 @@ document.getElementById('imagenInputKit').addEventListener('change', async (e) =
   }
 });
 
+// ---------- Carga ----------
 async function cargarProductosDisponibles() {
-  productosDisponibles = await apiFetch('/productos');
-  const cont = document.getElementById('selectorProductos');
-  cont.innerHTML = '';
-  productosDisponibles.forEach(p => {
-    const unidad = p.tipo_venta === 'unidad' ? 'pzas' : 'kg';
-    const fila = document.createElement('div');
-    fila.className = 'fila-producto-select';
-    fila.innerHTML = `
-      <input type="checkbox" id="chk_${p.id}" onchange="toggleCantidad(${p.id})">
-      <label for="chk_${p.id}">${p.nombre}</label>
-      <input type="number" id="cant_${p.id}" placeholder="${unidad}" step="0.01" disabled style="width:70px;">
-    `;
-    cont.appendChild(fila);
-  });
-}
-
-function toggleCantidad(id) {
-  const chk = document.getElementById(`chk_${id}`);
-  const cant = document.getElementById(`cant_${id}`);
-  cant.disabled = !chk.checked;
-  if (chk.checked) cant.value = cant.value || 1;
+  const data = await apiFetch('/productos');
+  productosDisponibles = Array.isArray(data) ? data : (data.productos || []);
+  productosPorId = new Map(productosDisponibles.map(p => [p.id, { ...p, _buscar: sinAcentos(p.nombre) + ' ' + sinAcentos(p.codigo_barras) }]));
+  productosDisponibles = [...productosPorId.values()];
+  pintarResultados();
+  renderKits();
 }
 
 async function cargarKits() {
-  const kits = await apiFetch('/kits');
-  const cont = document.getElementById('listaKits');
-  cont.innerHTML = '';
-  kits.forEach(k => {
-    const incluye = k.productos.map(p => `${p.nombre} (${p.cantidad} ${p.tipo_venta === 'unidad' ? 'pzas' : 'kg'})`).join(', ');
-    const div = document.createElement('div');
-    div.className = 'kit-card';
-    div.innerHTML = `
-      <div class="titulo"><span>${k.nombre}</span><span>$${parseFloat(k.precio_kit).toFixed(2)}</span></div>
-      <div class="incluye">Incluye: ${incluye || '(sin productos)'}</div>
-      <button class="btn btn-secondary" style="margin-top:8px;" onclick="eliminarKit(${k.id})">Eliminar</button>
-    `;
-    cont.appendChild(div);
+  try {
+    kits = await apiFetch('/kits');
+    renderKits();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Cuánto costarían los productos sueltos, cuánto cuestan y cuánto se gana.
+// Si a algún producto le falta precio o costo, ese dato se muestra como "—".
+function calcularKit(items, precioKit) {
+  let suelto = 0, costo = 0, sueltoCompleto = true, costoCompleto = true;
+  items.forEach(({ producto_id, cantidad }) => {
+    const p = productosPorId.get(producto_id);
+    if (!p || !(parseFloat(p.precio) > 0)) sueltoCompleto = false; else suelto += parseFloat(p.precio) * cantidad;
+    if (!p || !(parseFloat(p.precio_costo) > 0)) costoCompleto = false; else costo += parseFloat(p.precio_costo) * cantidad;
   });
+  const precio = parseFloat(precioKit || 0);
+  return {
+    suelto: sueltoCompleto ? suelto : null,
+    ahorro: sueltoCompleto && precio > 0 ? suelto - precio : null,
+    costo: costoCompleto ? costo : null,
+    ganancia: costoCompleto && precio > 0 ? precio - costo : null,
+    gananciaPct: costoCompleto && precio > 0 && costo > 0 ? ((precio - costo) / costo) * 100 : null
+  };
+}
+
+function fotoKit(k, chica, emoji = '🎁') {
+  return k.imagen_url
+    ? `<div class="foto ${chica ? 'chica' : ''}"><img src="${escapar(k.imagen_url)}" loading="lazy" onerror="this.parentNode.textContent='${emoji}'"></div>`
+    : `<div class="foto ${chica ? 'chica' : ''}">${emoji}</div>`;
+}
+
+function pillGanancia(c) {
+  if (c.ganancia === null) return '<span class="pill gris">Sin costo</span>';
+  return c.ganancia >= 0
+    ? `<span class="pill verde">Ganas ${entero(c.ganancia)}${c.gananciaPct !== null ? ' · ' + Math.round(c.gananciaPct) + '%' : ''}</span>`
+    : `<span class="pill amarillo">Pierdes ${entero(-c.ganancia)}</span>`;
+}
+
+function renderKits() {
+  const texto = sinAcentos(document.getElementById('buscadorKits').value.trim());
+  const lista = kits.filter(k => !texto || sinAcentos(k.nombre).includes(texto) || sinAcentos(k.codigo_barras).includes(texto));
+  document.getElementById('conteoKits').textContent = `${lista.length} ${lista.length === 1 ? 'kit' : 'kits'}`;
+
+  const datos = lista.map(k => {
+    const items = (k.productos || []).map(p => ({ producto_id: p.producto_id, cantidad: Number(p.cantidad), nombre: p.nombre }));
+    return { k, items, c: calcularKit(items, k.precio_kit) };
+  });
+
+  document.getElementById('rejillaKits').innerHTML = datos.map(({ k, items, c }) => `
+    <div class="caja kit-card ${k.id === kitEditandoId ? 'sel' : ''}">
+      <div class="kit-cab">
+        ${fotoKit(k, false)}
+        <div class="datos"><div class="nombre">${escapar(k.nombre)}</div><div class="conteo">${items.length} ${items.length === 1 ? 'producto' : 'productos'}</div></div>
+        <div class="precio"><b>${dinero(k.precio_kit)}</b>${pillGanancia(c)}</div>
+      </div>
+      <div class="chips-incluye">${items.map(i => `<span>${escapar(i.nombre)} × ${cantTxt(i.cantidad)}</span>`).join('') || '<span>(sin productos)</span>'}</div>
+      <div class="franja">
+        <span>Sueltos costarían <b>${c.suelto !== null ? dinero(c.suelto) : '—'}</b></span>
+        ${c.ahorro !== null ? (c.ahorro >= 0 ? `<span class="pill azul">Cliente ahorra ${entero(c.ahorro)}</span>` : `<span class="pill amarillo">Más caro que sueltos</span>`) : ''}
+      </div>
+      <div class="acciones">
+        <button class="btn btn-secondary crece" onclick="editarKit(${k.id})">✏️ Editar</button>
+        <button class="btn btn-secondary btn-peligro" onclick="eliminarKit(${k.id})">🗑️ Eliminar</button>
+      </div>
+    </div>`).join('') || '<div class="caja vacio" style="grid-column:1/-1;">Todavía no hay kits. Toca «＋ Nuevo kit» para crear el primero.</div>';
+
+  document.getElementById('filasKits').innerHTML = datos.map(({ k, items, c }) => `
+    <div class="fila-movil">
+      ${fotoKit(k, false)}
+      <div class="info"><b>${escapar(k.nombre)}</b><small>${items.length} ${items.length === 1 ? 'producto' : 'productos'}${c.suelto !== null ? ' · sueltos ' + entero(c.suelto) : ''}</small><div style="margin-top:4px;">${pillGanancia(c)}</div></div>
+      <div class="precio">${entero(k.precio_kit)}</div>
+      <div class="botones">
+        <button class="mini" onclick="editarKit(${k.id})">✏️</button>
+        <button class="mini" onclick="eliminarKit(${k.id})">🗑️</button>
+      </div>
+    </div>`).join('') || '<div class="vacio">Todavía no hay kits.</div>';
+}
+esAngosto.addEventListener('change', renderKits);
+
+// ---------- Armar el kit ----------
+function pintarResultados() {
+  const texto = sinAcentos(document.getElementById('buscadorProd').value.trim());
+  const cont = document.getElementById('resultadosProd');
+  if (!texto) {
+    cont.innerHTML = '<div class="nada">Escribe el nombre del producto o escanea su código.</div>';
+    return;
+  }
+  const coincidencias = productosDisponibles.filter(p => !enKit.has(p.id) && p._buscar.includes(texto)).slice(0, 12);
+  cont.innerHTML = coincidencias.map(p => `
+    <div class="fila-prod">
+      <div class="izq">${fotoKit(p, true, '📦')}<div style="min-width:0;"><div class="nom">${escapar(p.nombre)}</div><div class="sub">${dinero(p.precio)} ${p.tipo_venta === 'unidad' ? 'por pieza' : 'por kg'}</div></div></div>
+      <button class="mini agregar" onclick="agregarAlKit(${p.id})" title="Agregar al kit">＋</button>
+    </div>`).join('') || '<div class="nada">Sin coincidencias (o ya está en el kit).</div>';
+}
+
+// Enter en el buscador: si el texto es un código de barras exacto (lector físico), lo agrega directo.
+function teclaBuscador(e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const texto = sinAcentos(document.getElementById('buscadorProd').value.trim());
+  if (!texto) return;
+  const exacto = productosDisponibles.find(p => p.codigo_barras && sinAcentos(p.codigo_barras) === texto);
+  const unico = productosDisponibles.filter(p => !enKit.has(p.id) && p._buscar.includes(texto));
+  const elegido = exacto || (unico.length === 1 ? unico[0] : null);
+  if (elegido) agregarAlKit(elegido.id);
+}
+
+function agregarAlKit(id) {
+  if (!enKit.has(id)) enKit.set(id, 1);
+  document.getElementById('buscadorProd').value = '';
+  pintarResultados();
+  pintarEnKit();
+  document.getElementById('buscadorProd').focus();
+}
+
+function quitarDelKit(id) {
+  enKit.delete(id);
+  pintarResultados();
+  pintarEnKit();
+}
+
+function cambiarCantidad(id, delta) {
+  const p = productosPorId.get(id);
+  const nueva = Math.round((Number(enKit.get(id) || 0) + delta * pasoDe(p)) * 1000) / 1000;
+  if (nueva <= 0) return;
+  enKit.set(id, nueva);
+  pintarEnKit();
+}
+
+function escribirCantidad(id, valor) {
+  const n = parseFloat(valor);
+  if (!(n > 0)) { pintarEnKit(); return; }
+  enKit.set(id, n);
+  pintarEnKit();
+}
+
+function pintarEnKit() {
+  document.getElementById('cuentaEnKit').textContent = enKit.size;
+  document.getElementById('listaEnKit').innerHTML = [...enKit.entries()].map(([id, cant]) => {
+    const p = productosPorId.get(id);
+    const nombre = p ? p.nombre : `Producto #${id}`;
+    const sub = p && parseFloat(p.precio) > 0 ? dinero(parseFloat(p.precio) * cant) : '—';
+    return `
+      <div class="fila-prod">
+        <div class="izq">${p ? fotoKit(p, true, '📦') : '<div class="foto chica">📦</div>'}<div class="nom">${escapar(nombre)}</div></div>
+        <div class="der">
+          <div class="paso">
+            <button class="mini" onclick="cambiarCantidad(${id}, -1)">−</button>
+            <input type="number" value="${cant}" step="0.01" inputmode="decimal" onchange="escribirCantidad(${id}, this.value)">
+            <button class="mini" onclick="cambiarCantidad(${id}, 1)">＋</button>
+          </div>
+          <span class="subtotal">${sub}</span>
+          <button class="quitar" onclick="quitarDelKit(${id})" title="Quitar">✕</button>
+        </div>
+      </div>`;
+  }).join('') || '<div class="conteo" style="padding:6px;">Todavía no agregas productos.</div>';
+  pintarResumen();
+}
+
+function pintarResumen() {
+  const items = [...enKit.entries()].map(([producto_id, cantidad]) => ({ producto_id, cantidad }));
+  const c = calcularKit(items, document.getElementById('precioKit').value);
+  const centro = c.ahorro !== null
+    ? (c.ahorro >= 0 ? `<span class="pill azul">Cliente ahorra ${dinero(c.ahorro)}</span>` : `<span class="pill amarillo">Más caro que sueltos</span>`)
+    : '<span class="pill gris">—</span>';
+  document.getElementById('resumenKit').innerHTML = `
+    <div><div class="peq">Sueltos costarían</div><div class="num">${c.suelto !== null ? dinero(c.suelto) : '—'}</div></div>
+    <div style="text-align:center;">${centro}</div>
+    <div style="text-align:right;"><div class="peq">Tu ganancia</div><div class="num" style="color:${c.ganancia !== null && c.ganancia < 0 ? '#C62828' : '#2E7D32'};">${c.ganancia !== null ? dinero(c.ganancia) + (c.gananciaPct !== null ? ' · ' + Math.round(c.gananciaPct) + '%' : '') : '—'}</div></div>`;
+}
+
+// ---------- Nuevo / editar / guardar / eliminar ----------
+function limpiarFormulario() {
+  document.getElementById('nombreKit').value = '';
+  document.getElementById('precioKit').value = '';
+  document.getElementById('codigoBarrasKit').value = '';
+  document.getElementById('buscadorProd').value = '';
+  document.getElementById('previewImgKit').src = '';
+  imagenKitBase64 = '';
+  enKit = new Map();
+  pintarResultados();
+  pintarEnKit();
+}
+
+function nuevoKit() {
+  cancelarEdicion(false);
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('nombreKit').focus(), 60);
+}
+
+function editarKit(id) {
+  const k = kits.find(x => x.id === id);
+  if (!k) return;
+  kitEditandoId = k.id;
+  document.getElementById('tituloFormulario').textContent = `✏️ ${k.nombre}`;
+  document.getElementById('btnCancelarEdicion').style.display = 'inline-flex';
+  document.getElementById('btnGuardarKit').textContent = '💾 Guardar cambios';
+  document.getElementById('nombreKit').value = k.nombre;
+  document.getElementById('precioKit').value = parseFloat(k.precio_kit);
+  document.getElementById('codigoBarrasKit').value = k.codigo_barras || '';
+  document.getElementById('previewImgKit').src = k.imagen_url || '';
+  document.getElementById('buscadorProd').value = '';
+  imagenKitBase64 = k.imagen_url || '';
+  enKit = new Map((k.productos || []).map(p => [p.producto_id, Number(p.cantidad)]));
+  pintarResultados();
+  pintarEnKit();
+  renderKits();
+  if (esAngosto.matches) abrirHoja();
+}
+
+function cancelarEdicion(cerrar = true) {
+  kitEditandoId = null;
+  document.getElementById('tituloFormulario').textContent = '＋ Nuevo kit';
+  document.getElementById('btnCancelarEdicion').style.display = 'none';
+  document.getElementById('btnGuardarKit').textContent = '💾 Guardar kit';
+  limpiarFormulario();
+  renderKits();
+  if (cerrar) cerrarHoja();
 }
 
 async function guardarKit() {
@@ -125,24 +490,20 @@ async function guardarKit() {
   const codigo_barras = document.getElementById('codigoBarrasKit').value.trim() || null;
 
   if (!nombre || precio_kit <= 0) { mostrarToast('Nombre y precio son obligatorios', 'error'); return; }
+  if (enKit.size === 0) { mostrarToast('Agrega al menos un producto al kit', 'error'); return; }
 
-  const productosSeleccionados = productosDisponibles
-    .filter(p => document.getElementById(`chk_${p.id}`).checked)
-    .map(p => ({ producto_id: p.id, cantidad: parseFloat(document.getElementById(`cant_${p.id}`).value || 1) }));
-
-  if (productosSeleccionados.length === 0) { mostrarToast('Selecciona al menos un producto para el kit', 'error'); return; }
+  const productos = [...enKit.entries()].map(([producto_id, cantidad]) => ({ producto_id, cantidad }));
+  const cuerpo = JSON.stringify({ nombre, precio_kit, imagen_url: imagenKitBase64, codigo_barras, productos });
 
   try {
-    await apiFetch('/kits', {
-      method: 'POST',
-      body: JSON.stringify({ nombre, precio_kit, imagen_url: imagenKitBase64, codigo_barras, productos: productosSeleccionados })
-    });
-    document.getElementById('nombreKit').value = '';
-    document.getElementById('precioKit').value = '';
-    document.getElementById('codigoBarrasKit').value = '';
-    document.getElementById('previewImgKit').src = '';
-    imagenKitBase64 = '';
-    cargarProductosDisponibles();
+    if (kitEditandoId) {
+      await apiFetch(`/kits/${kitEditandoId}`, { method: 'PUT', body: cuerpo });
+      mostrarToast('Kit actualizado', 'exito');
+    } else {
+      await apiFetch('/kits', { method: 'POST', body: cuerpo });
+      mostrarToast('Kit guardado', 'exito');
+    }
+    cancelarEdicion();
     cargarKits();
   } catch (err) {
     mostrarToast(err.message, 'error');
@@ -151,10 +512,18 @@ async function guardarKit() {
 
 async function eliminarKit(id) {
   if (!(await confirmarAccion('¿Eliminar este kit?'))) return;
-  await apiFetch(`/kits/${id}`, { method: 'DELETE' });
-  cargarKits();
+  try {
+    await apiFetch(`/kits/${id}`, { method: 'DELETE' });
+    if (kitEditandoId === id) cancelarEdicion();
+    cargarKits();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
 }
 
+// En pantallas grandes "Foto y código de barras" ya viene abierto.
+if (!esAngosto.matches) document.getElementById('detMas').open = true;
+pintarEnKit();
 cargarProductosDisponibles();
 cargarKits();
 </script>

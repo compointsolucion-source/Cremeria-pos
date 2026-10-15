@@ -94,6 +94,64 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
   }
 });
 
+// Editar kit: cambia nombre, precio, foto y código, y reemplaza la lista de
+// productos que incluye. Las ventas ya hechas no se afectan (cada ticket
+// guarda su propio detalle).
+router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
+  const cliente = await pool.connect();
+  try {
+    const { nombre, precio_kit, imagen_url, codigo_barras, productos } = req.body;
+    if (!nombre || !precio_kit || !productos || productos.length === 0) {
+      return res.status(400).json({ error: 'Nombre, precio y al menos un producto son requeridos' });
+    }
+
+    await cliente.query('BEGIN');
+
+    const actual = await cliente.query(
+      'SELECT * FROM kits WHERE id = $1 AND sucursal_id = $2 AND activo = true',
+      [req.params.id, req.sucursalId]
+    );
+    if (actual.rows.length === 0) {
+      await cliente.query('ROLLBACK');
+      return res.status(404).json({ error: 'No existe ese kit' });
+    }
+
+    const kitResult = await cliente.query(
+      `UPDATE kits SET nombre = $1, precio_kit = $2, imagen_url = $3, codigo_barras = $4
+       WHERE id = $5 AND sucursal_id = $6 RETURNING *`,
+      [nombre, precio_kit, imagen_url || null, codigo_barras || null, req.params.id, req.sucursalId]
+    );
+    const kit = kitResult.rows[0];
+
+    await cliente.query('DELETE FROM kit_productos WHERE kit_id = $1', [kit.id]);
+    for (const p of productos) {
+      await cliente.query(
+        `INSERT INTO kit_productos (kit_id, producto_id, cantidad) VALUES ($1, $2, $3)`,
+        [kit.id, p.producto_id, p.cantidad]
+      );
+    }
+
+    await registrarBitacora(cliente, {
+      usuario_id: req.usuario.id,
+      accion: 'editar_kit',
+      modulo: 'kits',
+      referencia_id: kit.id,
+      valor_anterior: { nombre: actual.rows[0].nombre, precio_kit: actual.rows[0].precio_kit },
+      valor_nuevo: { nombre, precio_kit, num_productos: productos.length }
+    });
+
+    await cliente.query('COMMIT');
+    res.json(kit);
+  } catch (err) {
+    await cliente.query('ROLLBACK');
+    console.error(err);
+    if (err.code === '23505') return res.status(400).json({ error: 'Ese código de barras ya está en uso' });
+    res.status(500).json({ error: 'Error al editar el kit' });
+  } finally {
+    cliente.release();
+  }
+});
+
 // Desactivar kit
 router.delete('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {

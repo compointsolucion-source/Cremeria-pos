@@ -113,6 +113,26 @@ input[type="checkbox"], input[type="radio"] {
 .opcion-check:last-child { border-bottom: none; }
 .opcion-check input[type="checkbox"] { margin: 0; }
 
+/* Interruptor (switch) reutilizable: se usa poniendo class="interruptor" a un
+   <input type="checkbox">. Mantiene el mismo id/onchange de siempre, solo
+   cambia cómo se ve (Productos, Configuración → Formas de pago, etc.). */
+input[type="checkbox"].interruptor {
+  -webkit-appearance: none; appearance: none;
+  width: 42px; height: 24px; min-height: 0; margin: 0;
+  border-radius: 14px; background: #CFD6DD; position: relative;
+  cursor: pointer; flex-shrink: 0; transition: background 0.15s ease;
+}
+input[type="checkbox"].interruptor::after {
+  content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  transition: left 0.15s ease;
+}
+input[type="checkbox"].interruptor:checked { background: var(--primary); }
+input[type="checkbox"].interruptor:checked::after { left: 21px; }
+input[type="checkbox"].interruptor:disabled { opacity: 0.55; cursor: not-allowed; }
+[data-tema="oscuro"] input[type="checkbox"].interruptor { background: #4A5060; }
+[data-tema="oscuro"] input[type="checkbox"].interruptor:checked { background: var(--primary); }
+
 /* Título de sección discreto y reutilizable — para que cualquier pantalla
    pueda organizar sus bloques de contenido de forma consistente, sin
    inventar un estilo distinto cada vez. */
@@ -194,6 +214,12 @@ tbody tr:hover { background: #FAFAFB; }
   cursor: pointer;
   z-index: 999;
 }
+
+/* Cuando una pantalla abre su "hoja" desde abajo (celular), los botones
+   flotantes globales (tema y estado de conexión) se esconden para no tapar
+   los botones de la hoja. La pantalla pone/quita la clase hoja-abierta. */
+body.hoja-abierta .boton-tema-flotante,
+body.hoja-abierta #indicadorConexion { display: none !important; }
 
 /* ===== Toast (notificaciones) ===== */
 .toast-container {

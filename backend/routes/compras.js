@@ -12,7 +12,9 @@ router.use(verificarToken, requiereSucursalId);
 router.get('/', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT c.*, p.nombre AS proveedor_nombre FROM compras c
+      `SELECT c.*, p.nombre AS proveedor_nombre,
+         (SELECT COUNT(*) FROM compra_detalle d WHERE d.compra_id = c.id)::int AS num_productos
+       FROM compras c
        JOIN proveedores p ON c.proveedor_id = p.id
        WHERE c.sucursal_id = $1 ORDER BY c.fecha DESC LIMIT 50`,
       [req.sucursalId]
@@ -21,6 +23,42 @@ router.get('/', verificarToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener compras' });
+  }
+});
+
+// Por proveedor: cuántas compras, cuánto se ha comprado en total y la fecha de la última
+// (se calcula con TODAS las compras, no solo con las 50 que muestra el historial).
+router.get('/resumen-proveedores', verificarToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT proveedor_id, COUNT(*)::int AS num_compras,
+              COALESCE(SUM(total), 0) AS total_comprado, MAX(fecha) AS ultima_compra
+       FROM compras WHERE sucursal_id = $1 GROUP BY proveedor_id`,
+      [req.sucursalId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener el resumen de proveedores' });
+  }
+});
+
+// Detalle de una compra: los productos que se compraron
+router.get('/:id/detalle', verificarToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT d.producto_id, pr.nombre, pr.tipo_venta, d.cantidad, d.costo_unitario, d.precio_venta_nuevo, d.subtotal
+       FROM compra_detalle d
+       JOIN compras c ON c.id = d.compra_id
+       JOIN productos pr ON pr.id = d.producto_id
+       WHERE d.compra_id = $1 AND c.sucursal_id = $2
+       ORDER BY d.id`,
+      [req.params.id, req.sucursalId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener el detalle de la compra' });
   }
 });
 
@@ -55,6 +93,17 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
       // Actualizar precio de venta si se especificó uno nuevo
       if (item.precio_venta_nuevo) {
         await conexion.query('UPDATE productos SET precio = $1 WHERE id = $2', [item.precio_venta_nuevo, item.producto_id]);
+      }
+
+      // El costo de compra pasa a ser el costo actual del producto (y el % de
+      // ganancia se recalcula con el precio de venta vigente).
+      if (item.costo_unitario > 0) {
+        await conexion.query(
+          `UPDATE productos SET precio_costo = $1,
+             ganancia_porcentaje = CASE WHEN precio > 0 THEN ROUND(((precio - $1::numeric) / $1::numeric * 100), 2) ELSE ganancia_porcentaje END
+           WHERE id = $2`,
+          [item.costo_unitario, item.producto_id]
+        );
       }
 
       // Sumar al inventario

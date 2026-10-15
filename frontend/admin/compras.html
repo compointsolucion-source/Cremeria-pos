@@ -11,17 +11,143 @@
 <link rel="stylesheet" href="../css/sidebar.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-  .tabs button.activo { background: #5FAE46; color: white; }
-  .form-grupo { display: grid; gap: 10px; margin-bottom: 20px; }
-  .fila-doble { display: flex; gap: 10px; }
-  .fila-doble > * { flex: 1; }
-  .item-compra { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #EEE; }
-  .item-compra select { flex: 2; }
-  .item-compra input { flex: 1; }
-  .compra-card { background: white; border-radius: 12px; padding: 12px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .compra-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
+  .contenido { max-width: 1400px; margin: 16px auto; padding: 0 14px 40px; }
+  section[hidden] { display: none !important; }
+  .caja { background: var(--surface, #fff); border-radius: 12px; box-shadow: var(--shadow); }
+  .nada { text-align: center; color: #888; padding: 28px 12px; font-size: 13.5px; }
+  .conteo { font-size: 12px; color: var(--muted, #7A7D83); }
+
+  /* ---- Pestañas ---- */
+  .tabs-seg { display: flex; background: rgba(128,128,128,0.16); border-radius: 12px; padding: 4px; gap: 4px; max-width: 580px; margin-bottom: 14px; }
+  .tabs-seg button { flex: 1; border: none; background: transparent; color: var(--muted, #7A7D83); padding: 10px 8px; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .tabs-seg button small { font-weight: 600; opacity: 0.8; }
+  .tabs-seg button.activo { background: var(--surface, #fff); color: var(--text, #1F2023); box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+
+  /* ---- Nueva compra ---- */
+  .cols-compra { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
+  .barra-buscar { padding: 10px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .buscar-prod { position: relative; flex: 1 1 260px; }
+  .buscar-prod input { width: 100%; padding-left: 36px !important; }
+  .buscar-prod::before { content: "🔍"; position: absolute; left: 11px; top: 21px; transform: translateY(-50%); font-size: 14px; z-index: 1; }
+  .sugerencias { display: none; position: absolute; left: 0; right: 0; top: 46px; z-index: 20; background: var(--surface, #fff); border: 1px solid var(--border, #E4E6E9); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); max-height: 300px; overflow-y: auto; }
+  .sug-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border, #E4E6E9); cursor: pointer; }
+  .sug-item:last-child { border-bottom: none; }
+  .sug-item:hover, .sug-item.activa { background: rgba(95,174,70,0.12); }
+  .nom { font-weight: 600; }
+  .sub { font-size: 12px; color: var(--muted, #7A7D83); }
+  .foto { width: 42px; height: 42px; border-radius: 9px; background: rgba(128,128,128,0.14); display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden; flex: none; }
+  .foto.chica { width: 30px; height: 30px; font-size: 16px; }
+  .foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .tabla-compra { width: 100%; border-collapse: collapse; }
+  .tabla-compra th { text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, #7A7D83); padding: 9px 10px; white-space: nowrap; background: transparent; box-shadow: inset 0 -1px 0 var(--border, #E4E6E9); }
+  .tabla-compra td { padding: 8px 10px; border-bottom: 1px solid var(--border, #E4E6E9); vertical-align: top; font-size: 14px; }
+  .tabla-compra th.numero, .tabla-compra td.numero { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabla-compra input { min-height: 36px !important; padding: 6px 10px !important; text-align: right; }
+  .tabla-compra .producto { display: flex; align-items: center; gap: 10px; min-width: 190px; }
+  .tabla-compra .producto .foto { display: none; }
+  .celda-costo { display: flex; align-items: center; gap: 6px; }
+  .celda-costo input { width: 84px !important; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 14px; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+  .pill.verde { background: rgba(95,174,70,0.18); color: #2E7D32; }
+  .pill.amarillo { background: rgba(249,168,37,0.22); color: #8A5A00; }
+  .pill.gris { background: rgba(128,128,128,0.16); color: var(--muted, #7A7D83); }
+  .pill.azul { background: rgba(21,101,192,0.14); color: #1565C0; }
+  .ayuda-precio { font-size: 11.5px; color: var(--muted, #7A7D83); margin-top: 3px; }
+  .quitar { background: none; border: none; color: #C62828; font-size: 17px; cursor: pointer; padding: 6px; }
+  .tarjetas-compra { display: none; }
+
+  .panel-resumen { position: sticky; top: 12px; overflow: hidden; }
+  .panel-cab { background: rgba(128,128,128,0.12); padding: 12px 16px; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel-cuerpo { padding: 14px; display: grid; gap: 10px; }
+  .campo { display: grid; gap: 4px; }
+  .campo > label { font-size: 12px; font-weight: 700; color: var(--muted, #7A7D83); }
+  .fila-prov { display: flex; gap: 6px; }
+  .fila-prov select { flex: 1; min-width: 0; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dato { background: rgba(128,128,128,0.10); border-radius: 11px; padding: 10px; text-align: center; }
+  .dato .peq { font-size: 12px; color: var(--muted, #7A7D83); }
+  .dato b { font-size: 20px; }
+  .total-grande { background: rgba(95,174,70,0.14); border-radius: 12px; padding: 14px; text-align: center; }
+  .total-grande .peq { font-size: 12px; color: var(--muted, #7A7D83); letter-spacing: 0.04em; }
+  .total-grande .cifra { font-size: 34px; font-weight: 800; letter-spacing: -1px; color: #2E7D32; }
+  .lista-efectos { background: rgba(128,128,128,0.08); border: 1px solid var(--border, #E4E6E9); border-radius: 11px; padding: 11px; display: grid; gap: 7px; font-size: 13.5px; }
+  .lista-efectos h5 { font-size: 12px; color: var(--muted, #7A7D83); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+  .lista-efectos .ok { color: var(--primary, #5FAE46); font-weight: 800; margin-right: 8px; }
+  .lista-efectos .no { color: var(--muted, #7A7D83); margin-right: 8px; }
+  .panel-pie { border-top: 1px solid var(--border, #E4E6E9); padding: 10px 14px; background: var(--surface, #fff); }
+  .btn-grande { padding: 13px; font-size: 15px; font-weight: 800; width: 100%; }
+  .btn-chico { padding: 7px 11px; min-height: 0; font-size: 13px; }
+  .barra-fija { display: none; }
+
+  /* ---- Historial ---- */
+  .barra-historial { padding: 10px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .barra-historial .buscar { flex: 1 1 200px; position: relative; }
+  .barra-historial .buscar input { width: 100%; padding-left: 36px !important; }
+  .barra-historial .buscar::before { content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; }
+  .compra-fila { border-bottom: 1px solid var(--border, #E4E6E9); }
+  .compra-fila:last-child { border-bottom: none; }
+  .compra-cab { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  .compra-cab:hover { background: rgba(128,128,128,0.08); }
+  .compra-cab .info { flex: 1; min-width: 0; }
+  .compra-cab .info b { display: block; font-size: 15px; }
+  .compra-cab .monto { font-size: 18px; font-weight: 800; white-space: nowrap; }
+  .compra-cab .flecha { color: var(--muted, #7A7D83); transition: transform 0.15s; }
+  .compra-fila.abierta .flecha { transform: rotate(90deg); }
+  .compra-detalle { display: none; padding: 4px 14px 14px 64px; }
+  .compra-fila.abierta .compra-detalle { display: block; }
+  .compra-detalle table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compra-detalle th { text-align: left; font-size: 11px; color: var(--muted, #7A7D83); padding: 4px 8px; text-transform: uppercase; background: transparent; }
+  .compra-detalle td { padding: 5px 8px; border-top: 1px solid var(--border, #E4E6E9); }
+  .compra-detalle .numero { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ---- Proveedores ---- */
+  .cols-prov { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
+  .rejilla-prov { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .prov-card { padding: 14px; display: grid; gap: 10px; align-content: start; }
+  .prov-cab { display: flex; align-items: flex-start; gap: 12px; }
+  .avatar { width: 46px; height: 46px; border-radius: 50%; background: rgba(95,174,70,0.18); color: #2E7D32; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 16px; flex: none; }
+  .prov-cab .datos { flex: 1; min-width: 0; }
+  .prov-cab .nombre { font-weight: 800; font-size: 15px; }
+  .franja { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(128,128,128,0.10); border-radius: 9px; padding: 8px 10px; font-size: 12px; color: var(--muted, #7A7D83); flex-wrap: wrap; }
+  .franja b { color: var(--text, #1F2023); }
+  .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+  .acciones .btn { padding: 6px 10px; min-height: 0; font-size: 12.5px; }
+  .acciones .btn.crece { flex: 1; }
+  .btn-basura { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px 4px; color: var(--muted, #7A7D83); }
+  .panel-prov { position: sticky; top: 12px; overflow: hidden; }
+  .cerrar-hoja, .fondo-hoja, .boton-flotante { display: none; }
+
+  /* ---- Celular / pantallas angostas ---- */
+  @media (max-width: 1000px) {
+    .contenido { padding: 0 10px 40px; }
+    .tabs-seg { max-width: none; }
+    .tabs-seg button { padding: 9px 4px; font-size: 12.5px; }
+    .cols-compra, .cols-prov { grid-template-columns: 1fr; }
+    #vistaCompra { padding-bottom: 150px; }
+    .panel-resumen { display: none; }
+    .tabla-scroll { display: none; }
+    .tarjetas-compra { display: block; }
+    .barra-buscar { flex-direction: column; align-items: stretch; }
+    .barra-buscar .buscar-prod { flex: none; }
+    .buscar-prod::before { top: 21px; }
+    .linea-card { padding: 11px 12px; border-bottom: 1px solid var(--border, #E4E6E9); display: grid; gap: 8px; }
+    .linea-card .cab { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+    .linea-card .cab .izq { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .linea-card .tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .linea-card .campo input { min-height: 38px; }
+    .linea-card .calculado { min-height: 38px; display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; border-radius: 9px; background: rgba(128,128,128,0.12); font-weight: 800; }
+    .barra-fija { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; background: var(--surface, #fff); border-top: 1px solid var(--border, #E4E6E9); padding: 10px 12px; box-shadow: 0 -6px 18px rgba(0,0,0,0.18); }
+    .barra-fija .fila { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .barra-fija .cifra { font-size: 24px; font-weight: 800; color: #2E7D32; }
+    .panel-prov { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: 80px; z-index: 90; border-radius: 18px 18px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,0.35); overflow-y: auto; }
+    .panel-prov.abierto { display: block; }
+    .fondo-hoja { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 80; }
+    .fondo-hoja.abierto { display: block; }
+    .cerrar-hoja { display: inline-flex; }
+    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
+    .compra-detalle { padding-left: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -35,44 +161,95 @@
   </div>
 
   <div class="contenido">
-    <div class="tabs">
-      <button class="btn btn-secondary activo" id="tabProveedores" onclick="cambiarTab('proveedores')">Proveedores</button>
-      <button class="btn btn-secondary" id="tabCompras" onclick="cambiarTab('compras')">Registrar Compra</button>
-      <button class="btn btn-secondary" id="tabHistorial" onclick="cambiarTab('historial')">Historial</button>
+    <div class="tabs-seg" id="tabs">
+      <button class="activo" data-tab="compra" onclick="cambiarTab('compra')">🧾 Nueva compra</button>
+      <button data-tab="historial" onclick="cambiarTab('historial')">📜 Historial <small id="cntHistorial"></small></button>
+      <button data-tab="proveedores" onclick="cambiarTab('proveedores')">🏭 Proveedores <small id="cntProv"></small></button>
     </div>
 
-    <!-- Tab: Proveedores -->
-    <div id="seccionProveedores">
-      <div class="card form-grupo">
-        <h3>Nuevo proveedor</h3>
-        <input type="text" id="nombreProveedor" placeholder="Nombre del proveedor">
-        <div class="fila-doble">
-          <input type="text" id="contactoProveedor" placeholder="Persona de contacto">
-          <input type="text" id="telefonoProveedor" placeholder="Teléfono">
+    <!-- ================= Nueva compra ================= -->
+    <section id="vistaCompra">
+      <div class="cols-compra">
+        <div class="caja">
+          <div class="barra-buscar">
+            <div id="slotProvMovil" style="display:contents;"></div>
+            <div class="buscar-prod">
+              <input type="text" id="buscadorCompra" placeholder="Buscar o escanear producto…" autocomplete="off" oninput="pintarSugerencias()" onkeydown="teclaBuscador(event)" onfocus="pintarSugerencias()">
+              <div class="sugerencias" id="sugerenciasCompra"></div>
+            </div>
+          </div>
+          <div class="tabla-scroll">
+            <table class="tabla-compra" id="tablaCompra" style="display:none;">
+              <thead><tr><th>Producto</th><th class="numero">Cantidad</th><th>Costo unitario</th><th class="numero">Subtotal</th><th>Nuevo precio de venta</th><th></th></tr></thead>
+              <tbody id="cuerpoCompra"></tbody>
+            </table>
+          </div>
+          <div class="tarjetas-compra" id="tarjetasCompra"></div>
+          <div class="nada" id="vacioCompra">Busca o escanea un producto arriba para agregarlo a la compra.</div>
         </div>
-        <button class="btn btn-primary" onclick="guardarProveedor()">Guardar Proveedor</button>
+
+        <div class="caja panel-resumen">
+          <div class="panel-cab"><span>🧾 Resumen de la compra</span></div>
+          <div class="panel-cuerpo">
+            <div id="bloqueProveedor" class="campo">
+              <label>Proveedor *</label>
+              <div class="fila-prov">
+                <select id="proveedorCompra"></select>
+                <button class="btn btn-secondary btn-chico" onclick="nuevoProveedorDesdeCompra()">＋ Nuevo</button>
+              </div>
+            </div>
+            <div class="dos">
+              <div class="dato"><div class="peq">Productos</div><b id="resProductos">0</b></div>
+              <div class="dato"><div class="peq">Unidades / kg</div><b id="resUnidades">0</b></div>
+            </div>
+            <div class="total-grande"><div class="peq">TOTAL A PAGAR</div><div class="cifra" id="totalCompra">$0.00</div></div>
+            <div class="lista-efectos" id="listaEfectos"></div>
+          </div>
+          <div class="panel-pie"><button class="btn btn-primary btn-grande" onclick="guardarCompra()">✔ Registrar compra</button></div>
+        </div>
       </div>
-      <div id="listaProveedores"></div>
-    </div>
 
-    <!-- Tab: Registrar Compra -->
-    <div id="seccionCompras" style="display:none;">
-      <div class="card form-grupo">
-        <h3>Nueva compra</h3>
-        <select id="proveedorCompra"></select>
-
-        <div id="itemsCompra"></div>
-        <button class="btn btn-secondary" onclick="agregarFilaCompra()">+ Agregar producto</button>
-        <div style="text-align:right; font-weight:700; margin-top:10px;">Total: $<span id="totalCompra">0.00</span></div>
-        <button class="btn btn-primary" onclick="guardarCompra()">Registrar Compra</button>
+      <div class="barra-fija" id="barraFija">
+        <div class="fila"><span class="conteo" id="resumenMovil">0 productos</span><span class="cifra" id="totalCompraMovil">$0.00</span></div>
+        <button class="btn btn-primary btn-grande" onclick="guardarCompra()">✔ Registrar compra</button>
       </div>
-    </div>
+    </section>
 
-    <!-- Tab: Historial -->
-    <div id="seccionHistorial" style="display:none;">
-      <div id="listaCompras"></div>
-    </div>
+    <!-- ================= Historial ================= -->
+    <section id="vistaHistorial" hidden>
+      <div class="caja barra-historial">
+        <div class="buscar"><input type="text" id="buscadorHistorial" placeholder="Buscar por proveedor…" oninput="renderHistorial()"></div>
+        <span class="conteo" id="conteoHistorial"></span>
+      </div>
+      <div class="caja" id="listaCompras"></div>
+      <p class="conteo" style="margin-top:8px;">Se muestran las últimas 50 compras. Toca una para ver los productos.</p>
+    </section>
+
+    <!-- ================= Proveedores ================= -->
+    <section id="vistaProveedores" hidden>
+      <div class="cols-prov">
+        <div>
+          <div class="caja barra-historial">
+            <div class="buscar"><input type="text" id="buscadorProv" placeholder="Buscar proveedor…" oninput="renderProveedores()"></div>
+            <span class="conteo" id="conteoProv"></span>
+          </div>
+          <div class="rejilla-prov" id="rejillaProv"></div>
+        </div>
+
+        <div class="caja panel-prov" id="panelProv">
+          <div class="panel-cab"><span>＋ Nuevo proveedor</span><button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button></div>
+          <div class="panel-cuerpo">
+            <div class="campo"><label>Nombre *</label><input type="text" id="nombreProveedor" placeholder="Ej. Lácteos del Valle"></div>
+            <div class="campo"><label>Persona de contacto</label><input type="text" id="contactoProveedor" placeholder="Ej. Marta Ruiz"></div>
+            <div class="campo"><label>Teléfono / WhatsApp</label><input type="tel" id="telefonoProveedor" placeholder="10 dígitos" inputmode="tel"></div>
+          </div>
+          <div class="panel-pie"><button class="btn btn-primary btn-grande" onclick="guardarProveedor()">💾 Guardar proveedor</button></div>
+        </div>
+      </div>
+    </section>
   </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
+  <button class="boton-flotante" id="fabProv" onclick="nuevoProveedor()" style="display:none;">＋ Nuevo</button>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -80,28 +257,380 @@
 <script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
-let productosDisponibles = [];
-let proveedores = [];
 
+let productos = [];
+let productosPorId = new Map();
+let proveedores = [];
+let resumenProv = new Map();     // proveedor_id -> { num_compras, total_comprado, ultima_compra }
+let compras = [];
+let lineas = [];                 // { producto_id, cantidad, costo, precioNuevo }
+let tabActual = 'compra';
+let detallesCache = new Map();
+const esAngosto = window.matchMedia('(max-width: 1000px)');
+
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const fechaBonita = (f) => new Date(f).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const fechaCorta = (f) => new Date(f).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+
+// ---------- Pestañas ----------
 function cambiarTab(tab) {
-  document.getElementById('seccionProveedores').style.display = tab === 'proveedores' ? 'block' : 'none';
-  document.getElementById('seccionCompras').style.display = tab === 'compras' ? 'block' : 'none';
-  document.getElementById('seccionHistorial').style.display = tab === 'historial' ? 'block' : 'none';
-  document.getElementById('tabProveedores').classList.toggle('activo', tab === 'proveedores');
-  document.getElementById('tabCompras').classList.toggle('activo', tab === 'compras');
-  document.getElementById('tabHistorial').classList.toggle('activo', tab === 'historial');
+  tabActual = tab;
+  document.getElementById('vistaCompra').hidden = tab !== 'compra';
+  document.getElementById('vistaHistorial').hidden = tab !== 'historial';
+  document.getElementById('vistaProveedores').hidden = tab !== 'proveedores';
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
   if (tab === 'historial') cargarHistorial();
+  if (tab === 'proveedores') cargarResumenProveedores();
+  actualizarFlotantes();
+  history.replaceState(null, '', '#' + tab);
+}
+
+// Botones flotantes del sistema (tema / conexión) se esconden cuando algo fijo
+// ocupa la parte de abajo de la pantalla del celular.
+function actualizarFlotantes() {
+  const angosto = esAngosto.matches;
+  document.getElementById('fabProv').style.display = (angosto && tabActual === 'proveedores') ? 'block' : 'none';
+  const hojaAbierta = document.getElementById('panelProv').classList.contains('abierto');
+  document.body.classList.toggle('hoja-abierta', angosto && (hojaAbierta || tabActual === 'compra'));
+}
+
+function abrirHoja() {
+  document.getElementById('panelProv').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  actualizarFlotantes();
+}
+function cerrarHoja() {
+  document.getElementById('panelProv').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  actualizarFlotantes();
+}
+
+// El selector de proveedor vive en el panel (PC) o arriba de la lista (celular).
+function ubicarProveedor() {
+  const bloque = document.getElementById('bloqueProveedor');
+  const destino = esAngosto.matches ? document.getElementById('slotProvMovil') : document.querySelector('.panel-resumen .panel-cuerpo');
+  if (esAngosto.matches) destino.appendChild(bloque);
+  else destino.insertBefore(bloque, destino.firstChild);
+}
+
+// ---------- Carga ----------
+async function cargarProductos() {
+  const data = await apiFetch('/productos');
+  const lista = Array.isArray(data) ? data : (data.productos || []);
+  productos = lista.map(p => ({ ...p, _buscar: sinAcentos(p.nombre) + ' ' + sinAcentos(p.codigo_barras) }));
+  productosPorId = new Map(productos.map(p => [p.id, p]));
 }
 
 async function cargarProveedores() {
   proveedores = await apiFetch('/proveedores');
-  const cont = document.getElementById('listaProveedores');
-  cont.innerHTML = proveedores.map(p => `
-    <div class="compra-card"><div class="titulo"><span>${p.nombre}</span><span>${p.telefono || ''}</span></div></div>
-  `).join('');
-
+  document.getElementById('cntProv').textContent = `(${proveedores.length})`;
   const select = document.getElementById('proveedorCompra');
-  select.innerHTML = proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+  const previo = select.value;
+  select.innerHTML = proveedores.length
+    ? proveedores.map(p => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join('')
+    : '<option value="">— Primero crea un proveedor —</option>';
+  if (previo && proveedores.some(p => String(p.id) === previo)) select.value = previo;
+  renderProveedores();
+}
+
+async function cargarResumenProveedores() {
+  try {
+    const filas = await apiFetch('/compras/resumen-proveedores');
+    resumenProv = new Map(filas.map(f => [f.proveedor_id, f]));
+  } catch (err) {
+    resumenProv = new Map();     // el servidor aún no tiene esta consulta: se muestra sin estadísticas
+  }
+  renderProveedores();
+}
+
+// ---------- Nueva compra: buscador ----------
+let sugerenciasActuales = [];
+function pintarSugerencias() {
+  const texto = sinAcentos(document.getElementById('buscadorCompra').value.trim());
+  const cont = document.getElementById('sugerenciasCompra');
+  if (!texto) { cont.style.display = 'none'; return; }
+  sugerenciasActuales = productos.filter(p => p._buscar.includes(texto)).slice(0, 8);
+  cont.innerHTML = sugerenciasActuales.map(p => `
+    <div class="sug-item" onmousedown="event.preventDefault(); agregarLinea(${p.id})">
+      <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+        ${foto(p, true)}
+        <div style="min-width:0;"><div class="nom">${escapar(p.nombre)}</div><div class="sub">${num(p.precio_costo) > 0 ? 'Costo anterior ' + dinero(p.precio_costo) : 'Sin costo registrado'}${lineas.some(l => l.producto_id === p.id) ? ' · ya está en la compra' : ''}</div></div>
+      </div>
+      <span class="btn btn-secondary btn-chico">＋ Agregar</span>
+    </div>`).join('') || '<div class="nada">Sin coincidencias</div>';
+  cont.style.display = 'block';
+}
+
+// Enter: código de barras exacto (lector físico) o una sola coincidencia → se agrega directo.
+function teclaBuscador(e) {
+  if (e.key === 'Escape') { document.getElementById('sugerenciasCompra').style.display = 'none'; return; }
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const texto = sinAcentos(document.getElementById('buscadorCompra').value.trim());
+  if (!texto) return;
+  const exacto = productos.find(p => p.codigo_barras && sinAcentos(p.codigo_barras) === texto);
+  const coincidencias = productos.filter(p => p._buscar.includes(texto));
+  const elegido = exacto || (coincidencias.length === 1 ? coincidencias[0] : null);
+  if (elegido) agregarLinea(elegido.id);
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.buscar-prod')) document.getElementById('sugerenciasCompra').style.display = 'none';
+});
+
+function foto(p, chica) {
+  return p.imagen_url
+    ? `<div class="foto ${chica ? 'chica' : ''}"><img src="${escapar(p.imagen_url)}" loading="lazy" onerror="this.parentNode.textContent='📦'"></div>`
+    : `<div class="foto ${chica ? 'chica' : ''}">📦</div>`;
+}
+
+// ---------- Nueva compra: líneas ----------
+function agregarLinea(id) {
+  const p = productosPorId.get(id);
+  if (!p) return;
+  document.getElementById('buscadorCompra').value = '';
+  document.getElementById('sugerenciasCompra').style.display = 'none';
+  let idx = lineas.findIndex(l => l.producto_id === id);
+  if (idx === -1) {
+    lineas.push({ producto_id: id, cantidad: '', costo: num(p.precio_costo) > 0 ? String(num(p.precio_costo)) : '', precioNuevo: '' });
+    idx = lineas.length - 1;
+    renderLineas();
+  }
+  setTimeout(() => {
+    const campo = document.querySelector(`[data-linea="${idx}"][data-campo="cantidad"]`);
+    if (campo) campo.focus();
+  }, 30);
+}
+
+function quitarLinea(i) {
+  lineas.splice(i, 1);
+  renderLineas();
+}
+
+function editarLinea(i, campo, valor) {
+  lineas[i][campo] = valor;
+  actualizarLinea(i);
+  pintarResumen();
+}
+
+// Variación del costo contra el último costo registrado.
+function pillCosto(p, costo) {
+  const ant = num(p.precio_costo), c = num(costo);
+  if (!(c > 0)) return '';
+  if (!(ant > 0)) return '<span class="pill gris">costo nuevo</span>';
+  const dif = (c - ant) / ant * 100;
+  if (Math.abs(dif) < 0.05) return '<span class="pill verde">= igual</span>';
+  return dif > 0
+    ? `<span class="pill amarillo">▲ +${dif.toFixed(0)}%</span>`
+    : `<span class="pill azul">▼ ${dif.toFixed(0)}%</span>`;
+}
+
+function ayudaPrecio(p, l) {
+  const costo = num(l.costo);
+  const nuevo = num(l.precioNuevo);
+  if (nuevo > 0 && costo > 0) return `Ganancia ${((nuevo - costo) / costo * 100).toFixed(0)}%`;
+  if (nuevo > 0) return '';
+  const actual = num(p.precio);
+  if (actual > 0 && costo > 0) return `(queda ${dinero(actual)} · ${((actual - costo) / costo * 100).toFixed(0)}%)`;
+  return '';
+}
+
+// Actualiza solo lo calculado de una línea (sin repintar, para no perder el cursor).
+function actualizarLinea(i) {
+  const l = lineas[i], p = productosPorId.get(l.producto_id);
+  const sub = num(l.cantidad) * num(l.costo);
+  document.querySelectorAll(`[data-pill="${i}"]`).forEach(e => { e.innerHTML = pillCosto(p, l.costo); });
+  document.querySelectorAll(`[data-sub="${i}"]`).forEach(e => { e.textContent = sub > 0 ? dinero(sub) : '—'; });
+  document.querySelectorAll(`[data-ayuda="${i}"]`).forEach(e => { e.textContent = ayudaPrecio(p, l); });
+}
+
+function renderLineas() {
+  const hay = lineas.length > 0;
+  document.getElementById('vacioCompra').style.display = hay ? 'none' : 'block';
+  document.getElementById('tablaCompra').style.display = (hay && !esAngosto.matches) ? '' : 'none';
+
+  const campo = (i, c, valor, ph, extra = '') => `<input type="number" data-linea="${i}" data-campo="${c}" value="${escapar(valor)}" placeholder="${ph}" step="0.01" inputmode="decimal" oninput="editarLinea(${i}, '${c}', this.value)" ${extra}>`;
+
+  if (esAngosto.matches) {
+    document.getElementById('cuerpoCompra').innerHTML = '';
+    document.getElementById('tarjetasCompra').innerHTML = lineas.map((l, i) => {
+      const p = productosPorId.get(l.producto_id);
+      return `
+      <div class="linea-card">
+        <div class="cab"><div class="izq">${foto(p, true)}<div style="min-width:0;"><div class="nom">${escapar(p.nombre)}</div><div class="sub">${num(p.precio_costo) > 0 ? 'Costo anterior ' + dinero(p.precio_costo) : 'Sin costo registrado'}</div></div></div><button class="quitar" onclick="quitarLinea(${i})">✕</button></div>
+        <div class="tres">
+          <div class="campo"><label>Cantidad</label>${campo(i, 'cantidad', l.cantidad, '0')}</div>
+          <div class="campo"><label>Costo/u <span data-pill="${i}">${pillCosto(p, l.costo)}</span></label>${campo(i, 'costo', l.costo, '0.00')}</div>
+          <div class="campo"><label>Subtotal</label><div class="calculado" data-sub="${i}">${num(l.cantidad) * num(l.costo) > 0 ? dinero(num(l.cantidad) * num(l.costo)) : '—'}</div></div>
+        </div>
+        <div class="campo"><label>Nuevo precio de venta (opcional)</label>${campo(i, 'precioNuevo', l.precioNuevo, 'No cambiar')}<div class="ayuda-precio" data-ayuda="${i}">${ayudaPrecio(p, l)}</div></div>
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('tarjetasCompra').innerHTML = '';
+    document.getElementById('cuerpoCompra').innerHTML = lineas.map((l, i) => {
+      const p = productosPorId.get(l.producto_id);
+      return `
+      <tr>
+        <td><div class="producto">${foto(p, false)}<div><div class="nom">${escapar(p.nombre)}</div><div class="sub">${num(p.precio_costo) > 0 ? 'Costo anterior ' + dinero(p.precio_costo) : 'Sin costo registrado'}</div></div></div></td>
+        <td style="width:90px;">${campo(i, 'cantidad', l.cantidad, '0')}</td>
+        <td style="width:190px;"><div class="celda-costo">${campo(i, 'costo', l.costo, '0.00')}<span data-pill="${i}">${pillCosto(p, l.costo)}</span></div></td>
+        <td class="numero" style="width:100px; padding-top:16px;"><b data-sub="${i}">${num(l.cantidad) * num(l.costo) > 0 ? dinero(num(l.cantidad) * num(l.costo)) : '—'}</b></td>
+        <td style="width:150px;">${campo(i, 'precioNuevo', l.precioNuevo, 'No cambiar')}<div class="ayuda-precio" data-ayuda="${i}">${ayudaPrecio(p, l)}</div></td>
+        <td style="width:34px; padding-top:12px;"><button class="quitar" onclick="quitarLinea(${i})" title="Quitar">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+  pintarResumen();
+}
+esAngosto.addEventListener('change', () => { ubicarProveedor(); renderLineas(); renderProveedores(); actualizarFlotantes(); });
+
+function lineasValidas() {
+  return lineas.filter(l => num(l.cantidad) > 0 && num(l.costo) > 0);
+}
+
+function pintarResumen() {
+  const validas = lineasValidas();
+  const total = validas.reduce((s, l) => s + num(l.cantidad) * num(l.costo), 0);
+  const unidades = validas.reduce((s, l) => s + num(l.cantidad), 0);
+  const cambiosCosto = validas.filter(l => Math.abs(num(l.costo) - num(productosPorId.get(l.producto_id).precio_costo)) > 0.004).length;
+  const cambiosPrecio = validas.filter(l => num(l.precioNuevo) > 0 && Math.abs(num(l.precioNuevo) - num(productosPorId.get(l.producto_id).precio)) > 0.004).length;
+
+  document.getElementById('resProductos').textContent = validas.length;
+  document.getElementById('resUnidades').textContent = unidades.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  document.getElementById('totalCompra').textContent = dinero(total);
+  document.getElementById('totalCompraMovil').textContent = dinero(total);
+  document.getElementById('resumenMovil').textContent = `${validas.length} ${validas.length === 1 ? 'producto' : 'productos'} · ${unidades.toLocaleString('en-US', { maximumFractionDigits: 2 })} unidades`;
+
+  const fila = (ok, html) => `<div><span class="${ok ? 'ok' : 'no'}">${ok ? '✔' : '•'}</span>${html}</div>`;
+  document.getElementById('listaEfectos').innerHTML = `<h5>Al registrar la compra</h5>` +
+    fila(validas.length > 0, `Suma <b>${unidades.toLocaleString('en-US', { maximumFractionDigits: 2 })}</b> al inventario`) +
+    fila(cambiosCosto > 0, cambiosCosto > 0 ? `Actualiza el costo de <b>${cambiosCosto}</b> ${cambiosCosto === 1 ? 'producto' : 'productos'}` : 'No cambia ningún costo') +
+    fila(cambiosPrecio > 0, cambiosPrecio > 0 ? `Cambia el precio de venta de <b>${cambiosPrecio}</b> ${cambiosPrecio === 1 ? 'producto' : 'productos'}` : 'No cambia ningún precio de venta');
+}
+
+async function guardarCompra() {
+  const proveedor_id = document.getElementById('proveedorCompra').value;
+  if (!proveedor_id) { mostrarToast('Selecciona un proveedor', 'error'); return; }
+  if (lineas.length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
+
+  const incompletas = lineas.length - lineasValidas().length;
+  if (incompletas > 0) {
+    mostrarToast(`Hay ${incompletas} ${incompletas === 1 ? 'producto sin' : 'productos sin'} cantidad o costo: llénalos o quítalos`, 'error');
+    return;
+  }
+
+  const items = lineasValidas().map(l => ({
+    producto_id: l.producto_id,
+    cantidad: num(l.cantidad),
+    costo_unitario: num(l.costo),
+    precio_venta_nuevo: num(l.precioNuevo) > 0 ? num(l.precioNuevo) : null
+  }));
+
+  try {
+    await apiFetch('/compras', { method: 'POST', body: JSON.stringify({ proveedor_id, items }) });
+    mostrarToast('Compra registrada. Inventario y precios actualizados.', 'exito');
+    lineas = [];
+    renderLineas();
+    await cargarProductos();       // los costos y precios cambiaron
+    cargarHistorial();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ---------- Historial ----------
+async function cargarHistorial() {
+  try {
+    compras = await apiFetch('/compras');
+    document.getElementById('cntHistorial').textContent = `(${compras.length}${compras.length >= 50 ? '+' : ''})`;
+    renderHistorial();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+function renderHistorial() {
+  const texto = sinAcentos(document.getElementById('buscadorHistorial').value.trim());
+  const lista = compras.filter(c => !texto || sinAcentos(c.proveedor_nombre).includes(texto));
+  document.getElementById('conteoHistorial').textContent = `${lista.length} ${lista.length === 1 ? 'compra' : 'compras'}`;
+  document.getElementById('listaCompras').innerHTML = lista.map(c => `
+    <div class="compra-fila" id="compra-${c.id}">
+      <div class="compra-cab" onclick="alternarDetalle(${c.id})">
+        <div class="foto">🧾</div>
+        <div class="info"><b>${escapar(c.proveedor_nombre)}</b><span class="sub">${fechaBonita(c.fecha)}${c.num_productos != null ? ' · ' + c.num_productos + (c.num_productos === 1 ? ' producto' : ' productos') : ''}</span></div>
+        <div class="monto">${dinero(c.total)}</div>
+        <span class="flecha">▸</span>
+      </div>
+      <div class="compra-detalle" id="detalle-${c.id}"></div>
+    </div>`).join('') || '<div class="nada">Todavía no hay compras registradas.</div>';
+}
+
+async function alternarDetalle(id) {
+  const fila = document.getElementById('compra-' + id);
+  const cont = document.getElementById('detalle-' + id);
+  fila.classList.toggle('abierta');
+  if (!fila.classList.contains('abierta') || cont.dataset.cargado) return;
+  cont.innerHTML = '<div class="sub">Cargando…</div>';
+  try {
+    let det = detallesCache.get(id);
+    if (!det) { det = await apiFetch(`/compras/${id}/detalle`); detallesCache.set(id, det); }
+    cont.innerHTML = `<table><thead><tr><th>Producto</th><th class="numero">Cantidad</th><th class="numero">Costo</th><th class="numero">Subtotal</th></tr></thead><tbody>` +
+      det.map(d => `<tr><td>${escapar(d.nombre)}${d.precio_venta_nuevo ? ` <span class="sub">(nuevo precio ${dinero(d.precio_venta_nuevo)})</span>` : ''}</td><td class="numero">${Number(d.cantidad)}</td><td class="numero">${dinero(d.costo_unitario)}</td><td class="numero">${dinero(d.subtotal)}</td></tr>`).join('') +
+      '</tbody></table>';
+    cont.dataset.cargado = '1';
+  } catch (err) {
+    cont.innerHTML = '<div class="sub">No se pudo cargar el detalle de esta compra.</div>';
+  }
+}
+
+// ---------- Proveedores ----------
+function iniciales(nombre) {
+  const partes = String(nombre).trim().split(/\s+/).filter(Boolean);
+  return ((partes[0] || '?')[0] + (partes[1] ? partes[1][0] : (partes[0] || '')[1] || '')).toUpperCase();
+}
+
+function renderProveedores() {
+  const texto = sinAcentos(document.getElementById('buscadorProv').value.trim());
+  const lista = proveedores.filter(p => !texto || sinAcentos(p.nombre).includes(texto) || sinAcentos(p.contacto).includes(texto));
+  document.getElementById('conteoProv').textContent = `${lista.length} ${lista.length === 1 ? 'proveedor' : 'proveedores'}`;
+  document.getElementById('rejillaProv').innerHTML = lista.map(p => {
+    const digitos = String(p.telefono || '').replace(/\D/g, '');
+    const wa = digitos.length === 10 ? '52' + digitos : digitos;
+    const r = resumenProv.get(p.id);
+    return `
+    <div class="caja prov-card">
+      <div class="prov-cab">
+        <div class="avatar">${escapar(iniciales(p.nombre))}</div>
+        <div class="datos"><div class="nombre">${escapar(p.nombre)}</div><div class="sub">${p.contacto ? '👤 ' + escapar(p.contacto) : ''}${p.contacto && p.telefono ? ' · ' : ''}${p.telefono ? '📞 ' + escapar(p.telefono) : ''}${!p.contacto && !p.telefono ? 'Sin datos de contacto' : ''}</div></div>
+        <button class="btn-basura" onclick="eliminarProveedor(${p.id})" title="Eliminar proveedor">🗑️</button>
+      </div>
+      ${r ? `<div class="franja"><span>Última compra <b>${fechaCorta(r.ultima_compra)}</b></span><span>Comprado <b>${dinero(r.total_comprado)}</b></span></div>` : ''}
+      <div class="acciones">
+        <button class="btn btn-primary crece" onclick="comprarA(${p.id})">🛒 Comprar</button>
+        ${digitos ? `<a class="btn btn-secondary" href="tel:${digitos}">📞 Llamar</a><a class="btn btn-secondary" href="https://wa.me/${wa}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="caja nada" style="grid-column:1/-1;">Todavía no hay proveedores. Agrega el primero.</div>';
+}
+
+function comprarA(id) {
+  document.getElementById('proveedorCompra').value = String(id);
+  cambiarTab('compra');
+  setTimeout(() => document.getElementById('buscadorCompra').focus(), 60);
+}
+
+function nuevoProveedor() {
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('nombreProveedor').focus(), 60);
+}
+
+function nuevoProveedorDesdeCompra() {
+  cambiarTab('proveedores');
+  nuevoProveedor();
 }
 
 async function guardarProveedor() {
@@ -112,85 +641,35 @@ async function guardarProveedor() {
 
   try {
     await apiFetch('/proveedores', { method: 'POST', body: JSON.stringify({ nombre, contacto, telefono }) });
-    document.getElementById('nombreProveedor').value = '';
-    document.getElementById('contactoProveedor').value = '';
-    document.getElementById('telefonoProveedor').value = '';
+    ['nombreProveedor', 'contactoProveedor', 'telefonoProveedor'].forEach(id => { document.getElementById(id).value = ''; });
+    mostrarToast('Proveedor guardado', 'exito');
+    cerrarHoja();
+    await cargarProveedores();
+    cargarResumenProveedores();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function eliminarProveedor(id) {
+  if (!(await confirmarAccion('¿Eliminar este proveedor? Sus compras anteriores se conservan.'))) return;
+  try {
+    await apiFetch(`/proveedores/${id}`, { method: 'DELETE' });
     cargarProveedores();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-async function cargarProductosDisponibles() {
-  productosDisponibles = await apiFetch('/productos');
-}
-
-function agregarFilaCompra() {
-  const cont = document.getElementById('itemsCompra');
-  const fila = document.createElement('div');
-  fila.className = 'item-compra';
-  const opciones = productosDisponibles.map(p => `<option value="${p.id}" data-tipo="${p.tipo_venta}">${p.nombre}</option>`).join('');
-  fila.innerHTML = `
-    <select class="prod-select">${opciones}</select>
-    <input type="number" class="cant-input" placeholder="Cant." step="0.01">
-    <input type="number" class="costo-input" placeholder="Costo/u" step="0.01">
-    <input type="number" class="precio-input" placeholder="Nuevo precio (opc.)" step="0.01">
-    <button onclick="this.parentElement.remove(); calcularTotalCompra();" style="background:none; border:none; color:#C62828; font-size:18px;">✕</button>
-  `;
-  fila.querySelectorAll('input').forEach(inp => inp.addEventListener('input', calcularTotalCompra));
-  cont.appendChild(fila);
-}
-
-function calcularTotalCompra() {
-  let total = 0;
-  document.querySelectorAll('#itemsCompra .item-compra').forEach(fila => {
-    const cant = parseFloat(fila.querySelector('.cant-input').value || 0);
-    const costo = parseFloat(fila.querySelector('.costo-input').value || 0);
-    total += cant * costo;
-  });
-  document.getElementById('totalCompra').textContent = total.toFixed(2);
-}
-
-async function guardarCompra() {
-  const proveedor_id = document.getElementById('proveedorCompra').value;
-  if (!proveedor_id) { mostrarToast('Selecciona un proveedor', 'error'); return; }
-
-  const items = [];
-  document.querySelectorAll('#itemsCompra .item-compra').forEach(fila => {
-    const producto_id = fila.querySelector('.prod-select').value;
-    const cantidad = parseFloat(fila.querySelector('.cant-input').value || 0);
-    const costo_unitario = parseFloat(fila.querySelector('.costo-input').value || 0);
-    const precio_venta_nuevo = parseFloat(fila.querySelector('.precio-input').value || 0) || null;
-    if (producto_id && cantidad > 0 && costo_unitario > 0) {
-      items.push({ producto_id, cantidad, costo_unitario, precio_venta_nuevo });
-    }
-  });
-
-  if (items.length === 0) { mostrarToast('Agrega al menos un producto válido', 'error'); return; }
-
-  try {
-    await apiFetch('/compras', { method: 'POST', body: JSON.stringify({ proveedor_id, items }) });
-    mostrarToast('Compra registrada. Inventario y precios actualizados.', 'exito');
-    document.getElementById('itemsCompra').innerHTML = '';
-    document.getElementById('totalCompra').textContent = '0.00';
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
-}
-
-async function cargarHistorial() {
-  const compras = await apiFetch('/compras');
-  const cont = document.getElementById('listaCompras');
-  cont.innerHTML = compras.map(c => `
-    <div class="compra-card">
-      <div class="titulo"><span>${c.proveedor_nombre}</span><span>$${parseFloat(c.total).toFixed(2)}</span></div>
-      <small>${new Date(c.fecha).toLocaleString()}</small>
-    </div>
-  `).join('');
-}
-
-cargarProveedores();
-cargarProductosDisponibles();
+// ---------- Arranque ----------
+ubicarProveedor();
+renderLineas();
+(async () => {
+  await Promise.all([cargarProductos(), cargarProveedores()]).catch(err => mostrarToast(err.message, 'error'));
+  cargarHistorial().catch(() => {});
+  const hash = location.hash.replace('#', '');
+  if (['compra', 'historial', 'proveedores'].includes(hash)) cambiarTab(hash); else actualizarFlotantes();
+})();
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>

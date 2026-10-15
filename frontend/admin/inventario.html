@@ -106,7 +106,7 @@
     .fondo-hoja { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 80; }
     .fondo-hoja.abierto { display: block; }
     .cerrar-hoja { display: block; }
-    .boton-flotante { display: block; position: fixed; right: 16px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
+    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
   }
 </style>
 </head>
@@ -357,10 +357,12 @@ function elegirPestana(cual) {
 function abrirHoja() {
   document.getElementById('panelMov').classList.add('abierto');
   document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
 }
 function cerrarHoja() {
   document.getElementById('panelMov').classList.remove('abierto');
   document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
 }
 
 // Botón "＋ Entrada" / "－ Merma" de una fila: llena el panel con ese producto.

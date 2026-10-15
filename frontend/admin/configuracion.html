@@ -13,35 +13,189 @@
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/vendor/JsBarcode.all.min.js"></script>
 <style>
+  .contenido { max-width: 1400px; margin: 16px auto; padding: 0 14px 40px; }
+  .nota { font-size: 12px; color: var(--muted, #7A7D83); margin: 0; }
   .fila-doble { display: flex; gap: 8px; }
   .fila-doble > * { flex: 1; }
-  .contenido { max-width: 550px; margin: 20px auto; padding: 0 14px; }
-  .form-config { display: grid; gap: 10px; }
-  .estado-impresora { padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; text-align: center; }
-  .conectada { background: #E8F5E9; color: #5FAE46; }
-  .desconectada { background: #FFEBEE; color: #C62828; }
-  .fila-lineas { display: flex; align-items: center; gap: 10px; }
-  .fila-lineas input[type="number"] { width: 70px; }
-  .subtitulo-seccion { font-weight: 600; font-size: 14px; margin: 10px 0 2px; color: #444; }
-  .nota-pequena { font-size: 12px; color: #888; margin: -4px 0 4px; }
-  .card-titulo-grande { font-size: 17px; margin-bottom: 4px; }
-  .card-subtexto { font-size: 13px; color: #666; margin: 0 0 10px; }
-  .header-plegable { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 4px 0; }
-  .flecha-plegable { transition: transform 0.2s; font-size: 14px; color: #888; }
-  .flecha-plegable.colapsada { transform: rotate(-90deg); }
-  .seccion-plegable { margin-top: 10px; }
-  .seccion-plegable.colapsada { display: none; }
-  .disenador-ticket { display: grid; gap: 14px; }
-  .vista-previa-ticket { display: grid; gap: 8px; background: var(--card-bg, #fff); z-index: 5; }
-  @media (min-width: 600px) and (min-height: 760px) { .vista-previa-ticket { position: sticky; top: 0; padding: 6px 0; } }
-  .hoja-ticket-fondo { background: #E4E6EA; border-radius: 10px; padding: 12px 8px; display: flex; justify-content: center; overflow: auto; max-height: 340px; }
-  #hojaTicket { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); padding: 6px 8px; box-sizing: content-box; min-height: 60px; }
+
+  /* ================= Menú lateral + sección ================= */
+  .config-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; align-items: start; }
+
+  .config-menu { position: sticky; top: 12px; background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px; display: grid; gap: 2px; }
+  .menu-grupo { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--muted, #7A7D83); padding: 12px 10px 4px; }
+  .menu-grupo:first-child { padding-top: 6px; }
+  .menu-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: none; border: none; border-left: 3px solid transparent; border-radius: 8px; padding: 9px 10px; cursor: pointer; color: var(--text); font-family: inherit; font-size: 14px; }
+  .menu-item:hover { background: rgba(128,128,128,0.10); }
+  .menu-item.activo { background: rgba(95,174,70,0.14); background: color-mix(in srgb, var(--primary) 14%, transparent); border-left-color: var(--primary); }
+  .menu-ico { width: 34px; height: 34px; border-radius: 9px; background: rgba(128,128,128,0.14); display: flex; align-items: center; justify-content: center; font-size: 18px; flex: none; }
+  .menu-txt { display: grid; min-width: 0; flex: 1; }
+  .menu-txt b { font-size: 14px; }
+  .menu-txt small { font-size: 12px; color: var(--muted, #7A7D83); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu-chev { display: none; color: var(--muted, #7A7D83); font-size: 24px; line-height: 1; }
+  .menu-item.peligro { display: none; margin-top: 10px; border: 1px solid rgba(198,40,40,0.45); border-left-width: 1px; color: #C62828; font-weight: 700; }
+  .menu-item.peligro.visible { display: flex; }
+  .menu-item.peligro.activo { background: rgba(198,40,40,0.10); }
+  [data-tema="oscuro"] .menu-item.peligro { color: #EF9A9A; }
+
+  /* ---- Encabezado de cada sección ---- */
+  .sec { display: none; }
+  .sec.activa { display: block; }
+  .sec-cab-wrap { display: flex; align-items: center; gap: 12px; background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 18px; margin-bottom: 14px; }
+  .sec-cab { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  .sec-cab h2 { font-size: 20px; }
+  .sec-cab p { margin: 2px 0 0; font-size: 13px; color: var(--muted, #7A7D83); }
+  .sec-tit { min-width: 0; }
+  .btn-volver { display: none; align-items: center; justify-content: center; width: 38px; height: 38px; flex: none; border: none; border-radius: 10px; background: rgba(128,128,128,0.14); color: var(--text); font-size: 26px; line-height: 1; cursor: pointer; padding: 0 0 3px; }
+  .insignia { font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
+  .insignia.equipo { background: rgba(21,101,192,0.12); color: #1565C0; }
+  .insignia.negocio { background: rgba(46,125,50,0.14); color: #2E7D32; }
+  [data-tema="oscuro"] .insignia.equipo { background: rgba(66,165,245,0.16); color: #90CAF9; }
+  [data-tema="oscuro"] .insignia.negocio { background: rgba(129,199,132,0.16); color: #A5D6A7; }
+  .insignia.mini { font-size: 11px; padding: 3px 9px; }
+  .insignia.peligro { background: rgba(198,40,40,0.12); color: #C62828; }
+
+  .sec-cuerpo { display: grid; gap: 14px; }
+  .sec-cuerpo.dos-col { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .sec-cuerpo.dos-col > .ancho-total { grid-column: 1 / -1; }
+  .config-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+  .config-secciones { min-width: 0; }
+
+  /* ---- Tarjetas y campos ---- */
+  .tarjeta { background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; display: grid; gap: 11px; align-content: start; min-width: 0; }
+  .tarjeta > * { min-width: 0; }
+  .tarjeta h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tarjeta h3 .insignia { margin-left: auto; }
+  .campo { display: grid; gap: 4px; align-content: start; min-width: 0; }
+  .campo > span { font-size: 12px; font-weight: 700; color: var(--muted, #7A7D83); }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .rejilla.ancha { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .sub { font-weight: 700; font-size: 13px; margin: 2px 0 0; }
+  .botones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .botones .btn { flex: 1 1 120px; }
+  hr.linea { border: none; border-top: 1px solid var(--border); margin: 4px 0; width: 100%; }
+
+  .imp-caja { background: rgba(128,128,128,0.07); border: 1px solid var(--border); border-radius: 11px; padding: 11px; display: grid; gap: 9px; }
+  .imp-caja.punteada { border-style: dashed; border-color: var(--primary); }
+  .imp-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+  .estado-impresora { font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 20px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .estado-impresora::before { content: "● "; }
+  .estado-impresora.conectada { background: rgba(46,125,50,0.15); color: #2E7D32; }
+  .estado-impresora.desconectada { background: rgba(198,40,40,0.12); color: #C62828; }
+  [data-tema="oscuro"] .estado-impresora.conectada { color: #A5D6A7; }
+  [data-tema="oscuro"] .estado-impresora.desconectada { color: #EF9A9A; }
+
+  .segmentado { display: flex; background: rgba(128,128,128,0.14); border-radius: 10px; padding: 3px; gap: 3px; }
+  .segmentado button { flex: 1; border: none; background: transparent; border-radius: 8px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--muted, #7A7D83); cursor: pointer; font-family: inherit; min-height: 38px; }
+  .segmentado button.activo { background: var(--surface, #fff); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.20); }
+  .sel-oculto { display: none !important; }
+  .fila-papel { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .fila-papel .etq { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; color: var(--muted, #7A7D83); }
+  .fila-papel .segmentado { min-width: 180px; }
+  .plantillas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted, #7A7D83); font-weight: 600; }
+  .chip-btn { border: 1px solid var(--border); background: var(--surface, #fff); color: var(--text); border-radius: 20px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .chip-btn:hover { border-color: var(--primary); }
+
+  .opcion-tarjeta { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; cursor: pointer; font-size: 13.5px; font-weight: 700; background: var(--surface, #fff); }
+  .opcion-tarjeta small { display: block; font-weight: 400; color: var(--muted, #7A7D83); font-size: 11.5px; }
+
+  details.avanzado { border: 1px solid var(--border); border-radius: 11px; padding: 0 12px; }
+  details.avanzado > summary { cursor: pointer; font-size: 13.5px; font-weight: 600; padding: 11px 0; color: var(--muted, #7A7D83); }
+  details.avanzado[open] > summary { color: var(--text); }
+  details.avanzado > .dentro { display: grid; gap: 9px; padding: 0 0 12px; }
+  .fila-lineas { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .fila-lineas input[type="number"] { width: 76px; }
+
+  .colores { display: flex; gap: 10px; flex-wrap: wrap; }
+  .color-op { display: flex; align-items: center; gap: 8px; border: 2px solid var(--border); background: var(--surface, #fff); color: var(--text); border-radius: 11px; padding: 9px 14px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .color-op i { width: 18px; height: 18px; border-radius: 50%; display: block; background: var(--c); border: 1px solid rgba(128,128,128,0.55); }
+  .color-op.activo { border-color: var(--c); box-shadow: 0 0 0 1px var(--c); }
+  .color-op.activo::after { content: "✓"; font-weight: 800; }
+
+  /* ---- Barra de guardar ---- */
+  .barra-guardar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 -2px 10px rgba(16,24,40,0.07); padding: 12px 14px; position: sticky; bottom: 12px; z-index: 5; margin-top: 14px; }
+  .barra-guardar .nota { flex: 1 1 180px; }
+
+  /* ---- Vista previa del ticket ---- */
+  .vp { display: none; background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; min-width: 0; }
+  .config-main.con-preview .vp { display: block; }
+  .vp-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 14px; background: none; border: none; width: 100%; padding: 0; color: var(--text); font-family: inherit; text-align: left; cursor: default; }
+  .vp-flecha { display: none; color: var(--muted, #7A7D83); }
+  .vp-cuerpo { display: grid; gap: 10px; margin-top: 10px; }
+  .hoja-ticket-fondo { background: #E4E6EA; border-radius: 10px; padding: 12px 8px; display: flex; justify-content: center; overflow: auto; max-height: 440px; }
+  #hojaTicket { background: #fff; color: #000; box-shadow: 0 2px 8px rgba(0,0,0,.25); padding: 6px 8px; box-sizing: content-box; min-height: 60px; }
   #previewLogo:not([src]) { visibility: hidden; }
-  .bloque-config { border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
-  .bloque-config h4 { font-size: 15px; } .bloque-config h4 small { font-weight: 400; color: #888; }
-  .bloque-negocio { background: #FAFBFC; } .bloque-dispositivo { background: #F4FAF1; border-color: #CFE6C6; }
-  .fila-plantillas { display: flex; gap: 8px; flex-wrap: wrap; }
-  .campo-etiqueta { display: grid; gap: 4px; font-size: 14px; color: #444; }
+  @media (min-width: 1280px) {
+    .config-main.con-preview { grid-template-columns: minmax(0, 1fr) 350px; }
+    .vp { position: sticky; top: 12px; }
+    .hoja-ticket-fondo { max-height: calc(100vh - 250px); }
+  }
+  @media (max-width: 1279px) {
+    .vp { margin-top: 14px; }
+    .vp-cab { cursor: pointer; }
+    .vp-flecha { display: inline; }
+    .vp-cuerpo { display: none; }
+    .vp.abierto .vp-cuerpo { display: grid; }
+    .vp.abierto .vp-flecha { transform: rotate(180deg); }
+  }
+
+  /* ---- Formas de pago ---- */
+  .pagos { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+  .pago { background: var(--surface, #fff); border: 2px solid var(--border); border-radius: var(--radius); padding: 14px; display: grid; gap: 10px; align-content: start; }
+  .pago.on { border-color: var(--primary); }
+  .pago-cab { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .pago-ico { width: 38px; height: 38px; border-radius: 10px; background: rgba(128,128,128,0.14); display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none; }
+  .pago.on .pago-ico { background: rgba(95,174,70,0.18); background: color-mix(in srgb, var(--primary) 18%, transparent); }
+  .pago-cab b { flex: 1; font-size: 15px; }
+  .pago .extra { display: none; gap: 4px; }
+  .pago.on .extra { display: grid; }
+  .pago .txt-on { display: none; }
+  .pago.on .txt-on { display: block; }
+  .pago.on .txt-off { display: none; }
+  .pago .opcion-check { padding: 2px 0; border: none; font-weight: 700; }
+
+  /* ---- Anuncios ---- */
+  #listaPromosTurnos { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+  #formNuevaPromo { border: 1px solid var(--border); border-radius: 11px; padding: 12px; flex-direction: column; gap: 8px; }
+
+  /* ---- Zona peligrosa ---- */
+  .tarjeta.peligro { border-color: rgba(198,40,40,0.55); }
+
+  /* ================= Pantallas angostas (celular / tablet) ================= */
+  @media (max-width: 1000px) {
+    .contenido { padding: 0; margin: 0 auto; }
+    .config-layout { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: 90px; }
+    .config-layout.vista-sec .config-menu { display: none; }
+    .config-layout:not(.vista-sec) .config-main { display: none; }
+    .config-menu { position: static; margin: 12px; padding: 4px 8px 8px; }
+    .menu-item { padding: 12px 6px; border-left: none; border-bottom: 1px solid var(--border); border-radius: 0; }
+    .menu-item:last-child { border-bottom: none; }
+    .menu-item.activo { background: none; }
+    .menu-ico { width: 40px; height: 40px; font-size: 21px; background: rgba(95,174,70,0.14); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+    .menu-txt b { font-size: 15px; }
+    .menu-chev { display: block; }
+    .menu-item.peligro { margin: 12px 0 4px; border: 1px solid rgba(198,40,40,0.45); border-radius: 10px; justify-content: center; padding: 12px; }
+
+    .sec-cab-wrap { display: contents; }
+    .sec-cab { position: sticky; top: 0; z-index: 40; background: var(--surface, #fff); border-bottom: 1px solid var(--border); padding: 10px 12px; }
+    .sec-cab h2 { font-size: 17px; }
+    .sec-cab p { display: none; }
+    .btn-volver { display: flex; }
+    .sec-cab-wrap > .insignia { display: inline-block; margin: 12px 12px 0; }
+    .sec-cuerpo { padding: 12px; }
+    .config-main { display: block; }
+    .config-secciones { min-width: 0; }
+    .vp { margin: 0 12px 12px; }
+    .barra-guardar { position: fixed; left: 0; right: 0; bottom: 0; border-radius: 0; border-width: 1px 0 0; margin: 0; padding: 10px 12px; z-index: 450; flex-wrap: nowrap; }
+    .barra-guardar .btn { flex: 0 1 auto; padding-left: 14px; padding-right: 14px; white-space: nowrap; }
+    .barra-guardar .nota { display: none; }
+    .barra-guardar .btn-principal { flex: 1 1 auto; }
+    .solo-pc { display: none; }
+    .rejilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .rejilla.ancha { grid-template-columns: minmax(0, 1fr); }
+    .pagos { grid-template-columns: minmax(0, 1fr); }
+    .sec-cuerpo.dos-col { grid-template-columns: minmax(0, 1fr); }
+    #listaPromosTurnos { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -55,484 +209,593 @@
   </div>
 
   <div class="contenido">
+   <div class="config-layout" id="configLayout">
 
-    <!-- ============ 1. ESTE DISPOSITIVO ============ -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secDispositivo')">
-        <h3 class="card-titulo-grande">📱 Este dispositivo</h3>
-        <span class="flecha-plegable colapsada" id="flecha-secDispositivo">▾</span>
-      </div>
-      <div class="form-config seccion-plegable colapsada" id="secDispositivo">
-        <p class="card-subtexto">Lo de aquí solo cambia en este equipo (computadora, tablet o celular) y se guarda al momento.</p>
+    <!-- ================= MENÚ ================= -->
+    <nav class="config-menu" id="configMenu" aria-label="Secciones de configuración">
+      <div class="menu-grupo">ESTE EQUIPO</div>
+      <button type="button" class="menu-item" data-sec="dispositivo" onclick="abrirSeccion('dispositivo')">
+        <span class="menu-ico">📱</span><span class="menu-txt"><b>Dispositivo y color</b><small id="resDispositivo">—</small></span><span class="menu-chev">›</span>
+      </button>
+      <button type="button" class="menu-item" data-sec="impresion" onclick="abrirSeccion('impresion')">
+        <span class="menu-ico">🖨️</span><span class="menu-txt"><b>Impresión</b><small id="resImpresion">—</small></span><span class="menu-chev">›</span>
+      </button>
+      <button type="button" class="menu-item" data-sec="bascula" onclick="abrirSeccion('bascula')">
+        <span class="menu-ico">⚖️</span><span class="menu-txt"><b>Báscula y etiquetas</b><small id="resBascula">—</small></span><span class="menu-chev">›</span>
+      </button>
 
-        <p class="subtitulo-seccion">Nombre de este Mostrador</p>
-        <input type="text" id="nombreMostrador" placeholder="Ej. Mostrador 1" onblur="guardarNombreMostrador()">
-        <p class="nota-pequena">Es el que ve el cliente en la pantalla de turnos.</p>
+      <div class="menu-grupo">TODO EL NEGOCIO</div>
+      <button type="button" class="menu-item" data-sec="contenido" onclick="abrirSeccion('contenido')">
+        <span class="menu-ico">🧾</span><span class="menu-txt"><b>Contenido del ticket</b><small id="resContenido">—</small></span><span class="menu-chev">›</span>
+      </button>
+      <button type="button" class="menu-item" data-sec="pagos" onclick="abrirSeccion('pagos')">
+        <span class="menu-ico">💳</span><span class="menu-txt"><b>Formas de pago</b><small id="resPagos">—</small></span><span class="menu-chev">›</span>
+      </button>
+      <button type="button" class="menu-item" data-sec="anuncios" onclick="abrirSeccion('anuncios')">
+        <span class="menu-ico">📢</span><span class="menu-txt"><b>Anuncios y promociones</b><small id="resAnuncios">—</small></span><span class="menu-chev">›</span>
+      </button>
 
-        <p class="subtitulo-seccion">Acomodo de Mostrador</p>
-        <select id="layoutMostradorDispositivo" onchange="guardarLayoutMostrador()">
-          <option value="auto">Automático (según el tamaño de pantalla)</option>
-          <option value="pestanas">Pestañas — un panel a la vez (celular)</option>
-          <option value="deslizable">Panel deslizable — el ticket sube como cajón</option>
-          <option value="dividido">Dividido — lado a lado (tablet)</option>
-        </select>
-        <p class="nota-pequena" id="deteccionDispositivoTexto"></p>
+      <!-- Solo el dueño la ve (el backend también lo revisa) -->
+      <button type="button" class="menu-item peligro" id="menuZona" data-sec="zona" onclick="abrirSeccion('zona')">⚠️ Zona peligrosa</button>
+    </nav>
 
-        <p class="subtitulo-seccion">Color</p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button type="button" class="btn btn-secondary" style="border-color:#5FAE46;" onclick="establecerColorTema('verde'); marcarColorTemaActivo('verde')" data-color-boton="verde">🟢 Verde</button>
-          <button type="button" class="btn btn-secondary" style="border-color:#1565C0;" onclick="establecerColorTema('azul'); marcarColorTemaActivo('azul')" data-color-boton="azul">🔵 Azul</button>
-          <button type="button" class="btn btn-secondary" style="border-color:#6A1B9A;" onclick="establecerColorTema('morado'); marcarColorTemaActivo('morado')" data-color-boton="morado">🟣 Morado</button>
-          <button type="button" class="btn btn-secondary" style="border-color:#E65100;" onclick="establecerColorTema('naranja'); marcarColorTemaActivo('naranja')" data-color-boton="naranja">🟠 Naranja</button>
-          <button type="button" class="btn btn-secondary" style="border-color:#000000;" onclick="establecerColorTema('alto-contraste'); marcarColorTemaActivo('alto-contraste')" data-color-boton="alto-contraste">⚫ Alto Contraste</button>
+    <!-- ================= SECCIONES ================= -->
+    <div class="config-main" id="configMain">
+     <div class="config-secciones">
+
+      <!-- ============ ESTE DISPOSITIVO ============ -->
+      <section class="sec" id="sec-dispositivo">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>📱 Dispositivo y color</h2><p>Lo de aquí solo cambia en este equipo (computadora, tablet o celular) y se guarda al momento.</p></div></div>
+          <span class="insignia equipo">📍 Solo este equipo</span>
         </div>
-      </div>
-    </div>
-
-    <!-- ============ 2. IMPRESIÓN DE ESTE DISPOSITIVO ============ -->
-    <div class="card" style="margin-bottom:16px;" id="cardImpresion">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secImpresion')">
-        <h3 class="card-titulo-grande">🖨️ Impresión de este dispositivo</h3>
-        <span class="flecha-plegable" id="flecha-secImpresion">▾</span>
-      </div>
-      <div class="seccion-plegable" id="secImpresion">
-        <div class="disenador-ticket">
-          <div class="vista-previa-ticket">
-            <p class="subtitulo-seccion" style="margin-top:0;">👁️ Así se verá</p>
-            <select id="vistaTicketTipo" onchange="refrescarVistaPreviaTicket()">
-              <option value="final">Ticket final (ya pagado)</option>
-              <option value="mostrador">Ticket de Mostrador</option>
-            </select>
-            <div class="hoja-ticket-fondo">
-              <div id="hojaTicket"></div>
-            </div>
-            <p class="nota-pequena">Es aproximada: la impresora puede variar un poco.</p>
+        <div class="sec-cuerpo dos-col">
+          <div class="tarjeta">
+            <h3>Nombre de este Mostrador</h3>
+            <input type="text" id="nombreMostrador" placeholder="Ej. Mostrador 1" onblur="guardarNombreMostrador()">
+            <p class="nota">Es el que ve el cliente en la pantalla de turnos.</p>
           </div>
+          <div class="tarjeta">
+            <h3>Acomodo de Mostrador</h3>
+            <select id="layoutMostradorDispositivo" onchange="guardarLayoutMostrador()">
+              <option value="auto">Automático (según el tamaño de pantalla)</option>
+              <option value="pestanas">Pestañas — un panel a la vez (celular)</option>
+              <option value="deslizable">Panel deslizable — el ticket sube como cajón</option>
+              <option value="dividido">Dividido — lado a lado (tablet)</option>
+            </select>
+            <p class="nota" id="deteccionDispositivoTexto"></p>
+          </div>
+          <div class="tarjeta ancho-total">
+            <h3>Color</h3>
+            <div class="colores">
+              <button type="button" class="color-op" style="--c:#5FAE46" onclick="establecerColorTema('verde'); marcarColorTemaActivo('verde')" data-color-boton="verde"><i></i>Verde</button>
+              <button type="button" class="color-op" style="--c:#1565C0" onclick="establecerColorTema('azul'); marcarColorTemaActivo('azul')" data-color-boton="azul"><i></i>Azul</button>
+              <button type="button" class="color-op" style="--c:#6A1B9A" onclick="establecerColorTema('morado'); marcarColorTemaActivo('morado')" data-color-boton="morado"><i></i>Morado</button>
+              <button type="button" class="color-op" style="--c:#E65100" onclick="establecerColorTema('naranja'); marcarColorTemaActivo('naranja')" data-color-boton="naranja"><i></i>Naranja</button>
+              <button type="button" class="color-op" style="--c:#000000" onclick="establecerColorTema('alto-contraste'); marcarColorTemaActivo('alto-contraste')" data-color-boton="alto-contraste"><i></i>Alto contraste</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-          <div class="form-config">
-            <p class="nota-pequena" id="infoDispositivoTicket" style="margin:0;"></p>
+      <!-- ============ IMPRESIÓN DE ESTE DISPOSITIVO ============ -->
+      <section class="sec" id="sec-impresion">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>🖨️ Impresión</h2><p>Cómo imprime esta computadora, tablet o celular.</p></div></div>
+          <span class="insignia equipo">📍 Solo este equipo</span>
+        </div>
+        <div class="sec-cuerpo">
+          <p class="nota" id="infoDispositivoTicket"></p>
 
-            <div class="bloque-config bloque-dispositivo">
-              <h4>1 · Conexión</h4>
-              <label class="campo-etiqueta">¿Cómo imprime este equipo?
-                <select id="modoImpresion" onchange="refrescarVistaPreviaTicket()">
-                  <option value="directo">Directo (Bluetooth/USB) — imprime solo y corta el papel</option>
-                  <option value="sistema">Impresora instalada en Windows/Mac — abre el diálogo de impresión</option>
-                </select>
+          <div class="tarjeta">
+            <h3>1 · Conexión</h3>
+            <div class="segmentado" data-para="modoImpresion">
+              <button type="button" data-valor="directo">🔌 Directo (Bluetooth/USB)</button>
+              <button type="button" data-valor="sistema">🖥️ Impresora de Windows/Mac</button>
+            </div>
+            <select id="modoImpresion" class="sel-oculto" onchange="refrescarVistaPreviaTicket()">
+              <option value="directo">Directo (Bluetooth/USB) — imprime solo y corta el papel</option>
+              <option value="sistema">Impresora instalada en Windows/Mac — abre el diálogo de impresión</option>
+            </select>
+            <p class="nota" id="notaModoImpresion"></p>
+
+            <div id="bloqueImpresoraWindows" class="imp-caja punteada" style="display:none;">
+              <div class="sub">🖥️ Impresoras de Windows (programa de escritorio)</div>
+              <label class="campo"><span>Tickets y cortes de caja</span>
+                <select id="impresoraWindowsTicket"></select>
               </label>
+              <label class="campo"><span>Fichas de turno</span>
+                <select id="impresoraWindowsFicha"></select>
+              </label>
+              <div class="botones"><button class="btn btn-secondary" onclick="guardarImpresorasWindows()">Guardar impresoras de Windows</button></div>
+              <p class="nota">Funciona con el modo "Impresora instalada en Windows/Mac". Si eliges una impresora, imprime directo, sin abrir el diálogo. Si dejas "Preguntar cada vez", se abre el diálogo de siempre.</p>
+            </div>
 
-              <div id="bloqueImpresoraWindows" style="display:none; margin:6px 0 10px; padding:10px; border:1px dashed #5FAE46; border-radius:10px;">
-                <p class="subtitulo-seccion" style="margin-top:0;">🖥️ Impresoras de Windows (programa de escritorio)</p>
-                <label class="campo-etiqueta">Tickets y cortes de caja
-                  <select id="impresoraWindowsTicket"></select>
-                </label>
-                <label class="campo-etiqueta">Fichas de turno
-                  <select id="impresoraWindowsFicha"></select>
-                </label>
-                <button class="btn btn-secondary" style="margin-top:8px;" onclick="guardarImpresorasWindows()">Guardar impresoras de Windows</button>
-                <p class="nota-pequena">Funciona con el modo "Impresora instalada en Windows/Mac". Si eliges una impresora, imprime directo, sin abrir el diálogo. Si dejas "Preguntar cada vez", se abre el diálogo de siempre.</p>
-              </div>
-
-              <p class="subtitulo-seccion" style="margin-top:4px;">🎫 Impresora de tickets</p>
-              <div class="estado-impresora desconectada" id="estadoImpresoraTicket">Sin conectar en este dispositivo</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div class="imp-caja">
+              <div class="imp-fila"><b>🎫 Impresora de tickets</b><span class="estado-impresora desconectada" id="estadoImpresoraTicket">Sin conectar</span></div>
+              <div class="botones">
                 <button class="btn btn-primary" onclick="conectar('ticket')">🔵 Bluetooth</button>
                 <button class="btn btn-secondary" onclick="conectarUSB('ticket')">🔌 USB</button>
               </div>
-              <p class="nota-pequena">Solo hace falta con impresión directa. Se conecta una vez por equipo.</p>
+              <p class="nota">Solo hace falta con impresión directa. Se conecta una vez por equipo.</p>
+            </div>
 
-              <p class="subtitulo-seccion">🔢 Impresora de fichas (turnos)</p>
-              <div class="estado-impresora desconectada" id="estadoImpresoraFicha">Sin conectar en este dispositivo</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div class="imp-caja">
+              <div class="imp-fila"><b>🔢 Impresora de fichas (turnos)</b><span class="estado-impresora desconectada" id="estadoImpresoraFicha">Sin conectar</span></div>
+              <div class="botones">
                 <button class="btn btn-primary" onclick="conectar('ficha')">🔵 Bluetooth</button>
                 <button class="btn btn-secondary" onclick="conectarUSB('ficha')">🔌 USB</button>
                 <button class="btn btn-secondary" onclick="probarImpresionFicha()">Probar ficha</button>
               </div>
-              <p class="nota-pequena">Si usas la misma impresora para tickets y fichas, conéctala en las dos.</p>
-
-              <details>
-                <summary style="cursor:pointer; font-size:14px; color:#444;">🌐 Avanzado: fichas por red (IP)</summary>
-                <div class="form-config" style="margin-top:8px;">
-                  <p class="nota-pequena">Necesita el "Intermediario de Impresión" corriendo en una computadora de tu red WiFi.</p>
-                  <input type="text" id="intermediarioUrlFicha" placeholder="URL del intermediario (ej. http://192.168.1.50:3500)">
-                  <div class="fila-doble">
-                    <input type="text" id="intermediarioIpImpresoraFicha" placeholder="IP de la impresora">
-                    <input type="number" id="intermediarioPuertoImpresoraFicha" placeholder="Puerto" value="9100">
-                  </div>
-                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="btn btn-secondary" onclick="guardarConfigRedFichaUI()">Guardar</button>
-                    <button class="btn btn-secondary" onclick="probarIntermediarioUI()">🔍 Probar</button>
-                    <button class="btn btn-secondary" onclick="quitarConfigRedFichaUI()">Quitar</button>
-                  </div>
-                  <p class="nota-pequena" id="estadoRedFichaTexto"></p>
-                </div>
-              </details>
+              <p class="nota">Si usas la misma impresora para tickets y fichas, conéctala en las dos.</p>
             </div>
 
-            <div class="bloque-config bloque-dispositivo">
-              <h4>2 · Papel y letra</h4>
-              <label class="campo-etiqueta">Ancho del papel
-                <select id="anchoTicketDispositivo" onchange="refrescarVistaPreviaTicket()">
-                  <option value="80mm">80 mm</option>
-                  <option value="58mm">58 mm</option>
-                </select>
-              </label>
-
-              <p class="subtitulo-seccion">⚡ Plantillas rápidas</p>
-              <div class="fila-plantillas">
-                <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('clasico')">Clásico</button>
-                <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('compacto')">Compacto</button>
-                <button type="button" class="btn btn-secondary" onclick="aplicarPlantillaTicket('legible')">Letra grande</button>
+            <details class="avanzado">
+              <summary>🌐 Avanzado: fichas por red (IP)</summary>
+              <div class="dentro">
+                <p class="nota">Necesita el "Intermediario de Impresión" corriendo en una computadora de tu red WiFi.</p>
+                <input type="text" id="intermediarioUrlFicha" placeholder="URL del intermediario (ej. http://192.168.1.50:3500)">
+                <div class="fila-doble">
+                  <input type="text" id="intermediarioIpImpresoraFicha" placeholder="IP de la impresora">
+                  <input type="number" id="intermediarioPuertoImpresoraFicha" placeholder="Puerto" value="9100">
+                </div>
+                <div class="botones">
+                  <button class="btn btn-secondary" onclick="guardarConfigRedFichaUI()">Guardar</button>
+                  <button class="btn btn-secondary" onclick="probarIntermediarioUI()">🔍 Probar</button>
+                  <button class="btn btn-secondary" onclick="quitarConfigRedFichaUI()">Quitar</button>
+                </div>
+                <p class="nota" id="estadoRedFichaTexto"></p>
               </div>
+            </details>
+          </div>
 
-              <label class="campo-etiqueta">Letra de los productos
+          <div class="tarjeta">
+            <h3>2 · Papel y letra</h3>
+            <div class="fila-papel">
+              <span class="etq">ANCHO DEL PAPEL</span>
+              <div class="segmentado" data-para="anchoTicketDispositivo">
+                <button type="button" data-valor="58mm">58 mm</button>
+                <button type="button" data-valor="80mm">80 mm</button>
+              </div>
+            </div>
+            <select id="anchoTicketDispositivo" class="sel-oculto" onchange="refrescarVistaPreviaTicket()">
+              <option value="80mm">80 mm</option>
+              <option value="58mm">58 mm</option>
+            </select>
+
+            <div class="plantillas">
+              <span>⚡ Plantillas:</span>
+              <button type="button" class="chip-btn" onclick="aplicarPlantillaTicket('clasico')">Clásico</button>
+              <button type="button" class="chip-btn" onclick="aplicarPlantillaTicket('compacto')">Compacto</button>
+              <button type="button" class="chip-btn" onclick="aplicarPlantillaTicket('legible')">Letra grande</button>
+            </div>
+
+            <div class="rejilla">
+              <label class="campo"><span>Letra de productos</span>
                 <select id="tamanoLetra">
                   <option value="pequena">Pequeña (ahorra papel)</option>
                   <option value="normal">Normal</option>
                   <option value="grande">Grande</option>
                 </select>
               </label>
-              <label class="opcion-check">
-                <span><b>Productos en negrita</b> (se lee mejor)</span>
-                <input type="checkbox" id="productosNegritas">
-              </label>
-              <label class="campo-etiqueta">Nombre del negocio
+              <label class="campo"><span>Nombre del negocio</span>
                 <select id="nombreTamano">
                   <option value="normal">Normal</option>
                   <option value="grande">Grande</option>
                 </select>
               </label>
-              <label class="campo-etiqueta">Total
+              <label class="campo"><span>Total</span>
                 <select id="totalTamano">
                   <option value="normal">Normal</option>
                   <option value="grande">Grande</option>
                 </select>
               </label>
-              <label class="campo-etiqueta">Logo
+              <label class="campo"><span>Logo</span>
                 <select id="logoTamano">
                   <option value="chico">Chico</option>
                   <option value="mediano">Mediano</option>
                   <option value="grande">Grande</option>
                 </select>
               </label>
-              <label class="campo-etiqueta">QR de promoción
+              <label class="campo"><span>QR de promoción</span>
                 <select id="qrPromoTamano">
                   <option value="chico">Chico</option>
                   <option value="mediano">Mediano</option>
                   <option value="grande">Grande</option>
                 </select>
               </label>
-              <label class="campo-etiqueta">Acentos y ñ
+              <label class="campo"><span>Acentos y ñ</span>
                 <select id="ticketAcentos">
-                  <option value="quitar">Quitar acentos — siempre se ve bien (recomendado)</option>
-                  <option value="cp858">Mostrar acentos y ñ</option>
-                  <option value="cp850">Mostrar acentos y ñ — opción alterna</option>
+                  <option value="quitar">Quitar (recomendado)</option>
+                  <option value="cp858">Con acentos y ñ</option>
+                  <option value="cp850">Con acentos (alterna)</option>
                 </select>
               </label>
-              <label class="campo-etiqueta">Tipo de letra (solo con impresora instalada)
+              <label class="campo"><span>Tipo de letra (impresora instalada)</span>
                 <select id="tipoFuente">
-                  <option value="monospace">Clásica (alinea mejor)</option>
+                  <option value="monospace">Clásica</option>
                   <option value="sans-serif">Moderna</option>
                 </select>
               </label>
-              <label class="opcion-check">
-                <span>Precio unitario por producto</span>
-                <input type="checkbox" id="incluirPrecioUnitario">
-              </label>
-              <label class="opcion-check">
-                <span>Nombre completo (varios renglones si es largo)</span>
-                <input type="checkbox" id="descripcionCompleta">
-              </label>
+            </div>
+            <p class="nota">"Quitar" los acentos siempre se ve bien. Si tu impresora los soporta, prueba "Con acentos y ñ". La letra "Clásica" alinea mejor las columnas.</p>
 
-              <p class="subtitulo-seccion">Espacio en blanco (líneas)</p>
-              <div class="fila-lineas"><span style="flex:1;">Ticket de Mostrador · arriba</span><input type="number" id="lineasSuperioresMostrador" min="0" max="10"></div>
-              <div class="fila-lineas"><span style="flex:1;">Ticket de Mostrador · abajo</span><input type="number" id="lineasInferioresMostrador" min="0" max="10"></div>
-              <div class="fila-lineas"><span style="flex:1;">Ticket final · arriba</span><input type="number" id="lineasSuperioresCaja" min="0" max="10"></div>
-              <div class="fila-lineas"><span style="flex:1;">Ticket final · abajo</span><input type="number" id="lineasInferioresCaja" min="0" max="10"></div>
+            <div class="rejilla">
+              <label class="opcion-tarjeta"><span>Productos en negrita<small>se lee mejor</small></span><input type="checkbox" class="interruptor" id="productosNegritas"></label>
+              <label class="opcion-tarjeta"><span>Precio unitario<small>por cada producto</small></span><input type="checkbox" class="interruptor" id="incluirPrecioUnitario"></label>
+              <label class="opcion-tarjeta"><span>Descripción completa<small>varios renglones si es largo</small></span><input type="checkbox" class="interruptor" id="descripcionCompleta"></label>
             </div>
 
-            <div style="display:grid; gap:8px;">
-              <button class="btn btn-primary" onclick="guardarImpresionDispositivo()">💾 Guardar en este dispositivo</button>
-              <button class="btn btn-secondary" onclick="probarImpresion()">🖨️ Probar impresión</button>
-              <button class="btn btn-secondary" onclick="restablecerDisenoDispositivo()">↺ Volver a lo predeterminado</button>
+            <details class="avanzado">
+              <summary>↕ Espacio en blanco (líneas arriba / abajo)</summary>
+              <div class="dentro">
+                <div class="fila-lineas"><span style="flex:1;">Ticket de Mostrador · arriba</span><input type="number" id="lineasSuperioresMostrador" min="0" max="10"></div>
+                <div class="fila-lineas"><span style="flex:1;">Ticket de Mostrador · abajo</span><input type="number" id="lineasInferioresMostrador" min="0" max="10"></div>
+                <div class="fila-lineas"><span style="flex:1;">Ticket final · arriba</span><input type="number" id="lineasSuperioresCaja" min="0" max="10"></div>
+                <div class="fila-lineas"><span style="flex:1;">Ticket final · abajo</span><input type="number" id="lineasInferioresCaja" min="0" max="10"></div>
+              </div>
+            </details>
+          </div>
+
+          <div class="barra-guardar">
+            <button class="btn btn-primary btn-principal" onclick="guardarImpresionDispositivo()">💾 Guardar<span class="solo-pc">&nbsp;en este equipo</span></button>
+            <button class="btn btn-secondary" onclick="probarImpresion()">🖨️ Probar<span class="solo-pc">&nbsp;impresión</span></button>
+            <button class="btn btn-secondary" onclick="restablecerDisenoDispositivo()" title="Volver a lo predeterminado" aria-label="Volver a lo predeterminado">↺<span class="solo-pc">&nbsp;Restablecer</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ BÁSCULA Y ETIQUETAS ============ -->
+      <section class="sec" id="sec-bascula">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>⚖️ Báscula y etiquetas</h2><p>Lee el peso en vivo al pesar y arma la etiqueta de la bolsa.</p></div></div>
+          <span class="insignia equipo">📍 Este equipo</span>
+        </div>
+        <div class="sec-cuerpo dos-col">
+          <div class="tarjeta">
+            <h3>⚖️ Báscula de este equipo <span class="insignia equipo mini">📍 Este equipo</span></h3>
+            <p class="nota">Conecta una báscula para leer el peso en vivo al pesar un producto en Mostrador, en vez de teclearlo a mano. Es opcional: si no la conectas, el teclado numérico sigue funcionando igual.</p>
+            <div class="imp-fila"><b>Estado</b><span class="estado-impresora desconectada" id="estadoBascula">Sin conectar</span></div>
+            <p id="basculaPesoActualTexto" style="text-align:center; font-size:22px; font-weight:700; display:none; margin:0;">⚖️ <span id="basculaPesoActualValor">0.000</span> kg</p>
+
+            <label class="campo"><span>Velocidad del puerto (baud rate) — solo para conexión USB</span>
+              <select id="basculaBaudRate">
+                <option value="9600">9600 (la más común)</option>
+                <option value="4800">4800</option>
+                <option value="2400">2400</option>
+                <option value="19200">19200</option>
+              </select>
+            </label>
+            <div class="botones">
+              <button class="btn btn-secondary" onclick="conectarBasculaUSB()">🔌 Conectar por USB</button>
+              <button class="btn btn-primary" onclick="conectarBasculaBT()">🔵 Conectar Bluetooth</button>
+              <button class="btn btn-secondary" onclick="desconectarBasculaUI()">Desconectar</button>
+            </div>
+            <label class="opcion-check">
+              <span>Usar el peso de la báscula en Mostrador (si está conectada)</span>
+              <input type="checkbox" class="interruptor" id="basculaUsarEnMostrador" onchange="guardarUsoBasculaMostrador()">
+            </label>
+            <details class="avanzado">
+              <summary>ℹ️ ¿El peso no se lee bien?</summary>
+              <div class="dentro">
+                <p class="nota">No existe un solo protocolo que compartan todas las marcas de básculas. Esto funciona con la mayoría de básculas puestas en modo "salida continua" (revisa el manual de tu báscula para activarlo), pero puede necesitar ajustar la velocidad (baud rate) según el modelo real que conectes.</p>
+                <p class="nota">Si no sabes cuál usa tu báscula, deja 9600 e intenta conectar — es la más común en básculas comerciales. Si el peso se ve como símbolos o no aparece, prueba con otra. Siempre puedes seguir tecleándolo a mano.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="tarjeta">
+            <h3>🔖 Etiquetas PLU de la báscula <span class="insignia negocio mini">🏪 Todo el negocio</span></h3>
+            <p class="nota">Si tu báscula imprime su propia etiqueta con código de barras (con el PLU del producto y el peso o precio), Mostrador y Caja pueden leerla directo con el lector y agregar el producto ya pesado, sin volver a pesarlo. El PLU debe coincidir exactamente con el "Código de barras" de ese producto en Compoint.</p>
+            <label class="campo"><span>¿Qué trae la etiqueta? Compoint calcula el importe si trae el peso</span>
+              <select id="basculaTipoDato" onchange="guardarEtiquetaConfig()">
+                <option value="peso">Peso (kg) — Compoint calcula el importe</option>
+                <option value="precio">Precio ya calculado — Compoint lo usa</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="tarjeta ancho-total">
+            <h3>🏷️ Etiqueta final (bolsa) — tipo Torrey <span class="insignia negocio mini">🏪 Todo el negocio</span></h3>
+            <p class="nota">Elige cómo se genera la etiqueta que se pega en la bolsa al final de pesar un producto. <b>Automático</b>: la propia báscula imprime su etiqueta (o no se usa etiqueta). <b>Compoint imprime</b>: se usa una impresora de etiquetas conectada. Esta opción aplica a todos los mostradores; la impresora de abajo es solo de este equipo.</p>
+            <div class="rejilla ancha">
+              <label class="campo"><span>Modo</span>
+                <select id="etiquetaModo" onchange="guardarEtiquetaConfig()">
+                  <option value="auto">Automático — la báscula imprime la suya</option>
+                  <option value="sistema">Compoint imprime la etiqueta</option>
+                </select>
+              </label>
+              <label class="campo"><span>Tamaño de la etiqueta</span>
+                <select id="anchoEtiqueta" onchange="guardarEtiquetaConfig()">
+                  <option value="40mm">Etiqueta de 40 mm</option>
+                  <option value="50mm">Etiqueta de 50 mm</option>
+                  <option value="58mm">Etiqueta de 58 mm</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="imp-caja" id="secImpresoraEtiqueta">
+              <div class="imp-fila"><b>🖨️ Impresora de etiquetas <span class="insignia equipo mini">📍 Este equipo</span></b><span class="estado-impresora desconectada" id="estadoImpresoraEtiqueta">Sin conectar</span></div>
+              <div class="botones">
+                <button class="btn btn-primary" onclick="conectar('etiqueta')">🔵 Bluetooth</button>
+                <button class="btn btn-secondary" onclick="conectarUSB('etiqueta')">🔌 USB</button>
+                <button class="btn btn-secondary" onclick="probarImpresionEtiqueta()">🖨️ Probar etiqueta</button>
+              </div>
+            </div>
+
+            <details class="avanzado">
+              <summary>🌐 Imprimir etiquetas por red (IP), en vez de Bluetooth/USB</summary>
+              <div class="dentro">
+                <p class="nota">Necesitas tener corriendo el "Intermediario de Impresión" en una computadora de tu misma red WiFi. Si no lo tienes, pide el instalador.</p>
+                <input type="text" id="intermediarioUrlEtiqueta" placeholder="URL del intermediario (ej. http://192.168.1.50:3500)">
+                <div class="fila-doble">
+                  <input type="text" id="intermediarioIpImpresoraEtiqueta" placeholder="IP de la impresora (ej. 192.168.1.100)">
+                  <input type="number" id="intermediarioPuertoImpresoraEtiqueta" placeholder="Puerto (normalmente 9100)" value="9100">
+                </div>
+                <div class="botones">
+                  <button class="btn btn-secondary" onclick="guardarConfigRedEtiquetaUI()">Guardar</button>
+                  <button class="btn btn-secondary" onclick="probarIntermediarioEtiquetaUI()">🔍 Probar conexión</button>
+                  <button class="btn btn-secondary" onclick="quitarConfigRedEtiquetaUI()">Quitar (volver a Bluetooth/USB)</button>
+                </div>
+                <p class="nota" id="estadoRedEtiquetaTexto"></p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CONTENIDO DEL TICKET (negocio) ============ -->
+      <section class="sec" id="sec-contenido">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>🧾 Contenido del ticket</h2><p>Lo que dice el ticket. Es igual en todos los dispositivos.</p></div></div>
+          <span class="insignia negocio">🏪 Todo el negocio</span>
+        </div>
+        <div class="sec-cuerpo">
+          <div class="tarjeta">
+            <h3>Encabezado</h3>
+            <label class="campo"><span>Nombre del negocio</span><input type="text" id="nombreNegocio" maxlength="60" placeholder="Nombre de tu negocio"></label>
+            <label class="campo"><span>Mensaje debajo del nombre</span><input type="text" id="mensajeSuperior" maxlength="80" placeholder="Ej. Carnes frías y lácteos"></label>
+            <label class="campo"><span>Dirección</span><input type="text" id="direccion" placeholder="Dirección"></label>
+            <div class="rejilla">
+              <label class="campo"><span>Teléfono</span><input type="text" id="telefono" placeholder="Teléfono"></label>
+              <label class="campo"><span>RFC (opcional)</span><input type="text" id="rfc" placeholder="RFC (opcional)"></label>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ============ 3. CONTENIDO DEL TICKET (negocio) ============ -->
-    <div class="card" style="margin-bottom:16px;" id="cardContenidoTicket">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secContenido')">
-        <h3 class="card-titulo-grande">🧾 Contenido del ticket</h3>
-        <span class="flecha-plegable colapsada" id="flecha-secContenido">▾</span>
-      </div>
-      <div class="form-config seccion-plegable colapsada" id="secContenido">
-        <p class="card-subtexto">Lo que dice el ticket. Es igual en <b>todos</b> los dispositivos y se guarda en el sistema. La vista previa está en "Impresión de este dispositivo".</p>
-
-        <p class="subtitulo-seccion">Encabezado</p>
-        <input type="text" id="nombreNegocio" maxlength="60" placeholder="Nombre de tu negocio">
-        <input type="text" id="mensajeSuperior" maxlength="80" placeholder="Mensaje debajo del nombre (ej. Carnes frías y lácteos)">
-        <input type="text" id="direccion" placeholder="Dirección">
-        <input type="text" id="telefono" placeholder="Teléfono">
-        <input type="text" id="rfc" placeholder="RFC (opcional)">
-
-        <p class="subtitulo-seccion">🖼️ Logotipo</p>
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <img id="previewLogo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;">
-          <input type="file" id="logoInput" accept="image/*">
-          <button type="button" class="btn btn-secondary" onclick="quitarLogoTicket()">Quitar logo</button>
-        </div>
-        <p class="nota-pequena">Mejor en blanco y negro, con letras gruesas y fondo blanco.</p>
-        <label class="opcion-check">
-          <span>Imprimir el logo también en el ticket de Mostrador</span>
-          <input type="checkbox" id="logoEnMostrador">
-        </label>
-
-        <p class="subtitulo-seccion">Negritas</p>
-        <label class="opcion-check"><span>Nombre del negocio</span><input type="checkbox" id="negocioNegritas"></label>
-        <label class="opcion-check"><span>Total</span><input type="checkbox" id="totalNegritas"></label>
-
-        <p class="subtitulo-seccion">Texto al final (opcional)</p>
-        <textarea id="terminos" maxlength="400" rows="2" placeholder="Ej. No hay devoluciones sin ticket. Gracias por su preferencia." style="border-radius:10px; border:1px solid #D0D2D5; padding:8px 12px; font-size:14px;"></textarea>
-
-        <p class="subtitulo-seccion">Código QR de promoción</p>
-        <label class="opcion-check"><span>Imprimir un QR al final del ticket</span><input type="checkbox" id="qrPromoActivo"></label>
-        <input type="text" id="qrPromoContenido" maxlength="300" placeholder="Lo que abre el QR (página, Facebook, https://wa.me/52...)">
-        <input type="text" id="qrPromoTexto" maxlength="80" placeholder="Texto sobre el QR (ej. Escanea y recibe 10% de descuento)">
-        <label class="opcion-check"><span>También en el ticket de Mostrador</span><input type="checkbox" id="qrPromoEnMostrador"></label>
-
-        <p class="subtitulo-seccion">Ticket de Mostrador</p>
-        <label class="campo-etiqueta">Código para que Caja lo escanee
-          <select id="tipoCodigoEscaneo">
-            <option value="qr">Código QR</option>
-            <option value="barras">Código de barras</option>
-            <option value="ambos">Ambos</option>
-          </select>
-        </label>
-
-        <p class="subtitulo-seccion">Ticket final</p>
-        <label class="opcion-check"><span>Imprimir datos del cliente (ventas a crédito/fiado)</span><input type="checkbox" id="imprimirDatosCliente"></label>
-
-        <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarContenidoTicket()">💾 Guardar para todo el negocio</button>
-      </div>
-    </div>
-
-    <!-- ============ BÁSCULA ============ -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secBascula')">
-        <h3 class="card-titulo-grande">⚖️ Báscula de Este Dispositivo</h3>
-        <span class="flecha-plegable" id="flecha-secBascula">▾</span>
-      </div>
-      <div class="form-config seccion-plegable" id="secBascula">
-        <p class="card-subtexto">Conecta una báscula para leer el peso en vivo al pesar un producto en Mostrador, en vez de teclearlo a mano. Es una ayuda opcional — si no la conectas, el teclado numérico sigue funcionando igual que siempre.</p>
-        <p class="nota-pequena">Nota: no existe un solo protocolo que compartan todas las marcas de básculas. Esto funciona con la mayoría de básculas puestas en modo "salida continua" (revisa el manual de tu báscula para activarlo), pero puede necesitar ajustar la velocidad (baud rate) según el modelo real que conectes. Si el peso no se lee bien, siempre puedes seguir tecleándolo a mano.</p>
-
-        <div class="estado-impresora desconectada" id="estadoBascula">Sin conectar en este dispositivo</div>
-        <p id="basculaPesoActualTexto" style="text-align:center; font-size:22px; font-weight:700; display:none; margin:4px 0 10px;">⚖️ <span id="basculaPesoActualValor">0.000</span> kg</p>
-
-        <p class="subtitulo-seccion">Velocidad del puerto (baud rate) — solo para conexión USB</p>
-        <select id="basculaBaudRate">
-          <option value="9600">9600 (la más común)</option>
-          <option value="4800">4800</option>
-          <option value="2400">2400</option>
-          <option value="19200">19200</option>
-        </select>
-        <p class="nota-pequena">Si no sabes cuál usa tu báscula, deja 9600 e intenta conectar — es la velocidad más común en básculas comerciales. Si el peso se ve como símbolos o no aparece, prueba con otra.</p>
-
-        <button class="btn btn-secondary" onclick="conectarBasculaUSB()" style="margin-top:8px;">🔌 Conectar por USB (puerto serie)</button>
-        <button class="btn btn-primary" onclick="conectarBasculaBT()" style="margin-top:8px;">🔵 Conectar Bluetooth</button>
-        <button class="btn btn-secondary" onclick="desconectarBasculaUI()" style="margin-top:8px;">Desconectar</button>
-
-        <label style="display:flex; align-items:center; gap:8px; margin-top:12px;">
-          <input type="checkbox" id="basculaUsarEnMostrador" onchange="guardarUsoBasculaMostrador()">
-          Usar el peso de la báscula en Mostrador (si está conectada)
-        </label>
-
-        <hr style="border:none; border-top:1px solid #eee; margin:16px 0;">
-
-        <p class="subtitulo-seccion">🔖 Leer etiquetas que la báscula ya imprimió (PLU)</p>
-        <p class="nota-pequena">Si tu báscula es de las que imprime su propia etiqueta con código de barras (con el PLU del producto y el peso o precio), Mostrador y Caja pueden leer esa etiqueta directo con el lector de código de barras y agregar el producto ya pesado, sin volver a pesarlo. El PLU debe coincidir exactamente con el "Código de barras" de ese producto en Compoint. Esto aplica a todo el negocio.</p>
-        <select id="basculaTipoDato" onchange="guardarEtiquetaConfig()">
-          <option value="peso">La etiqueta trae el Peso (kg) — Compoint calcula el importe con el precio actual</option>
-          <option value="precio">La etiqueta trae el Precio ya calculado — Compoint lo usa directo</option>
-        </select>
-
-        <hr style="border:none; border-top:1px solid #eee; margin:16px 0;">
-
-        <p class="subtitulo-seccion">🏷️ Etiqueta final (bolsa) — tipo Torrey</p>
-        <p class="nota-pequena">Elige cómo se genera la etiqueta que se pega en la bolsa al final de pesar un producto. Esta opción aplica a todo el negocio (todos los mostradores), no solo a este dispositivo.</p>
-        <select id="etiquetaModo" onchange="guardarEtiquetaConfig()">
-          <option value="auto">Automático — la propia báscula imprime su etiqueta (o no se usa etiqueta)</option>
-          <option value="sistema">Compoint genera e imprime la etiqueta con una impresora de etiquetas conectada</option>
-        </select>
-        <select id="anchoEtiqueta" onchange="guardarEtiquetaConfig()" style="margin-top:8px;">
-          <option value="40mm">Etiqueta de 40mm</option>
-          <option value="50mm">Etiqueta de 50mm</option>
-          <option value="58mm">Etiqueta de 58mm</option>
-        </select>
-
-        <div id="secImpresoraEtiqueta" style="margin-top:12px;">
-          <p class="subtitulo-seccion">Impresora de Etiquetas de este dispositivo</p>
-          <div class="estado-impresora desconectada" id="estadoImpresoraEtiqueta">Sin conectar en este dispositivo</div>
-          <button class="btn btn-primary" onclick="conectar('etiqueta')">🔵 Conectar Bluetooth</button>
-          <button class="btn btn-secondary" onclick="conectarUSB('etiqueta')" style="margin-top:8px;">🔌 Conectar USB</button>
-          <button class="btn btn-secondary" onclick="probarImpresionEtiqueta()" style="margin-top:8px;">🖨️ Probar impresión (Etiqueta)</button>
-
-          <p class="subtitulo-seccion" style="margin-top:16px;">🌐 O imprimir Etiquetas por Red (IP), en vez de Bluetooth/USB</p>
-          <p class="nota-pequena">Necesitas tener corriendo el "Intermediario de Impresión" en una computadora de tu misma red WiFi. Si no lo tienes, pide el instalador.</p>
-          <input type="text" id="intermediarioUrlEtiqueta" placeholder="URL del intermediario (ej. http://192.168.1.50:3500)">
-          <div class="fila-doble" style="margin-top:8px;">
-            <input type="text" id="intermediarioIpImpresoraEtiqueta" placeholder="IP de la impresora (ej. 192.168.1.100)">
-            <input type="number" id="intermediarioPuertoImpresoraEtiqueta" placeholder="Puerto (normalmente 9100)" value="9100">
+          <div class="tarjeta">
+            <h3>🖼️ Logotipo</h3>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <img id="previewLogo" alt="Logotipo" style="width:70px; height:70px; object-fit:contain; border-radius:8px; background:#EEE;">
+              <input type="file" id="logoInput" accept="image/*" style="flex:1; min-width:180px;">
+              <button type="button" class="btn btn-secondary" onclick="quitarLogoTicket()">Quitar logo</button>
+            </div>
+            <p class="nota">Mejor en blanco y negro, con letras gruesas y fondo blanco.</p>
+            <label class="opcion-check">
+              <span>Imprimir el logo también en el ticket de Mostrador</span>
+              <input type="checkbox" class="interruptor" id="logoEnMostrador">
+            </label>
           </div>
-          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-            <button class="btn btn-secondary" onclick="guardarConfigRedEtiquetaUI()">Guardar</button>
-            <button class="btn btn-secondary" onclick="probarIntermediarioEtiquetaUI()">🔍 Probar conexión al intermediario</button>
-            <button class="btn btn-secondary" onclick="quitarConfigRedEtiquetaUI()">Quitar (volver a Bluetooth/USB)</button>
+
+          <div class="tarjeta">
+            <h3>Negritas</h3>
+            <label class="opcion-check"><span>Nombre del negocio</span><input type="checkbox" class="interruptor" id="negocioNegritas"></label>
+            <label class="opcion-check"><span>Total</span><input type="checkbox" class="interruptor" id="totalNegritas"></label>
           </div>
-          <p class="nota-pequena" id="estadoRedEtiquetaTexto"></p>
-        </div>
-      </div>
-    </div>
 
-    <!-- ============ FORMAS DE PAGO ============ -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secFormasPago')">
-        <h3 class="card-titulo-grande">💳 Formas de Pago</h3>
-        <span class="flecha-plegable colapsada" id="flecha-secFormasPago">▾</span>
-      </div>
-      <div class="form-config seccion-plegable colapsada" id="secFormasPago">
-
-        <p class="subtitulo-seccion">💵 Efectivo</p>
-        <label class="opcion-check">
-          <span>No permitir cobrar si el efectivo ingresado es menor que el total</span>
-          <input type="checkbox" id="efectivoBloquear">
-        </label>
-
-        <p class="subtitulo-seccion">💵 Dólares Americanos</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar el cobro en Dólares Americanos</span>
-          <input type="checkbox" id="dolaresHabilitado" onchange="toggleCampoDolar()">
-        </label>
-        <p class="nota-pequena">Al habilitarlo, Caja convierte el total a dólares usando este tipo de cambio.</p>
-        <input type="number" id="tipoCambioDolar" placeholder="Tipo de cambio (pesos por dólar)" step="0.0001">
-
-        <p class="subtitulo-seccion">💳 Tarjeta de Crédito/Débito</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar cobro con Tarjeta de Crédito/Débito</span>
-          <input type="checkbox" id="tarjetaHabilitado">
-        </label>
-        <input type="number" id="tarjetaComision" placeholder="Comisión por cobro con tarjeta (%, opcional)" step="0.01">
-        <p class="nota-pequena">La comisión es solo informativa (para tus reportes) — no se le cobra de más al cliente.</p>
-
-        <p class="subtitulo-seccion">🏦 Transferencias Bancarias</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar cobro con Transferencias</span>
-          <input type="checkbox" id="transferenciaHabilitado">
-        </label>
-        <input type="text" id="transferenciaEtiqueta" placeholder="Nombre a mostrar en el botón (ej. Transferencia)">
-
-        <p class="subtitulo-seccion">🖋️ Cheque</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar cobro con Cheque</span>
-          <input type="checkbox" id="chequeHabilitado">
-        </label>
-
-        <p class="subtitulo-seccion">🎟️ Vales de Despensa</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar cobro con Vales de Despensa</span>
-          <input type="checkbox" id="valesHabilitado">
-        </label>
-
-        <p class="subtitulo-seccion">🔀 Pagos Mixtos</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar el cobro con varias formas de pago (mixto)</span>
-          <input type="checkbox" id="mixtoHabilitado">
-        </label>
-
-        <p class="subtitulo-seccion">📒 Crédito / Fiado</p>
-        <label class="opcion-check">
-          <span>Deseo habilitar la venta a crédito (fiado)</span>
-          <input type="checkbox" id="creditoHabilitado">
-        </label>
-
-        <p class="subtitulo-seccion">🗄️ Cajón de Dinero</p>
-        <label class="opcion-check">
-          <span>Abrir el cajón de dinero automáticamente al cobrar (solo funciona con impresión directa Bluetooth/USB, conectada al mismo puerto que la impresora)</span>
-          <input type="checkbox" id="cajonAutomatico">
-        </label>
-
-        <button class="btn btn-primary" style="margin-top:10px;" onclick="guardarFormasPago()">Guardar Formas de Pago</button>
-      </div>
-    </div>
-
-    <!-- ============ ANUNCIOS / PROMOCIONES (Pantalla de Turnos) ============ -->
-    <div class="card">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secPromosTurnos')">
-        <h3 class="card-titulo-grande">📢 Anuncios y Promociones</h3>
-        <span class="flecha-plegable colapsada" id="flecha-secPromosTurnos">▾</span>
-      </div>
-      <div class="form-config seccion-plegable colapsada" id="secPromosTurnos">
-        <p class="card-subtexto">Se muestran rotando en un panel lateral de la <b>Pantalla de Turnos</b>, mientras los clientes esperan su número. Puedes agregar imágenes (promociones, anuncios), un código QR (por ejemplo, a tus redes sociales o catálogo) o un video promocional. Máximo 8.</p>
-
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 12px; background:var(--background); border-radius:10px;">
-          <label style="display:flex; flex-direction:column; gap:4px; font-size:13px; flex:1; min-width:160px;">
-            Segundos entre anuncios
-            <input type="number" id="promosIntervaloSegundos" min="3" max="120" step="1" value="10">
-          </label>
-          <label class="opcion-check" style="font-size:13px; margin-top:18px; border-bottom:none; padding:0;">
-            <span>Mostrar en orden aleatorio</span>
-            <input type="checkbox" id="promosOrdenAleatorio">
-          </label>
-        </div>
-
-        <div id="listaPromosTurnos" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
-
-        <div id="formNuevaPromo" style="display:none; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; display:flex; flex-direction:column; gap:8px;">
-          <select id="promoTipo" onchange="actualizarFormPromo()">
-            <option value="imagen">Imagen</option>
-            <option value="qr">Código QR</option>
-            <option value="video">Video</option>
-          </select>
-          <input type="text" id="promoTitulo" placeholder="Título (opcional, ej. '2x1 en jamón')" maxlength="80">
-          <div id="promoCampoImagen">
-            <input type="file" id="promoImagenInput" accept="image/*">
-            <img id="previewPromoImagen" style="display:none; width:100%; max-height:140px; object-fit:contain; border-radius:8px; background:#EEE; margin-top:6px;">
+          <div class="tarjeta">
+            <h3>Texto al final (opcional)</h3>
+            <textarea id="terminos" maxlength="400" rows="2" placeholder="Ej. No hay devoluciones sin ticket. Gracias por su preferencia."></textarea>
           </div>
-          <div id="promoCampoQr" style="display:none;">
-            <input type="text" id="promoQrContenido" placeholder="Contenido del QR (ej. https://facebook.com/tu-negocio)" maxlength="500">
+
+          <div class="tarjeta">
+            <h3>Código QR de promoción</h3>
+            <label class="opcion-check"><span>Imprimir un QR al final del ticket</span><input type="checkbox" class="interruptor" id="qrPromoActivo"></label>
+            <label class="campo"><span>Lo que abre el QR</span><input type="text" id="qrPromoContenido" maxlength="300" placeholder="Página, Facebook, https://wa.me/52..."></label>
+            <label class="campo"><span>Texto sobre el QR</span><input type="text" id="qrPromoTexto" maxlength="80" placeholder="Ej. Escanea y recibe 10% de descuento"></label>
+            <label class="opcion-check"><span>También en el ticket de Mostrador</span><input type="checkbox" class="interruptor" id="qrPromoEnMostrador"></label>
           </div>
-          <div id="promoCampoVideo" style="display:none;">
-            <input type="file" id="promoVideoInput" accept="video/*">
-            <p class="card-subtexto" style="margin:4px 0 0;">Máximo 25MB. Se reproduce sin sonido y en bucle.</p>
-            <video id="previewPromoVideo" style="display:none; width:100%; max-height:140px; border-radius:8px; background:#000; margin-top:6px;" muted controls></video>
-            <p id="promoVideoEstado" style="font-size:12px; color:#888; margin:4px 0 0;"></p>
+
+          <div class="tarjeta">
+            <h3>Ticket de Mostrador</h3>
+            <label class="campo"><span>Código para que Caja lo escanee</span>
+              <select id="tipoCodigoEscaneo">
+                <option value="qr">Código QR</option>
+                <option value="barras">Código de barras</option>
+                <option value="ambos">Ambos</option>
+              </select>
+            </label>
+            <h3 style="margin-top:6px;">Ticket final</h3>
+            <label class="opcion-check"><span>Imprimir datos del cliente (ventas a crédito/fiado)</span><input type="checkbox" class="interruptor" id="imprimirDatosCliente"></label>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-primary" onclick="confirmarNuevaPromo()">Agregar</button>
-            <button class="btn btn-secondary" onclick="cancelarNuevaPromo()">Cancelar</button>
+
+          <div class="barra-guardar">
+            <button class="btn btn-primary btn-principal" onclick="guardarContenidoTicket()">💾 Guardar para todo el negocio</button>
+            <span class="nota">Se aplica en todos los equipos.</span>
           </div>
         </div>
+      </section>
 
-        <button class="btn btn-secondary" id="botonAgregarPromo" onclick="mostrarFormNuevaPromo()">+ Agregar anuncio</button>
-        <button class="btn btn-primary" style="margin-top:10px; display:block; width:100%;" onclick="guardarPromosTurnos()">Guardar Anuncios</button>
-      </div>
-    </div>
+      <!-- ============ FORMAS DE PAGO ============ -->
+      <section class="sec" id="sec-pagos">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>💳 Formas de pago</h2><p>Lo que aparece al cobrar en Caja.</p></div></div>
+          <span class="insignia negocio">🏪 Todo el negocio</span>
+        </div>
+        <div class="sec-cuerpo">
+          <div class="pagos">
+            <div class="pago on">
+              <div class="pago-cab"><span class="pago-ico">💵</span><b>Efectivo</b><span class="insignia negocio mini">Siempre activo</span></div>
+              <label class="opcion-check">
+                <span>No cobrar si el efectivo es menor que el total</span>
+                <input type="checkbox" class="interruptor" id="efectivoBloquear">
+              </label>
+            </div>
 
-    <!-- ============ ZONA PELIGROSA (solo dueño) ============ -->
-    <div class="card" id="cardZonaPeligrosa" style="display:none; border:1px solid #C62828; margin-top:16px;">
-      <div class="header-plegable" onclick="toggleSeccionConfig('secZonaPeligrosa')">
-        <h3 class="card-titulo-grande" style="color:#C62828;">⚠️ Zona peligrosa</h3>
-        <span class="flecha-plegable colapsada" id="flecha-secZonaPeligrosa">▾</span>
-      </div>
-      <div class="form-config seccion-plegable colapsada" id="secZonaPeligrosa">
-        <p class="card-subtexto">Borra todas las ventas, tickets, turnos, movimientos de caja, créditos/abonos, devoluciones y bitácora de tu sucursal, y deja existencias y saldos de clientes en $0. <b>No borra</b> tu catálogo (productos, categorías, kits, proveedores), clientes, usuarios ni esta configuración. Úsalo solo para dejar el sistema limpio antes de arrancar en real — no se puede deshacer.</p>
-        <button class="btn btn-danger" onclick="abrirModalReinicioFabrica()">🗑️ Reinicio de fábrica</button>
-      </div>
-    </div>
+            <div class="pago" data-sw="tarjetaHabilitado">
+              <label class="pago-cab"><span class="pago-ico">💳</span><b>Tarjeta crédito / débito</b><input type="checkbox" class="interruptor" id="tarjetaHabilitado"></label>
+              <div class="extra">
+                <label class="campo"><span>Comisión % (solo informativa, para tus reportes)</span><input type="number" id="tarjetaComision" placeholder="Opcional, ej. 2.5" step="0.01"></label>
+                <p class="nota">No se le cobra de más al cliente.</p>
+              </div>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+            </div>
 
-  </div>
+            <div class="pago" data-sw="transferenciaHabilitado">
+              <label class="pago-cab"><span class="pago-ico">🏦</span><b>Transferencia</b><input type="checkbox" class="interruptor" id="transferenciaHabilitado"></label>
+              <div class="extra">
+                <label class="campo"><span>Nombre del botón en Caja</span><input type="text" id="transferenciaEtiqueta" placeholder="Ej. Transferencia"></label>
+              </div>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+            </div>
+
+            <div class="pago" data-sw="dolaresHabilitado">
+              <label class="pago-cab"><span class="pago-ico">🇺🇸</span><b>Dólares americanos</b><input type="checkbox" class="interruptor" id="dolaresHabilitado" onchange="toggleCampoDolar()"></label>
+              <div class="extra">
+                <label class="campo"><span>Tipo de cambio (pesos por dólar)</span><input type="number" id="tipoCambioDolar" placeholder="Ej. 17.2500" step="0.0001"></label>
+                <p class="nota">Caja convierte el total a dólares con este tipo de cambio.</p>
+              </div>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+            </div>
+
+            <div class="pago" data-sw="chequeHabilitado">
+              <label class="pago-cab"><span class="pago-ico">🖋️</span><b>Cheque</b><input type="checkbox" class="interruptor" id="chequeHabilitado"></label>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+              <p class="nota txt-on">Se puede cobrar con cheque.</p>
+            </div>
+
+            <div class="pago" data-sw="valesHabilitado">
+              <label class="pago-cab"><span class="pago-ico">🎟️</span><b>Vales de despensa</b><input type="checkbox" class="interruptor" id="valesHabilitado"></label>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+              <p class="nota txt-on">Se puede cobrar con vales de despensa.</p>
+            </div>
+
+            <div class="pago" data-sw="mixtoHabilitado">
+              <label class="pago-cab"><span class="pago-ico">🔀</span><b>Pagos mixtos</b><input type="checkbox" class="interruptor" id="mixtoHabilitado"></label>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+              <p class="nota txt-on">Permite combinar varias formas de pago en un cobro.</p>
+            </div>
+
+            <div class="pago" data-sw="creditoHabilitado">
+              <label class="pago-cab"><span class="pago-ico">📒</span><b>Crédito / fiado</b><input type="checkbox" class="interruptor" id="creditoHabilitado"></label>
+              <p class="nota txt-off">Apagado: no aparece en Caja.</p>
+              <p class="nota txt-on">Venta a crédito para clientes registrados.</p>
+            </div>
+
+            <div class="pago" data-sw="cajonAutomatico">
+              <label class="pago-cab"><span class="pago-ico">🗄️</span><b>Abrir cajón al cobrar</b><input type="checkbox" class="interruptor" id="cajonAutomatico"></label>
+              <p class="nota">Solo funciona con impresión directa Bluetooth/USB, con el cajón conectado al mismo puerto que la impresora.</p>
+            </div>
+          </div>
+
+          <div class="barra-guardar">
+            <button class="btn btn-primary btn-principal" onclick="guardarFormasPago()">💾 Guardar formas de pago</button>
+            <span class="nota">Los cambios se aplican en todos los equipos.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ANUNCIOS / PROMOCIONES (Pantalla de Turnos) ============ -->
+      <section class="sec" id="sec-anuncios">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>📢 Anuncios y promociones</h2><p>Se muestran rotando en la Pantalla de Turnos mientras los clientes esperan.</p></div></div>
+          <span class="insignia negocio">🏪 Todo el negocio</span>
+        </div>
+        <div class="sec-cuerpo">
+          <div class="tarjeta">
+            <p class="nota">Puedes agregar imágenes (promociones, anuncios), un código QR (por ejemplo, a tus redes sociales o catálogo) o un video promocional. Máximo 8.</p>
+            <div class="rejilla">
+              <label class="campo"><span>Segundos entre anuncios</span>
+                <input type="number" id="promosIntervaloSegundos" min="3" max="120" step="1" value="10">
+              </label>
+              <label class="opcion-tarjeta"><span>Orden aleatorio<small>mezcla los anuncios</small></span><input type="checkbox" class="interruptor" id="promosOrdenAleatorio"></label>
+            </div>
+          </div>
+
+          <div class="tarjeta">
+            <h3>Tus anuncios</h3>
+            <div id="listaPromosTurnos"></div>
+
+            <div id="formNuevaPromo" style="display:none;">
+              <select id="promoTipo" onchange="actualizarFormPromo()">
+                <option value="imagen">Imagen</option>
+                <option value="qr">Código QR</option>
+                <option value="video">Video</option>
+              </select>
+              <input type="text" id="promoTitulo" placeholder="Título (opcional, ej. '2x1 en jamón')" maxlength="80">
+              <div id="promoCampoImagen">
+                <input type="file" id="promoImagenInput" accept="image/*">
+                <img id="previewPromoImagen" style="display:none; width:100%; max-height:140px; object-fit:contain; border-radius:8px; background:#EEE; margin-top:6px;">
+              </div>
+              <div id="promoCampoQr" style="display:none;">
+                <input type="text" id="promoQrContenido" placeholder="Contenido del QR (ej. https://facebook.com/tu-negocio)" maxlength="500">
+              </div>
+              <div id="promoCampoVideo" style="display:none;">
+                <input type="file" id="promoVideoInput" accept="video/*">
+                <p class="nota" style="margin:4px 0 0;">Máximo 25MB. Se reproduce sin sonido y en bucle.</p>
+                <video id="previewPromoVideo" style="display:none; width:100%; max-height:140px; border-radius:8px; background:#000; margin-top:6px;" muted controls></video>
+                <p id="promoVideoEstado" class="nota" style="margin:4px 0 0;"></p>
+              </div>
+              <div class="botones">
+                <button class="btn btn-primary" onclick="confirmarNuevaPromo()">Agregar</button>
+                <button class="btn btn-secondary" onclick="cancelarNuevaPromo()">Cancelar</button>
+              </div>
+            </div>
+
+            <div class="botones"><button class="btn btn-secondary" id="botonAgregarPromo" onclick="mostrarFormNuevaPromo()">+ Agregar anuncio</button></div>
+          </div>
+
+          <div class="barra-guardar">
+            <button class="btn btn-primary btn-principal" onclick="guardarPromosTurnos()">💾 Guardar anuncios</button>
+            <span class="nota">Los anuncios nuevos se aplican hasta que guardes.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ZONA PELIGROSA (solo dueño) ============ -->
+      <section class="sec" id="sec-zona">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2 style="color:#C62828;">⚠️ Zona peligrosa</h2><p>Acciones que no se pueden deshacer.</p></div></div>
+          <span class="insignia peligro">Solo el dueño</span>
+        </div>
+        <div class="sec-cuerpo">
+          <div class="tarjeta peligro">
+            <p class="nota" style="font-size:13px;">Borra todas las ventas, tickets, turnos, movimientos de caja, créditos/abonos, devoluciones y bitácora de tu sucursal, y deja existencias y saldos de clientes en $0. <b>No borra</b> tu catálogo (productos, categorías, kits, proveedores), clientes, usuarios ni esta configuración. Úsalo solo para dejar el sistema limpio antes de arrancar en real — no se puede deshacer.</p>
+            <div class="botones"><button class="btn btn-danger" onclick="abrirModalReinicioFabrica()">🗑️ Reinicio de fábrica</button></div>
+          </div>
+        </div>
+      </section>
+
+     </div><!-- /config-secciones -->
+
+     <!-- ============ VISTA PREVIA DEL TICKET (compartida: Impresión y Contenido) ============ -->
+     <aside class="vp" id="panelVistaPrevia">
+       <button type="button" class="vp-cab" onclick="toggleVistaPrevia()"><span>👁️ Así se verá el ticket</span><span class="vp-flecha">▾</span></button>
+       <div class="vp-cuerpo">
+         <div class="segmentado" data-para="vistaTicketTipo">
+           <button type="button" data-valor="final">Ticket final</button>
+           <button type="button" data-valor="mostrador">De Mostrador</button>
+         </div>
+         <select id="vistaTicketTipo" class="sel-oculto" onchange="refrescarVistaPreviaTicket()">
+           <option value="final">Ticket final (ya pagado)</option>
+           <option value="mostrador">Ticket de Mostrador</option>
+         </select>
+         <div class="hoja-ticket-fondo">
+           <div id="hojaTicket"></div>
+         </div>
+         <p class="nota" style="text-align:center;">Es aproximada: la impresora puede variar un poco.</p>
+       </div>
+     </aside>
+    </div><!-- /config-main -->
+
+   </div><!-- /config-layout -->
+  </div><!-- /contenido -->
 
   <!-- Modal de Reinicio de Fábrica: dos candados (contraseña + palabra exacta) -->
   <div class="modal-confirm-overlay" id="modalReinicioFabrica">
@@ -561,17 +824,14 @@
 requiereLogin();
 let logoBase64 = '';
 
-function toggleSeccionConfig(idSeccion) {
-  document.getElementById(idSeccion).classList.toggle('colapsada');
-  document.getElementById('flecha-' + idSeccion).classList.toggle('colapsada');
-}
 
 // La Zona Peligrosa solo la ve el dueño — ni gerente ni cajero, aunque
 // entraran directo a esta URL, deben poder intentarlo (el backend también
 // lo revisa con requiereRol('dueno'), esto es solo para no mostrarla).
 const usuarioActualConfig = getUsuario();
-if (usuarioActualConfig && usuarioActualConfig.rol === 'dueno') {
-  document.getElementById('cardZonaPeligrosa').style.display = 'block';
+const esDuenoConfig = !!(usuarioActualConfig && usuarioActualConfig.rol === 'dueno');
+if (esDuenoConfig) {
+  document.getElementById('menuZona').classList.add('visible');
 }
 
 function abrirModalReinicioFabrica() {
@@ -659,6 +919,7 @@ function actualizarEstadoBasculaUI(nombre) {
   const elemento = document.getElementById('estadoBascula');
   elemento.className = 'estado-impresora conectada';
   elemento.textContent = `Conectada: ${nombre}`;
+  actualizarResumenes();
 }
 
 async function conectarBasculaUSB() {
@@ -684,8 +945,9 @@ async function desconectarBasculaUI() {
   await desconectarBascula();
   const elemento = document.getElementById('estadoBascula');
   elemento.className = 'estado-impresora desconectada';
-  elemento.textContent = 'Sin conectar en este dispositivo';
+  elemento.textContent = 'Sin conectar';
   document.getElementById('basculaPesoActualTexto').style.display = 'none';
+  actualizarResumenes();
   mostrarToast('Báscula desconectada', 'exito');
 }
 
@@ -855,10 +1117,22 @@ async function cargarConfiguracion() {
   } catch (err) {
     console.error(err);
   }
+  sincronizarSegmentados();
+  actualizarTarjetasPago();
+  actualizarResumenes();
 }
 
 function toggleCampoDolar() {
-  document.getElementById('tipoCambioDolar').style.display = document.getElementById('dolaresHabilitado').checked ? 'block' : 'none';
+  actualizarTarjetasPago();
+}
+
+// Cada forma de pago es una tarjeta: encendida (borde de color + sus campos)
+// o apagada (atenuada). Se calcula del estado real de su interruptor.
+function actualizarTarjetasPago() {
+  document.querySelectorAll('.pago[data-sw]').forEach(c => {
+    const sw = document.getElementById(c.dataset.sw);
+    c.classList.toggle('on', !!(sw && sw.checked));
+  });
 }
 
 async function guardarFormasPago() {
@@ -890,6 +1164,8 @@ function cargarModoImpresion() {
   document.getElementById('modoImpresion').value = localStorage.getItem('modo_impresion') || 'directo';
   document.getElementById('nombreMostrador').value = localStorage.getItem('nombre_mostrador') || '';
   document.getElementById('anchoTicketDispositivo').value = localStorage.getItem('ancho_ticket_dispositivo') || '80mm';
+  sincronizarSegmentados();
+  actualizarResumenes();
 }
 
 function guardarNombreMostrador() {
@@ -921,8 +1197,9 @@ function guardarLayoutMostrador() {
 
 function marcarColorTemaActivo(colorActivo) {
   document.querySelectorAll('[data-color-boton]').forEach(boton => {
-    boton.style.borderWidth = boton.dataset.colorBoton === colorActivo ? '3px' : '1px';
+    boton.classList.toggle('activo', boton.dataset.colorBoton === colorActivo);
   });
+  actualizarResumenes();
 }
 
 function cargarColorTema() {
@@ -1034,6 +1311,7 @@ function renderListaPromosTurnos() {
   const cont = document.getElementById('listaPromosTurnos');
   if (promosTurnosState.length === 0) {
     cont.innerHTML = '<p style="font-size:13px; color:#888;">Sin anuncios configurados todavía.</p>';
+    actualizarResumenes();
     return;
   }
   cont.innerHTML = promosTurnosState.map((p, i) => `
@@ -1060,6 +1338,7 @@ function renderListaPromosTurnos() {
       });
     }
   });
+  actualizarResumenes();
 }
 
 function mostrarFormNuevaPromo() {
@@ -1245,8 +1524,8 @@ function refrescarVistaPreviaTicket() {
   }, 150);
 }
 
-document.addEventListener('input', (e) => { if (e.target.closest('.disenador-ticket, #cardContenidoTicket')) refrescarVistaPreviaTicket(); });
-document.addEventListener('change', (e) => { if (e.target.closest('.disenador-ticket, #cardContenidoTicket')) refrescarVistaPreviaTicket(); });
+document.addEventListener('input', (e) => { if (e.target.closest('#sec-impresion, #sec-contenido')) refrescarVistaPreviaTicket(); });
+document.addEventListener('change', (e) => { if (e.target.closest('#sec-impresion, #sec-contenido')) refrescarVistaPreviaTicket(); });
 
 function quitarLogoTicket() {
   logoBase64 = '';
@@ -1400,6 +1679,133 @@ function guardarImpresorasWindows() {
   mostrarToast('Impresoras de Windows guardadas en este equipo. Prueba con "Probar impresión".', 'exito');
 }
 
+
+// ============ Menú de secciones ============
+// PC: menú a la izquierda y la sección elegida a la derecha.
+// Celular: lista de secciones; al tocar una se abre a pantalla completa.
+const SECCIONES = ['dispositivo', 'impresion', 'bascula', 'contenido', 'pagos', 'anuncios', 'zona'];
+const SECCIONES_CON_VISTA_PREVIA = ['impresion', 'contenido'];
+const mqAngosto = window.matchMedia('(max-width: 1000px)');
+let seccionActual = null;
+let empujadoAlHistorial = false;
+
+function seccionPermitida(id) {
+  return SECCIONES.includes(id) && (id !== 'zona' || esDuenoConfig);
+}
+function seccionDelHash() {
+  const h = location.hash.replace('#', '');
+  return seccionPermitida(h) ? h : null;
+}
+function ultimaSeccionGuardada() {
+  try {
+    const s = localStorage.getItem('config_seccion');
+    return seccionPermitida(s) && s !== 'zona' ? s : null;
+  } catch (e) { return null; }
+}
+function urlBase() { return location.pathname + location.search; }
+
+// Pinta la sección (sin tocar el historial del navegador).
+function mostrarSeccion(id) {
+  const angosto = mqAngosto.matches;
+  if (!id && !angosto) id = ultimaSeccionGuardada() || 'impresion';
+  seccionActual = id;
+  document.querySelectorAll('.sec').forEach(s => s.classList.toggle('activa', s.id === 'sec-' + id));
+  document.querySelectorAll('.menu-item[data-sec]').forEach(b => b.classList.toggle('activo', b.dataset.sec === id));
+  document.getElementById('configMain').classList.toggle('con-preview', SECCIONES_CON_VISTA_PREVIA.includes(id));
+  const enSeccion = angosto && !!id;
+  document.getElementById('configLayout').classList.toggle('vista-sec', enSeccion);
+  // Con una sección abierta en celular se esconden los botones flotantes (tema/conexión)
+  // para que no tapen la barra de guardar.
+  document.body.classList.toggle('hoja-abierta', enSeccion);
+}
+
+function abrirSeccion(id) {
+  if (!seccionPermitida(id)) return;
+  if (mqAngosto.matches) {
+    history.pushState(null, '', urlBase() + '#' + id);
+    empujadoAlHistorial = true;
+    window.scrollTo(0, 0);
+  } else {
+    history.replaceState(null, '', urlBase() + '#' + id);
+  }
+  if (id !== 'zona') { try { localStorage.setItem('config_seccion', id); } catch (e) {} }
+  mostrarSeccion(id);
+}
+
+function volverAlMenu() {
+  if (empujadoAlHistorial) { empujadoAlHistorial = false; history.back(); return; }
+  history.replaceState(null, '', urlBase());
+  mostrarSeccion(null);
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('hashchange', () => {
+  const id = seccionDelHash();
+  if (!id) empujadoAlHistorial = false;
+  mostrarSeccion(id);
+  window.scrollTo(0, 0);
+});
+mqAngosto.addEventListener('change', () => mostrarSeccion(seccionActual));
+
+function toggleVistaPrevia() {
+  document.getElementById('panelVistaPrevia').classList.toggle('abierto');
+}
+
+// ---- Control segmentado (botones tipo "pastilla") que maneja un <select> oculto ----
+// El <select> sigue siendo el que guarda el valor real (los guardados no cambian).
+function sincronizarSegmentados() {
+  document.querySelectorAll('.segmentado[data-para]').forEach(seg => {
+    const sel = document.getElementById(seg.dataset.para);
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('activo', !!sel && sel.value === b.dataset.valor));
+  });
+  const nota = document.getElementById('notaModoImpresion');
+  if (nota) {
+    nota.textContent = document.getElementById('modoImpresion').value === 'sistema'
+      ? 'Usa una impresora instalada en este equipo: abre el diálogo de impresión (o imprime directo si eliges una impresora abajo).'
+      : 'Imprime solo y corta el papel.';
+  }
+}
+document.addEventListener('click', (e) => {
+  const boton = e.target.closest('.segmentado[data-para] button');
+  if (!boton) return;
+  const sel = document.getElementById(boton.parentElement.dataset.para);
+  if (sel && sel.value !== boton.dataset.valor) {
+    sel.value = boton.dataset.valor;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  sincronizarSegmentados();
+  actualizarResumenes();
+});
+
+// ---- Resumen corto debajo de cada opción del menú ----
+const NOMBRES_COLOR_TEMA = { verde: 'Verde', azul: 'Azul', morado: 'Morado', naranja: 'Naranja', 'alto-contraste': 'Alto contraste' };
+function actualizarResumenes() {
+  const poner = (id, texto) => { const el = document.getElementById(id); if (el) el.textContent = texto; };
+  const nombre = (document.getElementById('nombreMostrador').value || '').trim() || 'Sin nombre';
+  const color = NOMBRES_COLOR_TEMA[localStorage.getItem('color_tema') || 'verde'] || 'Verde';
+  poner('resDispositivo', `${nombre} · ${color}`);
+
+  const modo = document.getElementById('modoImpresion').value === 'sistema' ? 'Windows/Mac' : 'Directo';
+  poner('resImpresion', `${modo} · ${document.getElementById('anchoTicketDispositivo').value.replace('mm', ' mm')}`);
+
+  poner('resBascula', (typeof basculaConectada === 'function' && basculaConectada()) ? 'Báscula conectada' : 'Báscula sin conectar');
+  poner('resContenido', document.getElementById('nombreNegocio').value.trim() || 'Sin nombre de negocio');
+
+  const formas = ['dolaresHabilitado', 'tarjetaHabilitado', 'transferenciaHabilitado', 'chequeHabilitado', 'valesHabilitado', 'mixtoHabilitado', 'creditoHabilitado'];
+  const activas = 1 + formas.filter(id => document.getElementById(id).checked).length; // el efectivo siempre está
+  poner('resPagos', activas === 1 ? '1 activa' : `${activas} activas`);
+
+  const anuncios = promosTurnosState.length;
+  poner('resAnuncios', anuncios === 0 ? 'Sin anuncios' : (anuncios === 1 ? '1 anuncio' : `${anuncios} anuncios`));
+}
+document.addEventListener('input', actualizarResumenes);
+document.addEventListener('change', (e) => {
+  if (e.target.closest('.pago')) actualizarTarjetasPago();
+  actualizarResumenes();
+});
+
+mostrarSeccion(seccionDelHash());
+
 cargarModoImpresion();
 cargarImpresorasWindows();
 cargarConfiguracion();
@@ -1428,6 +1834,7 @@ setTimeout(() => {
   if (basculaConectada()) {
     actualizarEstadoBasculaUI('Reconexión automática');
   }
+  actualizarResumenes();
 }, 1500);
 </script>
 <script src="../js/sidebar-nav.js"></script>
