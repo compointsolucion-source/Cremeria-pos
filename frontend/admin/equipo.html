@@ -9,22 +9,36 @@
 <title>Equipo - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 700px; margin: 20px auto; padding: 0 14px; }
-  .form-empleado { display: grid; gap: 10px; margin-bottom: 20px; }
-  .fila-doble { display: flex; gap: 10px; }
-  .fila-doble > * { flex: 1; }
-  .empleado-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .empleado-card .titulo { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
-  .rol-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: #E0E0E0; }
-  .rol-dueno { background: #F9A825; color: white; }
-  .rol-gerente { background: #1565C0; color: white; }
-  .rol-cajero { background: #5FAE46; color: white; }
-  .rol-mostrador { background: #6A1B9A; color: white; }
-  .inactivo { opacity: 0.5; }
-  .acciones-empleado { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-  .acciones-empleado button { font-size: 13px; padding: 6px 10px; }
+  .columnas { --ancho-panel: 450px; }
+  .rol-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 9px; background: #78909C; color: #fff; vertical-align: 1px; margin-left: 4px; }
+  .rol-dueno, .rol-jefe_general { background: #F9A825; }
+  .rol-gerente { background: #1565C0; }
+  .rol-cajero { background: #5FAE46; }
+  .rol-mostrador { background: #6A1B9A; }
+  .fila .info b { overflow-wrap: anywhere; }
+  .perfil { display: flex; align-items: center; gap: 12px; }
+  .perfil b { display: block; font-size: 17px; }
+  .perfil small { color: var(--muted, #7A7D83); font-size: 12.5px; }
+  .interruptor-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .interruptor-fila b { display: block; font-size: 14px; }
+  .interruptor-fila small { display: block; color: var(--muted, #7A7D83); font-size: 12px; }
+  .titulo-permisos { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .titulo-permisos b { font-size: 14px; }
+  .grupo { padding: 0; gap: 0; }
+  .grupo-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; padding: 11px 12px; cursor: pointer; font-family: inherit; font-size: 14px; color: var(--text, #1F2023); text-align: left; }
+  .grupo-cab small { color: var(--muted, #7A7D83); font-weight: 600; margin-left: 4px; }
+  .grupo-cab .flecha { font-size: 12px; color: var(--muted, #7A7D83); transition: transform .15s; }
+  .grupo.abierto .grupo-cab .flecha { transform: rotate(180deg); }
+  .grupo-cuerpo { display: none; padding: 0 12px 6px; }
+  .grupo.abierto .grupo-cuerpo { display: block; }
+  .perm { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border, #E4E6E9); font-size: 13.5px; cursor: pointer; }
+  .perm span { min-width: 0; }
+  .solo-lectura { text-align: center; padding: 26px 14px; color: var(--muted, #7A7D83); font-size: 14px; display: grid; gap: 8px; justify-items: center; }
+  .btn-nuevo-pc { display: inline-block; }
+  @media (max-width: 1000px) { .btn-nuevo-pc { display: none; } }
 </style>
 </head>
 <body>
@@ -33,29 +47,35 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>👥 Equipo</h1></div>
+    <button class="btn btn-primary btn-nuevo-pc" onclick="nuevoEmpleado()">＋ Nuevo empleado</button>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <div class="card form-empleado">
-      <h3>Nuevo empleado</h3>
-      <input type="text" id="nombreEmpleado" placeholder="Nombre completo">
-      <div class="fila-doble">
-        <input type="text" id="usuarioEmpleado" placeholder="Usuario para iniciar sesión">
-        <input type="password" id="passwordEmpleado" placeholder="Contraseña (mínimo 6 caracteres)">
+    <div class="columnas">
+      <div class="caja recorta">
+        <div class="barra">
+          <div class="buscar"><input type="text" id="buscador" placeholder="Buscar empleado…" autocomplete="off" oninput="pintarLista()"></div>
+          <span class="conteo" id="conteo"></span>
+        </div>
+        <div id="listaEquipo"><div class="vacio">Cargando…</div></div>
       </div>
-      <select id="rolEmpleado">
-        <option value="mostrador">Mostrador</option>
-        <option value="cajero">Cajero</option>
-        <option value="gerente">Gerente</option>
-      </select>
-      <button class="btn btn-primary" onclick="crearEmpleado()">Guardar Empleado</button>
-    </div>
 
-    <h3>Equipo actual</h3>
-    <div id="listaEquipo"></div>
+      <!-- Panel (en celular sale desde abajo) -->
+      <div class="caja panel-form" id="panelForm">
+        <div class="panel-cab">
+          <h3 id="panelTitulo">Equipo</h3>
+          <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+        </div>
+        <div class="panel-cuerpo" id="panelCuerpo"></div>
+        <div class="panel-pie" id="panelPie" style="display:none;"></div>
+      </div>
+    </div>
   </div>
+
+  <button class="boton-flotante" onclick="nuevoEmpleado()">＋ Nuevo</button>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -64,7 +84,9 @@
 <script>
 requiereLogin();
 
-const rolNombres = { dueno: 'Dueño', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador' };
+const rolNombres = { jefe_general: 'Jefe general', dueno: 'Dueño', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador' };
+const ROLES_EDITABLES = ['mostrador', 'cajero', 'gerente'];
+const esDueno = (u) => u.rol === 'dueno' || u.rol === 'jefe_general';
 
 // Agrupados por tema, solo para que se vean ordenados en pantalla — el
 // backend es quien realmente los exige, esto es nada más presentación.
@@ -76,7 +98,6 @@ const GRUPOS_PERMISOS = {
   'Productos': ['PRODUCTOS_CREAR', 'PRODUCTOS_EDITAR', 'PRODUCTOS_PRECIO'],
   'Clientes': ['CLIENTES_CREAR', 'CREDITO_ABONO']
 };
-
 const ETIQUETAS_PERMISOS = {
   VENTAS_CREAR: 'Generar tickets de venta', VENTAS_CANCELAR: 'Cancelar tickets', VENTAS_DEVOLVER: 'Procesar devoluciones',
   DESCUENTO_APLICAR: 'Aplicar descuentos (>15% pide autorización aparte)',
@@ -86,120 +107,236 @@ const ETIQUETAS_PERMISOS = {
   PRODUCTOS_CREAR: 'Dar de alta productos', PRODUCTOS_EDITAR: 'Editar productos existentes', PRODUCTOS_PRECIO: 'Cambiar precios',
   CLIENTES_CREAR: 'Dar de alta clientes', CREDITO_ABONO: 'Registrar abonos a crédito'
 };
+const COLORES = ['#1565C0', '#C62828', '#2E7D32', '#8E24AA', '#EF6C00', '#00838F', '#6D4C41', '#AD1457'];
 
-let equipoActual = [];
+let equipo = [];
+let modo = null;             // null | 'nuevo' | 'editar'
+let selId = null;
+let rolNuevo = 'mostrador';
+const gruposAbiertos = new Set(['Ventas']);
+const esAngosto = window.matchMedia('(max-width: 1000px)');
 
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const iniciales = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map((p) => p[0] || '').join('').toUpperCase() || '?';
+const colorDe = (n) => COLORES[[...String(n || '')].reduce((s, c) => s + c.charCodeAt(0), 0) % COLORES.length];
+const buscar = (id) => equipo.find((u) => u.id === id);
+
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+  if (esAngosto.matches && modo) { modo = null; selId = null; pintarLista(); pintarPanel(); }
+}
+
+// ---------- Lista ----------
 async function cargarEquipo() {
   try {
-    equipoActual = await apiFetch('/usuarios');
-    const cont = document.getElementById('listaEquipo');
-    cont.innerHTML = equipoActual.map(u => `
-      <div class="empleado-card ${u.activo ? '' : 'inactivo'}">
-        <div class="titulo">
-          <span>${u.nombre} <span class="rol-tag rol-${u.rol}">${rolNombres[u.rol]}</span></span>
-          <span style="font-size:13px; color:#888;">${u.usuario}</span>
-        </div>
-        ${u.nombre_mostrador ? `<div style="font-size:13px; color:#5FAE46; margin-top:2px;">🏪 Asignado a: <b>${u.nombre_mostrador}</b></div>` : ''}
-        ${u.rol !== 'dueno' ? `
-          <div class="acciones-empleado">
-            <button class="btn btn-secondary" onclick="toggleActivo(${u.id}, ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>
-            <button class="btn btn-secondary" onclick="cambiarRol(${u.id})">Cambiar rol</button>
-            <button class="btn btn-secondary" onclick="restablecerPassword(${u.id})">Restablecer contraseña</button>
-            <button class="btn btn-secondary" onclick="asignarMostrador(${u.id}, '${(u.nombre_mostrador || '').replace(/'/g, "\\'")}')">🏪 Asignar Mostrador</button>
-            <button class="btn btn-secondary" onclick="togglePermisosVisibles(${u.id})">Permisos ▾</button>
-          </div>
-          <div class="panel-permisos" id="permisos-${u.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #EEE;">
-            ${renderPermisosEmpleado(u)}
-          </div>
-        ` : ''}
-      </div>
-    `).join('');
+    equipo = await apiFetch('/usuarios');
+    pintarLista();
+    pintarPanel();
   } catch (err) {
     mostrarToast(err.message, 'error');
+    document.getElementById('listaEquipo').innerHTML = '<div class="vacio">No se pudo cargar el equipo.</div>';
   }
 }
 
-function renderPermisosEmpleado(u) {
+function pintarLista() {
+  const q = sinAcentos(document.getElementById('buscador').value.trim());
+  const visibles = equipo.filter((u) => !q || sinAcentos([u.nombre, u.usuario, u.nombre_mostrador, rolNombres[u.rol]].join(' ')).includes(q));
+  const activos = equipo.filter((u) => u.activo).length;
+  document.getElementById('conteo').textContent = `${equipo.length} ${equipo.length === 1 ? 'persona' : 'personas'} · ${activos} ${activos === 1 ? 'activa' : 'activas'}`;
+  const cont = document.getElementById('listaEquipo');
+  if (!visibles.length) { cont.innerHTML = `<div class="vacio">${equipo.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay empleados.'}</div>`; return; }
+  cont.innerHTML = visibles.map((u) => {
+    const partes = ['@' + escapar(u.usuario)];
+    if (u.nombre_mostrador) partes.push('mostrador: <strong>' + escapar(u.nombre_mostrador) + '</strong>');
+    if (!u.activo) partes.push('desactivado');
+    return `<div class="fila ${modo === 'editar' && selId === u.id ? 'sel' : ''} ${u.activo ? '' : 'apagada'}" onclick="seleccionar(${u.id})">
+      <div class="avatar" style="background:${colorDe(u.nombre)}">${escapar(iniciales(u.nombre))}</div>
+      <div class="info"><b>${escapar(u.nombre)} <span class="rol-tag rol-${escapar(u.rol)}">${escapar(rolNombres[u.rol] || u.rol)}</span></b><small>${partes.join(' · ')}</small></div>
+      ${esDueno(u) ? '<span class="pill amarillo">Acceso total</span>'
+        : `<input type="checkbox" class="interruptor" ${u.activo ? 'checked' : ''} title="${u.activo ? 'Desactivar' : 'Activar'}" onclick="event.stopPropagation()" onchange="alternarActivo(${u.id}, this.checked)">`}
+    </div>`;
+  }).join('');
+}
+
+function seleccionar(id) {
+  modo = 'editar';
+  selId = id;
+  pintarLista();
+  pintarPanel();
+  if (esAngosto.matches) abrirHoja();
+}
+
+// ---------- Panel ----------
+function pintarPanel() {
+  const cab = document.getElementById('panelTitulo');
+  const cuerpo = document.getElementById('panelCuerpo');
+  const pie = document.getElementById('panelPie');
+  if (modo === 'nuevo') return pintarNuevo(cab, cuerpo, pie);
+  const u = modo === 'editar' ? buscar(selId) : null;
+  if (!u) {
+    cab.textContent = '👥 Equipo';
+    pie.style.display = 'none';
+    cuerpo.innerHTML = '<div class="vacio-panel"><div class="gran">👈</div>Elige a alguien de la lista para editarlo,<br>o crea un empleado nuevo.</div>';
+    return;
+  }
+  cab.textContent = '✏️ Editando empleado';
+  const perfil = `<div class="perfil"><div class="avatar grande" style="background:${colorDe(u.nombre)}">${escapar(iniciales(u.nombre))}</div>
+    <div><b>${escapar(u.nombre)}</b><small>@${escapar(u.usuario)} · usuario para entrar</small></div></div>`;
+  if (esDueno(u)) {
+    pie.style.display = 'none';
+    cuerpo.innerHTML = perfil + `<div class="solo-lectura"><span class="rol-tag rol-${escapar(u.rol)}" style="font-size:13px;">${escapar(rolNombres[u.rol])}</span>
+      Esta cuenta tiene acceso total al sistema y no se modifica desde aquí.</div>`;
+    return;
+  }
   const efectivos = u.permisos_efectivos || [];
-  return Object.entries(GRUPOS_PERMISOS).map(([grupo, claves]) => `
-    <div style="margin-bottom:8px;">
-      <div style="font-weight:600; font-size:12px; color:#888; margin-bottom:4px;">${grupo}</div>
-      ${claves.map(clave => `
-        <label class="opcion-check" style="font-size:13px;">
-          <span>${ETIQUETAS_PERMISOS[clave]}</span>
-          <input type="checkbox" ${efectivos.includes(clave) ? 'checked' : ''} onchange="togglePermiso(${u.id}, '${clave}', this.checked)">
-        </label>
-      `).join('')}
-    </div>
-  `).join('');
+  cuerpo.innerHTML = perfil + `
+    <div class="bloque blanco"><div class="interruptor-fila">
+      <div><b>Cuenta activa</b><small>Si la apagas, ya no podrá entrar</small></div>
+      <input type="checkbox" class="interruptor" id="chkActivo" ${u.activo ? 'checked' : ''} onchange="alternarActivo(${u.id}, this.checked)">
+    </div></div>
+    <div class="campo"><label>Rol</label>
+      <div class="seg">${ROLES_EDITABLES.map((r) => `<button class="${u.rol === r ? 'activo' : ''}" onclick="elegirRol(${u.id}, '${r}')">${rolNombres[r]}</button>`).join('')}</div></div>
+    <div class="campo"><label for="mostradorNombre">Nombre que aparece en el mostrador</label>
+      <input type="text" id="mostradorNombre" value="${escapar(u.nombre_mostrador || '')}" placeholder="Ej. Mostrador 1" maxlength="40" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarMostrador(${u.id}, this)">
+      <div class="ayuda">Cuando esta persona inicie sesión en cualquier computadora, el sistema ya sabe cuál mostrador es. Déjalo vacío para quitarlo.</div></div>
+    <div class="titulo-permisos"><b>Permisos</b><span class="ayuda">Se guardan al instante</span></div>
+    ${Object.entries(GRUPOS_PERMISOS).map(([grupo, claves]) => {
+      const on = claves.filter((c) => efectivos.includes(c)).length;
+      return `<div class="bloque blanco grupo ${gruposAbiertos.has(grupo) ? 'abierto' : ''}" id="grupo-${escapar(grupo)}">
+        <button class="grupo-cab" onclick="alternarGrupo('${grupo}')"><span><b>${grupo}</b><small id="cnt-${escapar(grupo)}">${on} de ${claves.length}</small></span><span class="flecha">▼</span></button>
+        <div class="grupo-cuerpo">${claves.map((c) => `<label class="perm"><span>${escapar(ETIQUETAS_PERMISOS[c])}</span>
+          <input type="checkbox" class="interruptor" ${efectivos.includes(c) ? 'checked' : ''} onchange="alternarPermiso(${u.id}, '${c}', this.checked, this)"></label>`).join('')}</div>
+      </div>`;
+    }).join('')}`;
+  pie.style.display = '';
+  pie.innerHTML = `<button class="btn btn-secondary btn-grande" onclick="restablecerPassword(${u.id})">🔑 Restablecer contraseña</button>`;
 }
 
-function togglePermisosVisibles(id) {
-  const panel = document.getElementById(`permisos-${id}`);
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+function alternarGrupo(grupo) {
+  const el = document.getElementById('grupo-' + grupo);
+  if (!el) return;
+  const abierto = el.classList.toggle('abierto');
+  if (abierto) gruposAbiertos.add(grupo); else gruposAbiertos.delete(grupo);
 }
 
-async function togglePermiso(id, clave, activado) {
-  try {
-    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ permisos: { [clave]: activado } }) });
-    mostrarToast(`${ETIQUETAS_PERMISOS[clave]}: ${activado ? 'activado' : 'desactivado'}`, 'exito');
-    cargarEquipo();
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-    cargarEquipo();
-  }
+function nuevoEmpleado() {
+  modo = 'nuevo';
+  selId = null;
+  rolNuevo = 'mostrador';
+  pintarLista();
+  pintarPanel();
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('nombreEmpleado')?.focus(), 80);
 }
 
+function pintarNuevo(cab, cuerpo, pie) {
+  cab.textContent = '➕ Nuevo empleado';
+  cuerpo.innerHTML = `
+    <div class="campo"><label for="nombreEmpleado">Nombre completo</label><input type="text" id="nombreEmpleado" placeholder="Ej. Carlos Mendoza" autocomplete="off"></div>
+    <div class="campo"><label for="usuarioEmpleado">Usuario para iniciar sesión</label><input type="text" id="usuarioEmpleado" placeholder="Ej. carlos" autocomplete="off" autocapitalize="none"></div>
+    <div class="campo"><label for="passwordEmpleado">Contraseña</label><input type="password" id="passwordEmpleado" placeholder="Mínimo 6 caracteres" autocomplete="new-password" onkeydown="if (event.key === 'Enter') crearEmpleado()"></div>
+    <div class="campo"><label>Rol</label>
+      <div class="seg">${ROLES_EDITABLES.map((r) => `<button class="${rolNuevo === r ? 'activo' : ''}" onclick="elegirRolNuevo('${r}', this)">${rolNombres[r]}</button>`).join('')}</div></div>
+    <div class="aviso azul">Después de guardarlo podrás ajustar sus permisos y su mostrador.</div>`;
+  pie.style.display = '';
+  pie.innerHTML = '<button class="btn btn-primary btn-grande" id="btnCrear" onclick="crearEmpleado()">Guardar empleado</button>';
+}
+function elegirRolNuevo(rol, boton) {
+  rolNuevo = rol;
+  boton.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('activo', b === boton));
+}
+
+// ---------- Acciones ----------
 async function crearEmpleado() {
   const nombre = document.getElementById('nombreEmpleado').value.trim();
   const usuario = document.getElementById('usuarioEmpleado').value.trim();
   const password = document.getElementById('passwordEmpleado').value;
-  const rol = document.getElementById('rolEmpleado').value;
-
   if (!nombre || !usuario || !password) { mostrarToast('Completa todos los campos', 'error'); return; }
-
+  if (password.length < 6) { mostrarToast('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
+  const btn = document.getElementById('btnCrear');
+  btn.disabled = true;
   try {
-    await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify({ nombre, usuario, password, rol }) });
-    document.getElementById('nombreEmpleado').value = '';
-    document.getElementById('usuarioEmpleado').value = '';
-    document.getElementById('passwordEmpleado').value = '';
-    cargarEquipo();
+    const creado = await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify({ nombre, usuario, password, rol: rolNuevo }) });
+    mostrarToast('Empleado guardado', 'exito');
+    equipo = await apiFetch('/usuarios');
+    const nuevo = (creado && creado.id && buscar(creado.id)) || equipo.find((u) => u.usuario === usuario);
+    if (nuevo) { modo = 'editar'; selId = nuevo.id; } else { modo = null; }
+    pintarLista();
+    pintarPanel();
+    if (esAngosto.matches && !nuevo) cerrarHoja();
   } catch (err) {
     mostrarToast(err.message, 'error');
+    btn.disabled = false;
   }
 }
 
-async function toggleActivo(id, nuevoEstado) {
+async function alternarActivo(id, activo) {
   try {
-    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ activo: nuevoEstado }) });
-    cargarEquipo();
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ activo }) });
+    const u = buscar(id);
+    if (u) u.activo = activo;
+    mostrarToast(activo ? 'Cuenta activada' : 'Cuenta desactivada', 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+  cargarEquipo();
 }
 
-async function cambiarRol(id) {
-  const nuevoRol = await solicitarTexto('Nuevo rol (mostrador, cajero o gerente):');
-  if (!nuevoRol) return;
+async function elegirRol(id, rol) {
+  const u = buscar(id);
+  if (!u || u.rol === rol) return;
+  if (!(await confirmarAccion(`¿Cambiar el rol de ${u.nombre} a ${rolNombres[rol]}? Sus permisos se ajustarán al nuevo rol.`))) return;
   try {
-    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ rol: nuevoRol.trim() }) });
-    cargarEquipo();
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ rol }) });
+    mostrarToast(`Ahora es ${rolNombres[rol]}`, 'exito');
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+  cargarEquipo();
 }
 
 // Al asignarle un mostrador a un empleado, cuando esa persona inicie
 // sesión en cualquier computadora, el sistema ya sabe automáticamente
 // cuál mostrador es — sin tener que configurarlo a mano por dispositivo.
-async function asignarMostrador(id, actual) {
-  const nuevoNombre = await solicitarTexto('Nombre del mostrador para este empleado (ej. Mostrador 1) — déjalo en blanco para quitarle la asignación:', actual);
-  if (nuevoNombre === null) return; // canceló, no dio Enter con texto vacío a propósito
+async function guardarMostrador(id, campo) {
+  const u = buscar(id);
+  const nuevo = campo.value.trim();
+  if (u && (u.nombre_mostrador || '') === nuevo) return;
   try {
-    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ nombre_mostrador: nuevoNombre.trim() }) });
-    mostrarToast(nuevoNombre.trim() ? `Asignado a ${nuevoNombre.trim()}` : 'Asignación de mostrador quitada', 'exito');
-    cargarEquipo();
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ nombre_mostrador: nuevo }) });
+    if (u) u.nombre_mostrador = nuevo;
+    mostrarToast(nuevo ? `Asignado a ${nuevo}` : 'Asignación de mostrador quitada', 'exito');
+    pintarLista();
   } catch (err) {
+    mostrarToast(err.message, 'error');
+    campo.value = (u && u.nombre_mostrador) || '';
+  }
+}
+
+async function alternarPermiso(id, clave, activado, input) {
+  const u = buscar(id);
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ permisos: { [clave]: activado } }) });
+    if (u) {
+      const set = new Set(u.permisos_efectivos || []);
+      if (activado) set.add(clave); else set.delete(clave);
+      u.permisos_efectivos = [...set];
+      const grupo = Object.keys(GRUPOS_PERMISOS).find((g) => GRUPOS_PERMISOS[g].includes(clave));
+      const cnt = document.getElementById('cnt-' + grupo);
+      if (cnt) cnt.textContent = `${GRUPOS_PERMISOS[grupo].filter((c) => set.has(c)).length} de ${GRUPOS_PERMISOS[grupo].length}`;
+    }
+    mostrarToast(`${ETIQUETAS_PERMISOS[clave]}: ${activado ? 'activado' : 'desactivado'}`, 'exito');
+  } catch (err) {
+    input.checked = !activado;
     mostrarToast(err.message, 'error');
   }
 }
@@ -207,6 +344,7 @@ async function asignarMostrador(id, actual) {
 async function restablecerPassword(id) {
   const nueva = await solicitarTexto('Nueva contraseña para este empleado (mínimo 6 caracteres):');
   if (!nueva) return;
+  if (nueva.length < 6) { mostrarToast('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
   try {
     await apiFetch(`/usuarios/${id}/restablecer-password`, { method: 'PUT', body: JSON.stringify({ password_nueva: nueva }) });
     mostrarToast('Contraseña restablecida', 'exito');
@@ -215,6 +353,7 @@ async function restablecerPassword(id) {
   }
 }
 
+pintarPanel();
 cargarEquipo();
 </script>
 <script src="../js/sidebar-nav.js"></script>

@@ -9,15 +9,45 @@
 <title>Bitácora - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
-  .filtros { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-  .filtros select { flex: 1; min-width: 140px; }
-  .tabla-bitacora { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
-  .tabla-bitacora th, .tabla-bitacora td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 13px; vertical-align: top; }
-  .tag-accion { font-size: 11px; padding: 2px 8px; border-radius: 8px; color: white; background: #6B6E73; white-space: nowrap; }
-  .valor-json { font-family: monospace; font-size: 11px; color: #666; max-width: 260px; word-break: break-word; }
+  .barra select { width: auto; flex: 0 0 auto; min-width: 170px; }
+  .barra .buscar { flex: 1 1 260px; }
+  .bit { border-bottom: 1px solid var(--border, #E4E6E9); }
+  .bit:last-child { border-bottom: none; }
+  .bit-fila { display: flex; align-items: center; gap: 12px; padding: 11px 16px; cursor: default; }
+  .bit.con-detalle .bit-fila { cursor: pointer; }
+  .bit.con-detalle .bit-fila:hover { background: rgba(128,128,128,.07); }
+  .bit .cuadro { font-size: 20px; color: inherit; background: rgba(128,128,128,.14); }
+  .tono-verde { background: rgba(95,174,70,.2) !important; }
+  .tono-rojo { background: rgba(198,40,40,.15) !important; }
+  .tono-azul { background: rgba(21,101,192,.15) !important; }
+  .tono-morado { background: rgba(142,36,170,.15) !important; }
+  .tono-amarillo { background: rgba(249,168,37,.22) !important; }
+  .bit .texto { flex: 1; min-width: 0; font-size: 14.5px; line-height: 1.35; overflow-wrap: anywhere; }
+  .bit .texto small { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; color: var(--muted, #7A7D83); font-size: 12px; }
+  .bit .flecha { color: var(--muted, #7A7D83); font-size: 11px; flex: none; transition: transform .15s; }
+  .bit.abierto .flecha { transform: rotate(180deg); }
+  .bit-detalle { display: none; padding: 0 16px 14px 68px; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .bit.abierto .bit-detalle { display: grid; }
+  .bit-detalle.una { grid-template-columns: 1fr; }
+  .caja-dato { border-radius: 10px; padding: 9px 12px; font-size: 13px; background: rgba(128,128,128,.1); min-width: 0; }
+  .caja-dato h6 { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; margin: 0 0 4px; color: var(--muted, #7A7D83); }
+  .caja-dato.antes { background: rgba(198,40,40,.10); }
+  .caja-dato.antes h6 { color: #B71C1C; }
+  .caja-dato.despues { background: rgba(95,174,70,.14); }
+  .caja-dato.despues h6 { color: #2E7D32; }
+  [data-tema="oscuro"] .caja-dato.antes h6 { color: #F28B8B; }
+  [data-tema="oscuro"] .caja-dato.despues h6 { color: #8BD97A; }
+  .caja-dato div { overflow-wrap: anywhere; padding: 1px 0; }
+  .pie-lista { text-align: center; padding: 12px; font-size: 12px; color: var(--muted, #7A7D83); border-top: 1px solid var(--border, #E4E6E9); }
+  @media (max-width: 600px) {
+    .bit-fila { padding: 10px 12px; gap: 10px; }
+    .bit-detalle { padding: 0 12px 12px; grid-template-columns: 1fr; }
+    .bit .cuadro { width: 36px; height: 36px; font-size: 18px; }
+    .barra select { flex: 1 1 140px; min-width: 0; width: auto; }
+  }
 </style>
 </head>
 <body>
@@ -30,28 +60,22 @@
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
-  <div class="contenido">
-    <div class="filtros">
-      <select id="filtroModulo">
-        <option value="">Todos los módulos</option>
-        <option value="tickets">Tickets</option>
-        <option value="turnos">Turnos</option>
-        <option value="usuarios">Usuarios</option>
-        <option value="configuracion">Configuración</option>
-        <option value="devoluciones">Devoluciones</option>
-        <option value="productos">Productos</option>
-        <option value="clientes">Clientes</option>
-        <option value="compras">Compras</option>
-        <option value="inventario">Inventario</option>
-        <option value="kits">Kits</option>
-      </select>
-      <button class="btn btn-primary" onclick="cargarBitacora()">Filtrar</button>
+  <div class="contenido angosto">
+    <div class="caja recorta">
+      <div class="barra">
+        <div class="buscar"><input type="text" id="buscador" placeholder="Buscar en la bitácora… (producto, folio, persona)" autocomplete="off" oninput="pintar()"></div>
+        <select id="filtroPersona" onchange="pintar()" aria-label="Persona"><option value="">👤 Todas las personas</option></select>
+        <select id="filtroRango" onchange="cargarBitacora()" aria-label="Fechas">
+          <option value="hoy">📅 Hoy</option>
+          <option value="7" selected>📅 Últimos 7 días</option>
+          <option value="30">📅 Últimos 30 días</option>
+          <option value="todo">📅 Todo lo reciente</option>
+        </select>
+      </div>
+      <div class="barra"><div class="chips desliza" id="chipsModulo"></div></div>
+      <div id="lista"><div class="vacio">Cargando…</div></div>
+      <div class="pie-lista" id="pieLista" style="display:none;"></div>
     </div>
-
-    <table class="tabla-bitacora">
-      <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Detalle</th></tr></thead>
-      <tbody id="tablaBitacora"></tbody>
-    </table>
   </div>
 
 <script src="../js/config.js"></script>
@@ -61,42 +85,230 @@
 <script>
 requiereLogin();
 
-const nombresAccion = {
-  abrir_turno: 'Abrió turno', cerrar_turno: 'Cerró turno',
-  crear_empleado: 'Creó empleado', editar_empleado: 'Editó empleado', restablecer_password: 'Restableció contraseña',
-  actualizar_configuracion: 'Actualizó configuración',
-  procesar_devolucion: 'Procesó devolución',
-  cobrar_ticket: 'Cobró ticket',
-  crear_producto: 'Creó producto', crear_cliente: 'Creó cliente', registrar_compra: 'Registró compra',
-  ajustar_inventario: 'Ajustó inventario', registrar_merma: 'Registró merma', crear_kit: 'Creó kit',
-  entrada_manual_inventario: 'Agregó inventario manual',
-  abrir_cajon_manual: 'Abrió el cajón de dinero (manual)',
-  aplicar_descuento: 'Aplicó descuento', cancelar_ticket: 'Canceló ticket',
-  login: 'Inició sesión', logout: 'Cerró sesión'
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const LIMITE_BACKEND = 200;
+
+// Nombre y color con que se muestra cada módulo
+const MODULOS = {
+  tickets: ['Ventas', '#2E7D32'], devoluciones: ['Devoluciones', '#EF6C00'], turnos: ['Caja', '#00838F'],
+  productos: ['Productos', '#1565C0'], kits: ['Kits', '#8E24AA'], inventario: ['Inventario', '#455A64'], compras: ['Compras', '#0277BD'],
+  clientes: ['Clientes', '#AD1457'], facturacion: ['Facturación', '#5D4037'], usuarios: ['Equipo', '#6D4C41'],
+  sucursales: ['Sucursales', '#6D4C41'], configuracion: ['Configuración', '#607D8B'], sistema: ['Sistema', '#C62828']
 };
+// Chips de filtro: agrupan módulos parecidos
+const GRUPOS = [
+  ['todos', 'Todos', null],
+  ['productos', 'Productos', ['productos', 'kits']],
+  ['ventas', 'Ventas', ['tickets', 'devoluciones']],
+  ['caja', 'Caja', ['turnos']],
+  ['inventario', 'Inventario', ['inventario', 'compras']],
+  ['clientes', 'Clientes', ['clientes', 'facturacion']],
+  ['equipo', 'Equipo', ['usuarios', 'sucursales']],
+  ['configuracion', 'Configuración', ['configuracion', 'sistema']]
+];
+
+const ETIQUETA_CLAVE = {
+  nombre: 'Nombre', usuario: 'Usuario', rol: 'Rol', activo: 'Activa', precio: 'Precio', precio_kit: 'Precio del kit', precio_costo: 'Costo', precio_mayoreo: 'Precio mayoreo',
+  precio_promocional: 'Precio de promoción', cantidad_minima: 'Cantidad mínima', total: 'Total', monto_total: 'Monto', fondo_inicial: 'Fondo inicial', saldo_teorico: 'Saldo esperado',
+  saldo_contado: 'Saldo contado', diferencia_total: 'Diferencia', diferencias: 'Diferencias', motivo: 'Motivo', folio: 'Folio', ticket_folio: 'Ticket', metodo_reembolso: 'Reembolso',
+  metodo_pago: 'Método de pago', num_items: 'Productos', num_productos: 'Productos', cantidad: 'Cantidad', descuento_monto: 'Descuento', autorizado_por: 'Autorizado por',
+  porcentaje: 'Porcentaje', telefono: 'Teléfono', direccion: 'Dirección', limite_credito: 'Límite de crédito', estado: 'Estado', producto: 'Producto', proveedor_id: 'Proveedor (id)',
+  creados: 'Creados', actualizados: 'Actualizados', omitidos: 'Omitidos', lotes_fallidos: 'Lotes con error', tipo_venta: 'Tipo de venta', venta_sin_internet: 'Vendido sin internet', fecha_venta: 'Fecha de venta'
+};
+const CLAVES_DINERO = ['precio', 'precio_kit', 'precio_costo', 'precio_mayoreo', 'precio_promocional', 'total', 'monto_total', 'fondo_inicial', 'saldo_teorico', 'saldo_contado', 'diferencia_total', 'descuento_monto', 'limite_credito'];
+const CLAVES_SECRETAS = /pass|clave|token|secret|contrase/i;
+const ROLES = { dueno: 'Dueño', jefe_general: 'Jefe general', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador' };
+const PAGOS = { efectivo: 'efectivo', tarjeta: 'tarjeta', transferencia: 'transferencia', credito: 'crédito', mixto: 'pago mixto', dolares: 'dólares', cheque: 'cheque', vale_despensa: 'vale de despensa', ajuste_credito: 'ajuste a crédito', sin_reembolso: 'sin reembolso' };
+
+let registros = [];
+let grupoActivo = 'todos';
+const abiertos = new Set();
+
+// ---------- Cómo se cuenta cada acción en lenguaje normal ----------
+const b = (t) => `<b>${escapar(t)}</b>`;
+function describir(r) {
+  const n = r.valor_nuevo || {}, a = r.valor_anterior || {};
+  const quien = b(r.usuario_nombre || 'Alguien');
+  const D = (icono, tono, texto) => ({ icono, tono, texto: `${quien} ${texto}` });
+  switch (r.accion) {
+    case 'login': return D('🔑', 'gris', 'inició sesión');
+    case 'logout': return D('🚪', 'gris', 'cerró sesión');
+    case 'abrir_turno': return D('🔓', 'verde', `abrió turno · fondo ${b(dinero(n.fondo_inicial))}`);
+    case 'cerrar_turno': {
+      const dif = Number(n.diferencia_total);
+      const txt = !isFinite(dif) ? '' : (Math.abs(dif) < 0.005 ? ' · caja cuadrada' : (dif > 0 ? ` · sobrante ${b(dinero(dif))}` : ` · faltante ${b(dinero(Math.abs(dif)))}`));
+      return D('🔒', 'gris', 'cerró el turno' + txt);
+    }
+    case 'abrir_cajon_manual': return D('🗄️', 'amarillo', `abrió el cajón de dinero (manual)${n.motivo ? ' · ' + escapar(n.motivo) : ''}`);
+    case 'cobrar_ticket': return D('🛒', 'verde', `cobró el ticket ${b(n.folio || '')} · ${b(dinero(n.total))}${n.metodo_pago ? ' en ' + escapar(PAGOS[n.metodo_pago] || n.metodo_pago) : ''}${n.venta_sin_internet ? ' (venta sin internet)' : ''}`);
+    case 'cancelar_ticket': return D('🚫', 'rojo', `canceló el ticket ${b(n.folio || '')}${n.motivo ? ' · ' + escapar(n.motivo) : ''}`);
+    case 'aplicar_descuento': return D('➖', 'amarillo', `aplicó un descuento de ${b(dinero(n.descuento_monto))}${n.producto ? ' a ' + escapar(n.producto) : ''}${n.autorizado_por ? ' · autorizó ' + escapar(n.autorizado_por) : ''}`);
+    case 'procesar_devolucion': return D('↩️', 'azul', `registró una devolución${n.ticket_folio ? ' del ticket ' + b(n.ticket_folio) : ''} · ${b(dinero(n.monto_total))}${n.metodo_reembolso ? ' (' + escapar(PAGOS[n.metodo_reembolso] || n.metodo_reembolso) + ')' : ''}`);
+    case 'crear_producto': return D('🆕', 'azul', `creó el producto ${b(n.nombre || '')}${n.precio != null ? ' · ' + dinero(n.precio) : ''}`);
+    case 'importar_productos': return D('📥', 'azul', `importó productos · ${n.creados || 0} nuevos, ${n.actualizados || 0} actualizados`);
+    case 'crear_departamento': return D('🏷️', 'azul', `creó el departamento ${b(n.nombre || '')}`);
+    case 'eliminar_departamento': return D('🗑️', 'rojo', 'eliminó un departamento');
+    case 'crear_promocion': return D('🏷️', 'amarillo', `creó una promoción${n.cantidad_minima ? ' · desde ' + escapar(n.cantidad_minima) + ' piezas a ' + b(dinero(n.precio_promocional)) : ''}`);
+    case 'crear_kit': return D('📦', 'morado', `creó el kit ${b(n.nombre || '')}${n.precio_kit != null ? ' · ' + dinero(n.precio_kit) : ''}`);
+    case 'editar_kit': return D('📦', 'morado', `editó el kit ${b(n.nombre || a.nombre || '')}`);
+    case 'ajustar_inventario': return D('📊', 'amarillo', 'ajustó el inventario' + (n.motivo ? ' · ' + escapar(n.motivo) : ''));
+    case 'registrar_merma': return D('🗑️', 'rojo', 'registró una merma' + (n.motivo ? ' · ' + escapar(n.motivo) : ''));
+    case 'entrada_manual_inventario': return D('📥', 'verde', 'agregó inventario manualmente' + (n.cantidad != null ? ' · ' + escapar(n.cantidad) + ' piezas' : ''));
+    case 'registrar_compra': return D('🚚', 'azul', `registró una compra · ${b(dinero(n.total))}${n.num_items ? ' · ' + n.num_items + (n.num_items === 1 ? ' producto' : ' productos') : ''}`);
+    case 'crear_cliente': return D('👤', 'verde', `dio de alta al cliente ${b(n.nombre || '')}`);
+    case 'actualizar_solicitud_factura': return D('🧾', 'azul', `actualizó la solicitud de factura ${b(n.folio || '')}${n.estado ? ' → ' + escapar(n.estado) : ''}`);
+    case 'crear_empleado': return D('👤', 'verde', `dio de alta a ${b(n.nombre || '')}${n.rol ? ' (' + escapar(ROLES[n.rol] || n.rol) + ')' : ''}`);
+    case 'editar_empleado': return D('✏️', 'azul', `editó a ${b(n.nombre || a.nombre || '')}`);
+    case 'restablecer_password': return D('🔑', 'amarillo', 'restableció la contraseña de un empleado');
+    case 'crear_sucursal': return D('🏬', 'verde', `creó la sucursal ${b(n.nombre || '')}`);
+    case 'editar_sucursal': return D('🏬', 'azul', `editó la sucursal ${b(n.nombre || '')}`);
+    case 'actualizar_configuracion': return D('⚙️', 'gris', 'actualizó la configuración');
+    case 'reinicio_fabrica': return D('⚠️', 'rojo', 'reinició el sistema a valores de fábrica');
+    default: return D('•', 'gris', escapar(String(r.accion || 'realizó una acción').replace(/_/g, ' ')));
+  }
+}
+
+function valorBonito(clave, v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (CLAVES_SECRETAS.test(clave)) return '••••';
+  if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+  if (clave === 'rol') return ROLES[v] || v;
+  if (clave === 'metodo_pago' || clave === 'metodo_reembolso') return PAGOS[v] || v;
+  if (CLAVES_DINERO.includes(clave) && isFinite(Number(v))) return dinero(v);
+  if (clave === 'fecha_venta') { const d = new Date(v); return isNaN(d) ? v : d.toLocaleString('es-MX'); }
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
+function lineasDe(obj) {
+  if (!obj || typeof obj !== 'object') return [];
+  return Object.entries(obj).map(([k, v]) => {
+    const val = valorBonito(k, v);
+    if (val === null) return null;
+    const etiqueta = ETIQUETA_CLAVE[k] || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
+    return `<div>${escapar(etiqueta)}: <b>${escapar(val)}</b></div>`;
+  }).filter(Boolean);
+}
+
+// ---------- Fechas ----------
+function nombreDia(d) {
+  const hoy = new Date(), ayer = new Date(Date.now() - 86400000);
+  const largo = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+  const txt = largo.charAt(0).toUpperCase() + largo.slice(1);
+  if (d.toDateString() === hoy.toDateString()) return 'Hoy · ' + txt;
+  if (d.toDateString() === ayer.toDateString()) return 'Ayer · ' + txt;
+  return txt;
+}
+const horaTxt = (d) => d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' h';
+
+// ---------- Carga ----------
+function desdeRango() {
+  const r = document.getElementById('filtroRango').value;
+  if (r === 'todo') return null;
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (r === '7') d.setDate(d.getDate() - 6);
+  if (r === '30') d.setDate(d.getDate() - 29);
+  return d.toISOString();
+}
 
 async function cargarBitacora() {
   try {
-    const modulo = document.getElementById('filtroModulo').value;
-    const url = modulo ? `/bitacora?modulo=${modulo}` : '/bitacora';
-    const registros = await apiFetch(url);
-
-    document.getElementById('tablaBitacora').innerHTML = registros.map(r => {
-      const valorNuevo = r.valor_nuevo ? JSON.stringify(r.valor_nuevo) : '';
-      const valorAnterior = r.valor_anterior ? `Antes: ${JSON.stringify(r.valor_anterior)}` : '';
-      return `
-        <tr>
-          <td>${new Date(r.fecha).toLocaleString()}</td>
-          <td>${r.usuario_nombre}</td>
-          <td><span class="tag-accion">${nombresAccion[r.accion] || r.accion}</span></td>
-          <td>${r.modulo}</td>
-          <td class="valor-json">${valorAnterior} ${valorNuevo}</td>
-        </tr>
-      `;
-    }).join('') || '<tr><td colspan="5">Sin registros</td></tr>';
+    const desde = desdeRango();
+    registros = await apiFetch('/bitacora' + (desde ? '?desde=' + encodeURIComponent(desde) : ''));
+    registros.forEach((r, i) => {
+      r._i = r.id != null ? 'r' + r.id : 'i' + i;
+      r._fecha = new Date(r.fecha);
+      r._desc = describir(r);
+      r._detalleAntes = lineasDe(r.valor_anterior);
+      r._detalleDespues = lineasDe(r.valor_nuevo);
+      // Solo se busca en lo que se ve en pantalla (los datos secretos salen ocultos y no se pueden buscar)
+      const plano = [r._desc.texto, MODULOS[r.modulo] ? MODULOS[r.modulo][0] : r.modulo, ...r._detalleAntes, ...r._detalleDespues].join(' ').replace(/<[^>]+>/g, ' ');
+      r._texto = sinAcentos(plano);
+    });
+    pintarPersonas();
+    pintar();
   } catch (err) {
     mostrarToast(err.message, 'error');
+    document.getElementById('lista').innerHTML = '<div class="vacio">No se pudo cargar la bitácora.</div>';
   }
+}
+
+function pintarPersonas() {
+  const sel = document.getElementById('filtroPersona');
+  const actual = sel.value;
+  const vistos = {};
+  registros.forEach((r) => { if (r.usuario_id != null) vistos[r.usuario_id] = r.usuario_nombre; });
+  sel.innerHTML = '<option value="">👤 Todas las personas</option>'
+    + Object.entries(vistos).map(([id, n]) => `<option value="${escapar(id)}">${escapar(n)}</option>`).join('');
+  if (vistos[actual]) sel.value = actual;
+}
+
+const enGrupo = (r, grupo) => {
+  if (grupo === 'todos') return true;
+  const g = GRUPOS.find((x) => x[0] === grupo);
+  return !!g && g[2].includes(r.modulo);
+};
+
+function pintarChips(baseSinGrupo) {
+  document.getElementById('chipsModulo').innerHTML = GRUPOS.map(([k, t]) => {
+    const n = baseSinGrupo.filter((r) => enGrupo(r, k)).length;
+    return `<button class="chip ${grupoActivo === k ? 'activo' : ''}" onclick="elegirGrupo('${k}')">${t}<i>${n}</i></button>`;
+  }).join('');
+}
+function elegirGrupo(k) { grupoActivo = k; pintar(); }
+
+function pintar() {
+  const q = sinAcentos(document.getElementById('buscador').value.trim());
+  const persona = document.getElementById('filtroPersona').value;
+  const base = registros.filter((r) => (!persona || String(r.usuario_id) === persona) && (!q || r._texto.includes(q)));
+  pintarChips(base);
+  const visibles = base.filter((r) => enGrupo(r, grupoActivo));
+
+  const lista = document.getElementById('lista');
+  const pie = document.getElementById('pieLista');
+  if (!visibles.length) {
+    lista.innerHTML = `<div class="vacio">${registros.length ? 'No hay movimientos con ese filtro.' : 'Todavía no hay movimientos en este rango de fechas.'}</div>`;
+    pie.style.display = 'none';
+    return;
+  }
+  let html = '', diaActual = '';
+  visibles.forEach((r) => {
+    const dia = r._fecha.toDateString();
+    if (dia !== diaActual) { diaActual = dia; html += `<div class="dia-titulo">${escapar(nombreDia(r._fecha))}</div>`; }
+    html += filaHTML(r);
+  });
+  lista.innerHTML = html;
+  pie.style.display = '';
+  pie.textContent = `Mostrando ${visibles.length} ${visibles.length === 1 ? 'movimiento' : 'movimientos'}`
+    + (registros.length >= LIMITE_BACKEND ? ` · el sistema muestra como máximo los últimos ${LIMITE_BACKEND}; usa el filtro de fechas para ver otros` : '');
+}
+
+function filaHTML(r) {
+  const [nombreMod, colorMod] = MODULOS[r.modulo] || [r.modulo, '#78909C'];
+  const tieneDetalle = r._detalleAntes.length || r._detalleDespues.length;
+  const abierto = tieneDetalle && abiertos.has(r._i);
+  let detalle = '';
+  if (tieneDetalle) {
+    const dos = r._detalleAntes.length && r._detalleDespues.length;
+    detalle = `<div class="bit-detalle ${dos ? '' : 'una'}">
+      ${r._detalleAntes.length ? `<div class="caja-dato antes"><h6>Antes</h6>${r._detalleAntes.join('')}</div>` : ''}
+      ${r._detalleDespues.length ? `<div class="caja-dato ${dos ? 'despues' : ''}"><h6>${dos ? 'Después' : 'Detalle'}</h6>${r._detalleDespues.join('')}</div>` : ''}
+    </div>`;
+  }
+  return `<div class="bit ${tieneDetalle ? 'con-detalle' : ''} ${abierto ? 'abierto' : ''}" id="bit-${r._i}">
+    <div class="bit-fila" ${tieneDetalle ? `onclick="alternarDetalle('${r._i}')"` : ''}>
+      <div class="cuadro tono-${r._desc.tono}">${r._desc.icono}</div>
+      <div class="texto">${r._desc.texto}<small>${isNaN(r._fecha) ? '' : horaTxt(r._fecha)} · <span class="etiqueta" style="background:${colorMod}">${escapar(nombreMod)}</span></small></div>
+      ${tieneDetalle ? '<span class="flecha">▼</span>' : ''}
+    </div>${detalle}
+  </div>`;
+}
+function alternarDetalle(id) {
+  const el = document.getElementById('bit-' + id);
+  if (!el) return;
+  if (el.classList.toggle('abierto')) abiertos.add(id); else abiertos.delete(id);
 }
 
 cargarBitacora();

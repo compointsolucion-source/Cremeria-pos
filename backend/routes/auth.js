@@ -104,7 +104,7 @@ router.put('/cambiar-password', verificarToken, async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const passwordValida = await bcrypt.compare(password_actual, result.rows[0].password_hash);
-    if (!passwordValida) return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+    if (!passwordValida) return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
 
     const nuevoHash = await bcrypt.hash(password_nueva, 10);
     await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [nuevoHash, req.usuario.id]);

@@ -9,24 +9,53 @@
 <title>Sucursales - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 900px; margin: 20px auto; padding: 0 14px; }
-  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
-  .resumen-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-  .resumen-tile .valor { font-size: 22px; font-weight: 800; }
-  .resumen-tile .etiqueta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .form-sucursal { display: grid; gap: 10px; margin-bottom: 20px; }
-  .tope-aviso { font-size: 12.5px; color: var(--muted); margin-top: -4px; }
-  .sucursal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
-  .sucursal-card.inactiva { opacity: 0.55; }
-  .sucursal-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .sucursal-card-header h3 { font-size: 16px; }
-  .sucursal-datos { font-size: 13px; color: var(--muted); margin-top: 4px; }
-  .sucursal-acciones { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .sucursal-acciones .btn { font-size: 12.5px; padding: 7px 12px; min-height: 34px; }
-  .etiqueta-inactiva { display: inline-block; font-size: 11px; font-weight: 700; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; padding: 1px 7px; margin-left: 8px; }
-  .form-editar-sucursal { display: grid; gap: 8px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .columnas { --ancho-panel: 420px; }
+  .kpis { margin-bottom: 12px; grid-template-columns: repeat(5, 1fr); }
+  .kpi { padding: 12px; }
+  .kpi .v { font-size: 22px; }
+  .kpi .ic.verde { background: rgba(95,174,70,.18); }
+  .kpi .ic.azul { background: rgba(21,101,192,.14); }
+  .kpi .ic.rojo { background: rgba(198,40,40,.14); }
+  .kpi .ic.amarillo { background: rgba(249,168,37,.2); }
+  .kpi .v.rojo-t { color: #C62828; }
+  [data-tema="oscuro"] .kpi .v.rojo-t { color: #F28B8B; }
+
+  .cupo { padding: 14px 16px; margin-bottom: 12px; display: grid; gap: 8px; }
+  .cupo .prog { height: 10px; }
+
+  .suc { padding: 14px; margin-bottom: 12px; display: grid; gap: 12px; }
+  .suc.sel { box-shadow: var(--shadow), inset 4px 0 0 var(--primary, #5FAE46); }
+  .suc.apagada .cabeza { opacity: .6; }
+  .suc .cabeza { display: flex; align-items: center; gap: 12px; }
+  .suc .cuadro { width: 52px; height: 52px; font-size: 26px; background: rgba(128,128,128,.16); }
+  .suc .datos { flex: 1; min-width: 0; }
+  .suc .datos h3 { font-size: 17px; overflow-wrap: anywhere; }
+  .suc .datos small { display: block; color: var(--muted, #7A7D83); font-size: 12.5px; overflow-wrap: anywhere; }
+  .suc .etiquetas { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: none; }
+  .suc .botones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .suc .botones .principal { flex: 1 1 180px; font-weight: 800; }
+  .btn.es-actual { background: rgba(95,174,70,.14); border-color: transparent; color: #2E7D32; cursor: default; }
+  [data-tema="oscuro"] .btn.es-actual { color: #8BD97A; }
+  .btn-nueva-pc { display: inline-block; }
+
+  @media (max-width: 1000px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpis > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .btn-nueva-pc { display: none; }
+  }
+  @media (max-width: 600px) {
+    .kpi { padding: 11px; gap: 10px; }
+    .kpi .ic { display: none; }
+    .kpi .v { font-size: 20px; }
+    .suc .cabeza { flex-wrap: wrap; }
+    .suc .etiquetas { justify-content: flex-start; width: 100%; }
+    .suc .cuadro { width: 44px; height: 44px; font-size: 22px; }
+    .suc .botones .principal { flex: 1 1 100%; }
+    .suc .botones .btn:not(.principal) { flex: 1; }
+  }
 </style>
 </head>
 <body>
@@ -35,31 +64,40 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>🏬 Sucursales</h1></div>
+    <button class="btn btn-primary btn-nueva-pc" onclick="nuevaSucursal()">＋ Nueva sucursal</button>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <p class="titulo-seccion-panel">Resumen de todas las sucursales — hoy</p>
-    <div class="resumen-grid" id="resumenGeneral">
-      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Ventas de hoy</div></div>
-      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Tickets de hoy</div></div>
-      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Fiado pendiente</div></div>
-      <div class="resumen-tile"><div class="valor">—</div><div class="etiqueta">Productos en stock bajo</div></div>
-    </div>
+    <div class="kpis" id="resumenGeneral"></div>
+    <div class="caja cupo" id="cupo"></div>
 
-    <div class="card form-sucursal">
-      <h3>Nueva sucursal</h3>
-      <input type="text" id="nuevaSucursalNombre" placeholder="Nombre (ej. Sucursal Centro)">
-      <input type="text" id="nuevaSucursalDireccion" placeholder="Dirección (opcional)">
-      <input type="text" id="nuevaSucursalTelefono" placeholder="Teléfono (opcional)">
-      <button class="btn btn-primary" onclick="crearSucursal()">Dar de alta</button>
-      <p class="tope-aviso" id="topeAviso"></p>
-    </div>
+    <div class="columnas">
+      <div id="listaSucursales"><div class="vacio">Cargando…</div></div>
 
-    <p class="titulo-seccion-panel">Todas las sucursales</p>
-    <div id="listaSucursales"></div>
+      <!-- Alta / edición (en celular sale desde abajo) -->
+      <div class="caja panel-form" id="panelForm">
+        <div class="panel-cab">
+          <h3 id="panelTitulo">＋ Nueva sucursal</h3>
+          <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+        </div>
+        <div class="panel-cuerpo">
+          <div class="campo"><label for="sucNombre">Nombre</label><input type="text" id="sucNombre" placeholder="Ej. Sucursal Centro" autocomplete="off" maxlength="80"></div>
+          <div class="campo"><label for="sucDireccion">Dirección (opcional)</label><input type="text" id="sucDireccion" placeholder="Calle y colonia" autocomplete="off" maxlength="160"></div>
+          <div class="campo"><label for="sucTelefono">Teléfono (opcional)</label><input type="tel" id="sucTelefono" placeholder="33 0000 0000" autocomplete="off" maxlength="30" onkeydown="if (event.key === 'Enter') guardarSucursal()"></div>
+          <div class="aviso azul" id="avisoEdicion" style="display:none;">Estás editando una sucursal que ya existe. Los cambios se ven en cuanto guardes.</div>
+        </div>
+        <div class="panel-pie">
+          <button class="btn btn-primary btn-grande" id="btnGuardar" onclick="guardarSucursal()">💾 Crear sucursal</button>
+          <button class="btn btn-secondary" id="btnCancelarEdicion" onclick="nuevaSucursal(true)" style="display:none;">Cancelar edición</button>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <button class="boton-flotante" onclick="nuevaSucursal()">＋ Nueva</button>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -77,100 +115,173 @@ if (!usuarioActual || usuarioActual.rol !== 'jefe_general') {
 
 let sucursalesState = [];
 let topeSucursales = 0;
+let editandoId = null;
+const esAngosto = window.matchMedia('(max-width: 1000px)');
 
-function operarSucursal(id, nombre) {
-  fijarSucursalSeleccionada(id, nombre);
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const buscar = (id) => sucursalesState.find((s) => s.id === id);
+
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+  if (esAngosto.matches && editandoId !== null) limpiarFormulario();
+}
+
+function operarSucursal(id) {
+  const s = buscar(id);
+  fijarSucursalSeleccionada(id, s ? s.nombre : '');
   window.location.href = 'dashboard.html';
 }
 
+// ---------- Resumen ----------
 async function cargarResumenGeneral() {
+  const cont = document.getElementById('resumenGeneral');
   try {
-    const data = await apiFetch('/dashboard/general');
-    const t = data.totales;
-    const tiles = document.querySelectorAll('#resumenGeneral .resumen-tile .valor');
-    tiles[0].textContent = `$${t.ventas_hoy.toFixed(2)}`;
-    tiles[1].textContent = t.tickets_hoy;
-    tiles[2].textContent = `$${t.fiado_total.toFixed(2)}`;
-    tiles[3].textContent = t.stock_bajo_count + t.agotados_count;
+    const t = (await apiFetch('/dashboard/general')).totales;
+    cont.innerHTML = `
+      <div class="caja kpi"><div class="ic verde">💰</div><div><div class="v num">${dinero(t.ventas_hoy)}</div><div class="l">Ventas de hoy · todas</div></div></div>
+      <div class="caja kpi"><div class="ic azul">🧾</div><div><div class="v num">${t.tickets_hoy}</div><div class="l">Tickets de hoy</div></div></div>
+      <div class="caja kpi"><div class="ic rojo">📒</div><div><div class="v num rojo-t">${dinero(t.fiado_total)}</div><div class="l">Fiado pendiente</div></div></div>
+      <div class="caja kpi"><div class="ic amarillo">📉</div><div><div class="v num">${t.stock_bajo_count}</div><div class="l">Productos en stock bajo</div></div></div>
+      <div class="caja kpi"><div class="ic rojo">🚫</div><div><div class="v num">${t.agotados_count}</div><div class="l">Agotados</div></div></div>`;
   } catch (err) {
     console.error('No se pudo cargar el resumen general:', err.message);
+    cont.innerHTML = '';
   }
 }
 
+// ---------- Lista ----------
 async function cargarSucursales() {
   try {
     const data = await apiFetch('/sucursales');
     sucursalesState = data.sucursales;
     topeSucursales = data.tope;
+    pintarCupo();
+    pintarLista();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    document.getElementById('listaSucursales').innerHTML = '<div class="vacio">No se pudieron cargar las sucursales.</div>';
+  }
+}
 
-    document.getElementById('topeAviso').textContent =
-      `${sucursalesState.length} de ${topeSucursales} sucursales usadas en esta instalación`;
+function pintarCupo() {
+  const usadas = sucursalesState.length, tope = Number(topeSucursales) || 0;
+  const quedan = tope - usadas;
+  const pct = tope > 0 ? Math.min(100, usadas / tope * 100) : 0;
+  const hayInactivas = sucursalesState.some((s) => !s.activo);
+  let nota;
+  if (tope <= 0) nota = '';
+  else if (quedan > 0) nota = `Te ${quedan === 1 ? 'queda 1 lugar disponible' : 'quedan ' + quedan + ' lugares disponibles'} en esta instalación.`;
+  else nota = 'Ya usaste todos los lugares de esta instalación. Para agregar más sucursales hay que ampliar el plan.';
+  document.getElementById('cupo').innerHTML = `
+    <div class="entre"><b>Sucursales usadas</b><span><b>${usadas}</b> de <b>${tope}</b> permitidas</span></div>
+    <div class="prog ${quedan <= 0 ? 'amarilla' : ''}"><i style="width:${pct.toFixed(0)}%"></i></div>
+    <div class="ayuda">${nota}${hayInactivas ? ' Las desactivadas también cuentan.' : ''}</div>`;
+}
 
-    document.getElementById('listaSucursales').innerHTML = sucursalesState.map(s => `
-      <div class="sucursal-card ${s.activo ? '' : 'inactiva'}">
-        <div class="sucursal-card-header">
-          <h3>${s.nombre}${s.activo ? '' : '<span class="etiqueta-inactiva">Inactiva</span>'}</h3>
-        </div>
-        <div class="sucursal-datos">${s.direccion || 'Sin dirección registrada'}${s.telefono ? ' · ' + s.telefono : ''}</div>
-        <div class="sucursal-acciones">
-          <button class="btn btn-primary" onclick="operarSucursal(${s.id}, '${s.nombre.replace(/'/g, "\\'")}')">Operar esta sucursal</button>
-          <button class="btn btn-secondary" onclick="mostrarFormEditar(${s.id})">Editar</button>
-          <button class="btn btn-secondary" onclick="alternarActiva(${s.id}, ${!s.activo})">${s.activo ? 'Desactivar' : 'Reactivar'}</button>
-        </div>
-        <div class="form-editar-sucursal" id="formEditar${s.id}" style="display:none;">
-          <input type="text" id="editarNombre${s.id}" value="${s.nombre.replace(/"/g, '&quot;')}" placeholder="Nombre">
-          <input type="text" id="editarDireccion${s.id}" value="${(s.direccion || '').replace(/"/g, '&quot;')}" placeholder="Dirección">
-          <input type="text" id="editarTelefono${s.id}" value="${(s.telefono || '').replace(/"/g, '&quot;')}" placeholder="Teléfono">
-          <button class="btn btn-primary" onclick="guardarEdicion(${s.id})">Guardar cambios</button>
-        </div>
+function pintarLista() {
+  const cont = document.getElementById('listaSucursales');
+  if (!sucursalesState.length) { cont.innerHTML = '<div class="caja vacio">Sin sucursales todavía.</div>'; return; }
+  const actual = String(sucursalSeleccionada());
+  cont.innerHTML = sucursalesState.map((s) => {
+    const esActual = actual !== '' && String(s.id) === actual;
+    const etiquetas = (s.activo ? '<span class="pill verde">● Activa</span>' : '<span class="pill rojo">Desactivada</span>')
+      + (esActual ? '<span class="pill azul">📍 Operando aquí</span>' : '');
+    const operar = esActual
+      ? '<button class="btn es-actual principal" disabled>✔ Es la actual</button>'
+      : `<button class="btn ${s.activo ? 'btn-primary' : 'btn-secondary'} principal" onclick="operarSucursal(${s.id})">▶ Operar esta sucursal</button>`;
+    return `<div class="caja suc ${s.activo ? '' : 'apagada'} ${editandoId === s.id ? 'sel' : ''}">
+      <div class="cabeza">
+        <div class="cuadro">🏬</div>
+        <div class="datos"><h3>${escapar(s.nombre)}</h3>
+          <small>${escapar(s.direccion || 'Sin dirección registrada')}</small>
+          ${s.telefono ? `<small>📞 ${escapar(s.telefono)}</small>` : ''}</div>
+        <div class="etiquetas">${etiquetas}</div>
       </div>
-    `).join('') || '<p style="color:var(--muted); font-size:13px;">Sin sucursales todavía</p>';
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
+      <div class="botones">
+        ${s.activo ? operar : `<button class="btn btn-secondary principal" onclick="alternarActiva(${s.id}, true)">♻️ Reactivar</button>`}
+        <button class="btn btn-secondary" onclick="editarSucursal(${s.id})">✏️ Editar</button>
+        ${s.activo ? `<button class="btn btn-secondary btn-peligro" onclick="alternarActiva(${s.id}, false)">Desactivar</button>` : operarSecundario(s)}
+      </div>
+    </div>`;
+  }).join('');
+}
+function operarSecundario(s) {
+  return String(s.id) === String(sucursalSeleccionada()) ? '' : `<button class="btn btn-secondary" onclick="operarSucursal(${s.id})">Operar</button>`;
 }
 
-function mostrarFormEditar(id) {
-  const form = document.getElementById(`formEditar${id}`);
-  form.style.display = form.style.display === 'none' ? 'grid' : 'none';
+// ---------- Formulario ----------
+function limpiarFormulario() {
+  editandoId = null;
+  ['sucNombre', 'sucDireccion', 'sucTelefono'].forEach((id) => { document.getElementById(id).value = ''; });
+  document.getElementById('panelTitulo').textContent = '＋ Nueva sucursal';
+  document.getElementById('btnGuardar').textContent = '💾 Crear sucursal';
+  document.getElementById('btnCancelarEdicion').style.display = 'none';
+  document.getElementById('avisoEdicion').style.display = 'none';
+  pintarLista();
 }
 
-async function crearSucursal() {
-  const nombre = document.getElementById('nuevaSucursalNombre').value.trim();
-  if (!nombre) { mostrarToast('El nombre de la sucursal es obligatorio', 'error'); return; }
+function nuevaSucursal(soloLimpiar) {
+  limpiarFormulario();
+  if (soloLimpiar) { if (esAngosto.matches) cerrarHoja(); return; }
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('sucNombre').focus(), 80);
+}
+
+function editarSucursal(id) {
+  const s = buscar(id);
+  if (!s) return;
+  editandoId = id;
+  document.getElementById('sucNombre').value = s.nombre || '';
+  document.getElementById('sucDireccion').value = s.direccion || '';
+  document.getElementById('sucTelefono').value = s.telefono || '';
+  document.getElementById('panelTitulo').textContent = '✏️ Editar sucursal';
+  document.getElementById('btnGuardar').textContent = '💾 Guardar cambios';
+  document.getElementById('btnCancelarEdicion').style.display = '';
+  document.getElementById('avisoEdicion').style.display = '';
+  pintarLista();
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('sucNombre').focus(), 80);
+}
+
+async function guardarSucursal() {
+  const nombre = document.getElementById('sucNombre').value.trim();
+  if (!nombre) { mostrarToast('El nombre de la sucursal es obligatorio', 'error'); document.getElementById('sucNombre').focus(); return; }
+  const cuerpo = {
+    nombre,
+    direccion: document.getElementById('sucDireccion').value.trim(),
+    telefono: document.getElementById('sucTelefono').value.trim()
+  };
+  const btn = document.getElementById('btnGuardar');
+  btn.disabled = true;
   try {
-    await apiFetch('/sucursales', {
-      method: 'POST',
-      body: JSON.stringify({
-        nombre,
-        direccion: document.getElementById('nuevaSucursalDireccion').value.trim(),
-        telefono: document.getElementById('nuevaSucursalTelefono').value.trim()
-      })
-    });
-    document.getElementById('nuevaSucursalNombre').value = '';
-    document.getElementById('nuevaSucursalDireccion').value = '';
-    document.getElementById('nuevaSucursalTelefono').value = '';
-    mostrarToast('Sucursal creada', 'exito');
+    if (editandoId === null) {
+      await apiFetch('/sucursales', { method: 'POST', body: JSON.stringify(cuerpo) });
+      mostrarToast('Sucursal creada', 'exito');
+    } else {
+      await apiFetch(`/sucursales/${editandoId}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+      // si se editó la que se está operando, se actualiza el nombre guardado en este equipo
+      if (String(editandoId) === String(sucursalSeleccionada())) fijarSucursalSeleccionada(editandoId, nombre);
+      mostrarToast('Sucursal actualizada', 'exito');
+    }
+    const eraAngosto = esAngosto.matches;
+    editandoId = null;
+    limpiarFormulario();
+    if (eraAngosto) cerrarHoja();
     cargarSucursales();
+    cargarResumenGeneral();
   } catch (err) {
     mostrarToast(err.message, 'error');
-  }
-}
-
-async function guardarEdicion(id) {
-  try {
-    await apiFetch(`/sucursales/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        nombre: document.getElementById(`editarNombre${id}`).value.trim(),
-        direccion: document.getElementById(`editarDireccion${id}`).value.trim(),
-        telefono: document.getElementById(`editarTelefono${id}`).value.trim()
-      })
-    });
-    mostrarToast('Sucursal actualizada', 'exito');
-    cargarSucursales();
-  } catch (err) {
-    mostrarToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -179,6 +290,7 @@ async function alternarActiva(id, nuevoValor) {
   if (!confirmado) return;
   try {
     await apiFetch(`/sucursales/${id}`, { method: 'PUT', body: JSON.stringify({ activo: nuevoValor }) });
+    mostrarToast(nuevoValor ? 'Sucursal reactivada' : 'Sucursal desactivada', 'exito');
     cargarSucursales();
   } catch (err) {
     mostrarToast(err.message, 'error');

@@ -9,10 +9,26 @@
 <title>Backups - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 600px; margin: 20px auto; padding: 0 14px; }
-  .nota-limitacion { background: #FFF3E0; color: #7A5B00; padding: 14px; border-radius: 12px; font-size: 14px; margin-bottom: 20px; }
+  .contenido.estrecho { max-width: 640px; }
+  .tarjeta { padding: 18px; display: grid; gap: 14px; margin-top: 12px; }
+  .encabezado { display: flex; align-items: center; gap: 14px; }
+  .encabezado .cuadro { width: 56px; height: 56px; font-size: 28px; border-radius: 14px; background: rgba(95,174,70,.18); color: inherit; }
+  .encabezado h2 { font-size: 19px; line-height: 1.2; }
+  .encabezado small { color: var(--muted, #7A7D83); font-size: 12.5px; }
+  .incluye h5 { margin-bottom: 8px; }
+  .incluye ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 14px; }
+  .incluye li::before { content: "✓"; color: #2E7D32; font-weight: 800; margin-right: 8px; }
+  [data-tema="oscuro"] .incluye li::before { color: #8BD97A; }
+  .incluye li.no { grid-column: 1 / -1; margin-top: 4px; }
+  .incluye li.no::before { content: "✕"; color: #C62828; }
+  @media (max-width: 600px) {
+    .contenido.estrecho { padding-top: 4px; }
+    .incluye ul { grid-template-columns: 1fr; }
+    .tarjeta { padding: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -25,15 +41,34 @@
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
-  <div class="contenido">
-    <div class="nota-limitacion">
-      ⚠️ <b>Importante sobre esta función:</b> este botón descarga un archivo JSON con tus datos actuales (productos, clientes, tickets, turnos, inventario, configuración). <b>No es un backup restaurable con un clic</b> — si necesitas recuperar datos desde este archivo, requeriría reinsertarlos manualmente en la base de datos con ayuda técnica. Para restauración automática de los últimos cambios, Neon ya incluye un "point-in-time restore" de 6 horas en su plan gratuito, sin que tengas que hacer nada.
+  <div class="contenido estrecho">
+    <div class="aviso amarillo">
+      ⚠️ <b>Importante sobre esta función:</b> este botón descarga un archivo JSON con tus datos actuales (productos, clientes, tickets, turnos, inventario, configuración). <b>No es un backup restaurable con un clic</b> — si necesitas recuperar datos desde este archivo, requeriría reinsertarlos manualmente en la base de datos con ayuda técnica.
     </div>
 
-    <div class="card">
-      <h3>Exportar datos actuales</h3>
-      <p style="font-size:13px; color:#666;">Se descargará un archivo .json con la información de tu sucursal. Las contraseñas nunca se incluyen.</p>
-      <button class="btn btn-primary" style="width:100%;" onclick="exportarDatos()">⬇️ Descargar Exportación</button>
+    <div class="caja tarjeta">
+      <div class="encabezado">
+        <div class="cuadro">💾</div>
+        <div><h2>Exportar datos actuales</h2><small>Se descarga un archivo .json con la información de tu sucursal</small></div>
+      </div>
+      <div class="bloque incluye">
+        <h5>Qué incluye</h5>
+        <ul>
+          <li>Productos y precios</li>
+          <li>Clientes y saldos</li>
+          <li>Tickets y ventas</li>
+          <li>Turnos y cortes</li>
+          <li>Inventario</li>
+          <li>Configuración</li>
+          <li class="no">Contraseñas · <b>nunca</b> se incluyen</li>
+        </ul>
+      </div>
+      <button class="btn btn-primary btn-grande" id="btnExportar" onclick="exportarDatos()">⬇️ Descargar exportación</button>
+      <div class="ayuda" id="estadoExport"></div>
+    </div>
+
+    <div class="aviso azul separa">
+      🛟 <b>Respaldo automático:</b> para restauración automática de los últimos cambios, Neon ya incluye un "point-in-time restore" de 6 horas en su plan gratuito, sin que tengas que hacer nada.
     </div>
   </div>
 
@@ -44,20 +79,34 @@
 <script>
 requiereLogin();
 
+const fechaLocal = () => {
+  const d = new Date(), p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+};
+
 async function exportarDatos() {
+  const btn = document.getElementById('btnExportar');
+  const estado = document.getElementById('estadoExport');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando exportación…';
+  estado.textContent = 'Puede tardar unos segundos, no cierres esta pantalla.';
   try {
-    mostrarToast('Generando exportación, puede tardar unos segundos...', 'info');
     const datos = await apiFetch('/backups/exportar');
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cremeria-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `cremeria-pos-backup-${fechaLocal()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     mostrarToast('Exportación descargada', 'exito');
+    estado.textContent = 'Listo: el archivo se descargó en este equipo (' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) + ').';
   } catch (err) {
     mostrarToast(err.message, 'error');
+    estado.textContent = 'No se pudo generar la exportación. Intenta de nuevo.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇️ Descargar exportación';
   }
 }
 </script>
