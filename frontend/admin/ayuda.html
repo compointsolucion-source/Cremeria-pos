@@ -117,6 +117,23 @@
       </details>
 
       <details class="guia">
+        <summary>Sin internet: seguir vendiendo y subir todo a la nube al regresar</summary>
+        <ul>
+          <li>El <b>servidor del negocio</b> (esta computadora en modo servidor) trabaja siempre con su propia base de datos: <b>si se va el internet, no se nota</b>.</li>
+          <li>Con la sincronización activa, todo lo que se registra (ventas, productos, inventario, turnos…) se anota en una fila de espera y se sube a la nube <b>cada 30 segundos</b>. Sin internet la fila solo crece; al regresar se vacía sola.</li>
+          <li>La nube queda como <b>copia para consultar</b> (reportes desde cualquier lugar) y respaldo. <b>Captura todo en el servidor</b>: lo que se capture directo en la nube se reemplaza con lo del servidor.</li>
+        </ul>
+        <p><b>Para activarla (una sola vez):</b></p>
+        <ol>
+          <li>En el panel del servidor (Ctrl+Alt+S) → <b>Sincronizar con la nube</b> → <b>Conectar o cambiar la nube</b> → pulsa <b>Generar una clave nueva</b> y cópiala.</li>
+          <li>En <b>Render</b> abre el <b>servidor</b> de tu negocio (el que termina en <code>-pos</code>, no la página) → <b>Environment</b> → agrega la variable <code>SYNC_KEY</code> con esa clave → guarda (se reinicia solo).</li>
+          <li>Regresa al panel, escribe la dirección de tu sistema en la nube (ej. <code>https://minegocio.onrender.com</code>) y pulsa <b>Conectar y copiar todo</b>.</li>
+          <li>Verás <b>"Al día con la nube"</b> y cuántos cambios están en espera de subir.</li>
+        </ol>
+        <div class="aviso">La primera copia vacía y vuelve a llenar la nube con lo del servidor. Si el plan gratis de Render está "dormido", la primera conexión puede tardar cerca de 1 minuto.</div>
+      </details>
+
+      <details class="guia">
         <summary>Respaldos y copia en la nube (Cloudinary)</summary>
         <ul>
           <li>El servidor guarda un respaldo <b>al cerrar</b> con "Salir por completo", <b>cada 12 horas</b> y cuando pulses "Respaldar ahora". Quedan en <code>C:\CompointPunto\Respaldos</code> (los últimos 30).</li>

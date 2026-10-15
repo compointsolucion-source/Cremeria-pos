@@ -27,5 +27,9 @@ contextBridge.exposeInMainWorld('compointServidor', {
   restaurar: () => ipcRenderer.invoke('srv-restaurar'),
   quitarNube: () => ipcRenderer.invoke('srv-quitar-nube'),
   cambiarACliente: (url) => ipcRenderer.invoke('srv-cambiar-a-cliente', url),
+  syncGuardar: (d) => ipcRenderer.invoke('srv-sync-guardar', d),
+  syncAhora: () => ipcRenderer.invoke('srv-sync-ahora'),
+  syncCompleto: () => ipcRenderer.invoke('srv-sync-completo'),
+  syncQuitar: () => ipcRenderer.invoke('srv-sync-quitar'),
   elegirModoServidor: () => ipcRenderer.invoke('srv-elegir-modo')
 });

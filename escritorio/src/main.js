@@ -580,6 +580,7 @@ async function cerrarServidorConRespaldo() {
     mostrarEstado('Guardando el respaldo del negocio… no apagues la computadora');
     const r = await Promise.race([sv.respaldos.hacerRespaldo('cierre'), new Promise((ok) => setTimeout(() => ok({ ok: false, error: 'tiempo agotado' }), 90000))]);
     if (!r.ok) log('Respaldo al cerrar: ' + r.error);
+    try { await sv.sync.ultimoEnvio(12000); } catch (e) { log('Último envío a la nube: ' + e.message); }
     mostrarEstado('Cerrando…');
     await Promise.race([sv.detener(), new Promise((ok) => setTimeout(ok, 40000))]);
   } catch (e) { log('Cierre del servidor: ' + e.message); }
@@ -606,14 +607,17 @@ ipcMain.handle('srv-alta-guardar', async (e, datos) => {
 });
 ipcMain.handle('srv-alta-cancelar', (e) => { if (esLocal(e) && ventanaAlta) ventanaAlta.close(); });
 
-ipcMain.handle('srv-estado', (e) => {
+ipcMain.handle('srv-estado', async (e) => {
   if (!esLocal(e) || !servidorLocal) return null;
+  let sincro = null;
+  try { sincro = await servidorLocal.sync.estado(); } catch (err) { sincro = { configurado: false }; }
   const c = servidorLocal.configuracion();
   const n = servidorLocal.nube();
   return {
     negocio: c.negocio || '', urlLocal: servidorLocal.urlLocal, direcciones: servidorLocal.direcciones(),
     carpeta: servidorLocal.rutas.respaldos, estado: servidorLocal.respaldos.estado(), locales: servidorLocal.respaldos.listarLocales(),
-    nube: { cloud_name: n.cloud_name, api_key: n.api_key, tieneSecreto: !!n.api_secret }
+    nube: { cloud_name: n.cloud_name, api_key: n.api_key, tieneSecreto: !!n.api_secret },
+    sync: sincro
   };
 });
 ipcMain.handle('srv-respaldar', async (e) => { if (!esLocal(e)) return { ok: false, error: 'No permitido' }; return respaldarAhora(); });
@@ -639,6 +643,44 @@ ipcMain.handle('srv-quitar-nube', async (e) => {
   });
   if (conf.response !== 0) return { ok: false };
   servidorLocal.quitarNube();
+  return { ok: true };
+});
+
+// Sincronización con la nube (el negocio sigue sin internet y todo se sube al regresar).
+ipcMain.handle('srv-sync-guardar', async (e, d) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  const yaHay = !!(await servidorLocal.sync.estado()).configurado;
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'warning', buttons: ['Conectar y copiar todo', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Sincronizar con la nube',
+    message: yaHay ? 'Se volverá a copiar TODA la información de esta computadora a la nube.' : 'La nube será una copia de lo que se registra en esta computadora.',
+    detail: 'IMPORTANTE: lo que haya capturado directamente en el sistema de la nube se reemplaza con la información de este servidor. A partir de ahora, captura todo aquí (en el servidor del negocio); la nube sirve para consultar y como respaldo.\n\nSi se va el internet, el negocio sigue trabajando normal y todo se sube solo al regresar.'
+  });
+  if (conf.response !== 0) return { ok: false };
+  try { await servidorLocal.guardarSync({ texto: d && d.texto, clave: d && d.clave }); return { ok: true }; }
+  catch (err) {
+    const msg = String(err && err.message || err);
+    log('Sync guardar: ' + msg);
+    return { error: err && err.http ? msg : (/fetch failed|abort|timeout|ENOTFOUND|ECONN/i.test(msg) ? 'No hay conexión con la nube (revisa el internet y la dirección). Si usas el plan gratis de Render puede tardar ~1 minuto en despertar: intenta de nuevo.' : msg) };
+  }
+});
+ipcMain.handle('srv-sync-ahora', async (e) => { if (!esLocal(e) || !servidorLocal) return { ok: false, error: 'No permitido' }; return servidorLocal.sync.ahora(false); });
+ipcMain.handle('srv-sync-completo', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { ok: false, error: 'No permitido' };
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'question', buttons: ['Copiar todo de nuevo', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Copia completa a la nube',
+    message: '¿Volver a copiar TODO a la nube?', detail: 'La nube se vacía y se llena otra vez con lo de esta computadora. Úsalo si notas diferencias.'
+  });
+  if (conf.response !== 0) return { ok: false };
+  return servidorLocal.sync.ahora(true);
+});
+ipcMain.handle('srv-sync-quitar', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'question', buttons: ['Quitar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Dejar de sincronizar',
+    message: '¿Dejar de sincronizar con la nube?', detail: 'Lo que ya está en la nube se queda como está, pero ya no se actualizará. Esta computadora sigue funcionando igual.'
+  });
+  if (conf.response !== 0) return { ok: false };
+  await servidorLocal.quitarSync();
   return { ok: true };
 });
 

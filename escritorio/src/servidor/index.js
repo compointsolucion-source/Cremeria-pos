@@ -9,6 +9,7 @@ const { rutas, leerJson, guardarJson } = require('./rutas');
 const { iniciarPostgres } = require('./postgres');
 const { baseVacia, crearNegocio } = require('./negocio');
 const { crearGestor, restaurarRespaldo } = require('./respaldos');
+const { crearSincronizador, resolverApi } = require('./sync');
 
 const PUERTO_WEB = 3000;
 const PUERTO_PG = 54329;
@@ -107,6 +108,10 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
     obtenerNube: nubeActual
   });
 
+  // Sincronización con la nube (local → nube). Se arranca ya con las migraciones aplicadas.
+  const sync = crearSincronizador({ url: bd.url, rutas: r, log, obtenerConfig: () => cfg.sync, descifrar });
+  sync.iniciar().catch((e) => log('Sincronización no pudo iniciar: ' + e.message));
+
   async function apagarWeb() {
     await new Promise((ok) => { try { backend.io.close(() => ok()); } catch (e) { ok(); } setTimeout(ok, 3000); });
     await new Promise((ok) => { try { backend.server.close(() => ok()); } catch (e) { ok(); } setTimeout(ok, 3000); });
@@ -114,7 +119,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
   }
 
   return {
-    rutas: r, respaldos, puertoWeb,
+    rutas: r, respaldos, puertoWeb, sync,
     urlLocal: `http://localhost:${puertoWeb}`,
     direcciones: () => direccionesRed(puertoWeb),
     configuracion: () => ({ ...cfg, db_password: undefined, jwt_secret: undefined }),
@@ -129,11 +134,26 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
       delete process.env.CLOUDINARY_CLOUD_NAME; delete process.env.CLOUDINARY_API_KEY; delete process.env.CLOUDINARY_API_SECRET;
     },
     nube: nubeActual,
-    async detener() { await apagarWeb(); await bd.detener(); },
+    // Guarda la conexión con la nube y arranca la copia completa inicial.
+    async guardarSync({ texto, clave }) {
+      const api = await resolverApi(texto);
+      const previa = cfg.sync || {};
+      let claveFinal = String(clave || '').trim();
+      if (!claveFinal && previa.clave_cifrada) { try { claveFinal = descifrar(previa.clave_cifrada); } catch (e) { claveFinal = ''; } }
+      if (claveFinal.length < 16) throw new Error('La clave debe tener al menos 16 caracteres.');
+      await sync.probar(api, claveFinal); // lanza error si no hay conexión o la clave no coincide
+      guardarCfg({ sync: { api, texto: String(texto).trim(), clave_cifrada: cifrar(claveFinal) } });
+      await sync.activar();
+      return { api };
+    },
+    async quitarSync() { await sync.desactivar(); guardarCfg({ sync: {} }); },
+    async detener() { await sync.detener(); await apagarWeb(); await bd.detener(); },
     async restaurar(archivo) {
       // Se apaga el servidor web, se restaura, y la app debe reiniciarse.
+      await sync.detener();
       await apagarWeb();
       const res = await restaurarRespaldo({ url: bd.url, archivo, dirServidor, log });
+      if (cfg.sync && cfg.sync.api) sync.marcarCompleto(); // la base cambió por completo: se vuelve a copiar todo
       await bd.detener();
       return res;
     }
