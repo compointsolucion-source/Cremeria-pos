@@ -58,6 +58,8 @@
   .cuerpo code { background: rgba(128,128,128,.18); padding: 1px 6px; border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; }
   .cuerpo a { color: var(--primary-dark, #4C9439); }
   .cuerpo a:hover { text-decoration: underline; }
+  .cuerpo a.boton-descarga { display: inline-flex; align-items: center; gap: 8px; background: var(--primary, #5FAE46); color: #fff; padding: 11px 18px; border-radius: 10px; font-weight: 800; text-decoration: none; }
+  .cuerpo a.boton-descarga:hover { text-decoration: none; filter: brightness(.95); }
 
   /* ---- Contacto ---- */
   .contacto-cuerpo { padding: 4px 16px 16px; display: grid; gap: 12px; }
@@ -207,16 +209,18 @@
           </details>
 
           <!-- Solo se muestra dentro del programa de escritorio (.exe) -->
-          <details class="guia herramientas" id="guiaHerramientasServidor" data-item data-solo-escritorio hidden data-claves="herramientas firewall ip fija bat descargar archivos servidor administrador windows protegio pc">
-            <summary>🛠️ Herramientas para la computadora servidor (Firewall e IP fija)</summary>
+          <details class="guia herramientas" id="guiaHerramientasServidor" data-item data-solo-escritorio hidden data-claves="asistente herramientas firewall ip fija exe bat descargar servidor administrador windows protegio pc predeterminado avanzado quitar permisos copiar direccion">
+            <summary>🛠️ Asistente para la computadora servidor (Firewall e IP fija)</summary>
             <div class="cuerpo">
-              <p>Descárgalos y ejecútalos <b>en la computadora que es el servidor</b> (la principal). Sirven para que las otras cajas puedan entrar.</p>
+              <p>Descárgalo y ábrelo <b>en la computadora que es el servidor</b> (la principal). Deja todo listo para que las otras cajas puedan entrar: permite el acceso en el Firewall y deja la IP fija.</p>
+              <p><a class="boton-descarga" href="../descargas/Asistente-Servidor-Compoint.exe" download>⬇️ Descargar el Asistente del servidor (.exe)</a></p>
               <ol>
-                <li><a href="../descargas/1-Permitir-acceso-Firewall.bat" download><b>1-Permitir-acceso-Firewall.bat</b></a> — abre el acceso en el Firewall de Windows y te muestra la dirección para las otras computadoras.</li>
-                <li><a href="../descargas/2-Fijar-IP-de-esta-computadora.bat" download><b>2-Fijar-IP-de-esta-computadora.bat</b></a> — deja la IP de esta computadora siempre igual.</li>
-                <li><a href="../descargas/3-Quitar-regla-Firewall.bat" download><b>3-Quitar-regla-Firewall.bat</b></a> — quita el permiso si ya no lo necesitas.</li>
+                <li>Ábrelo con doble clic. Si Windows muestra "protegió su PC", pulsa <b>Más información → Ejecutar de todas formas</b>.</li>
+                <li>Elige <b>Predeterminado</b> (recomendado: lo hace todo solo) o <b>Avanzado</b> (tú eliges puerto, tarjeta de red e IP).</li>
+                <li>Cuando Windows pida permiso de administrador, di <b>Sí</b>.</li>
+                <li>Al terminar te muestra la <b>dirección</b> que se escribe en las otras cajas. Usa el botón <b>Copiar</b>.</li>
               </ol>
-              <p><b>Cómo usarlos:</b> descarga el archivo, ábrelo con doble clic y, cuando Windows pida permiso de administrador, di <b>Sí</b>. Si Windows muestra "protegió su PC", pulsa <b>Más información → Ejecutar de todas formas</b>.</p>
+              <p><b>Para deshacerlo</b> (si esa computadora ya no será servidor): abre el asistente y usa <b>Quitar permisos…</b>. Ahí también puedes regresar la IP a automática.</p>
               <div class="aviso amarillo">La computadora servidor debe quedar encendida y con Compoint Punto abierto para que las demás puedan trabajar.</div>
             </div>
           </details>

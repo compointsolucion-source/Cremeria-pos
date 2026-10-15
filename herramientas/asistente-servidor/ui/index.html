@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asistente del servidor · Compoint Punto</title>
+<link rel="icon" href="emblema.png">
+<style>
+  :root { --verde:#5FAE46; --verde-osc:#4C9439; --texto:#1F2023; --muted:#6a6e75; --borde:#e3e6ea; --fondo:#fff; --noche:#1d2b22; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; color: var(--texto); background: var(--fondo); font-size: 14px; overflow: hidden; }
+  button { font-family: inherit; border: 0; border-radius: 9px; padding: 11px 20px; font-size: 14px; font-weight: 700; cursor: pointer; transition: filter .12s, transform .05s; }
+  button:hover:not(:disabled) { filter: brightness(.96); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .pri { background: var(--verde); color: #fff; }
+  .sec { background: #e9ecef; color: #333; }
+  input, select { font-family: inherit; border: 1px solid #cfd4da; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; width: 100%; background: #fff; color: #222; }
+  input:focus, select:focus { outline: 2px solid rgba(95,174,70,.45); border-color: var(--verde); }
+  code { background: #eef0f2; border-radius: 5px; padding: 1px 6px; font-size: 12.5px; }
+
+  .app { display: flex; height: 100vh; min-height: 540px; }
+  .lado { width: 220px; flex: none; background: linear-gradient(170deg,#1d2b22,#25352b 60%,#2c4333); color: #fff; padding: 24px 18px; display: flex; flex-direction: column; gap: 22px; }
+  .lado img.lg { width: 168px; display: block; margin: 0 auto; }
+  .pasos { display: grid; gap: 14px; margin-top: 4px; }
+  .pasos div { display: flex; align-items: center; gap: 11px; font-size: 14px; color: #a9bcae; }
+  .pasos i { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #587061; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; font-weight: 800; flex: none; }
+  .pasos .on { color: #fff; font-weight: 700; } .pasos .on i { background: var(--verde); border-color: var(--verde); }
+  .pasos .hecho { color: #cfe0d3; } .pasos .hecho i { background: #3d6a49; border-color: #3d6a49; color: #fff; }
+  .lado .v { margin-top: auto; font-size: 11.5px; color: #8aa292; line-height: 1.5; }
+
+  .main { flex: 1; min-width: 0; padding: 28px 34px 0; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  h1 { font-size: 23px; line-height: 1.2; }
+  p.s { color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .pie { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: auto; padding: 12px 0 22px; border-top: 1px solid #e9ecef; flex: none; position: sticky; bottom: 0; background: #fff; }
+  .pie small { color: #7A7D83; font-size: 12.5px; }
+  .pie .der { display: flex; gap: 10px; }
+
+  .aviso { background: #FFF8E1; border: 1px solid #f5d98a; color: #7a5b00; border-radius: 10px; padding: 10px 13px; font-size: 13px; line-height: 1.45; }
+  .aviso.rojo { background: #FDECEA; border-color: #f2b8b5; color: #8E1B1B; }
+  .aviso.azul { background: #e8f1fb; border-color: #b7d3f2; color: #0D47A1; }
+  .cargando { display: flex; align-items: center; gap: 12px; color: var(--muted); padding: 18px 4px; }
+  .rueda { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #d9ded9; border-top-color: var(--verde); animation: gira .8s linear infinite; flex: none; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+
+  /* Bienvenida */
+  .info { border: 1px solid var(--borde); border-radius: 13px; overflow: hidden; }
+  .info .fila { display: flex; align-items: center; gap: 12px; padding: 11px 15px; border-bottom: 1px solid #eceef0; font-size: 14px; }
+  .info .fila:last-child { border-bottom: 0; }
+  .info .fila .ic { width: 26px; text-align: center; font-size: 17px; flex: none; }
+  .info .fila .t { color: var(--muted); width: 140px; flex: none; }
+  .info .fila b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .etq { font-size: 11.5px; font-weight: 800; border-radius: 12px; padding: 2px 9px; flex: none; }
+  .etq.ok { background: rgba(95,174,70,.16); color: #2E7D32; } .etq.no { background: #FFF1C9; color: #8a6200; }
+
+  /* Modo */
+  .opc { display: grid; gap: 12px; margin-top: 2px; }
+  .op { border: 2px solid var(--borde); border-radius: 14px; padding: 16px 18px; display: flex; gap: 14px; align-items: center; cursor: pointer; background: #fff; text-align: left; width: 100%; font-weight: 400; color: inherit; }
+  .op:hover:not(:disabled) { border-color: #b9dcab; filter: none; }
+  .op.sel { border-color: var(--verde); background: rgba(95,174,70,.07); }
+  .op .rd { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #b5bbc2; flex: none; display: flex; align-items: center; justify-content: center; }
+  .op.sel .rd { border-color: var(--verde); } .op.sel .rd::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--verde); }
+  .op .ic { font-size: 28px; flex: none; }
+  .op h3 { font-size: 16.5px; display: flex; align-items: center; gap: 8px; }
+  .op h3 em { font-style: normal; background: var(--verde); color: #fff; font-size: 10.5px; padding: 2px 8px; border-radius: 10px; }
+  .op p { font-size: 13.5px; color: #5d6168; line-height: 1.45; margin-top: 3px; }
+
+  /* Resumen */
+  .lista { display: grid; gap: 10px; }
+  .item { display: flex; gap: 13px; align-items: center; padding: 12px 15px; border-radius: 12px; background: #f5f7f8; font-size: 14.5px; }
+  .item .ic { font-size: 22px; width: 28px; text-align: center; flex: none; }
+  .item small { display: block; color: #7A7D83; font-size: 12.5px; margin-top: 1px; }
+
+  /* Avanzado */
+  .gr { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tar { border: 1px solid var(--borde); border-radius: 13px; padding: 14px; display: grid; gap: 10px; background: #fcfcfd; align-content: start; }
+  .tar.ancha { grid-column: 1 / -1; }
+  .tar .h { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 700; }
+  .tar label.l { font-size: 11.5px; color: #7A7D83; font-weight: 700; display: block; margin-bottom: 3px; }
+  .tar .nota { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .tar .campos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tar.apagada .campos { opacity: .45; pointer-events: none; }
+  .chk { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; cursor: pointer; user-select: none; margin-right: 12px; }
+  .chk input { width: 16px; height: 16px; accent-color: var(--verde); padding: 0; }
+  .sw { width: 40px; height: 23px; border-radius: 12px; background: #bfc4ca; position: relative; flex: none; cursor: pointer; border: 0; padding: 0; transition: background .15s; }
+  .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .sw.on { background: var(--verde); } .sw.on::after { left: 20px; }
+  .enlace { background: none; color: #1565C0; padding: 4px 0; font-weight: 700; font-size: 13px; text-align: left; }
+  .enlace:hover { text-decoration: underline; filter: none; }
+
+  /* Avance */
+  .barra { height: 9px; border-radius: 6px; background: var(--borde); overflow: hidden; flex: none; }
+  .barra i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#5FAE46,#7bc45f); border-radius: 6px; transition: width .35s; }
+  .paso { display: flex; gap: 13px; align-items: center; padding: 12px 15px; border-radius: 12px; background: #f5f7f8; font-size: 14.5px; }
+  .paso .p { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12.5px; flex: none; background: #dfe3e7; color: #888; }
+  .paso small { display: block; color: #7A7D83; font-size: 12.5px; margin-top: 1px; }
+  .paso.ok { background: rgba(95,174,70,.12); } .paso.ok .p { background: var(--verde); color: #fff; }
+  .paso.haciendo { background: #FFF8E1; } .paso.haciendo .p { background: #fff; padding: 0; }
+  .paso.aviso { background: #FFF8E1; } .paso.aviso .p { background: #f5b82e; color: #fff; }
+  .paso.error { background: #FDECEA; } .paso.error .p { background: #d9534f; color: #fff; }
+  .paso.pendiente { opacity: .65; }
+
+  /* Listo */
+  .cab-listo { display: flex; gap: 14px; align-items: center; }
+  .cab-listo .c { width: 52px; height: 52px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 28px; flex: none; }
+  .cab-listo .c.mal { background: #d9534f; }
+  .dir { background: var(--noche); color: #fff; border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
+  .dir .t { flex: 1; min-width: 0; }
+  .dir small { display: block; color: #9fb8a6; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .dir b { font-size: 22px; overflow-wrap: anywhere; }
+  .dir2 { display: flex; align-items: center; gap: 12px; padding: 4px 2px; font-size: 14px; flex-wrap: wrap; }
+  .dir2 b { overflow-wrap: anywhere; }
+  .dir2 button { padding: 5px 12px; font-size: 12.5px; }
+  details.que { border: 1px solid var(--borde); border-radius: 12px; padding: 0 14px; }
+  details.que summary { cursor: pointer; padding: 11px 0; font-weight: 700; font-size: 13.5px; }
+  details.que .lista { padding-bottom: 12px; }
+  .centro { margin: auto; text-align: center; display: grid; gap: 12px; justify-items: center; }
+  .centro .c { width: 64px; height: 64px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="lado">
+    <img class="lg" src="logo-claro.png" alt="Compoint, punto de soluciones">
+    <div class="pasos" id="pasosLado"></div>
+    <div class="v">Asistente del servidor<br>Versión __VERSION__</div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<script>
+const TOKEN = '__TOKEN__';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(ruta, cuerpo) {
+  let r;
+  try {
+    r = await fetch(ruta, { method: cuerpo ? 'POST' : 'GET', headers: { 'X-Token': TOKEN, 'Content-Type': 'application/json' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+  } catch (e) { throw new Error('El asistente se cerró. Ábrelo de nuevo.'); }
+  let datos = {};
+  try { datos = await r.json(); } catch (e) { /* sin cuerpo */ }
+  if (!r.ok) throw new Error(datos.error || 'Algo salió mal.');
+  return datos;
+}
+
+const S = {
+  estado: null, modo: 'pred', pant: 'bienvenida', av: null, ultimaOp: null, desde: 'modo', volverA: 'modo',
+  deshacer: { fw: true, ip: false, adaptador: 0 }, trabajo: null, errorForm: '', enviando: false
+};
+
+const NOMBRES_LADO = ['Bienvenida', 'Modo', 'Aplicando', 'Listo'];
+const PASO_DE = { bienvenida: 1, modo: 2, resumen: 2, avanzado: 2, deshacer: 2, aplicando: 3, error: 3, listo: 4 };
+
+function pintarLado() {
+  const n = PASO_DE[S.pant] || 1;
+  $('#pasosLado').innerHTML = NOMBRES_LADO.map((t, i) => {
+    const k = i + 1;
+    const hecho = k < n || S.pant === 'listo';
+    return '<div class="' + (k === n && S.pant !== 'listo' ? 'on' : (hecho ? 'hecho' : '')) + '"><i>' + (hecho ? '✓' : k) + '</i>' + t + '</div>';
+  }).join('');
+}
+
+function principal() {
+  const e = S.estado;
+  if (!e || !e.adaptadores) return null;
+  return e.adaptadores.find((a) => a.principal) || null;
+}
+
+function ir(pant) { S.pant = pant; S.errorForm = ''; dibujar(); }
+
+function dibujar() {
+  pintarLado();
+  ({ bienvenida, modo, resumen, avanzado, deshacer, aplicando, error: pantError, listo }[S.pant])();
+  $('#main').scrollTop = 0;
+}
+
+/* ------------------------------------------------------------ Bienvenida */
+function bienvenida() {
+  const e = S.estado, a = principal();
+  let cuerpo;
+  if (!e) {
+    cuerpo = '<div class="cargando"><div class="rueda"></div>Revisando esta computadora…</div>';
+  } else {
+    const filas = [];
+    filas.push('<div class="fila"><span class="ic">💻</span><span class="t">Equipo</span><b>' + esc(e.equipo || '—') + '</b></div>');
+    if (a) {
+      filas.push('<div class="fila"><span class="ic">🌐</span><span class="t">Conexión</span><b>' + esc(a.nombre) + '</b></div>');
+      filas.push('<div class="fila"><span class="ic">📍</span><span class="t">IP actual</span><b>' + esc(a.ip) + '</b><span class="etq ' + (a.dhcp ? 'no' : 'ok') + '">' + (a.dhcp ? 'Cambia sola' : 'Fija') + '</span></div>');
+      filas.push('<div class="fila"><span class="ic">🚪</span><span class="t">Puerta de enlace</span><b>' + esc(a.puerta) + '</b></div>');
+    }
+    filas.push('<div class="fila"><span class="ic">🛡️</span><span class="t">Firewall</span><b>' + (e.reglaFirewall ? 'Permitido en el puerto ' + e.puertoRegla : 'Todavía no permite a otras cajas') + '</b><span class="etq ' + (e.reglaFirewall ? 'ok' : 'no') + '">' + (e.reglaFirewall ? 'Listo' : 'Falta') + '</span></div>');
+    filas.push('<div class="fila"><span class="ic">🏠</span><span class="t">Tipo de red</span><b>' + (e.redPublica ? 'Pública (Windows bloquea más cosas)' : 'Privada') + '</b><span class="etq ' + (e.redPublica ? 'no' : 'ok') + '">' + (e.redPublica ? 'Cambiar' : 'Listo') + '</span></div>');
+    cuerpo = '<div class="info">' + filas.join('') + '</div>';
+    if (!a) cuerpo += '<div class="aviso rojo">No encontré una conexión de red activa. Conecta el cable o el WiFi y abre el asistente otra vez. Mientras, solo puedes usar el modo Avanzado para el Firewall.</div>';
+    else if (e.aviso) cuerpo += '<div class="aviso">' + esc(e.aviso) + '</div>';
+  }
+  $('#main').innerHTML =
+    '<h1>Bienvenido</h1>' +
+    '<p class="s">Este asistente prepara <b>esta computadora</b> para que las otras cajas puedan entrar a Compoint Punto. Tarda menos de un minuto.</p>' +
+    cuerpo +
+    '<div class="pie"><small>Compoint · Punto de soluciones</small><div class="der"><button class="pri" id="sig" ' + (e ? '' : 'disabled') + '>Siguiente →</button></div></div>';
+  $('#sig').onclick = () => ir('modo');
+}
+
+/* ------------------------------------------------------------ Modo */
+function modo() {
+  const a = principal(), e = S.estado || {};
+  if (!a && S.modo === 'pred') S.modo = 'avanzado';
+  const opPred = '<button class="op ' + (S.modo === 'pred' ? 'sel' : '') + '" id="mPred" ' + (a ? '' : 'disabled') + '><div class="rd"></div><div class="ic">⚡</div><div><h3>Predeterminado <em>Recomendado</em></h3><p>Permite el acceso en el Firewall, pone la red en Privada y deja la IP fija. Todo automático.' + (a ? '' : ' <b>(Necesita una conexión de red activa.)</b>') + '</p></div></button>';
+  const opAv = '<button class="op ' + (S.modo === 'avanzado' ? 'sel' : '') + '" id="mAv"><div class="rd"></div><div class="ic">🛠️</div><div><h3>Avanzado</h3><p>Eliges el puerto, la tarjeta de red y cada paso. También puedes quitar permisos o volver a IP automática.</p></div></button>';
+  $('#main').innerHTML =
+    '<h1>¿Cómo quieres prepararla?</h1>' +
+    '<p class="s">Esta computadora será el servidor: las otras cajas se conectarán a ella por la red del negocio.</p>' +
+    '<div class="opc">' + opPred + opAv + '</div>' +
+    '<div class="pie"><small>💻 ' + esc(e.equipo || '') + (a ? ' · IP actual ' + esc(a.ip) : '') + '</small><div class="der"><button class="sec" id="atras">← Atrás</button><button class="pri" id="sig">Siguiente →</button></div></div>';
+  $('#mPred').onclick = () => { if (a) { S.modo = 'pred'; modo(); } };
+  $('#mAv').onclick = () => { S.modo = 'avanzado'; modo(); };
+  $('#atras').onclick = () => ir('bienvenida');
+  $('#sig').onclick = () => { if (S.modo === 'pred') ir('resumen'); else { iniciarAv(); ir('avanzado'); } };
+}
+
+/* ------------------------------------------------------------ Predeterminado: resumen */
+function opPredeterminado() {
+  const a = principal();
+  return {
+    firewall: true, puerto: 3000, perfiles: ['private', 'domain', 'public'], ping: true, redPrivada: true,
+    ipFija: !!a, adaptador: a ? a.indice : 0, ip: a ? a.ip : '', prefijo: a ? a.prefijo : 24, puerta: a ? a.puerta : '', dns: a && a.dns ? a.dns : []
+  };
+}
+
+function resumen() {
+  const a = principal();
+  const ya = a && !a.dhcp;
+  $('#main').innerHTML =
+    '<h1>Esto es lo que voy a hacer</h1>' +
+    '<p class="s">Revisa la lista. Si estás de acuerdo, pulsa <b>Configurar ahora</b>.</p>' +
+    '<div class="lista">' +
+    '<div class="item"><span class="ic">🛡️</span><div>Permitir el acceso en el Firewall<small>Puerto 3000 · todas las redes</small></div></div>' +
+    '<div class="item"><span class="ic">🏠</span><div>Poner la red en modo Privada<small>Si está en Pública, Windows bloquea a las otras cajas</small></div></div>' +
+    '<div class="item"><span class="ic">📍</span><div>Dejar fija la IP de esta computadora<small>' + esc(a ? a.ip + ' (la que tiene ahora)' + (ya ? ' · ya era fija' : '') : '') + '</small></div></div>' +
+    '<div class="item"><span class="ic">📶</span><div>Responder a ping<small>Sirve para revisar fallas de red</small></div></div>' +
+    '</div>' +
+    '<div class="aviso">🔐 Windows te va a pedir <b>permiso de administrador</b>: elige <b>Sí</b>. Al fijar la IP el internet puede cortarse un segundo.</div>' +
+    (S.errorForm ? '<div class="aviso rojo">' + esc(S.errorForm) + '</div>' : '') +
+    '<div class="pie"><button class="sec" id="atras">← Atrás</button><button class="pri" id="ok">Configurar ahora</button></div>';
+  $('#atras').onclick = () => ir('modo');
+  $('#ok').onclick = () => aplicar(opPredeterminado(), 'resumen');
+}
+
+/* ------------------------------------------------------------ Avanzado */
+function iniciarAv() {
+  if (S.av) return;
+  const a = principal() || ((S.estado && S.estado.adaptadores && S.estado.adaptadores[0]) || null);
+  S.av = {
+    firewall: true, puerto: '3000', perfiles: { private: true, domain: true, public: true }, redPrivada: true, ping: true,
+    ipFija: !!a, adaptador: a ? a.indice : 0, ip: a ? a.ip : '', prefijo: a ? String(a.prefijo) : '24', puerta: a ? a.puerta : '', dns: a && a.dns ? a.dns.join(', ') : ''
+  };
+}
+
+function opDeAv() {
+  const v = S.av;
+  return {
+    firewall: v.firewall, puerto: parseInt(v.puerto, 10) || 0, perfiles: Object.keys(v.perfiles).filter((k) => v.perfiles[k]),
+    ping: v.ping, redPrivada: v.redPrivada, ipFija: v.ipFija, adaptador: v.adaptador, ip: v.ip.trim(), prefijo: parseInt(v.prefijo, 10) || 0,
+    puerta: v.puerta.trim(), dns: v.dns.split(/[,\s]+/).filter(Boolean)
+  };
+}
+
+function avanzado() {
+  const v = S.av, ads = (S.estado && S.estado.adaptadores) || [];
+  const cuantos = [v.firewall, v.redPrivada, v.ipFija, v.ping].filter(Boolean).length;
+  const sel = ads.length > 1
+    ? '<div style="grid-column:span 2"><label class="l">Tarjeta de red</label><select data-k="adaptador">' + ads.map((x) => '<option value="' + x.indice + '" ' + (x.indice === v.adaptador ? 'selected' : '') + '>' + esc(x.nombre + ' — ' + x.ip) + '</option>').join('') + '</select></div>'
+    : '<div style="grid-column:span 2"><label class="l">Tarjeta de red</label><input value="' + esc(ads[0] ? ads[0].nombre : 'Sin conexión') + '" disabled></div>';
+  const sw = (k, on) => '<button type="button" class="sw ' + (on ? 'on' : '') + '" data-sw="' + k + '" aria-label="Activar o desactivar"></button>';
+  const chk = (k, t) => '<label class="chk"><input type="checkbox" data-perfil="' + k + '" ' + (v.perfiles[k] ? 'checked' : '') + '>' + t + '</label>';
+  $('#main').innerHTML =
+    '<h1 style="font-size:21px">Opciones avanzadas</h1>' +
+    '<div class="gr">' +
+    '<div class="tar ' + (v.firewall ? '' : 'apagada') + '"><div class="h">🛡️ Firewall ' + sw('firewall', v.firewall) + '</div><div class="campos" style="grid-template-columns:1fr"><div><label class="l">Puerto</label><input data-k="puerto" inputmode="numeric" value="' + esc(v.puerto) + '"></div><div><label class="l">Redes donde aplica</label>' + chk('private', 'Privada') + chk('domain', 'Dominio') + chk('public', 'Pública') + '</div></div></div>' +
+    '<div class="tar"><div class="h">🏠 Red Privada ' + sw('redPrivada', v.redPrivada) + '</div><div class="nota">Cambia la red de «Pública» a «Privada». Sin esto Windows bloquea a las otras cajas.</div></div>' +
+    '<div class="tar ancha ' + (v.ipFija ? '' : 'apagada') + '"><div class="h">📍 IP fija ' + sw('ipFija', v.ipFija) + '</div><div class="campos">' + sel + '<div><label class="l">Máscara (lo normal es 24)</label><input data-k="prefijo" inputmode="numeric" value="' + esc(v.prefijo) + '"></div><div><label class="l">IP de esta computadora</label><input data-k="ip" value="' + esc(v.ip) + '"></div><div><label class="l">Puerta de enlace</label><input data-k="puerta" value="' + esc(v.puerta) + '"></div><div><label class="l">DNS (opcional)</label><input data-k="dns" value="' + esc(v.dns) + '" placeholder="Vacío = puerta de enlace" title="Ejemplo: 8.8.8.8, 1.1.1.1. Si lo dejas vacío se usa la puerta de enlace."></div></div></div>' +
+    '<div class="tar ancha"><div class="h">📶 Responder a ping ' + sw('ping', v.ping) + '</div><div class="nota">Permite que esta computadora conteste pings; ayuda a diagnosticar fallas de red.</div></div>' +
+    '</div>' +
+    '<button class="enlace" id="irDeshacer">↩️ Deshacer cambios anteriores (quitar permiso del Firewall, volver a IP automática)</button>' +
+    (S.errorForm ? '<div class="aviso rojo">' + esc(S.errorForm) + '</div>' : '') +
+    '<div class="pie"><button class="sec" id="atras">← Atrás</button><button class="pri" id="ok" ' + (cuantos ? '' : 'disabled') + '>Aplicar ' + (cuantos === 1 ? '1 cambio' : cuantos + ' cambios') + ' →</button></div>';
+
+  document.querySelectorAll('[data-sw]').forEach((b) => b.onclick = () => { v[b.dataset.sw] = !v[b.dataset.sw]; avanzado(); });
+  document.querySelectorAll('[data-perfil]').forEach((c) => c.onchange = () => { v.perfiles[c.dataset.perfil] = c.checked; });
+  document.querySelectorAll('input[data-k]').forEach((i) => i.oninput = () => { v[i.dataset.k] = i.value; });
+  const s = $('select[data-k="adaptador"]');
+  if (s) s.onchange = () => {
+    v.adaptador = parseInt(s.value, 10);
+    const x = ads.find((y) => y.indice === v.adaptador);
+    if (x) { v.ip = x.ip; v.prefijo = String(x.prefijo); v.puerta = x.puerta; v.dns = x.dns ? x.dns.join(', ') : ''; }
+    avanzado();
+  };
+  $('#irDeshacer').onclick = () => { S.volverA = 'avanzado'; ir('deshacer'); };
+  $('#atras').onclick = () => ir('modo');
+  $('#ok').onclick = () => aplicar(opDeAv(), 'avanzado');
+}
+
+/* ------------------------------------------------------------ Deshacer */
+function deshacer() {
+  const ads = (S.estado && S.estado.adaptadores) || [], d = S.deshacer, a = principal() || ads[0];
+  if (!d.adaptador && a) d.adaptador = a.indice;
+  const sw = (k, on) => '<button type="button" class="sw ' + (on ? 'on' : '') + '" data-sw="' + k + '" aria-label="Activar o desactivar"></button>';
+  const sel = ads.length > 1
+    ? '<div class="campos" style="grid-template-columns:1fr"><div><label class="l">Tarjeta de red</label><select id="dAd">' + ads.map((x) => '<option value="' + x.indice + '" ' + (x.indice === d.adaptador ? 'selected' : '') + '>' + esc(x.nombre + ' — ' + x.ip) + '</option>').join('') + '</select></div></div>' : '';
+  const cuantos = [d.fw, d.ip].filter(Boolean).length;
+  $('#main').innerHTML =
+    '<h1 style="font-size:21px">Deshacer cambios</h1>' +
+    '<p class="s">Elige qué quieres quitar. No se borra nada del sistema: solo se regresa Windows a como estaba.</p>' +
+    '<div class="gr" style="grid-template-columns:1fr">' +
+    '<div class="tar"><div class="h">🛡️ Quitar el permiso del Firewall ' + sw('fw', d.fw) + '</div><div class="nota">Las otras computadoras ya no podrán entrar a esta.' + (S.estado && S.estado.reglaFirewall ? '' : ' (Ahora mismo no hay ningún permiso puesto.)') + '</div></div>' +
+    '<div class="tar ' + (a ? '' : 'apagada') + '"><div class="h">📍 Volver a IP automática ' + sw('ip', d.ip) + '</div><div class="nota">El router volverá a repartir la IP. Úsalo si esta computadora ya no será el servidor.</div>' + sel + '</div>' +
+    '</div>' +
+    (S.errorForm ? '<div class="aviso rojo">' + esc(S.errorForm) + '</div>' : '') +
+    '<div class="pie"><button class="sec" id="atras">← Atrás</button><button class="pri" id="ok" ' + (cuantos ? '' : 'disabled') + '>Quitar lo elegido</button></div>';
+  document.querySelectorAll('[data-sw]').forEach((b) => b.onclick = () => { d[b.dataset.sw] = !d[b.dataset.sw]; deshacer(); });
+  const s = $('#dAd'); if (s) s.onchange = () => { d.adaptador = parseInt(s.value, 10); };
+  $('#atras').onclick = () => ir(S.volverA || 'modo');
+  $('#ok').onclick = () => aplicar({ quitarFirewall: d.fw, ipAutomatica: d.ip, adaptador: d.ip ? d.adaptador : 0 }, 'deshacer');
+}
+
+/* ------------------------------------------------------------ Aplicar */
+async function aplicar(op, desde) {
+  if (S.enviando) return;
+  S.enviando = true; S.errorForm = '';
+  try {
+    await api('/api/aplicar', op);
+    S.ultimaOp = op; S.desde = desde; S.trabajo = null;
+    ir('aplicando');
+    sondear();
+  } catch (e) {
+    S.errorForm = e.message;
+    dibujar();
+  } finally { S.enviando = false; }
+}
+
+let temporizador = null;
+async function sondear() {
+  clearTimeout(temporizador);
+  try {
+    const t = await api('/api/progreso');
+    S.trabajo = t;
+    if (S.pant === 'aplicando') aplicando();
+    if (t.fase === 'terminado') {
+      try { S.estado = await api('/api/estado?refrescar=1'); } catch (e) { /* se muestra sin direcciones */ }
+      ir('listo'); return;
+    }
+    if (t.fase === 'error') { ir('error'); return; }
+  } catch (e) { /* intenta otra vez */ }
+  temporizador = setTimeout(sondear, 400);
+}
+
+function icono(p, i) {
+  if (p.estado === 'ok') return '✓';
+  if (p.estado === 'haciendo') return '<div class="rueda" style="width:22px;height:22px;border-width:3px"></div>';
+  if (p.estado === 'aviso') return '!';
+  if (p.estado === 'error') return '✕';
+  return String(i + 1);
+}
+
+function listaPasos(pasos) {
+  return pasos.map((p, i) => '<div class="paso ' + esc(p.estado) + '"><span class="p">' + icono(p, i) + '</span><div>' + esc(p.titulo) + (p.detalle ? '<small>' + esc(p.detalle) + '</small>' : '') + '</div></div>').join('');
+}
+
+function aplicando() {
+  const t = S.trabajo || { fase: 'esperando-permiso', pasos: [], modo: 'configurar' };
+  const hechos = t.pasos.filter((p) => p.estado === 'ok' || p.estado === 'aviso').length;
+  const pct = t.pasos.length ? Math.round((hechos / t.pasos.length) * 100) : 0;
+  $('#main').innerHTML =
+    '<h1>' + (t.modo === 'deshacer' ? 'Deshaciendo cambios…' : 'Aplicando cambios…') + '</h1>' +
+    '<div class="barra"><i style="width:' + Math.max(pct, 4) + '%"></i></div>' +
+    (t.fase === 'esperando-permiso' ? '<div class="aviso">🔐 Windows está pidiendo <b>permiso de administrador</b>. Elige <b>Sí</b> en la ventana que apareció. Si no la ves, búscala en la barra de tareas.</div>' : '') +
+    '<div class="lista">' + listaPasos(t.pasos) + '</div>' +
+    '<div class="pie"><small>No cierres esta ventana mientras trabaja.</small></div>';
+}
+
+/* ------------------------------------------------------------ Error */
+function pantError() {
+  const t = S.trabajo || { pasos: [], error: '' };
+  const falloIP = t.pasos.some((p) => p.clave === 'ip' && p.estado === 'error');
+  $('#main').innerHTML =
+    '<div class="cab-listo"><div class="c mal">!</div><div><h1>No se pudo terminar</h1><p class="s">Puedes intentarlo otra vez.' + (falloIP ? ' La IP se quedó como estaba (automática).' : '') + '</p></div></div>' +
+    '<div class="aviso rojo">' + esc(t.error || 'Ocurrió un problema.') + '</div>' +
+    '<div class="lista">' + listaPasos(t.pasos) + '</div>' +
+    '<div class="aviso azul">¿Sigue igual? Mándale una foto de esta pantalla a Compoint por WhatsApp: <b style="white-space:nowrap">33 25 90 70 90</b>.</div>' +
+    '<div class="pie"><button class="sec" id="atras">← Volver</button><button class="pri" id="reint">Reintentar</button></div>';
+  $('#atras').onclick = () => ir(S.desde || 'modo');
+  $('#reint').onclick = () => aplicar(S.ultimaOp, S.desde);
+}
+
+/* ------------------------------------------------------------ Listo */
+function direcciones() {
+  const e = S.estado || {}, t = S.trabajo || {};
+  const puerto = t.puerto || e.puertoRegla || 3000;
+  const ads = (e.adaptadores || []).filter((a) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.ip) && !a.virtual);
+  const prin = principal() || ads[0] || null;
+  return { puerto, prin, otras: ads.filter((a) => prin && a.ip !== prin.ip), equipo: e.equipo };
+}
+
+function copiar(texto, boton) {
+  const listo = () => { const t = boton.textContent; boton.textContent = '¡Copiado!'; setTimeout(() => { boton.textContent = t; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(listo, () => copiarViejo(texto, listo));
+  else copiarViejo(texto, listo);
+}
+function copiarViejo(texto, listo) {
+  const x = document.createElement('textarea'); x.value = texto; document.body.appendChild(x); x.select();
+  try { document.execCommand('copy'); listo(); } catch (e) { /* nada */ }
+  x.remove();
+}
+
+function listo() {
+  const t = S.trabajo || { pasos: [], modo: 'configurar' }, e = S.estado || {};
+  const d = direcciones();
+  const esConfig = t.modo !== 'deshacer';
+  const hayDir = esConfig && e.reglaFirewall && d.prin;
+  const avisos = t.pasos.filter((p) => p.estado === 'aviso').length;
+  let html = '<div class="cab-listo"><div class="c">✓</div><div><h1>¡Listo!</h1><p class="s">' +
+    (esConfig ? (hayDir ? 'Esta computadora ya es el servidor del negocio.' : 'Los cambios se aplicaron correctamente.') : 'Se quitó lo que pediste.') + '</p></div></div>';
+  if (hayDir) {
+    const url = 'http://' + d.prin.ip + ':' + d.puerto;
+    html += '<div class="dir"><div class="t"><small>Escríbela en las otras cajas</small><b>' + esc(url) + '</b></div><button class="pri" id="cp1">Copiar</button></div>';
+    if (d.equipo) html += '<div class="dir2">También funciona con el nombre: <b>http://' + esc(d.equipo) + ':' + d.puerto + '</b><button class="sec" id="cp2">Copiar</button></div>';
+    if (d.otras.length) html += '<p class="s" style="font-size:12.5px">Otras direcciones de esta computadora: ' + d.otras.map((a) => '<code>http://' + esc(a.ip) + ':' + d.puerto + '</code>').join(' ') + '</p>';
+    html += '<div class="aviso">💡 Deja esta computadora <b>encendida</b> y con Compoint Punto <b>abierto</b>. En las otras cajas, escribe la dirección en «Dirección del sistema».</div>';
+    if (!d.prin.dhcp && t.pasos.some((p) => p.clave === 'ip' && p.estado === 'ok')) html += '<div class="aviso azul">🔒 Tip: si puedes, en el router «reserva» esta IP para que ningún otro equipo la use.</div>';
+    if (d.prin.dhcp) html += '<div class="aviso">📍 La IP de esta computadora todavía <b>cambia sola</b>: si el router la cambia, las otras cajas dejarán de encontrarla. Vuelve a abrir el asistente y elige Predeterminado para fijarla.</div>';
+  }
+  if (avisos) html += '<div class="aviso">Hubo ' + avisos + ' paso(s) opcional(es) que no se pudieron hacer, pero no afectan lo principal.</div>';
+  html += '<details class="que"><summary>Ver qué se hizo</summary><div class="lista">' + listaPasos(t.pasos) + '</div></details>';
+  html += '<div class="pie"><button class="sec" id="quitar">' + (esConfig ? 'Quitar permisos…' : 'Volver al inicio') + '</button><button class="pri" id="fin">Finalizar</button></div>';
+  $('#main').innerHTML = html;
+  if (hayDir) {
+    $('#cp1').onclick = (ev) => copiar('http://' + d.prin.ip + ':' + d.puerto, ev.target);
+    const c2 = $('#cp2'); if (c2) c2.onclick = (ev) => copiar('http://' + d.equipo + ':' + d.puerto, ev.target);
+  }
+  $('#quitar').onclick = () => { if (esConfig) { S.volverA = 'listo'; ir('deshacer'); } else { S.av = null; ir('modo'); } };
+  $('#fin').onclick = finalizar;
+}
+
+async function finalizar() {
+  try { await api('/api/cerrar', {}); } catch (e) { /* ya se cerró */ }
+  $('#main').innerHTML = '<div class="centro"><div class="c">✓</div><h1>Listo</h1><p class="s">Ya puedes cerrar esta ventana.</p></div>';
+  try { window.close(); } catch (e) { /* nada */ }
+}
+
+/* ------------------------------------------------------------ Inicio */
+setInterval(() => { api('/api/latido', {}).catch(() => {}); }, 3000);
+api('/api/latido', {}).catch(() => {});
+dibujar();
+api('/api/estado').then((e) => { S.estado = e; if (S.pant === 'bienvenida') bienvenida(); })
+  .catch((e) => { S.estado = { equipo: '', adaptadores: [], aviso: e.message }; if (S.pant === 'bienvenida') bienvenida(); });
+</script>
+</body>
+</html>

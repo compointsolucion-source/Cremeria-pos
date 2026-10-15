@@ -1,0 +1,41 @@
+ASISTENTE DEL SERVIDOR - COMPOINT PUNTO
+=======================================
+
+QUE ES
+Un solo programa (Asistente-Servidor-Compoint.exe) que reemplaza a los 3 .bat
+anteriores (permitir Firewall, fijar IP, quitar regla). Se baja desde
+Ayuda y soporte (solo aparece dentro del programa de escritorio) y se usa en
+la computadora que sera el servidor del negocio.
+
+MODOS
+- Predeterminado (recomendado): permite el acceso en el Firewall (puerto 3000),
+  pone la red en Privada, deja fija la IP actual y responde a ping.
+- Avanzado: se elige cada paso, el puerto, los tipos de red del Firewall, la
+  tarjeta de red y la IP / mascara / puerta / DNS a mano.
+- Deshacer: quita el permiso del Firewall y/o regresa la tarjeta a IP automatica.
+
+COMO FUNCIONA POR DENTRO
+- El .exe abre una ventana (Microsoft Edge o Chrome en modo "app", sin barra de
+  direcciones) que muestra una pagina local (127.0.0.1, con clave de sesion).
+- Los cambios se hacen con PowerShell. Windows pide permiso de administrador
+  UNA vez, al pulsar "Configurar ahora" / "Aplicar" / "Quitar".
+- Si falla fijar la IP, regresa la tarjeta a automatica para no dejar la
+  computadora sin red.
+- Registro para soporte: %TEMP%\CompointAsistente\asistente-log.txt
+
+PROBAR LA PANTALLA SIN TOCAR WINDOWS
+  go build -o asistente . && ./asistente --simulado --sin-ventana --puerto 8780 --token prueba
+  y abrir  http://127.0.0.1:8780/?t=prueba
+  (variables para probar errores: ASISTENTE_SIM_ERROR=ip, ASISTENTE_SIM_UAC=no,
+   ASISTENTE_SIM_SINRED=1)
+
+RECOMPILAR EL .EXE
+  ./construir.sh       (genera frontend/descargas/Asistente-Servidor-Compoint.exe)
+
+ARCHIVOS
+  main.go        servidor local, clave de sesion, cierre al cerrar la ventana
+  tipos.go       opciones, validaciones y pasos
+  windows.go     PowerShell, permisos de administrador, ventana
+  simulado.go    version de pruebas (no toca Windows)
+  ui/index.html  la pantalla (logo, Predeterminado / Avanzado)
+  recursos/      icono de Compoint, manifiesto y version del .exe
