@@ -280,6 +280,9 @@
     <div class="card" style="width:95%; max-width:820px; max-height:96vh; overflow-y:auto;">
       <h3>💰 COBRAR</h3>
       <div class="total-grande" id="totalCobrarModal" style="text-align:center; margin:10px 0;"></div>
+      <div id="avisoOfflineCobro" style="display:none; background:#FFF3CD; color:#7A5B00; border:2px solid #FFB300; border-radius:10px; padding:8px 12px; margin:0 0 10px; font-weight:700; text-align:center;">
+        🟠 SIN INTERNET: la venta se guarda en esta computadora y se sube sola cuando regrese la conexión. (Fiado no disponible.)
+      </div>
 
       <div class="cobro-cols">
         <div class="cobro-izq">
@@ -348,6 +351,7 @@
 <script src="js/impresora-termica.js"></script>
 <script src="js/turno-caja.js"></script>
 <script src="js/offline-db.js"></script>
+<script src="js/ventas-offline.js"></script>
 <script>
 requiereLogin();
 
@@ -1230,6 +1234,62 @@ function devolverDesdeHistorial() {
   window.location.href = `admin/devoluciones.html?folio=${ticketSeleccionadoHistorial.folio}`;
 }
 
+// ---------- Cobro SIN INTERNET ----------
+// Arma el ticket en memoria con el mismo formato que el del servidor. Los descuentos de más
+// del 15% necesitan que un dueño/gerente teclee su contraseña, y eso solo se puede validar con internet.
+function construirTicketOfflineAv(pest) {
+  const limite = (monto, base) => base > 0 && (monto / base) * 100 > 15.0001;
+  for (const it of pest.carrito) {
+    if (limite(descuentoItemAv(it), subtotalItemAv(it))) {
+      mostrarToast('Sin internet no se pueden hacer descuentos de más del 15% (necesitan autorización). Quita o baja ese descuento.', 'error', 6000);
+      return null;
+    }
+  }
+  const t = totalesPestanaAv(pest);
+  if (limite(t.descTicket, t.bruto - t.descItems)) {
+    mostrarToast('Sin internet no se pueden hacer descuentos de más del 15% (necesitan autorización). Quita o baja ese descuento.', 'error', 6000);
+    return null;
+  }
+  const r2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
+  return {
+    offline: true, id: null, folio: generarFolioOffline(),
+    total: r2(t.bruto), descuento_monto: r2(t.descTicket),
+    descuento_motivo: pest.descuentoTicket ? pest.descuentoTicket.motivo : null,
+    items: pest.carrito.map(it => ({
+      id: null, tipo: it.tipo === 'kit' ? 'kit' : 'producto', producto_id: it.producto_id || null, kit_id: it.kit_id || null,
+      nombre_producto: it.nombre_producto, cantidad: it.cantidad, precio_unitario: it.precio_unitario,
+      subtotal: r2(subtotalItemAv(it)), descuento_monto: r2(descuentoItemAv(it)),
+      descuento_motivo: it.descuento ? it.descuento.motivo : null
+    }))
+  };
+}
+
+// Guarda la venta cobrada en esta computadora (se sube sola cuando regrese el internet).
+async function registrarVentaOfflineAv(ticket, pago) {
+  await guardarVentaOffline({
+    folio: ticket.folio, fecha: new Date().toISOString(),
+    metodo_pago: pago.metodo_pago, monto_efectivo: pago.monto_efectivo, monto_tarjeta: pago.monto_tarjeta,
+    efectivo_recibido: pago.efectivo_recibido, turno_id: pago.turno_id,
+    descuento_monto: ticket.descuento_monto, descuento_motivo: ticket.descuento_motivo,
+    items: ticket.items.map(i => ({
+      tipo: i.tipo, producto_id: i.producto_id, kit_id: i.kit_id, nombre_producto: i.nombre_producto,
+      cantidad: i.cantidad, precio_unitario: i.precio_unitario, descuento_monto: i.descuento_monto, descuento_motivo: i.descuento_motivo
+    }))
+  });
+  pintarAvisoVentasOffline();
+  setTimeout(() => { sincronizarVentasOffline(); }, 1500); // por si el internet ya regresó
+  return { offline: true, productos_agotados: [] };
+}
+
+function turnoDesdeCacheOffline() {
+  const t = leerCacheOffline('turno');
+  if (!t || !t.id) {
+    mostrarToast('Sin internet y no hay un turno abierto guardado en esta caja. Abre el turno cuando haya internet.', 'error', 6000);
+    return null;
+  }
+  return t;
+}
+
 async function irACobrarAvanzada() {
   if (carritoActivo().length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
 
@@ -1242,9 +1302,16 @@ async function irACobrarAvanzada() {
       // Ya es un ticket real guardado (vino de Mostrador) — se usa tal cual, sin duplicarlo.
       ticket = await apiFetch(`/tickets/folio/${encodeURIComponent(pestanaActual.nombre.replace('📥 ', ''))}`);
     } else {
-      ticket = await apiFetch('/tickets', { method: 'POST', body: JSON.stringify({ items: carritoActivo().map(itemParaServidorAv) }) });
-      ticketCreado = ticket;
-      if (hayDescuentosPendientesAv(pestanaActual)) {
+      try {
+        ticket = await apiFetch('/tickets', { method: 'POST', body: JSON.stringify({ items: carritoActivo().map(itemParaServidorAv) }) });
+        ticketCreado = ticket;
+      } catch (errCrear) {
+        // Sin internet: la venta se arma aquí mismo y se guarda en esta computadora al cobrar.
+        if (!esErrorDeConexion(errCrear)) throw errCrear;
+        ticket = construirTicketOfflineAv(pestanaActual);
+        if (!ticket) return;
+      }
+      if (!ticket.offline && hayDescuentosPendientesAv(pestanaActual)) {
         ticket = await aplicarDescuentosPendientesAv(ticket, pestanaActual);
       }
     }
@@ -1273,8 +1340,16 @@ let configuracionCobrarAvanzada = null;
 async function abrirModalCobrar(ticket) {
   ticketParaCobrarAvanzada = ticket;
   if (!configuracionCobrarAvanzada) {
-    configuracionCobrarAvanzada = await apiFetch('/configuracion');
+    try {
+      configuracionCobrarAvanzada = await apiFetch('/configuracion');
+      guardarCacheOffline('config', configuracionCobrarAvanzada);
+    } catch (errCfg) {
+      if (!esErrorDeConexion(errCfg)) throw errCfg;
+      configuracionCobrarAvanzada = leerCacheOffline('config') || {};
+    }
   }
+  const avisoOff = document.getElementById('avisoOfflineCobro');
+  if (avisoOff) avisoOff.style.display = ticket.offline ? 'block' : 'none';
 
   document.getElementById('totalCobrarModal').textContent = `$${totalNetoTicketAv(ticket).toFixed(2)}`;
   renderMetodosPagoModalCobrar();
@@ -1299,7 +1374,7 @@ function renderMetodosPagoModalCobrar() {
     { id: 'cheque', label: '🖋️ Cheque', activo: !!config.cheque_habilitado },
     { id: 'vale_despensa', label: '🎟️ Vale', activo: !!config.vales_habilitado },
     { id: 'mixto', label: 'Mixto', activo: config.mixto_habilitado !== false },
-    { id: 'credito', label: '💳 Fiado', activo: config.credito_habilitado !== false }
+    { id: 'credito', label: '💳 Fiado', activo: config.credito_habilitado !== false && !(ticketParaCobrarAvanzada && ticketParaCobrarAvanzada.offline) }
   ];
 
   document.getElementById('metodosPagoModalCobrar').innerHTML = metodos.filter(m => m.activo).map(m => `
@@ -1534,7 +1609,7 @@ async function confirmarCobroAvanzada(sinTicket = false) {
 
   try {
     // Sin turno abierto: se abre una ventana para abrirlo y declarar el efectivo en caja.
-    const turno = await asegurarTurnoAbierto();
+    const turno = ticketParaCobrarAvanzada.offline ? turnoDesdeCacheOffline() : await asegurarTurnoAbierto();
     if (!turno) return;
 
     const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
@@ -1575,12 +1650,16 @@ async function confirmarCobroAvanzada(sinTicket = false) {
       cliente_id = clienteCobrarAvanzada.id;
     }
 
-    const resultadoPago = await apiFetch(`/tickets/${ticketParaCobrarAvanzada.id}/pagar`, {
-      method: 'POST',
-      body: JSON.stringify({ metodo_pago: metodoPagoCobrarAvanzada, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket })
-    });
+    const datosPago = { metodo_pago: metodoPagoCobrarAvanzada, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket };
+    let resultadoPago;
+    if (ticketParaCobrarAvanzada.offline) {
+      if (metodoPagoCobrarAvanzada === 'credito') { mostrarToast('El fiado necesita internet', 'error'); return; }
+      resultadoPago = await registrarVentaOfflineAv(ticketParaCobrarAvanzada, datosPago);
+    } else {
+      resultadoPago = await apiFetch(`/tickets/${ticketParaCobrarAvanzada.id}/pagar`, { method: 'POST', body: JSON.stringify(datosPago) });
+    }
 
-    mostrarToast('Pago procesado correctamente', 'exito');
+    mostrarToast(resultadoPago.offline ? `🟠 Venta guardada SIN internet (folio ${ticketParaCobrarAvanzada.folio}). Se subirá sola.` : 'Pago procesado correctamente', 'exito', resultadoPago.offline ? 5000 : undefined);
     if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
       mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')}`, 'error');
     }

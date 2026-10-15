@@ -154,11 +154,13 @@ async function abrirTurnoConDeclaracion() {
 // Devuelve el turno abierto; si no hay, ofrece abrirlo en ese momento.
 async function asegurarTurnoAbierto() {
   const turno = await apiFetch('/turnos/actual');
-  if (turno) return turno;
+  // Se guarda una copia del turno para poder seguir cobrando si luego se va el internet.
+  const guardar = (t) => { if (t && typeof guardarCacheOffline === 'function') guardarCacheOffline('turno', t); };
+  if (turno) { guardar(turno); return turno; }
   const quiere = await confirmarAccion('No hay un turno de caja abierto. Para cobrar hay que abrir uno y declarar el efectivo que hay en caja. ¿Abrirlo ahora?');
   if (!quiere) return null;
   const nuevo = await abrirTurnoConDeclaracion();
-  if (nuevo) mostrarToast('Turno abierto. ¡Ya puedes cobrar!', 'exito');
+  if (nuevo) { guardar(nuevo); mostrarToast('Turno abierto. ¡Ya puedes cobrar!', 'exito'); }
   return nuevo;
 }
 

@@ -17,6 +17,64 @@ function generarFolio(sucursalId) {
   return `S${sucursalId}${base}`;
 }
 
+// Descuenta del inventario lo vendido en un ticket ya pagado (productos, y componentes de kits).
+// Devuelve los nombres de los productos que quedaron agotados.
+async function descontarInventarioVenta(conexion, ticketId, usuarioId) {
+  // Descontar inventario automáticamente por cada producto vendido (no aplica a kits, que descuentan sus componentes).
+  // La existencia NUNCA baja de 0 (GREATEST), pero la venta se permite de
+  // todas formas — solo se avisa al final si algún producto quedó agotado.
+  const productosAgotados = [];
+  const items = await conexion.query('SELECT * FROM ticket_detalle WHERE ticket_id = $1', [ticketId]);
+  for (const item of items.rows) {
+    if (item.tipo === 'producto' && item.producto_id) {
+      await conexion.query(
+        `INSERT INTO inventario (producto_id, existencia_actual) VALUES ($1, 0)
+         ON CONFLICT (producto_id) DO NOTHING`,
+        [item.producto_id]
+      );
+      const antesResult = await conexion.query('SELECT existencia_actual FROM inventario WHERE producto_id = $1', [item.producto_id]);
+      const existenciaAntes = parseFloat(antesResult.rows[0].existencia_actual);
+      if (existenciaAntes - parseFloat(item.cantidad) < 0) {
+        productosAgotados.push(item.nombre_producto);
+      }
+      await conexion.query(
+        'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual - $1, 0) WHERE producto_id = $2',
+        [item.cantidad, item.producto_id]
+      );
+      await conexion.query(
+        `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, referencia_id, usuario_id)
+         VALUES ($1, 'salida_venta', $2, $3, $4)`,
+        [item.producto_id, -item.cantidad, ticketId, usuarioId]
+      );
+    } else if (item.tipo === 'kit' && item.kit_id) {
+      const componentes = await conexion.query('SELECT * FROM kit_productos WHERE kit_id = $1', [item.kit_id]);
+      for (const comp of componentes.rows) {
+        const cantidadTotal = comp.cantidad * item.cantidad; // por si el kit se vendió más de una vez
+        await conexion.query(
+          `INSERT INTO inventario (producto_id, existencia_actual) VALUES ($1, 0) ON CONFLICT (producto_id) DO NOTHING`,
+          [comp.producto_id]
+        );
+        const antesResult = await conexion.query('SELECT existencia_actual FROM inventario WHERE producto_id = $1', [comp.producto_id]);
+        const existenciaAntes = parseFloat(antesResult.rows[0].existencia_actual);
+        if (existenciaAntes - cantidadTotal < 0) {
+          const nombreProdResult = await conexion.query('SELECT nombre FROM productos WHERE id = $1', [comp.producto_id]);
+          productosAgotados.push(nombreProdResult.rows[0].nombre);
+        }
+        await conexion.query(
+          'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual - $1, 0) WHERE producto_id = $2',
+          [cantidadTotal, comp.producto_id]
+        );
+        await conexion.query(
+          `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, referencia_id, usuario_id)
+           VALUES ($1, 'salida_venta', $2, $3, $4)`,
+          [comp.producto_id, -cantidadTotal, ticketId, usuarioId]
+        );
+      }
+    }
+  }
+  return productosAgotados;
+}
+
 // Crear ticket desde mostrador
 router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
   const cliente = await pool.connect();
@@ -63,6 +121,94 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     res.status(500).json({ error: 'Error al generar el ticket' });
   } finally {
     cliente.release();
+  }
+});
+
+// Venta cobrada SIN INTERNET en una caja: la caja la guardó en la computadora (con su folio ya
+// impreso en el ticket) y la manda aquí al regresar la conexión. Crea el ticket ya pagado, descuenta
+// inventario y es idempotente: si el folio ya existe, no la duplica.
+router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
+  try {
+    const b = req.body || {};
+    const folio = String(b.folio || '').toUpperCase();
+    if (!/^[A-Z0-9-]{4,20}$/.test(folio)) return res.status(400).json({ error: 'Folio inválido' });
+    const metodosOk = ['efectivo', 'tarjeta', 'transferencia', 'dolares', 'cheque', 'vale_despensa', 'mixto'];
+    if (!metodosOk.includes(b.metodo_pago)) return res.status(400).json({ error: 'Método de pago no permitido para ventas sin internet' });
+    const items = Array.isArray(b.items) ? b.items : [];
+    if (!items.length || items.length > 500) return res.status(400).json({ error: 'La venta necesita productos' });
+    for (const it of items) {
+      if (!(Number(it.cantidad) > 0) || !(Number(it.precio_unitario) >= 0) || !it.nombre_producto) return res.status(400).json({ error: 'Renglón de venta inválido' });
+    }
+
+    const previo = await conexion.query('SELECT * FROM tickets WHERE folio = $1', [folio]);
+    if (previo.rows.length) return res.json({ ...previo.rows[0], duplicado: true });
+
+    // Fecha real de la venta (la de la caja), sin permitir futuro ni más de 60 días atrás.
+    let fecha = new Date(b.fecha);
+    const ahora = new Date();
+    if (isNaN(fecha.getTime()) || fecha > ahora) fecha = ahora;
+    if (ahora - fecha > 60 * 24 * 3600 * 1000) fecha = ahora;
+
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const lineas = items.map((it) => {
+      const cantidad = Number(it.cantidad), precio = Number(it.precio_unitario);
+      const subtotal = r2(cantidad * precio);
+      const desc = Math.min(Math.max(r2(Number(it.descuento_monto) || 0), 0), subtotal);
+      return { it, cantidad, precio, subtotal, desc, tipo: it.tipo === 'kit' ? 'kit' : 'producto' };
+    });
+    const bruto = r2(lineas.reduce((s, l) => s + l.subtotal, 0));
+    const descItems = r2(lineas.reduce((s, l) => s + l.desc, 0));
+    const descTicket = Math.min(Math.max(r2(Number(b.descuento_monto) || 0), 0), r2(bruto - descItems));
+    const neto = r2(bruto - descItems - descTicket);
+
+    const montoEfectivo = Math.max(Number(b.monto_efectivo) || 0, 0);
+    const montoTarjeta = Math.max(Number(b.monto_tarjeta) || 0, 0);
+    const efectivoRecibido = b.efectivo_recibido ? Math.max(Number(b.efectivo_recibido) || 0, 0) : null;
+
+    let turnoId = null;
+    if (b.turno_id) {
+      const t = await conexion.query('SELECT id FROM turnos WHERE id = $1 AND sucursal_id = $2', [parseInt(b.turno_id), req.sucursalId]);
+      if (t.rows.length) turnoId = t.rows[0].id;
+    }
+
+    await conexion.query('BEGIN');
+    const tk = (await conexion.query(
+      `INSERT INTO tickets (folio, sucursal_id, mostrador_usuario_id, cajero_usuario_id, turno_id, estado, total,
+         metodo_pago, monto_efectivo, monto_tarjeta, fecha_creacion, fecha_pago, descuento_monto, descuento_motivo, efectivo_recibido)
+       VALUES ($1,$2,$3,$3,$4,'pagado',$5,$6,$7,$8,$9::timestamptz,$9::timestamptz,$10,$11,$12) RETURNING *`,
+      [folio, req.sucursalId, req.usuario.id, turnoId, bruto, b.metodo_pago, montoEfectivo, montoTarjeta, fecha.toISOString(),
+       descTicket, descTicket > 0 ? String(b.descuento_motivo || 'Descuento (venta sin internet)').slice(0, 255) : null, efectivoRecibido]
+    )).rows[0];
+    for (const l of lineas) {
+      await conexion.query(
+        `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal, descuento_monto, descuento_motivo)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [tk.id, l.tipo, l.tipo === 'producto' ? (l.it.producto_id || null) : null, l.tipo === 'kit' ? (l.it.kit_id || null) : null,
+         String(l.it.nombre_producto).slice(0, 150), l.cantidad, l.precio, l.subtotal, l.desc,
+         l.desc > 0 ? String(l.it.descuento_motivo || 'Descuento (venta sin internet)').slice(0, 255) : null]
+      );
+    }
+    const agotados = await descontarInventarioVenta(conexion, tk.id, req.usuario.id);
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id, accion: 'cobrar_ticket', modulo: 'tickets', referencia_id: tk.id,
+      valor_nuevo: { folio, total: bruto, metodo_pago: b.metodo_pago, venta_sin_internet: true, fecha_venta: fecha.toISOString() }
+    });
+    await conexion.query('COMMIT');
+
+    const io = req.app.get('io');
+    if (io) io.to(`sucursal_${req.sucursalId}`).emit('ticket_pagado', { id: tk.id });
+    res.json({ ...tk, total_neto: neto, productos_agotados: [...new Set(agotados)] });
+  } catch (err) {
+    await conexion.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') { // otro envío igual llegó al mismo tiempo
+      const ya = await pool.query('SELECT * FROM tickets WHERE folio = $1', [String(req.body && req.body.folio || '').toUpperCase()]).catch(() => ({ rows: [] }));
+      if (ya.rows.length) return res.json({ ...ya.rows[0], duplicado: true });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar la venta hecha sin internet' });
+  } finally {
+    conexion.release();
   }
 });
 
@@ -442,58 +588,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
       await conexion.query('UPDATE clientes SET saldo_actual = saldo_actual + $1 WHERE id = $2', [totalNeto, cliente_id]);
     }
 
-    // Descontar inventario automáticamente por cada producto vendido (no aplica a kits, que descuentan sus componentes).
-    // La existencia NUNCA baja de 0 (GREATEST), pero la venta se permite de
-    // todas formas — solo se avisa al final si algún producto quedó agotado.
-    const productosAgotados = [];
-    const items = await conexion.query('SELECT * FROM ticket_detalle WHERE ticket_id = $1', [ticketPagado.id]);
-    for (const item of items.rows) {
-      if (item.tipo === 'producto' && item.producto_id) {
-        await conexion.query(
-          `INSERT INTO inventario (producto_id, existencia_actual) VALUES ($1, 0)
-           ON CONFLICT (producto_id) DO NOTHING`,
-          [item.producto_id]
-        );
-        const antesResult = await conexion.query('SELECT existencia_actual FROM inventario WHERE producto_id = $1', [item.producto_id]);
-        const existenciaAntes = parseFloat(antesResult.rows[0].existencia_actual);
-        if (existenciaAntes - parseFloat(item.cantidad) < 0) {
-          productosAgotados.push(item.nombre_producto);
-        }
-        await conexion.query(
-          'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual - $1, 0) WHERE producto_id = $2',
-          [item.cantidad, item.producto_id]
-        );
-        await conexion.query(
-          `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, referencia_id, usuario_id)
-           VALUES ($1, 'salida_venta', $2, $3, $4)`,
-          [item.producto_id, -item.cantidad, ticketPagado.id, req.usuario.id]
-        );
-      } else if (item.tipo === 'kit' && item.kit_id) {
-        const componentes = await conexion.query('SELECT * FROM kit_productos WHERE kit_id = $1', [item.kit_id]);
-        for (const comp of componentes.rows) {
-          const cantidadTotal = comp.cantidad * item.cantidad; // por si el kit se vendió más de una vez
-          await conexion.query(
-            `INSERT INTO inventario (producto_id, existencia_actual) VALUES ($1, 0) ON CONFLICT (producto_id) DO NOTHING`,
-            [comp.producto_id]
-          );
-          const antesResult = await conexion.query('SELECT existencia_actual FROM inventario WHERE producto_id = $1', [comp.producto_id]);
-          const existenciaAntes = parseFloat(antesResult.rows[0].existencia_actual);
-          if (existenciaAntes - cantidadTotal < 0) {
-            const nombreProdResult = await conexion.query('SELECT nombre FROM productos WHERE id = $1', [comp.producto_id]);
-            productosAgotados.push(nombreProdResult.rows[0].nombre);
-          }
-          await conexion.query(
-            'UPDATE inventario SET existencia_actual = GREATEST(existencia_actual - $1, 0) WHERE producto_id = $2',
-            [cantidadTotal, comp.producto_id]
-          );
-          await conexion.query(
-            `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, referencia_id, usuario_id)
-             VALUES ($1, 'salida_venta', $2, $3, $4)`,
-            [comp.producto_id, -cantidadTotal, ticketPagado.id, req.usuario.id]
-          );
-        }
-      }
-    }
+    const productosAgotados = await descontarInventarioVenta(conexion, ticketPagado.id, req.usuario.id);
 
     await registrarBitacora(conexion, {
       usuario_id: req.usuario.id,
