@@ -1,55 +1,119 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Configurar Compoint Punto</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
-<link rel="stylesheet" href="estilos.css"></head><body><div class="caja">
-<h1>Configurar Compoint Punto</h1>
-<p>Escribe la dirección del sistema de este negocio (te la da Compoint). Solo se hace una vez en este equipo.</p>
-<label>Dirección del sistema</label>
-<input id="url" placeholder="https://minegocio.onrender.com  (o la del servidor: http://192.168.1.10:3000)" autofocus>
-<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button class="sec" id="buscar" type="button" style="margin-top:0;width:auto;padding:8px 14px;font-size:13px">Buscar servidor en la red</button><span id="busq" style="font-size:12px;color:#666"></span></div>
-<div id="hallados" style="margin-top:6px"></div>
-<label>Nombre del negocio (opcional)</label>
-<input id="nombre" placeholder="Mi negocio">
-<details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px;color:#555">Entrar automáticamente con un usuario (opcional)</summary>
-<label>Usuario</label><input id="usuario" autocomplete="off">
-<label>Contraseña</label><input id="password" type="password" autocomplete="off">
-<div class="nota">Solo para equipos de una sola persona. La contraseña se guarda cifrada con tu cuenta de Windows y solo entra sola al abrir el programa; si cierras sesión, la siguiente vez la escribes tú.</div></details>
-<div class="err" id="err"></div>
-<button id="ok">Guardar y abrir</button><button class="sec" id="cancelar" style="display:none">Cancelar</button>
-<div id="bloqueServidor" style="display:none;margin-top:18px;border-top:1px solid #e5e5e5;padding-top:14px">
-<p style="margin-bottom:6px"><b>¿Es la computadora principal del negocio?</b> Instálala como servidor: guarda toda la información, sigue trabajando sin internet y hace respaldos automáticos. Las demás cajas se conectan a ella por la red local.</p>
-<button class="sec" id="esServidor" style="margin-top:0">Esta computadora será el servidor del negocio</button></div>
-</div><script>
-(async()=>{
-  const c=await compoint.leerConfig();
-  if(c.url) document.getElementById('url').value=c.url;
-  if(c.nombre&&c.nombre!=='Compoint Punto') document.getElementById('nombre').value=c.nombre;
-  if(c.usuario) document.getElementById('usuario').value=c.usuario;
-  if(window.compointServidor) document.getElementById('bloqueServidor').style.display='block';
-  document.getElementById('esServidor').onclick=()=>compointServidor.elegirModoServidor();
-  if(c.configurado){const b=document.getElementById('cancelar');b.style.display='block';b.onclick=()=>compoint.cerrar();}
-  document.getElementById('ok').onclick=async()=>{
-    let url=document.getElementById('url').value.trim();
-    if(url&&!/^https?:\/\//i.test(url)){
+<link rel="stylesheet" href="estilos-asistente.css"></head>
+<body>
+<div class="app">
+  <aside class="lado">
+    <img class="lg" src="logo-claro.png" alt="Compoint, punto de soluciones">
+    <div class="pasos" id="pasosLado"></div>
+    <div class="v">Compoint Punto<br>Versión <span id="ver">1.0.0</span></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// c = configuración actual; uso = 'caja' | 'servidor'; vinoDeUso = si se mostró la pantalla de uso
+const S = { c: {}, pant: 'uso', uso: 'caja', vinoDeUso: false, rutas: null };
+
+function pintarLado() {
+  const nombres = S.vinoDeUso ? ['Uso', 'Conexión'] : ['Conexión'];
+  const n = S.vinoDeUso && S.pant === 'conexion' ? 2 : 1;
+  $('#pasosLado').innerHTML = nombres.map((t, i) => {
+    const k = i + 1;
+    return '<div class="' + (k === n ? 'on' : (k < n ? 'hecho' : '')) + '"><i>' + (k < n ? '✓' : k) + '</i>' + t + '</div>';
+  }).join('');
+}
+
+function dibujar() { pintarLado(); (S.pant === 'uso' ? pantallaUso : pantallaConexion)(); $('#main').scrollTop = 0; }
+
+/* ------------------------------------------------------------ ¿Cómo se usará esta computadora? */
+function pantallaUso() {
+  const srv = S.uso === 'servidor';
+  $('#main').innerHTML =
+    '<h1>¿Cómo se usará esta computadora?</h1>' +
+    '<p class="s">Solo se pregunta una vez. Podrás cambiarlo después desde el icono junto al reloj.</p>' +
+    '<div class="opc">' +
+      '<button class="op' + (!srv ? ' sel' : '') + '" data-uso="caja"><span class="rd"></span><span class="ic">🖥️</span><div><h3>Caja o equipo normal</h3><p>Se conecta al sistema del negocio (en internet o en la red del local).</p></div></button>' +
+      '<button class="op' + (srv ? ' sel' : '') + '" data-uso="servidor"><span class="rd"></span><span class="ic">🗄️</span><div><h3>Servidor del negocio</h3><p>Guarda toda la información, sigue vendiendo sin internet y hace respaldos. Las demás cajas se conectan a esta.</p></div></button>' +
+    '</div>' +
+    (srv ? '<div class="aviso azul">La información del negocio se guardará en <b>' + esc(S.rutas ? S.rutas.datos : 'C:\\CompointPunto\\datos') + '</b> y los respaldos en <b>' + esc(S.rutas ? S.rutas.respaldos : 'C:\\CompointPunto\\Respaldos') + '</b>.</div>' : '') +
+    '<div class="pie"><small>Si no estás seguro, elige «Caja» y pregunta a Compoint.</small><div class="der"><button class="pri" id="sig">' + (srv ? 'Preparar el servidor' : 'Siguiente') + '</button></div></div>';
+  document.querySelectorAll('[data-uso]').forEach((b) => { b.onclick = () => { S.uso = b.dataset.uso; pantallaUso(); }; });
+  $('#sig').onclick = () => {
+    if (S.uso === 'servidor') { $('#sig').disabled = true; $('#sig').textContent = 'Abriendo…'; compointServidor.elegirModoServidor(); }
+    else { S.pant = 'conexion'; dibujar(); }
+  };
+}
+
+/* ------------------------------------------------------------ Conexión al sistema del negocio */
+function pantallaConexion() {
+  const c = S.c;
+  $('#main').innerHTML =
+    '<h1>Conectar con el sistema del negocio</h1>' +
+    '<p class="s">Escribe la dirección del sistema de este negocio (te la da Compoint). Solo se hace una vez en este equipo.</p>' +
+    '<div class="camp"><label>Dirección del sistema</label><input id="url" placeholder="https://minegocio.onrender.com  (o la del servidor: http://192.168.1.10:3000)" autofocus></div>' +
+    '<div class="fila-busca"><button class="sec" id="buscar" type="button">Buscar servidor en la red</button><span id="busq"></span></div>' +
+    '<div id="hallados" style="display:grid;gap:6px"></div>' +
+    '<div class="camp"><label>Nombre del negocio (opcional)</label><input id="nombre" placeholder="Mi negocio"></div>' +
+    '<details class="que"><summary>Entrar automáticamente con un usuario (opcional)</summary><div class="cuerpo">' +
+      '<div class="f2"><div class="camp"><label>Usuario</label><input id="usuario" autocomplete="off"></div><div class="camp"><label>Contraseña</label><input id="password" type="password" autocomplete="off"></div></div>' +
+      '<div class="nota">Solo para equipos de una sola persona. La contraseña se guarda cifrada con tu cuenta de Windows y solo entra sola al abrir el programa; si cierras sesión, la siguiente vez la escribes tú.</div></div></details>' +
+    '<div class="err" id="err"></div>' +
+    (c.configurado && window.compointServidor ? '<button class="enlace" id="esServidor" type="button">Convertir esta computadora en el servidor del negocio…</button>' : '') +
+    '<div class="pie"><small>Los datos se guardan solo en este equipo.</small><div class="der">' +
+      (S.vinoDeUso ? '<button class="sec" id="atras">Atrás</button>' : '') +
+      (c.configurado ? '<button class="sec" id="cancelar">Cancelar</button>' : '') +
+      '<button class="pri" id="ok">Guardar y abrir</button></div></div>';
+
+  if (c.url) $('#url').value = c.url;
+  if (c.nombre && c.nombre !== 'Compoint Punto') $('#nombre').value = c.nombre;
+  if (c.usuario) $('#usuario').value = c.usuario;
+  if ($('#atras')) $('#atras').onclick = () => { S.pant = 'uso'; dibujar(); };
+  if ($('#cancelar')) $('#cancelar').onclick = () => compoint.cerrar();
+  if ($('#esServidor')) $('#esServidor').onclick = () => compointServidor.elegirModoServidor();
+
+  $('#ok').onclick = async () => {
+    let url = $('#url').value.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
       // Nombre de equipo o IP (sin punto de dominio, o numérica, o con puerto) = servidor local: http y puerto 3000
-      const local=/^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(url)||/^[^./:]+(:\d+)?(\/.*)?$/.test(url);
-      if(local){ const m=url.match(/^([^/:]+)(:\d+)?(\/.*)?$/); url='http://'+m[1]+(m[2]||':3000')+(m[3]||'/login.html'); }
-      else url='https://'+url;
+      const local = /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(url) || /^[^./:]+(:\d+)?(\/.*)?$/.test(url);
+      if (local) { const m = url.match(/^([^/:]+)(:\d+)?(\/.*)?$/); url = 'http://' + m[1] + (m[2] || ':3000') + (m[3] || '/login.html'); }
+      else url = 'https://' + url;
     }
-    if(!url){document.getElementById('err').textContent='Escribe la dirección del sistema';return;}
-    const r=await compoint.guardarConfig({url,nombre:document.getElementById('nombre').value.trim(),usuario:document.getElementById('usuario').value.trim(),password:document.getElementById('password').value});
-    if(r&&r.error) document.getElementById('err').textContent=r.error;
+    if (!url) { $('#err').textContent = 'Escribe la dirección del sistema'; return; }
+    const r = await compoint.guardarConfig({ url, nombre: $('#nombre').value.trim(), usuario: $('#usuario').value.trim(), password: $('#password').value });
+    if (r && r.error) $('#err').textContent = r.error;
   };
-  document.getElementById('buscar').onclick=async()=>{
-    const b=document.getElementById('buscar'),s=document.getElementById('busq'),h=document.getElementById('hallados');
-    b.disabled=true;h.innerHTML='';s.textContent='Buscando en la red…';
-    const r=await compoint.buscarServidores();
-    b.disabled=false;
-    if(!r.length){s.textContent='No se encontró ninguno. Revisa que el servidor esté encendido y el Firewall permita el acceso.';return;}
-    s.textContent=r.length+' encontrado(s):';
-    r.forEach(x=>{const d=document.createElement('button');d.type='button';d.className='sec';d.style.cssText='margin-top:4px;text-align:left;font-size:13px';
-      d.textContent=(x.equipo?x.equipo+'  —  ':'')+x.url;
-      d.onclick=()=>{document.getElementById('url').value=x.url+'/login.html';};h.appendChild(d);});
+
+  $('#buscar').onclick = async () => {
+    const b = $('#buscar'), s = $('#busq'), h = $('#hallados');
+    b.disabled = true; h.innerHTML = ''; s.textContent = 'Buscando en la red…';
+    const r = await compoint.buscarServidores();
+    b.disabled = false;
+    if (!r.length) { s.textContent = 'No se encontró ninguno. Revisa que el servidor esté encendido y el Firewall permita el acceso.'; return; }
+    s.textContent = r.length + ' encontrado(s):';
+    r.forEach((x) => {
+      const d = document.createElement('button'); d.type = 'button'; d.className = 'hallado';
+      d.textContent = (x.equipo ? x.equipo + '  —  ' : '') + x.url;
+      d.onclick = () => { $('#url').value = x.url + '/login.html'; };
+      h.appendChild(d);
+    });
   };
-  document.addEventListener('keyup',e=>{if(e.key==='Enter')document.getElementById('ok').click();});
+  $('#url').focus();
+}
+
+document.addEventListener('keyup', (e) => { if (e.key === 'Enter' && S.pant === 'conexion' && document.activeElement && document.activeElement.tagName === 'INPUT') $('#ok').click(); });
+
+(async () => {
+  S.c = await compoint.leerConfig();
+  if (S.c.version) $('#ver').textContent = S.c.version;
+  try { S.rutas = await compointServidor.rutasPrevistas(); } catch (e) { S.rutas = null; }
+  // Primera vez (sin dirección guardada): se pregunta si esta computadora es caja o servidor.
+  S.vinoDeUso = !S.c.configurado && !!window.compointServidor;
+  S.pant = S.vinoDeUso ? 'uso' : 'conexion';
+  dibujar();
 })();
-</script></body></html>
+</script>
+</body></html>

@@ -8,7 +8,9 @@
   "scripts": {
     "start": "node scripts/preparar-servidor.js && electron .",
     "build": "node scripts/construir.js",
-    "preparar": "node scripts/preparar-servidor.js"
+    "preparar": "node scripts/preparar-servidor.js",
+    "test": "node --test",
+    "empaquetar": "node scripts/empaquetar-instalador.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -57,18 +59,22 @@
       ]
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
-      "runAfterFinish": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Compoint Punto",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "installerSidebar": "build/instalador-lateral.bmp",
+      "uninstallerSidebar": "build/instalador-lateral.bmp",
+      "language": "3082"
     },
-    "artifactName": "Instalar-CompointPunto-${env.CLIENTE_ARCHIVO}.${ext}",
+    "artifactName": "Payload-CompointPunto.${ext}",
     "asar": false
   }
 }

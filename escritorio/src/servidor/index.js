@@ -49,13 +49,15 @@ function esperarSalud(puerto, intentos = 60) {
 }
 
 /**
- * @param {object} o  { app, dirServidor, pedirDatosNegocio: async () => datos, avisar: (texto) => void, secretos: { cifrar, descifrar } }
+ * @param {object} o  { app, dirServidor, pedirDatosNegocio: async () => datos, avisar: (texto) => void, secretos: { cifrar, descifrar },
+ *                   carpetas: { datos, respaldos, copiaExtra } elegidas en el instalador (opcionales) }
  */
-async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () => {}, secretos = {} }) {
+async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () => {}, secretos = {}, carpetas = {} }) {
   const cifrar = secretos.cifrar || ((t) => t);
   const descifrar = secretos.descifrar || ((t) => t);
-  const r = rutas(app);
+  const r = rutas(app, carpetas);
   const log = (t) => { try { fs.appendFileSync(r.log, new Date().toISOString() + ' ' + t + '\n'); } catch (e) { /* sin log */ } };
+  for (const aviso of r.avisos || []) log(aviso);
 
   // Claves internas (se generan una sola vez y se conservan)
   let cfg = leerJson(r.configuracion, {});

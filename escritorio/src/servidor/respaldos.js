@@ -1,5 +1,6 @@
 // Respaldos automáticos del negocio.
-//  - Se guardan en el disco local (C:\CompointPunto\Respaldos), los últimos 30.
+//  - Se guardan en el disco local (C:\CompointPunto\Respaldos, o la carpeta elegida en el instalador), los últimos 30.
+//  - Si se eligió una "copia extra" (otra unidad, USB o carpeta de red), cada respaldo también se copia ahí.
 //  - Si hay internet y Cloudinary está configurado, se sube una copia (1 por día, los últimos 10 días).
 //  - Si no hay internet, la copia en la nube queda pendiente y se reintenta sola.
 // Formato: archivo .json.gz con todas las tablas (se restaura con restaurarRespaldo).
@@ -98,9 +99,60 @@ function crearGestor({ rutas, urlBase, obtenerNegocio, obtenerNube, log }) {
   function estado() { return leerJson(rutas.estadoRespaldos, {}); }
   function guardarEstado(cambios) { guardarJson(rutas.estadoRespaldos, { ...estado(), ...cambios }); }
 
-  function listarLocales() {
-    return fs.readdirSync(rutas.respaldos).filter(f => /^respaldo-.*\.json\.gz$/.test(f)).sort().reverse()
-      .map(f => { const st = fs.statSync(path.join(rutas.respaldos, f)); return { archivo: f, ruta: path.join(rutas.respaldos, f), tamano: st.size, fecha: st.mtime.toISOString() }; });
+  // Carpeta de respaldos que sí se puede usar ahora: la elegida o, si no está disponible (USB desconectada),
+  // la estándar.
+  function dirRespaldos() {
+    try {
+      fs.mkdirSync(rutas.respaldos, { recursive: true });
+      fs.accessSync(rutas.respaldos, fs.constants.W_OK);
+      return rutas.respaldos;
+    } catch (e) {
+      if (rutas.respaldosPorDefecto && rutas.respaldosPorDefecto !== rutas.respaldos) {
+        log('La carpeta de respaldos (' + rutas.respaldos + ') no está disponible; se usa ' + rutas.respaldosPorDefecto);
+        fs.mkdirSync(rutas.respaldosPorDefecto, { recursive: true });
+        return rutas.respaldosPorDefecto;
+      }
+      throw e;
+    }
+  }
+
+  function listarEn(dir) {
+    try {
+      return fs.readdirSync(dir).filter(f => /^respaldo-.*\.json\.gz$/.test(f)).sort().reverse()
+        .map(f => { const st = fs.statSync(path.join(dir, f)); return { archivo: f, ruta: path.join(dir, f), tamano: st.size, fecha: st.mtime.toISOString() }; });
+    } catch (e) { return []; }
+  }
+
+  function listarLocales() { return listarEn(dirRespaldos()); }
+
+  // Copia extra: el mismo archivo en otra unidad. Si la unidad no está, queda pendiente y se reintenta.
+  function copiarExtra(archivo, nombre) {
+    const destinoDir = rutas.copiaExtra;
+    if (!destinoDir) return { estado: 'sin-configurar' };
+    try {
+      fs.mkdirSync(destinoDir, { recursive: true });
+      const destino = path.join(destinoDir, nombre);
+      fs.copyFileSync(archivo, destino + '.parcial');
+      fs.renameSync(destino + '.parcial', destino);
+      for (const viejo of listarEn(destinoDir).slice(MAX_LOCALES)) { try { fs.unlinkSync(viejo.ruta); } catch (e) { /* ignorar */ } }
+      guardarEstado({ extra: { ruta: destinoDir, ultimo_ok: new Date().toISOString(), archivo: nombre, error: null } });
+      return { estado: 'ok', ruta: destinoDir };
+    } catch (e) {
+      const msg = String(e && e.message || e).slice(0, 300);
+      log('Copia extra de respaldos falló (' + destinoDir + '): ' + msg);
+      guardarEstado({ extra: { ...(estado().extra || {}), ruta: destinoDir, error: msg, ultimo_intento: new Date().toISOString() } });
+      return { estado: 'error', error: msg };
+    }
+  }
+
+  // Si la copia extra quedó pendiente (unidad desconectada), la vuelve a intentar con el último respaldo.
+  function reintentarExtra() {
+    if (!rutas.copiaExtra) return null;
+    const ultimo = listarLocales()[0];
+    if (!ultimo) return null;
+    const ya = listarEn(rutas.copiaExtra)[0];
+    if (ya && ya.archivo === ultimo.archivo && !(estado().extra || {}).error) return null;
+    return copiarExtra(ultimo.ruta, ultimo.archivo);
   }
 
   async function intentarNube(archivo, fecha) {
@@ -123,21 +175,24 @@ function crearGestor({ rutas, urlBase, obtenerNegocio, obtenerNube, log }) {
     enCurso = (async () => {
       const ahora = new Date();
       const nombre = `respaldo-${selloHora(ahora)}.json.gz`;
-      const final = path.join(rutas.respaldos, nombre);
-      const tmp = final + '.parcial';
+      let final = '', tmp = '';
       try {
+        const dirLocal = dirRespaldos();
+        final = path.join(dirLocal, nombre);
+        tmp = final + '.parcial';
         const tablas = await volcar(urlBase, tmp, log);
         verificar(tmp, tablas);
         fs.renameSync(tmp, final);
         const filas = Object.values(tablas).reduce((a, b) => a + b, 0);
         // Rotación local
-        for (const viejo of listarLocales().slice(MAX_LOCALES)) { try { fs.unlinkSync(viejo.ruta); } catch (e) { /* ignorar */ } }
+        for (const viejo of listarEn(path.dirname(final)).slice(MAX_LOCALES)) { try { fs.unlinkSync(viejo.ruta); } catch (e) { /* ignorar */ } }
         guardarEstado({ local: { ultimo_ok: ahora.toISOString(), archivo: nombre, tamano: fs.statSync(final).size, filas, motivo, error: null } });
         log(`Respaldo local listo: ${nombre} (${filas} filas, ${motivo})`);
+        const extra = copiarExtra(final, nombre);
         const nube = await intentarNube(final, sello(ahora));
-        return { ok: true, archivo: nombre, ruta: final, filas, nube };
+        return { ok: true, archivo: nombre, ruta: final, filas, nube, extra };
       } catch (e) {
-        try { fs.unlinkSync(tmp); } catch (e2) { /* nada */ }
+        try { if (tmp) fs.unlinkSync(tmp); } catch (e2) { /* nada */ }
         guardarEstado({ local: { ...(estado().local || {}), error: String(e.message || e).slice(0, 300), ultimo_intento: ahora.toISOString() } });
         log('Respaldo FALLÓ: ' + (e.message || e));
         return { ok: false, error: String(e.message || e) };
@@ -161,7 +216,7 @@ function crearGestor({ rutas, urlBase, obtenerNegocio, obtenerNube, log }) {
     return !u || (Date.now() - new Date(u).getTime()) > horas * 3600 * 1000;
   }
 
-  return { hacerRespaldo, reintentarNube, tocaRespaldo, listarLocales, estado };
+  return { hacerRespaldo, reintentarNube, reintentarExtra, tocaRespaldo, listarLocales, estado };
 }
 
 // ---------------------------------------------------------------- restaurar

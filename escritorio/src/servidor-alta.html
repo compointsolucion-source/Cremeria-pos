@@ -1,23 +1,97 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Preparar el servidor del negocio</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
-<link rel="stylesheet" href="estilos.css"><style>body{align-items:flex-start;padding:16px 0}.caja{width:min(480px,94vw)}select{width:100%;padding:11px 12px;border:1px solid #ccc;border-radius:10px;font-size:15px;background:#fff}.fila{display:flex;gap:10px}.fila>div{flex:1}</style></head><body><div class="caja">
-<h1>Preparar el servidor del negocio</h1>
-<p>Esta computadora guardará la información del negocio y las demás cajas se conectarán a ella. Se hace una sola vez.</p>
-<label>Nombre del negocio</label><input id="negocio" placeholder="Cremería La Esperanza" autofocus>
-<label>Giro</label><select id="giro"><option value="cremeria">Cremería</option><option value="carniceria">Carnicería</option><option value="abarrotes">Abarrotes</option><option value="fruteria">Frutería</option><option value="polleria">Pollería</option><option value="tortilleria">Tortillería</option><option value="panaderia">Panadería</option><option value="dulceria">Dulcería</option><option value="rosticeria">Rosticería</option></select>
-<div class="fila"><div><label>Teléfono (opcional)</label><input id="telefono"></div><div><label>Dirección (opcional)</label><input id="direccion"></div></div>
-<label>Nombre del dueño</label><input id="dueno">
-<div class="fila"><div><label>Usuario para entrar</label><input id="usuario" autocomplete="off" placeholder="admin"></div><div><label>Contraseña (mín. 8)</label><input id="password" type="password" autocomplete="new-password"></div></div>
-<div class="nota">Anota la contraseña en un lugar seguro: es la del dueño del sistema.</div>
-<div class="err" id="err"></div>
-<button id="ok">Crear negocio y empezar</button><button class="sec" id="cancelar">Cancelar</button>
-</div><script>
-const $=id=>document.getElementById(id);
-$('ok').onclick=async()=>{
-  $('err').textContent='';$('ok').disabled=true;$('ok').textContent='Creando…';
-  const r=await compointServidor.altaGuardar({negocio:$('negocio').value,giro:$('giro').value,telefono:$('telefono').value,direccion:$('direccion').value,dueno:$('dueno').value,usuario:$('usuario').value,password:$('password').value});
-  if(r&&r.error){$('err').textContent=r.error;$('ok').disabled=false;$('ok').textContent='Crear negocio y empezar';}
-};
-$('cancelar').onclick=()=>compointServidor.altaCancelar();
-document.addEventListener('keyup',e=>{if(e.key==='Enter')$('ok').click();});
-</script></body></html>
+<link rel="stylesheet" href="estilos-asistente.css"></head>
+<body>
+<div class="app">
+  <aside class="lado">
+    <img class="lg" src="logo-claro.png" alt="Compoint, punto de soluciones">
+    <div class="pasos" id="pasosLado"></div>
+    <div class="v">Servidor del negocio<br>Compoint Punto</div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const GIROS = [['cremeria', 'Cremería'], ['carniceria', 'Carnicería'], ['abarrotes', 'Abarrotes'], ['fruteria', 'Frutería'], ['polleria', 'Pollería'], ['tortilleria', 'Tortillería'], ['panaderia', 'Panadería'], ['dulceria', 'Dulcería'], ['rosticeria', 'Rosticería']];
+
+// Los datos se conservan al ir y venir entre las dos pantallas.
+const D = { negocio: '', giro: 'cremeria', telefono: '', direccion: '', dueno: '', usuario: '', password: '', repetir: '' };
+const S = { pant: 'negocio', rutas: null, enviando: false };
+
+function pintarLado() {
+  const n = S.pant === 'negocio' ? 1 : 2;
+  $('#pasosLado').innerHTML = ['Tu negocio', 'Dueño y acceso'].map((t, i) => {
+    const k = i + 1;
+    return '<div class="' + (k === n ? 'on' : (k < n ? 'hecho' : '')) + '"><i>' + (k < n ? '✓' : k) + '</i>' + t + '</div>';
+  }).join('');
+}
+function guardarCampos() { document.querySelectorAll('[data-k]').forEach((el) => { D[el.dataset.k] = el.value; }); }
+function dibujar() { pintarLado(); (S.pant === 'negocio' ? pantallaNegocio : pantallaDueno)(); $('#main').scrollTop = 0; }
+
+/* ------------------------------------------------------------ 1 · Tu negocio */
+function pantallaNegocio() {
+  $('#main').innerHTML =
+    '<h1>Preparar el servidor del negocio</h1>' +
+    '<p class="s">Esta computadora guardará la información y las demás cajas se conectarán a ella. Se hace una sola vez.</p>' +
+    '<div class="camp"><label>Nombre del negocio</label><input data-k="negocio" placeholder="Cremería La Esperanza" autofocus></div>' +
+    '<div class="f2"><div class="camp"><label>Giro</label><select data-k="giro">' + GIROS.map((g) => '<option value="' + g[0] + '">' + g[1] + '</option>').join('') + '</select></div>' +
+    '<div class="camp"><label>Teléfono (opcional)</label><input data-k="telefono"></div></div>' +
+    '<div class="camp"><label>Dirección (opcional)</label><input data-k="direccion"></div>' +
+    '<div class="err" id="err"></div>' +
+    '<div class="pie"><small>Se hace una sola vez en este equipo.</small><div class="der"><button class="sec" id="cancelar">Cancelar</button><button class="pri" id="sig">Siguiente</button></div></div>';
+  document.querySelectorAll('[data-k]').forEach((el) => { el.value = D[el.dataset.k]; });
+  $('#cancelar').onclick = () => compointServidor.altaCancelar();
+  $('#sig').onclick = () => {
+    guardarCampos();
+    if (!D.negocio.trim()) { $('#err').textContent = 'Escribe el nombre del negocio.'; return; }
+    S.pant = 'dueno'; dibujar();
+  };
+  $('[data-k=negocio]').focus();
+}
+
+/* ------------------------------------------------------------ 2 · Dueño y acceso */
+function pantallaDueno() {
+  const r = S.rutas;
+  $('#main').innerHTML =
+    '<h1>Dueño y acceso al sistema</h1>' +
+    '<p class="s">Estos datos crean al dueño, que podrá agregar después al resto del equipo.</p>' +
+    '<div class="camp"><label>Nombre del dueño</label><input data-k="dueno" autofocus></div>' +
+    '<div class="f2"><div class="camp"><label>Usuario para entrar</label><input data-k="usuario" autocomplete="off" placeholder="admin"></div>' +
+    '<div class="camp"><label>Contraseña (mínimo 8)</label><input data-k="password" type="password" autocomplete="new-password"></div></div>' +
+    '<div class="camp" style="max-width:calc(50% - 6px)"><label>Repite la contraseña</label><input data-k="repetir" type="password" autocomplete="new-password"></div>' +
+    '<div class="aviso azul">Anota la contraseña en un lugar seguro: es la del dueño del sistema.' +
+      (r ? '<br>La información del negocio se guardará en <b>' + esc(r.datos) + '</b> y los respaldos en <b>' + esc(r.respaldos) + '</b>' + (r.copiaExtra ? ', con copia extra en <b>' + esc(r.copiaExtra) + '</b>' : '') + '.' : '') + '</div>' +
+    '<div class="err" id="err"></div>' +
+    '<div class="pie"><small>Después se enciende el servidor (tarda un poco la primera vez).</small><div class="der"><button class="sec" id="atras">Atrás</button><button class="pri" id="ok">Crear negocio y empezar</button></div></div>';
+  document.querySelectorAll('[data-k]').forEach((el) => { el.value = D[el.dataset.k]; });
+  $('#atras').onclick = () => { guardarCampos(); S.pant = 'negocio'; dibujar(); };
+  $('#ok').onclick = crear;
+  $('[data-k=dueno]').focus();
+}
+
+async function crear() {
+  if (S.enviando) return;
+  guardarCampos();
+  const err = (t) => { $('#err').textContent = t; };
+  if (!D.dueno.trim()) return err('Escribe el nombre del dueño.');
+  if (!/^[A-Za-z0-9._-]{3,30}$/.test(D.usuario)) return err('El usuario debe tener de 3 a 30 letras o números (sin espacios).');
+  if (D.password.length < 8) return err('La contraseña debe tener al menos 8 caracteres.');
+  if (D.password !== D.repetir) return err('Las dos contraseñas no son iguales.');
+  S.enviando = true; err('');
+  $('#ok').disabled = true; $('#ok').textContent = 'Creando…';
+  const r = await compointServidor.altaGuardar({ negocio: D.negocio, giro: D.giro, telefono: D.telefono, direccion: D.direccion, dueno: D.dueno, usuario: D.usuario, password: D.password });
+  if (r && r.error) { S.enviando = false; err(r.error); $('#ok').disabled = false; $('#ok').textContent = 'Crear negocio y empezar'; }
+}
+
+document.addEventListener('keyup', (e) => {
+  if (e.key !== 'Enter' || !document.activeElement || document.activeElement.tagName !== 'INPUT') return;
+  (S.pant === 'negocio' ? $('#sig') : $('#ok')).click();
+});
+
+(async () => {
+  try { S.rutas = await compointServidor.rutasPrevistas(); } catch (e) { S.rutas = null; }
+  dibujar();
+})();
+</script>
+</body></html>

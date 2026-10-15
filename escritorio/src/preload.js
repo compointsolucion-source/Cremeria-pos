@@ -31,5 +31,8 @@ contextBridge.exposeInMainWorld('compointServidor', {
   syncAhora: () => ipcRenderer.invoke('srv-sync-ahora'),
   syncCompleto: () => ipcRenderer.invoke('srv-sync-completo'),
   syncQuitar: () => ipcRenderer.invoke('srv-sync-quitar'),
-  elegirModoServidor: () => ipcRenderer.invoke('srv-elegir-modo')
+  elegirModoServidor: () => ipcRenderer.invoke('srv-elegir-modo'),
+  rutasPrevistas: () => ipcRenderer.invoke('srv-rutas-previstas'),
+  elegirCopiaExtra: () => ipcRenderer.invoke('srv-copia-extra-elegir'),
+  quitarCopiaExtra: () => ipcRenderer.invoke('srv-copia-extra-quitar')
 });

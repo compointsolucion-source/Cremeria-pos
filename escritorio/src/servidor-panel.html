@@ -32,6 +32,11 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{pa
 <div class="fila"><button id="syGuardar">Conectar y copiar todo</button></div></details>
 <div class="fila"><button class="sec" id="syAhora">Sincronizar ahora</button><button class="sec" id="syCompleto">Copiar todo de nuevo</button><button class="sec" id="syQuitar">Dejar de sincronizar</button></div>
 
+<h2>Dónde se guarda todo</h2>
+<div id="dondeGuarda"></div>
+<div class="fila"><button class="sec" id="copiaElegir">Elegir copia extra…</button><button class="sec" id="copiaQuitar" style="display:none">Quitar copia extra</button></div>
+<div class="nota">La copia extra guarda cada respaldo también en otra unidad (USB, otro disco o carpeta de red). Para cambiar la carpeta de la información o de los respaldos, vuelve a ejecutar el instalador y elige «Avanzado».</div>
+
 <h2>Respaldos</h2>
 <div id="estadoResp"></div>
 <div class="fila"><button id="respaldar">Respaldar ahora</button><button class="sec" id="carpeta">Abrir carpeta de respaldos</button></div>
@@ -62,6 +67,15 @@ async function cargar(){
   const l=s.estado.local||{};
   $('estadoResp').innerHTML=l.ultimo_ok?`<span class="ok">Último respaldo: ${fecha(l.ultimo_ok)}</span> (${mb(l.tamano||0)})`+(l.error?`<br><span class="mal">Último intento con error: ${esc(l.error)}</span>`:''):`<span class="aviso">Aún no hay respaldos.</span>`+(l.error?`<br><span class="mal">${esc(l.error)}</span>`:'');
   $('lista').innerHTML='<tr><th>Archivo</th><th>Fecha</th><th>Tamaño</th></tr>'+s.locales.slice(0,8).map(f=>`<tr><td>${esc(f.archivo)}</td><td>${fecha(f.fecha)}</td><td>${mb(f.tamano)}</td></tr>`).join('');
+  const rt=s.rutas||{},ex=s.estado.extra||{};
+  const estExtra=!rt.copiaExtra?'<span class="aviso">Sin copia extra</span>':(ex.error?`<span class="mal">No se pudo copiar: ${esc(ex.error)}</span><br><span class="nota">Revisa que la unidad esté conectada; se reintenta sola.</span>`:(ex.ultimo_ok?`<span class="ok">Última copia: ${fecha(ex.ultimo_ok)}</span>`:'<span class="aviso">Se copiará con el próximo respaldo</span>'));
+  $('dondeGuarda').innerHTML=`<table><tr><th>Qué</th><th>Dónde</th></tr>`+
+    `<tr><td>Información del negocio</td><td><code>${esc(rt.datos||'')}</code></td></tr>`+
+    `<tr><td>Respaldos</td><td><code>${esc(rt.respaldos||'')}</code></td></tr>`+
+    `<tr><td>Copia extra</td><td>${rt.copiaExtra?`<code>${esc(rt.copiaExtra)}</code><br>`:''}${estExtra}</td></tr></table>`+
+    (rt.avisos&&rt.avisos.length?rt.avisos.map(a=>`<div class="mal nota">${esc(a)}</div>`).join(''):'');
+  $('copiaQuitar').style.display=rt.copiaExtra?'':'none';
+  $('copiaElegir').textContent=rt.copiaExtra?'Cambiar copia extra…':'Elegir copia extra…';
   pintarSync(s.sync||{});
   const n=s.estado.nube||{};
   $('estadoNube').innerHTML=!s.nube.cloud_name?'<span class="aviso">No configurada: solo se guardan copias en esta computadora.</span>':(n.pendiente?`<span class="aviso">Pendiente de subir (sin internet o con error). Se reintenta sola.</span><br><span class="mal">${esc(n.error||'')}</span>`:(n.ultimo_ok?`<span class="ok">Última copia en la nube: ${fecha(n.ultimo_ok)}</span>`:'Configurada. Se subirá en el próximo respaldo.'));
@@ -95,6 +109,9 @@ $('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled
   const r=await compointServidor.respaldar();$('respaldar').disabled=false;$('respaldar').textContent='Respaldar ahora';
   $('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?('Respaldo listo ('+r.archivo+')'+(r.nube&&r.nube.estado==='ok'?' y copia en la nube guardada.':(r.nube&&r.nube.estado==='pendiente'?'. La copia en la nube quedó pendiente.':'.'))):('No se pudo respaldar: '+r.error);cargar();};
 $('carpeta').onclick=()=>compointServidor.abrirCarpeta();
+$('copiaElegir').onclick=async()=>{$('msg').className='';$('msg').textContent='';const r=await compointServidor.elegirCopiaExtra();
+  if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('msg').className='ok';$('msg').textContent='Copia extra guardada: '+r.ruta+(r.copia==='ok'?' (ya se copió el último respaldo).':'.');}cargar();};
+$('copiaQuitar').onclick=async()=>{const r=await compointServidor.quitarCopiaExtra();if(r&&r.ok){$('msg').className='ok';$('msg').textContent='Copia extra desactivada.';}cargar();};
 $('guardarNube').onclick=async()=>{const r=await compointServidor.guardarNube({cloud_name:$('cn').value,api_key:$('ak').value,api_secret:$('as').value});$('as').value='';$('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?'Guardado.':r.error;cargar();};
 $('probarNube').onclick=async()=>{$('msg').className='';$('msg').textContent='Probando…';const r=await compointServidor.probarNube();$('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?'Conexión con Cloudinary correcta.':('No se pudo conectar: '+r.error);};
 $('quitarNube').onclick=async()=>{const r=await compointServidor.quitarNube();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('cn').value='';$('ak').value='';$('msg').className='ok';$('msg').textContent='Configuración de Cloudinary quitada.';cargar();}};

@@ -1,0 +1,79 @@
+name: Instalador de escritorio (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      cliente_url:
+        description: 'Dirección del sistema del cliente (ej. https://cliente1.onrender.com/login.html). Vacío = instalador genérico.'
+        required: false
+        default: ''
+      cliente_nombre:
+        description: 'Nombre del negocio (ej. Cremería La Vaquita)'
+        required: true
+        default: 'Compoint Punto'
+
+jobs:
+  construir:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: herramientas/instalador-escritorio/go.mod
+          cache: false
+
+      - name: Instalar dependencias
+        working-directory: escritorio
+        run: npm ci
+
+      - name: Probar la lógica del escritorio (informativo)
+        working-directory: escritorio
+        continue-on-error: true
+        run: npm test
+
+      # 1) El instalador del programa (el "paquete"): dist/Payload-CompointPunto.exe
+      - name: Construir el instalador del programa
+        working-directory: escritorio
+        run: node scripts/construir.js
+        env:
+          CLIENTE_URL: ${{ inputs.cliente_url }}
+          CLIENTE_NOMBRE: ${{ inputs.cliente_nombre }}
+
+      # 2) La pantalla de Compoint (Go). Si falla, se entrega el instalador clásico y se avisa.
+      - name: Probar el instalador de Compoint (informativo)
+        working-directory: herramientas/instalador-escritorio
+        continue-on-error: true
+        run: go test ./...
+
+      - name: Compilar el instalador de Compoint
+        working-directory: herramientas/instalador-escritorio
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_ENABLED: '0'
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          mkdir -p ../../escritorio/dist
+          go build -buildvcs=false -trimpath -ldflags "-H=windowsgui -s -w" -o ../../escritorio/dist/instalador-base.exe .
+
+      # 3) Todo en un solo .exe:  dist/final/Instalar-CompointPunto-<Negocio>.exe
+      - name: Armar el instalador final
+        working-directory: escritorio
+        run: node scripts/empaquetar-instalador.js
+        env:
+          CLIENTE_URL: ${{ inputs.cliente_url }}
+          CLIENTE_NOMBRE: ${{ inputs.cliente_nombre }}
+
+      - name: Subir instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: instalador-compoint-punto
+          path: escritorio/dist/final/*.exe
+          if-no-files-found: error
+          retention-days: 30

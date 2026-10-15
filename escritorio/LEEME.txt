@@ -4,7 +4,7 @@ COMPOINT PUNTO PARA ESCRITORIO (Windows 10 y 11)
 QUE ES
 Un programa instalable (.exe) que abre el sistema del negocio en su propia
 ventana, con el icono de Compoint, sin barra de direcciones. Ademas:
-- Arranca solo al prender Windows.
+- Arranca solo al prender Windows (se puede desmarcar al instalar).
 - Si cierras la ventana se queda en segundo plano (icono junto al reloj).
 - Trae adentro el intermediario de impresion por red (puerto 3500):
   ya no hay que instalarlo aparte en esa computadora.
@@ -20,21 +20,64 @@ COMO GENERAR EL INSTALADOR DE UN CLIENTE (lo haces tu, en GitHub)
 3. Clic en "Run workflow" y llena:
    - Direccion del sistema del cliente (ej. https://cliente1.onrender.com/login.html)
    - Nombre del negocio
-4. Espera ~5 minutos. Al terminar, abre esa ejecucion y baja el archivo de
+4. Espera ~6 minutos. Al terminar, abre esa ejecucion y baja el archivo de
    "Artifacts" (Instalar-CompointPunto-<Negocio>.exe, viene dentro de un zip).
    Esos archivos se conservan 30 dias.
 5. Pasale ese instalador al cliente.
 
+Que hace GitHub por dentro (por si algun dia falla):
+  a) Construye el instalador del programa con electron-builder
+     (escritorio/dist/Payload-CompointPunto.exe). Es el "paquete".
+  b) Compila la pantalla de Compoint (Go) -> escritorio/dist/instalador-base.exe
+     (carpeta herramientas/instalador-escritorio).
+  c) Pega el paquete al final de la pantalla y deja UN solo archivo:
+     escritorio/dist/final/Instalar-CompointPunto-<Negocio>.exe
+  Si el paso (b) o (c) falla, el flujo NO se rompe: entrega el instalador
+  clasico de Windows (con la barra lateral de Compoint, en espanol, y que
+  tambien deja elegir la carpeta del programa) con el mismo nombre. Se nota
+  porque al abrirlo se ve el asistente gris de Windows y no el de Compoint.
+
 COMO LO INSTALA EL CLIENTE
 1. Doble clic en el instalador. Si Windows dice "Windows protegio su PC":
    "Mas informacion" -> "Ejecutar de todas formas" (aparece porque no tiene
-   firma digital de paga; es normal).
-2. En unos segundos se instala solo (sin permisos de administrador), crea el
-   icono en el escritorio y abre el sistema.
-3. Listo. Desde ese momento abre solo al prender Windows.
+   firma digital de paga; es normal. Algunos antivirus tambien lo revisan
+   unos segundos la primera vez).
+2. Se abre la ventana de Compoint con panel lateral:
+   Bienvenida -> Tipo de instalacion -> Carpetas -> Instalando -> Listo.
+3. Tipo de instalacion:
+   - PREDETERMINADO (recomendado): no pregunta nada. Programa en
+     %LOCALAPPDATA%\Programs\Compoint Punto, icono en escritorio, inicia con
+     Windows. Sin permisos de administrador.
+   - AVANZADO: pregunta para que se usara la computadora (Caja o Servidor
+     del negocio), los accesos directos, "iniciar con Windows" y las carpetas.
+4. Carpetas que se pueden elegir (solo en Avanzado):
+   - Programa: donde se instala el programa. Si la carpeta elegida no se
+     llama "Compoint Punto" el instalador agrega esa subcarpeta solo.
+     Si se elige Archivos de programa, Windows pide permiso de administrador.
+   - Informacion del negocio (base de datos): solo en modo Servidor. Por
+     omision C:\CompointPunto\datos. Si ya existe una base de datos de
+     Compoint en esta PC, la carpeta queda fija para no perder informacion.
+   - Respaldos: por omision C:\CompointPunto\Respaldos, y opcionalmente una
+     COPIA EXTRA en otra unidad (memoria USB o segundo disco). El instalador
+     sugiere la USB si hay una conectada.
+   Reglas: todo debe ir en un disco de la computadora (no USB ni red) salvo
+   la copia extra; los respaldos no pueden quedar dentro del programa ni de
+   la base de datos. El instalador avisa en rojo (no deja seguir) o en
+   amarillo (deja seguir pero advierte, ej. "la copia extra esta en el mismo
+   disco").
+5. Al terminar, boton "Abrir Compoint Punto". Desde ese momento abre solo al
+   prender Windows (si se dejo marcado).
 
 Si generas el instalador SIN direccion, la primera vez pide la direccion del
 sistema (y opcionalmente un usuario para entrar automatico).
+
+COMO SE ENTREGAN LAS ELECCIONES AL PROGRAMA
+El instalador no escribe la configuracion del programa: deja un archivo
+%LOCALAPPDATA%\CompointPunto\instalacion.json con lo elegido (modo, carpetas,
+iniciar con Windows). La PRIMERA vez que abre el programa lo lee, lo aplica y
+lo borra (src/instalacion.js, aplicarInstalacion() en src/main.js). Para
+probarlo sin instalar, se puede apuntar a otro archivo con la variable de
+entorno COMPOINT_INSTALACION.
 
 USO DIARIO
 - F11: pantalla completa.   Ctrl+R / F5: recargar.   Ctrl +/-/0: zoom.
@@ -45,7 +88,7 @@ USO DIARIO
   todo: clic derecho en el icono -> "Salir por completo".
 - Impresoras USB/Bluetooth: se elige la impresora en una ventanita la primera
   vez; despues reconecta sola.
-- Dirección para fichas por red en Configuracion del sistema:
+- Direccion para fichas por red en Configuracion del sistema:
   en esa misma PC  http://localhost:3500
   desde otros equipos  http://IP-DE-ESA-PC:3500
 
@@ -58,13 +101,16 @@ para que su corte de caja sea suyo).
 
 MODO SERVIDOR (trabajar sin internet)
 - Instalar el MISMO instalador en la PC que sera el servidor y elegir
-  "Esta computadora sera el servidor del negocio". Pide los datos del negocio
-  y crea su propia base de datos local. No necesita internet para vender.
-- Todo se guarda en C:\CompointPunto  (datos\, Respaldos\, servidor.json,
-  servidor-log.txt). NO borrar esa carpeta.
+  Avanzado -> "Esta computadora sera el servidor del negocio". Despues, al
+  abrir el programa, pide los datos del negocio y crea su propia base de datos
+  local. No necesita internet para vender.
+- Todo se guarda por omision en C:\CompointPunto  (datos\, Respaldos\,
+  servidor.json, servidor-log.txt) o en las carpetas que se hayan elegido al
+  instalar. NO borrar esas carpetas. En el panel del servidor, seccion
+  "Donde se guarda todo", se ve cada ruta y se puede cambiar la copia extra.
 - Esa PC debe estar encendida mientras se use el sistema.
-- Las demas cajas: instalar el escritorio normal y poner la direccion que
-  muestra el panel del servidor, ejemplo  http://192.168.1.50:3000
+- Las demas cajas: instalar el escritorio normal (Predeterminado) y poner la
+  direccion que muestra el panel del servidor, ejemplo  http://192.168.1.50:3000
   (o abrirla en un navegador). Para impresoras USB/Bluetooth usar la app de
   escritorio, no el navegador.
 - Al primer arranque Windows pregunta por el Firewall: elegir
@@ -72,22 +118,63 @@ MODO SERVIDOR (trabajar sin internet)
 - Panel del servidor: Ctrl+Alt+S o clic derecho en el icono junto al reloj.
 
 RESPALDOS
-- Al elegir "Salir por completo" se guarda un respaldo en
-  C:\CompointPunto\Respaldos (se conservan los ultimos 30).
+- Al elegir "Salir por completo" se guarda un respaldo en la carpeta de
+  respaldos (se conservan los ultimos 30).
 - Tambien hay respaldo automatico cada 12 horas y boton "Respaldar ahora".
+- COPIA EXTRA (otra unidad): cada respaldo se copia tambien alli. Si la unidad
+  no esta conectada (USB desenchufada) el respaldo normal se hace igual y la
+  copia queda pendiente; el panel lo avisa.
 - Copia en la nube (Cloudinary): se configura en el panel con cloud name,
   api key y api secret. Se conservan los 10 dias mas recientes.
   Si no hay internet queda pendiente y se sube despues.
 - Restaurar: desde el panel, elegir un respaldo. Antes de restaurar se guarda
   automaticamente un respaldo del estado actual.
 
-ACTUALIZAR EL SERVIDOR
-Instalar el instalador nuevo encima. Los datos de C:\CompointPunto se conservan.
+ACTUALIZAR / REINSTALAR
+Correr el instalador nuevo encima. El programa se reemplaza; los datos y
+respaldos NO se tocan (el instalador detecta la base de datos existente y deja
+esa carpeta fija). El instalador no deja continuar si Compoint Punto esta
+abierto: pide cerrarlo (clic derecho en el icono junto al reloj -> Salir por
+completo) y se puede reintentar sin empezar de nuevo.
 
 DESINSTALAR
 Configuracion de Windows -> Aplicaciones -> Compoint Punto -> Desinstalar.
+Quita el programa y los accesos. La informacion del negocio y los respaldos
+NO se borran (estan fuera de la carpeta del programa); si de verdad se quieren
+eliminar hay que borrar esas carpetas a mano.
+
+SI ALGO FALLA AL INSTALAR
+La pantalla de error tiene "Reintentar" y el WhatsApp de soporte. El registro
+queda en  %TEMP%\CompointInstalador\instalador-log.txt  (mandarlo a soporte).
+
+PRUEBA MANUAL EN WINDOWS (hacerla una vez con cada instalador nuevo)
+La pantalla del instalador se probo completa en modo simulado, pero lo que
+toca Windows de verdad (discos, permisos, accesos directos) solo se puede ver
+en una PC real. Checklist:
+ 1. Predeterminado: instala sin preguntar, icono en el escritorio, abre el
+    programa, arranca con Windows.
+ 2. Avanzado + Caja: carpeta del programa en otro disco (ej. D:\); aparece
+    D:\Compoint Punto con el .exe adentro; desmarcar "icono en el escritorio"
+    -> no debe quedar el icono.
+ 3. Avanzado + Servidor con carpetas propias (datos en D:\, respaldos en D:\,
+    copia extra en una USB): al abrir el programa y hacer el alta, la base de
+    datos esta en la carpeta elegida; "Respaldar ahora" crea archivo en ambas.
+ 4. Reinstalar encima con el programa cerrado: no se pierde la base de datos,
+    la carpeta de datos aparece fija.
+ 5. Reinstalar con el programa abierto: avisa que hay que cerrarlo; se cierra
+    y "Reintentar" continua.
+ 6. Programa en Archivos de programa: Windows pide permiso (UAC); si se
+    cancela, el instalador muestra el error y deja reintentar.
+ 7. Cerrar la ventana a media instalacion no corta la instalacion.
 
 DESARROLLO
-- Probar en tu PC:  cd escritorio, npm install, npm start
+- Probar la app en tu PC:  cd escritorio, npm install, npm start
+- Pruebas de la logica:  cd escritorio, node --test   (16 pruebas)
 - Archivos: src/main.js (ventana, bandeja, impresoras), src/intermediario.js,
-  src/setup.html (primera configuracion), config-cliente.json (direccion).
+  src/instalacion.js (lo que dejo el instalador), src/setup.html (primera
+  configuracion), config-cliente.json (direccion), servidor/ (modo servidor).
+- Instalacion asistida: package.json -> build.nsis (carpeta elegible,
+  barra lateral build/instalador-lateral.bmp, espanol).
+- Armado del instalador final: scripts/empaquetar-instalador.js.
+- La pantalla de Compoint (Go) esta en herramientas/instalador-escritorio
+  (ahi hay su propio LEEME.txt).

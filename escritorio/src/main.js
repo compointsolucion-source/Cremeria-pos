@@ -5,6 +5,8 @@ const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, session, shell, safeSto
 const path = require('path');
 const fs = require('fs');
 const intermediario = require('./intermediario');
+const instalacion = require('./instalacion');
+const { rutasPrevistas } = require('./servidor/rutas');
 
 const PUERTO_INTERMEDIARIO = 3500;
 
@@ -42,6 +44,28 @@ function guardarUsuario(cambios) {
 function log(texto) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'log.txt'), new Date().toISOString() + ' ' + texto + '\n'); } catch (e) { /* sin log */ }
 }
+
+// Carpetas elegidas en el instalador (modo servidor): información del negocio, respaldos y copia extra.
+function carpetasElegidas() {
+  const c = configuracion();
+  return { datos: c.carpetaDatos || '', respaldos: c.carpetaRespaldos || '', copiaExtra: c.copiaExtra || '' };
+}
+
+// Lo que se eligió en el instalador llega en un archivo; la primera vez que abre la app se aplica.
+const archivoInstalacion = () => process.env.COMPOINT_INSTALACION
+  || path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'CompointPunto', 'instalacion.json');
+function aplicarInstalacion() {
+  try {
+    const actual = leerJson(archivoUsuario());
+    instalacion.aplicar({
+      archivo: archivoInstalacion(),
+      guardar: guardarUsuario,
+      datosActuales: [actual.carpetaDatos, rutasPrevistas({}).datos],
+      log
+    });
+  } catch (e) { log('No se pudieron leer las opciones del instalador: ' + e.message); }
+}
+
 const origenConfigurado = () => { try { return new URL(configuracion().url).origin; } catch (e) { return null; } };
 // En modo servidor la ventana puede abrirse por localhost, por el nombre del equipo o por su IP: todas son "el sistema".
 function origenEsDelSistema(origen) {
@@ -66,7 +90,7 @@ function iconoApp() { return path.join(__dirname, 'icono.png'); }
 function abrirConfig() {
   if (ventanaConfig && !ventanaConfig.isDestroyed()) { ventanaConfig.focus(); return; }
   ventanaConfig = new BrowserWindow({
-    width: 520, height: 660, resizable: false, autoHideMenuBar: true, icon: iconoApp(),
+    width: 920, height: 680, useContentSize: true, resizable: false, autoHideMenuBar: true, icon: iconoApp(),
     title: 'Configurar Compoint Punto',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
@@ -237,7 +261,7 @@ function configurarPermisos() {
 ipcMain.handle('leer-config', (e) => {
   if (!esLocal(e)) return {};
   const c = configuracion();
-  return { url: c.url || '', nombre: c.nombre, usuario: c.usuario || '', configurado: !!c.url };
+  return { url: c.url || '', nombre: c.nombre, usuario: c.usuario || '', configurado: !!c.url, modo: c.modo || '', version: app.getVersion() };
 });
 
 // Busca servidores del negocio en la red local (puerto 3000) y prueba una dirección escrita a mano.
@@ -499,13 +523,12 @@ const secretos = {
 };
 
 function mostrarEstado(texto) {
-  const html = '<meta charset="utf-8"><body style="font-family:Segoe UI,Arial;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f4f6f8;color:#333"><div style="text-align:center;padding:20px"><div style="font-size:34px;margin-bottom:10px">⏳</div><div style="font-size:15px">' + String(texto).replace(/[<&]/g, '') + '</div></div>';
   if (!ventanaEstado || ventanaEstado.isDestroyed()) {
-    ventanaEstado = new BrowserWindow({ width: 380, height: 180, resizable: false, frame: true, minimizable: false, closable: false, autoHideMenuBar: true, icon: iconoApp(), title: 'Compoint Punto',
+    ventanaEstado = new BrowserWindow({ width: 460, height: 320, useContentSize: true, resizable: false, minimizable: false, closable: false, autoHideMenuBar: true, icon: iconoApp(), title: 'Compoint Punto',
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
     ventanaEstado.setMenu(null);
   }
-  ventanaEstado.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  ventanaEstado.loadFile(path.join(__dirname, 'estado.html'), { query: { t: String(texto) } });
 }
 function cerrarEstado() { if (ventanaEstado && !ventanaEstado.isDestroyed()) { ventanaEstado.setClosable(true); ventanaEstado.destroy(); } ventanaEstado = null; }
 
@@ -514,7 +537,7 @@ function pedirDatosNegocio() {
     cerrarEstado();
     resolverAlta = resolver;
     ventanaAlta = new BrowserWindow({
-      width: 520, height: 720, autoHideMenuBar: true, icon: iconoApp(), title: 'Preparar el servidor del negocio',
+      width: 920, height: 680, useContentSize: true, resizable: false, autoHideMenuBar: true, icon: iconoApp(), title: 'Preparar el servidor del negocio',
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
     });
     ventanaAlta.setMenu(null);
@@ -527,7 +550,7 @@ async function iniciarModoServidor() {
   mostrarEstado('Encendiendo el servidor del negocio… (la primera vez tarda un poco más)');
   try {
     const { crearServidor } = require('./servidor');
-    servidorLocal = await crearServidor({ app, dirServidor: dirServidor(), avisar: mostrarEstado, pedirDatosNegocio, secretos });
+    servidorLocal = await crearServidor({ app, dirServidor: dirServidor(), avisar: mostrarEstado, pedirDatosNegocio, secretos, carpetas: carpetasElegidas() });
   } catch (err) {
     cerrarEstado();
     log('No se pudo iniciar el servidor: ' + (err && err.stack || err));
@@ -557,7 +580,7 @@ function abrirPanel() {
 async function respaldarAhora() {
   if (!servidorLocal) return { ok: false, error: 'El servidor no está encendido.' };
   const r = await servidorLocal.respaldos.hacerRespaldo('manual');
-  try { if (tray) tray.displayBalloon({ title: r.ok ? 'Respaldo listo' : 'No se pudo respaldar', content: r.ok ? 'Guardado en ' + servidorLocal.rutas.respaldos : String(r.error), iconType: r.ok ? 'info' : 'error' }); } catch (e) { /* ignorar */ }
+  try { if (tray) tray.displayBalloon({ title: r.ok ? 'Respaldo listo' : 'No se pudo respaldar', content: r.ok ? 'Guardado en ' + path.dirname(r.ruta) + (r.extra && r.extra.estado === 'ok' ? ' y copia extra en ' + r.extra.ruta : (r.extra && r.extra.estado === 'error' ? '. La copia extra no se pudo guardar (¿está conectada la unidad?).' : '')) : String(r.error), iconType: r.ok ? 'info' : 'error' }); } catch (e) { /* ignorar */ }
   return r;
 }
 
@@ -568,6 +591,7 @@ function programarRespaldos() {
     try {
       if (servidorLocal.respaldos.tocaRespaldo(12)) await servidorLocal.respaldos.hacerRespaldo('automatico');
       else await servidorLocal.respaldos.reintentarNube();
+      servidorLocal.respaldos.reintentarExtra();
     } catch (e) { log('Revisión de respaldos: ' + e.message); }
   };
   setTimeout(revisar, 2 * 60 * 1000);
@@ -616,12 +640,43 @@ ipcMain.handle('srv-estado', async (e) => {
   return {
     negocio: c.negocio || '', urlLocal: servidorLocal.urlLocal, direcciones: servidorLocal.direcciones(),
     carpeta: servidorLocal.rutas.respaldos, estado: servidorLocal.respaldos.estado(), locales: servidorLocal.respaldos.listarLocales(),
+    rutas: { datos: servidorLocal.rutas.datos, respaldos: servidorLocal.rutas.respaldos, copiaExtra: servidorLocal.rutas.copiaExtra || '', base: servidorLocal.rutas.base, avisos: servidorLocal.rutas.avisos || [] },
     nube: { cloud_name: n.cloud_name, api_key: n.api_key, tieneSecreto: !!n.api_secret },
     sync: sincro
   };
 });
 ipcMain.handle('srv-respaldar', async (e) => { if (!esLocal(e)) return { ok: false, error: 'No permitido' }; return respaldarAhora(); });
 ipcMain.handle('srv-abrir-carpeta', (e) => { if (esLocal(e) && servidorLocal) shell.openPath(servidorLocal.rutas.respaldos); });
+// Dónde se guardará todo (para mostrarlo en pantalla antes y después de crear el negocio).
+ipcMain.handle('srv-rutas-previstas', (e) => {
+  if (!esLocal(e)) return null;
+  const r = servidorLocal ? servidorLocal.rutas : rutasPrevistas(carpetasElegidas());
+  return { datos: r.datos, respaldos: r.respaldos, copiaExtra: r.copiaExtra || '' };
+});
+// Copia extra de los respaldos (otra unidad, USB o carpeta de red): se puede cambiar desde el panel.
+ipcMain.handle('srv-copia-extra-elegir', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  const sel = await dialog.showOpenDialog(ventanaPanel || undefined, {
+    title: 'Elige la carpeta para la copia extra de los respaldos', defaultPath: servidorLocal.rutas.copiaExtra || undefined,
+    properties: ['openDirectory', 'createDirectory']
+  });
+  if (sel.canceled || !sel.filePaths.length) return { ok: false };
+  const ruta = sel.filePaths[0];
+  const { limpiaRuta, usable } = require('./servidor/rutas');
+  if (!limpiaRuta(ruta) || !usable(ruta)) return { error: 'No se puede guardar en esa carpeta. Elige otra.' };
+  const actuales = [servidorLocal.rutas.datos, servidorLocal.rutas.respaldos].map((x) => String(x).toLowerCase().replace(/[\\/]+$/, ''));
+  if (actuales.includes(ruta.toLowerCase().replace(/[\\/]+$/, ''))) return { error: 'Elige una carpeta distinta a la de los respaldos y a la de los datos.' };
+  guardarUsuario({ copiaExtra: ruta });
+  servidorLocal.rutas.copiaExtra = ruta;
+  const r = servidorLocal.respaldos.reintentarExtra();
+  return { ok: true, ruta, copia: r ? r.estado : 'sin-respaldos' };
+});
+ipcMain.handle('srv-copia-extra-quitar', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  guardarUsuario({ copiaExtra: '' });
+  servidorLocal.rutas.copiaExtra = '';
+  return { ok: true };
+});
 ipcMain.handle('srv-guardar-nube', (e, d) => {
   if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
   if (!String(d.cloud_name || '').trim() || !String(d.api_key || '').trim()) return { error: 'Escribe el Cloud name y la API key.' };
@@ -697,7 +752,7 @@ ipcMain.handle('srv-cambiar-a-cliente', async (e, urlTexto) => {
   const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
     type: 'warning', buttons: ['Cambiar a la nube', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Dejar de ser servidor',
     message: 'Esta computadora dejará de ser el servidor del negocio.',
-    detail: 'Se guarda un respaldo y el programa se reinicia conectado a:\n' + url.href + '\n\nLas demás cajas que usan este servidor dejarán de conectar. Tu información local se conserva en C:\\CompointPunto y puedes volver al modo servidor desde "Cambiar dirección o usuario".'
+    detail: 'Se guarda un respaldo y el programa se reinicia conectado a:\n' + url.href + '\n\nLas demás cajas que usan este servidor dejarán de conectar. Tu información local se conserva en ' + servidorLocal.rutas.datos + ' y puedes volver al modo servidor desde "Cambiar dirección o usuario".'
   });
   if (conf.response !== 0) return { ok: false };
   try {
@@ -762,6 +817,7 @@ app.on('before-quit', (e) => {
 app.on('window-all-closed', () => { /* se queda en la bandeja */ });
 
 app.whenReady().then(async () => {
+  aplicarInstalacion();
   configurarPermisos();
   crearBandeja();
   aplicarInicioConWindows();
