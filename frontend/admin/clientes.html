@@ -9,20 +9,43 @@
 <title>Clientes y Créditos - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 800px; margin: 20px auto; padding: 0 14px; }
-  .form-cliente { display: grid; gap: 10px; margin-bottom: 20px; }
-  .fila-doble { display: flex; gap: 10px; }
-  .fila-doble > * { flex: 1; }
-  .cliente-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; }
-  .cliente-card .titulo { display: flex; justify-content: space-between; font-weight: 700; }
-  .cliente-card .saldo { font-size: 13px; color: #C62828; margin-top: 4px; }
-  .cliente-card .saldo.al-corriente { color: #5FAE46; }
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
-  .modal-overlay.abierto { display: flex; }
-  .modal-cuenta { background: white; border-radius: 16px; padding: 20px; width: 90%; max-width: 420px; max-height: 80vh; overflow-y: auto; }
-  .movimiento-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #EEE; font-size: 13px; }
+  .columnas { --ancho-panel: 440px; }
+
+  /* ---- Lista: tabla hecha con rejilla (PC) que se vuelve tarjeta en celular ---- */
+  .cli-cab, .cli-fila { display: grid; grid-template-columns: minmax(0, 1.5fr) 110px minmax(150px, 1fr) 150px; grid-template-areas: "nom debe uso btns"; gap: 12px; align-items: center; padding: 10px 14px; }
+  .cli-cab { padding-top: 8px; padding-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted, #7A7D83); background: rgba(128,128,128,.07); border-bottom: 1px solid var(--border, #E4E6E9); border-top: 1px solid var(--border, #E4E6E9); }
+  .cli-fila { border-bottom: 1px solid var(--border, #E4E6E9); cursor: pointer; }
+  .cli-fila:hover { background: rgba(128,128,128,.07); }
+  .cli-fila.sel { background: rgba(95,174,70,.13); background: color-mix(in srgb, var(--primary, #5FAE46) 14%, transparent); box-shadow: inset 4px 0 0 var(--primary, #5FAE46); }
+  .cli-nom { grid-area: nom; display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .cli-nom .txt { min-width: 0; }
+  .cli-nom b { display: block; font-size: 14.5px; }
+  .cli-nom small { color: var(--muted, #7A7D83); font-size: 12px; font-family: Consolas, monospace; }
+  .cli-debe { grid-area: debe; text-align: right; font-weight: 800; font-size: 15px; }
+  .cli-debe small { display: block; font-size: 11px; font-weight: 600; color: var(--muted, #7A7D83); }
+  .cli-uso { grid-area: uso; min-width: 0; }
+  .cli-uso small { display: block; margin-top: 3px; font-size: 12px; color: var(--muted, #7A7D83); }
+  .cli-btns { grid-area: btns; display: flex; gap: 6px; justify-content: flex-end; }
+  .cli-cab .d { text-align: right; }
+  .cli-cab .b { grid-area: btns; }
+
+  /* ---- Panel: estado de cuenta ---- */
+  .persona { display: flex; align-items: center; gap: 12px; }
+  .persona .nombre { font-weight: 800; font-size: 17px; }
+  .persona .sub { font-size: 12.5px; color: var(--muted, #7A7D83); }
+  .monto-grande { font-size: 22px !important; font-weight: 800 !important; }
+  .movs .linea { padding: 8px 0; }
+  .movs .linea b { white-space: nowrap; }
+
+  @media (max-width: 1000px) {
+    .cli-cab { display: none; }
+    .cli-fila { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom debe" "uso uso"; row-gap: 7px; }
+    .cli-btns { display: none; }
+    .cli-uso small { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -31,45 +54,42 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>👤 Clientes y Créditos</h1></div>
+    <button class="btn btn-primary solo-pc" onclick="nuevoCliente()">＋ Nuevo cliente</button>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <div class="card form-cliente">
-      <h3>Nuevo cliente</h3>
-      <input type="text" id="nombreCliente" placeholder="Nombre completo">
-      <div class="fila-doble">
-        <input type="text" id="telefonoCliente" placeholder="Teléfono">
-        <input type="number" id="limiteCredito" placeholder="Límite de crédito ($)">
-      </div>
-      <button class="btn btn-primary" onclick="guardarCliente()">Guardar Cliente</button>
-    </div>
+    <div class="columnas">
 
-    <h3>Clientes registrados</h3>
-    <div id="listaClientes"></div>
-  </div>
-
-  <div class="modal-overlay" id="modalCuenta">
-    <div class="modal-cuenta">
-      <h3 id="nombreClienteModal"></h3>
-      <p>Saldo actual: $<span id="saldoActualModal"></span> / Límite: $<span id="limiteModal"></span></p>
-
-      <div style="display:flex; gap:8px; margin-bottom:14px;">
-        <input type="number" id="montoAbono" placeholder="Monto del abono">
-        <button class="btn btn-primary" onclick="registrarAbono()">Registrar Abono</button>
+      <!-- ================= Lista ================= -->
+      <div class="caja recorta">
+        <div class="barra">
+          <div class="buscar"><input type="text" id="buscador" placeholder="Buscar por nombre o teléfono…" oninput="reiniciarLista()"></div>
+          <span class="conteo" id="conteo"></span>
+        </div>
+        <div class="barra"><div class="chips desliza" id="chipsFiltro"></div></div>
+        <div class="cli-cab"><span>Cliente</span><span class="d">Debe</span><span>Uso del crédito</span><span class="b"></span></div>
+        <div id="lista"></div>
+        <div id="masClientes" style="padding:12px; text-align:center;"></div>
       </div>
 
-      <h4>Cargos (fiados)</h4>
-      <div id="listaCargos"></div>
-
-      <h4>Abonos</h4>
-      <div id="listaAbonos"></div>
-
-      <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="generarComprobante()">🖨️ Generar Comprobante</button>
-      <button class="btn btn-secondary" style="width:100%; margin-top:8px;" onclick="cerrarModalCuenta()">Cerrar</button>
+      <!-- ================= Panel (en celular sale desde abajo) ================= -->
+      <div class="caja panel-form" id="panelForm">
+        <div class="panel-cab">
+          <h3 id="panelTitulo">＋ Nuevo cliente</h3>
+          <div style="display:flex; gap:6px;">
+            <span id="panelAcciones" style="display:flex; gap:6px;"></span>
+            <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+          </div>
+        </div>
+        <div class="panel-cuerpo" id="panelCuerpo"></div>
+        <div class="panel-pie" id="panelPie"></div>
+      </div>
     </div>
   </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
+  <button class="boton-flotante" onclick="nuevoCliente()">＋ Nuevo</button>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -77,104 +97,287 @@
 <script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
-let clienteActualId = null;
 
-let clientesOffsetActual = 0;
-const CLIENTES_POR_PAGINA = 30;
+let clientes = [];              // todos los clientes de la sucursal
+let filtro = 'todos';           // todos | deuda | corriente | cerca
+let visibles = 60;              // cuántos se pintan (para que la lista no se alente)
+let modo = 'nuevo';             // nuevo | editar | cuenta
+let clienteId = null;           // cliente abierto en el panel
+let cuenta = null;              // respuesta de /estado-cuenta
+let metodoAbono = 'efectivo';
+let verTodosMovs = false;
+const esAngosto = window.matchMedia('(max-width: 1000px)');
+const COLORES = ['#1565C0', '#C62828', '#2E7D32', '#8E24AA', '#EF6C00', '#00838F', '#6D4C41', '#5C6BC0'];
+const METODOS = { efectivo: '💵 Efectivo', tarjeta: '💳 Tarjeta', transferencia: '🏦 Transf.' };
+const NOMBRE_METODO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia' };
 
-async function cargarClientes(reiniciar = true) {
-  if (reiniciar) {
-    clientesOffsetActual = 0;
-    document.getElementById('listaClientes').innerHTML = '';
-  }
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const entero = (n) => '$' + Math.round(Number(n || 0)).toLocaleString('en-US');
+const iniciales = (n) => { const p = String(n || '?').trim().split(/\s+/); return ((p[0] || '?')[0] + (p[1] ? p[1][0] : '')).toUpperCase(); };
+const saldoDe = (c) => parseFloat(c.saldo_actual) || 0;
+const limiteDe = (c) => parseFloat(c.limite_credito) || 0;
+const cercaDelLimite = (c) => limiteDe(c) > 0 && saldoDe(c) >= limiteDe(c) * 0.9;   // igual que el aviso del Inicio
+const fechaCorta = (f) => f ? new Date(f).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '';
+const puedeEditar = () => { const u = getUsuario(); return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol); };
 
-  const data = await apiFetch(`/clientes?limit=${CLIENTES_POR_PAGINA}&offset=${clientesOffsetActual}`);
-  const cont = document.getElementById('listaClientes');
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+  if (modo !== 'nuevo') { modo = 'nuevo'; clienteId = null; cuenta = null; pintarPanel(); pintarLista(); }
+}
 
-  data.clientes.forEach(c => {
-    const saldoClase = parseFloat(c.saldo_actual) > 0 ? 'saldo' : 'saldo al-corriente';
-    const div = document.createElement('div');
-    div.className = 'cliente-card';
-    div.innerHTML = `
-      <div class="titulo"><span>${c.nombre}</span><span>${c.telefono || ''}</span></div>
-      <div class="${saldoClase}">Debe: $${parseFloat(c.saldo_actual).toFixed(2)} / Límite: $${parseFloat(c.limite_credito).toFixed(2)}</div>
-    `;
-    div.onclick = () => abrirEstadoCuenta(c.id);
-    cont.appendChild(div);
-  });
-
-  clientesOffsetActual += data.clientes.length;
-
-  let botonCargarMas = document.getElementById('btnCargarMasClientes');
-  if (clientesOffsetActual < data.total) {
-    if (!botonCargarMas) {
-      botonCargarMas = document.createElement('button');
-      botonCargarMas.id = 'btnCargarMasClientes';
-      botonCargarMas.className = 'btn btn-secondary';
-      botonCargarMas.style.marginTop = '10px';
-      botonCargarMas.textContent = 'Cargar más clientes';
-      botonCargarMas.onclick = () => cargarClientes(false);
-      cont.after(botonCargarMas);
+// ---------- Carga ----------
+// Se traen todos los clientes (de 200 en 200) para poder buscar y filtrar al instante.
+async function cargarClientes() {
+  try {
+    const todos = [];
+    let offset = 0, total = Infinity;
+    while (offset < total && offset < 20000) {
+      const d = await apiFetch(`/clientes?limit=200&offset=${offset}`);
+      todos.push(...d.clientes);
+      total = d.total;
+      offset += d.clientes.length;
+      if (!d.clientes.length) break;
     }
-  } else if (botonCargarMas) {
-    botonCargarMas.remove();
+    clientes = todos;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
   }
+  pintarLista();
+}
+
+// ---------- Lista ----------
+function filtrados() {
+  const t = sinAcentos(document.getElementById('buscador').value.trim());
+  const soloDigitos = t.replace(/\D/g, '');
+  return clientes.filter(c => {
+    if (t) {
+      const porNombre = sinAcentos(c.nombre).includes(t);
+      const porTel = soloDigitos.length >= 3 && String(c.telefono || '').replace(/\D/g, '').includes(soloDigitos);
+      if (!porNombre && !porTel) return false;
+    }
+    if (filtro === 'deuda') return saldoDe(c) > 0.005;
+    if (filtro === 'corriente') return saldoDe(c) <= 0.005;
+    if (filtro === 'cerca') return cercaDelLimite(c);
+    return true;
+  });
+}
+
+function reiniciarLista() { visibles = 60; pintarLista(); }
+function ponerFiltro(f) { filtro = f; reiniciarLista(); }
+
+function pintarLista() {
+  const conDeuda = clientes.filter(c => saldoDe(c) > 0.005).length;
+  const cerca = clientes.filter(cercaDelLimite).length;
+  const defs = [['todos', 'Todos', clientes.length], ['deuda', 'Con deuda', conDeuda], ['corriente', 'Al corriente', clientes.length - conDeuda], ['cerca', '⚠️ Cerca del límite', cerca]];
+  document.getElementById('chipsFiltro').innerHTML = defs
+    .map(([k, t, n]) => `<button class="chip ${filtro === k ? 'activo' : ''}" onclick="ponerFiltro('${k}')">${t}<i>${n}</i></button>`).join('');
+
+  const lista = filtrados();
+  document.getElementById('conteo').textContent = `${lista.length} ${lista.length === 1 ? 'cliente' : 'clientes'}`;
+  const cont = document.getElementById('lista');
+  if (!lista.length) {
+    cont.innerHTML = `<div class="vacio">${clientes.length ? 'Ningún cliente coincide con la búsqueda o el filtro.' : 'Todavía no hay clientes. Agrega el primero con el botón verde.'}</div>`;
+    document.getElementById('masClientes').innerHTML = '';
+    return;
+  }
+  cont.innerHTML = lista.slice(0, visibles).map(c => {
+    const saldo = saldoDe(c), lim = limiteDe(c);
+    const pct = lim > 0 ? Math.min(100, saldo / lim * 100) : (saldo > 0 ? 100 : 0);
+    const claseBarra = pct >= 90 ? 'roja' : (pct >= 70 ? 'amarilla' : '');
+    const debe = saldo > 0.005
+      ? `<span class="rojo-t">${entero(saldo)}</span>${lim > 0 ? `<small class="solo-movil">de ${entero(lim)}</small>` : ''}`
+      : '<span class="pill verde">Al corriente</span>';
+    return `
+    <div class="cli-fila ${clienteId === c.id ? 'sel' : ''}" onclick="abrirCuenta(${c.id})">
+      <div class="cli-nom"><div class="avatar" style="background:${COLORES[c.id % COLORES.length]}">${escapar(iniciales(c.nombre))}</div>
+        <div class="txt"><b>${escapar(c.nombre)}${cercaDelLimite(c) ? ' <span class="pill rojo" style="margin-left:4px">Cerca del límite</span>' : ''}</b><small>${escapar(c.telefono || 'Sin teléfono')}</small></div></div>
+      <div class="cli-debe">${debe}</div>
+      <div class="cli-uso"><div class="prog ${claseBarra}"><i style="width:${pct.toFixed(0)}%"></i></div><small>${lim > 0 ? pct.toFixed(0) + '% de ' + entero(lim) : 'Sin límite de crédito'}</small></div>
+      <div class="cli-btns" onclick="event.stopPropagation()">
+        <button class="btn btn-primary btn-chico" onclick="abrirCuenta(${c.id}, true)">💵 Abonar</button>
+        <button class="mini" title="Estado de cuenta" onclick="abrirCuenta(${c.id})">📄</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const faltan = lista.length - visibles;
+  document.getElementById('masClientes').innerHTML = faltan > 0
+    ? `<button class="btn btn-secondary" onclick="visibles += 60; pintarLista()">Mostrar más (${faltan} restantes)</button>` : '';
+}
+
+// ---------- Panel ----------
+function pintarPanel() {
+  const titulo = document.getElementById('panelTitulo');
+  const acciones = document.getElementById('panelAcciones');
+  const cuerpo = document.getElementById('panelCuerpo');
+  const pie = document.getElementById('panelPie');
+
+  if (modo === 'cuenta' && cuenta) {
+    const c = cuenta.cliente;
+    titulo.textContent = '📄 Estado de cuenta';
+    acciones.innerHTML = `${puedeEditar() ? '<button class="btn btn-secondary btn-chico" onclick="editarCliente()">✏️ Editar</button>' : ''}<button class="btn btn-secondary btn-chico solo-pc" onclick="nuevoCliente()">＋ Nuevo cliente</button>`;
+    const saldo = saldoDe(c), lim = limiteDe(c);
+    const disponible = Math.max(0, lim - saldo);
+
+    const movs = [
+      ...cuenta.cargos.map(x => ({ tipo: 'cargo', fecha: x.fecha, texto: `Ticket ${x.folio}`, sub: 'Compra a crédito', monto: parseFloat(x.monto) })),
+      ...cuenta.abonos.map(x => ({ tipo: 'abono', fecha: x.fecha, texto: `Abono · ${NOMBRE_METODO[x.metodo_pago] || x.metodo_pago || 'efectivo'}`, sub: 'Pago recibido', monto: parseFloat(x.monto) }))
+    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const mostrados = verTodosMovs ? movs : movs.slice(0, 10);
+
+    const rapidos = [100, 200, 500].map(n => `<button type="button" class="chip" onclick="ponerMonto(${n})">$${n}</button>`).join('')
+      + (saldo > 0.005 ? `<button type="button" class="chip" onclick="ponerMonto(${saldo.toFixed(2)})">Liquidar ${entero(saldo)}</button>` : '');
+
+    cuerpo.innerHTML = `
+      <div class="persona">
+        <div class="avatar grande" style="background:${COLORES[c.id % COLORES.length]}">${escapar(iniciales(c.nombre))}</div>
+        <div><div class="nombre">${escapar(c.nombre)}</div><div class="sub">${c.telefono ? '📞 ' + escapar(c.telefono) : 'Sin teléfono'}</div></div>
+      </div>
+      <div class="estadisticas">
+        <div class="stat"><small>Debe</small><b class="${saldo > 0.005 ? 'rojo-t' : ''}">${entero(saldo)}</b></div>
+        <div class="stat"><small>Límite</small><b>${entero(lim)}</b></div>
+        <div class="stat"><small>Disponible</small><b class="verde-t">${entero(disponible)}</b></div>
+      </div>
+      <div class="bloque blanco">
+        <h5>Registrar abono</h5>
+        <input type="number" id="montoAbono" class="monto-grande" placeholder="$ 0.00" step="0.01" min="0" inputmode="decimal" onkeydown="if (event.key === 'Enter') registrarAbono()">
+        <div class="chips">${rapidos}</div>
+        <div class="seg">${Object.entries(METODOS).map(([k, t]) => `<button type="button" class="${metodoAbono === k ? 'activo' : ''}" onclick="ponerMetodo('${k}')">${t}</button>`).join('')}</div>
+        <button class="btn btn-primary btn-grande" onclick="registrarAbono()">Registrar abono</button>
+      </div>
+      <div>
+        <div class="entre" style="margin-bottom:2px;"><b style="font-size:13px;">Movimientos recientes</b><button class="btn btn-secondary btn-chico" onclick="generarComprobante()">🧾 Comprobante</button></div>
+        <div class="movs">${mostrados.map(m => `
+          <div class="linea"><div><div style="font-weight:600; font-size:13.5px;">${escapar(m.texto)}</div><small>${fechaCorta(m.fecha)} · ${m.sub}</small></div>
+            <b class="num ${m.tipo === 'cargo' ? 'rojo-t' : 'verde-t'}">${m.tipo === 'cargo' ? '+' : '−'}${dinero(m.monto)}</b></div>`).join('') || '<div class="vacio" style="padding:14px;">Este cliente todavía no tiene movimientos.</div>'}
+        </div>
+        ${movs.length > 10 ? `<button class="btn btn-secondary btn-chico" style="width:100%; margin-top:8px;" onclick="verTodosMovs = !verTodosMovs; pintarPanel()">${verTodosMovs ? 'Ver menos' : 'Ver todos (' + movs.length + ')'}</button>` : ''}
+      </div>`;
+    pie.innerHTML = '';
+    pie.style.display = 'none';
+    return;
+  }
+
+  // Formulario: cliente nuevo o edición
+  const editando = modo === 'editar' && cuenta;
+  const c = editando ? cuenta.cliente : {};
+  titulo.textContent = editando ? `✏️ Editando: ${c.nombre}` : '＋ Nuevo cliente';
+  acciones.innerHTML = editando ? '<button class="btn btn-secondary btn-chico solo-pc" onclick="abrirCuenta(clienteId)">✕ Cancelar</button>' : '';
+  cuerpo.innerHTML = `
+    <div class="campo"><label for="nombreCliente">Nombre completo *</label><input type="text" id="nombreCliente" placeholder="Ej. María Fernández" maxlength="100" value="${escapar(c.nombre || '')}"></div>
+    <div class="dos">
+      <div class="campo"><label for="telefonoCliente">Teléfono</label><input type="tel" id="telefonoCliente" placeholder="33 0000 0000" maxlength="20" value="${escapar(c.telefono || '')}"></div>
+      <div class="campo"><label for="limiteCredito">Límite de crédito ($)</label><input type="number" id="limiteCredito" placeholder="0.00" step="0.01" min="0" inputmode="decimal" value="${editando ? limiteDe(c) : ''}" onkeydown="if (event.key === 'Enter') guardarCliente()"></div>
+    </div>
+    <div class="aviso azul">ℹ️ El límite es lo máximo que el cliente puede deber al comprar “a crédito”. Con límite en $0 no se le puede fiar.</div>`;
+  pie.style.display = '';
+  pie.innerHTML = `<button class="btn btn-primary btn-grande" onclick="guardarCliente()">${editando ? '💾 Guardar cambios' : '💾 Guardar cliente'}</button>`;
+}
+
+function nuevoCliente() {
+  modo = 'nuevo'; clienteId = null; cuenta = null;
+  pintarPanel(); pintarLista();
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => { const i = document.getElementById('nombreCliente'); if (i) i.focus(); }, 60);
+}
+
+async function abrirCuenta(id, enfocarAbono = false) {
+  try {
+    const data = await apiFetch(`/clientes/${id}/estado-cuenta`);
+    cuenta = data; clienteId = id; modo = 'cuenta'; verTodosMovs = false;
+    pintarPanel(); pintarLista();
+    if (esAngosto.matches) abrirHoja();
+    if (enfocarAbono) setTimeout(() => { const i = document.getElementById('montoAbono'); if (i) i.focus(); }, 80);
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+function editarCliente() {
+  if (!cuenta) return;
+  modo = 'editar';
+  pintarPanel();
+  setTimeout(() => { const i = document.getElementById('nombreCliente'); if (i) i.focus(); }, 60);
 }
 
 async function guardarCliente() {
   const nombre = document.getElementById('nombreCliente').value.trim();
   const telefono = document.getElementById('telefonoCliente').value.trim();
   const limite_credito = parseFloat(document.getElementById('limiteCredito').value || 0);
-
   if (!nombre) { mostrarToast('El nombre es obligatorio', 'error'); return; }
-
+  if (limite_credito < 0) { mostrarToast('El límite no puede ser negativo', 'error'); return; }
   try {
-    await apiFetch('/clientes', { method: 'POST', body: JSON.stringify({ nombre, telefono, limite_credito }) });
-    document.getElementById('nombreCliente').value = '';
-    document.getElementById('telefonoCliente').value = '';
-    document.getElementById('limiteCredito').value = '';
-    cargarClientes();
+    if (modo === 'editar' && clienteId) {
+      await apiFetch(`/clientes/${clienteId}`, { method: 'PUT', body: JSON.stringify({ nombre, telefono, limite_credito }) });
+      mostrarToast('Cliente actualizado', 'exito');
+      await cargarClientes();
+      await abrirCuenta(clienteId);
+    } else {
+      await apiFetch('/clientes', { method: 'POST', body: JSON.stringify({ nombre, telefono, limite_credito }) });
+      mostrarToast('Cliente guardado', 'exito');
+      await cargarClientes();
+      if (esAngosto.matches) cerrarHoja(); else nuevoCliente();
+    }
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-let estadoCuentaActual = null;
-
-async function abrirEstadoCuenta(id) {
-  clienteActualId = id;
-  const data = await apiFetch(`/clientes/${id}/estado-cuenta`);
-  estadoCuentaActual = data;
-  document.getElementById('nombreClienteModal').textContent = data.cliente.nombre;
-  document.getElementById('saldoActualModal').textContent = parseFloat(data.cliente.saldo_actual).toFixed(2);
-  document.getElementById('limiteModal').textContent = parseFloat(data.cliente.limite_credito).toFixed(2);
-
-  const cargosCont = document.getElementById('listaCargos');
-  cargosCont.innerHTML = data.cargos.map(c => `
-    <div class="movimiento-row"><span>Ticket ${c.folio}</span><span>$${parseFloat(c.monto).toFixed(2)}</span></div>
-  `).join('') || '<p style="color:#888; font-size:13px;">Sin cargos</p>';
-
-  const abonosCont = document.getElementById('listaAbonos');
-  abonosCont.innerHTML = data.abonos.map(a => `
-    <div class="movimiento-row"><span>${new Date(a.fecha).toLocaleDateString()} (${a.metodo_pago})</span><span>$${parseFloat(a.monto).toFixed(2)}</span></div>
-  `).join('') || '<p style="color:#888; font-size:13px;">Sin abonos</p>';
-
-  document.getElementById('modalCuenta').classList.add('abierto');
+// ---------- Abonos ----------
+function ponerMonto(n) {
+  const i = document.getElementById('montoAbono');
+  i.value = n;
+  i.focus();
+}
+function ponerMetodo(k) {
+  const monto = (document.getElementById('montoAbono') || {}).value;
+  metodoAbono = k;
+  pintarPanel();
+  if (monto) document.getElementById('montoAbono').value = monto;
 }
 
-function generarComprobante() {
-  const data = estadoCuentaActual;
-  if (!data) return;
+async function registrarAbono() {
+  const monto = parseFloat(document.getElementById('montoAbono').value || 0);
+  if (!(monto > 0)) { mostrarToast('Ingresa un monto válido', 'error'); return; }
+  const saldo = saldoDe(cuenta.cliente);
+  if (monto > saldo + 0.005) {
+    const sigue = await confirmarAccion(`El abono (${dinero(monto)}) es mayor que lo que debe (${dinero(saldo)}). ¿Registrarlo de todos modos? Quedaría saldo a favor del cliente.`);
+    if (!sigue) return;
+  }
+  try {
+    await apiFetch(`/clientes/${clienteId}/abono`, { method: 'POST', body: JSON.stringify({ monto, metodo_pago: metodoAbono }) });
+    mostrarToast(`Abono de ${dinero(monto)} registrado`, 'exito');
+    await cargarClientes();
+    await abrirCuenta(clienteId);
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
 
-  const filasCargos = data.cargos.map(c => `<tr><td>Cargo — Ticket ${c.folio}</td><td>${new Date(c.fecha).toLocaleDateString()}</td><td style="color:#C62828;">+$${parseFloat(c.monto).toFixed(2)}</td></tr>`).join('');
-  const filasAbonos = data.abonos.map(a => `<tr><td>Abono (${a.metodo_pago})</td><td>${new Date(a.fecha).toLocaleDateString()}</td><td style="color:#5FAE46;">-$${parseFloat(a.monto).toFixed(2)}</td></tr>`).join('');
+// ---------- Comprobante imprimible ----------
+function generarComprobante() {
+  const data = cuenta;
+  if (!data) return;
+  const nombre = escapar(data.cliente.nombre);
+  const filasCargos = data.cargos.map(c => `<tr><td>Cargo — Ticket ${escapar(c.folio)}</td><td>${new Date(c.fecha).toLocaleDateString()}</td><td style="color:#C62828;">+$${parseFloat(c.monto).toFixed(2)}</td></tr>`).join('');
+  const filasAbonos = data.abonos.map(a => `<tr><td>Abono (${escapar(a.metodo_pago)})</td><td>${new Date(a.fecha).toLocaleDateString()}</td><td style="color:#5FAE46;">-$${parseFloat(a.monto).toFixed(2)}</td></tr>`).join('');
 
   const html = `
     <!DOCTYPE html>
     <html lang="es">
     <head>
     <meta charset="UTF-8">
-    <title>Estado de Cuenta - ${data.cliente.nombre}</title>
+    <title>Estado de Cuenta - ${nombre}</title>
     <style>
       body { font-family: Arial, sans-serif; padding: 30px; color: #2A2B2E; }
       h1 { font-size: 20px; }
@@ -186,7 +389,7 @@ function generarComprobante() {
     </head>
     <body>
       <h1>Estado de Cuenta</h1>
-      <p><b>Cliente:</b> ${data.cliente.nombre}${data.cliente.telefono ? ' — ' + data.cliente.telefono : ''}</p>
+      <p><b>Cliente:</b> ${nombre}${data.cliente.telefono ? ' — ' + escapar(data.cliente.telefono) : ''}</p>
       <p><b>Fecha de emisión:</b> ${new Date().toLocaleString()}</p>
 
       <div class="resumen">
@@ -217,27 +420,7 @@ function generarComprobante() {
   ventana.document.close();
 }
 
-function cerrarModalCuenta() {
-  document.getElementById('modalCuenta').classList.remove('abierto');
-  cargarClientes();
-}
-
-async function registrarAbono() {
-  const monto = parseFloat(document.getElementById('montoAbono').value || 0);
-  if (monto <= 0) { mostrarToast('Ingresa un monto válido', 'error'); return; }
-
-  try {
-    await apiFetch(`/clientes/${clienteActualId}/abono`, {
-      method: 'POST',
-      body: JSON.stringify({ monto, metodo_pago: 'efectivo' })
-    });
-    document.getElementById('montoAbono').value = '';
-    abrirEstadoCuenta(clienteActualId);
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
-}
-
+pintarPanel();
 cargarClientes();
 </script>
 <script src="../js/sidebar-nav.js"></script>

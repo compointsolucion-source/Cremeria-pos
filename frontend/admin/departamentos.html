@@ -9,13 +9,14 @@
 <title>Departamentos - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
 <style>
-  .contenido { max-width: 500px; margin: 20px auto; padding: 0 14px; }
-  .form-depto { display: grid; gap: 10px; margin-bottom: 20px; }
-  .depto-card { background: white; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
-  .depto-card .acciones { display: flex; gap: 6px; }
-  .depto-card button { font-size: 12px; padding: 6px 10px; }
+  .columnas { --ancho-panel: 420px; }
+  .fila .info .reparto { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+  .fila .info .reparto .prog { flex: 1; max-width: 240px; }
+  .flechas { display: flex; gap: 6px; }
+  #avisoSinDepto:not(:empty) { margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -24,20 +25,53 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>🗂️ Departamentos</h1></div>
+    <button class="btn btn-primary solo-pc" onclick="nuevo()">＋ Nuevo departamento</button>
     <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
-    <div class="card form-depto">
-      <h3>Nuevo departamento</h3>
-      <input type="text" id="nombreDepto" placeholder="Nombre (ej. Carnes, Lácteos, Embutidos)">
-      <button class="btn btn-primary" onclick="crearDepto()">Guardar</button>
-    </div>
+    <div id="avisoSinDepto"></div>
+    <div class="columnas">
 
-    <h3>Departamentos actuales</h3>
-    <div id="listaDeptos"></div>
+      <!-- ================= Lista ================= -->
+      <div class="caja recorta">
+        <div class="barra">
+          <div class="buscar"><input type="text" id="buscador" placeholder="Buscar departamento…" oninput="pintar()"></div>
+          <span class="conteo" id="conteo"></span>
+        </div>
+        <div id="lista"></div>
+      </div>
+
+      <!-- ================= Panel (en celular sale desde abajo) ================= -->
+      <div class="caja panel-form" id="panelForm">
+        <div class="panel-cab">
+          <h3 id="tituloPanel">＋ Nuevo departamento</h3>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-secondary btn-chico solo-pc" id="btnCancelar" style="display:none;" onclick="cancelarEdicion()">✕ Cancelar</button>
+            <button class="btn btn-secondary btn-chico cerrar-hoja" onclick="cerrarHoja()">✕</button>
+          </div>
+        </div>
+        <div class="panel-cuerpo">
+          <div class="campo">
+            <label for="nombreDepto">Nombre del departamento</label>
+            <input type="text" id="nombreDepto" placeholder="Ej. Carnes, Lácteos, Embutidos" maxlength="60" onkeydown="if (event.key === 'Enter') guardar()">
+          </div>
+          <div class="aviso azul">ℹ️ Si eliminas un departamento, sus productos no se borran: quedan como <b>“Sin categoría”</b>.</div>
+          <div class="bloque" id="bloqueRapido">
+            <h5>Agregar rápido</h5>
+            <div class="chips" id="chipsRapidos"></div>
+            <span class="ayuda">Un toque y se crea. Después puedes cambiarle el nombre.</span>
+          </div>
+        </div>
+        <div class="panel-pie">
+          <button class="btn btn-primary btn-grande" id="btnGuardar" onclick="guardar()">💾 Guardar departamento</button>
+        </div>
+      </div>
+    </div>
   </div>
+  <div class="fondo-hoja" id="fondoHoja" onclick="cerrarHoja()"></div>
+  <button class="boton-flotante" onclick="nuevo()">＋ Nuevo</button>
 
 <script src="../js/config.js"></script>
 <script src="../js/api.js"></script>
@@ -46,58 +80,227 @@
 <script>
 requiereLogin();
 
-async function cargarDeptos() {
-  try {
-    const deptos = await apiFetch('/departamentos');
-    document.getElementById('listaDeptos').innerHTML = deptos.map(d => `
-      <div class="depto-card">
-        <span>${d.nombre}</span>
-        <span class="acciones">
-          <button class="btn btn-secondary" onclick="editarDepto(${d.id}, '${d.nombre.replace(/'/g, "\\'")}')">Modificar</button>
-          <button class="btn btn-secondary" onclick="eliminarDepto(${d.id})">Eliminar</button>
-        </span>
-      </div>
-    `).join('') || '<p style="color:#888; font-size:13px;">Sin departamentos todavía</p>';
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
+let deptos = [];            // [{id, nombre, orden}] ya ordenados
+let conteos = new Map();    // id -> cuántos productos tiene
+let sinDepto = 0;           // productos sin departamento
+let editandoId = null;
+const esAngosto = window.matchMedia('(max-width: 1000px)');
+
+const COLORES = ['#1565C0', '#F9A825', '#C62828', '#8D6E63', '#2E7D32', '#00838F', '#8E24AA', '#EF6C00'];
+const SUGERIDOS = ['Lácteos', 'Quesos', 'Carnes frías', 'Embutidos', 'Huevo', 'Abarrotes', 'Bebidas', 'Botanas', 'Panadería', 'Congelados', 'Dulces', 'Limpieza', 'Desechables', 'Frutas y verduras'];
+
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+// ---------- Hoja (celular) ----------
+function abrirHoja() {
+  document.getElementById('panelForm').classList.add('abierto');
+  document.getElementById('fondoHoja').classList.add('abierto');
+  document.body.classList.add('hoja-abierta');
+}
+function cerrarHoja() {
+  document.getElementById('panelForm').classList.remove('abierto');
+  document.getElementById('fondoHoja').classList.remove('abierto');
+  document.body.classList.remove('hoja-abierta');
+  limpiarFormulario();
+  pintar();
 }
 
-async function crearDepto() {
+// ---------- Carga ----------
+async function cargar() {
+  try {
+    const lista = await apiFetch('/departamentos');
+    deptos = lista.slice().sort((a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0) || a.nombre.localeCompare(b.nombre, 'es'));
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    return;
+  }
+  pintar();
+  cargarConteos();
+}
+
+// Cuántos productos tiene cada departamento (si falla, solo se omite el dato).
+async function cargarConteos() {
+  try {
+    const data = await apiFetch('/productos');
+    const prods = Array.isArray(data) ? data : (data.productos || []);
+    conteos = new Map();
+    sinDepto = 0;
+    prods.forEach(p => {
+      if (p.categoria_id) conteos.set(p.categoria_id, (conteos.get(p.categoria_id) || 0) + 1);
+      else sinDepto++;
+    });
+  } catch (err) {
+    conteos = new Map();
+    sinDepto = 0;
+  }
+  pintar();
+}
+
+// ---------- Lista ----------
+function pintar() {
+  const texto = sinAcentos(document.getElementById('buscador').value);
+  const filtrando = !!texto;
+  const visibles = deptos.filter(d => !texto || sinAcentos(d.nombre).includes(texto));
+  const total = [...conteos.values()].reduce((a, b) => a + b, 0) + sinDepto;
+  const maximo = Math.max(1, ...conteos.values());
+  const hayConteos = conteos.size > 0 || sinDepto > 0;
+
+  document.getElementById('conteo').textContent =
+    `${deptos.length} ${deptos.length === 1 ? 'departamento' : 'departamentos'}${hayConteos ? ' · ' + total + ' productos' : ''}`;
+
+  document.getElementById('avisoSinDepto').innerHTML = sinDepto > 0
+    ? `<div class="aviso amarillo entre"><span>⚠️ <b>${sinDepto} ${sinDepto === 1 ? 'producto sin departamento' : 'productos sin departamento'}</b> — no salen en los filtros del mostrador.</span><a class="btn btn-secondary btn-chico" href="productos.html">Ver productos</a></div>`
+    : '';
+
+  const cont = document.getElementById('lista');
+  if (!visibles.length) {
+    cont.innerHTML = `<div class="vacio">${deptos.length ? 'Ningún departamento coincide con la búsqueda.' : 'Todavía no hay departamentos. Crea el primero con el botón verde o con “Agregar rápido”.'}</div>`;
+  } else {
+    cont.innerHTML = visibles.map(d => {
+      const i = deptos.indexOf(d);
+      const n = conteos.get(d.id) || 0;
+      const color = COLORES[d.id % COLORES.length];
+      return `
+      <div class="fila ${editandoId === d.id ? 'sel' : ''}" onclick="editar(${d.id})">
+        <div class="cuadro" style="background:${color}">${escapar((d.nombre || '?').trim().charAt(0).toUpperCase())}</div>
+        <div class="info">
+          <b>${escapar(d.nombre)}</b>
+          <div class="reparto">
+            ${hayConteos ? `<div class="prog"><i style="width:${n ? Math.max(4, Math.round(n / maximo * 100)) : 0}%; background:${color}"></i></div><small style="white-space:nowrap">${n} ${n === 1 ? 'producto' : 'productos'}</small>` : ''}
+          </div>
+        </div>
+        <div class="acc" onclick="event.stopPropagation()">
+          <span class="flechas solo-pc">
+            <button class="mini" title="Subir" ${filtrando || i === 0 ? 'disabled' : ''} onclick="mover(${d.id}, -1)">▲</button>
+            <button class="mini" title="Bajar" ${filtrando || i === deptos.length - 1 ? 'disabled' : ''} onclick="mover(${d.id}, 1)">▼</button>
+          </span>
+          <button class="mini" title="Modificar" onclick="editar(${d.id})">✏️</button>
+          <button class="mini" title="Eliminar" onclick="eliminar(${d.id})">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  pintarRapidos();
+}
+
+function pintarRapidos() {
+  const existentes = new Set(deptos.map(d => sinAcentos(d.nombre)));
+  const faltan = SUGERIDOS.filter(s => !existentes.has(sinAcentos(s))).slice(0, 8);
+  document.getElementById('bloqueRapido').style.display = faltan.length ? '' : 'none';
+  document.getElementById('chipsRapidos').innerHTML = faltan
+    .map(s => `<button type="button" class="chip" onclick="crearRapido('${escapar(s)}')">＋ ${escapar(s)}</button>`).join('');
+}
+
+// ---------- Panel ----------
+function limpiarFormulario() {
+  editandoId = null;
+  document.getElementById('nombreDepto').value = '';
+  document.getElementById('tituloPanel').textContent = '＋ Nuevo departamento';
+  document.getElementById('btnCancelar').style.display = 'none';
+  document.getElementById('btnGuardar').textContent = '💾 Guardar departamento';
+}
+
+function nuevo() {
+  limpiarFormulario();
+  pintar();
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('nombreDepto').focus(), 60);
+}
+
+function editar(id) {
+  const d = deptos.find(x => x.id === id);
+  if (!d) return;
+  editandoId = id;
+  document.getElementById('tituloPanel').textContent = `✏️ Editando: ${d.nombre}`;
+  document.getElementById('btnCancelar').style.display = 'inline-flex';
+  document.getElementById('btnGuardar').textContent = '💾 Guardar cambios';
+  document.getElementById('nombreDepto').value = d.nombre;
+  pintar();
+  if (esAngosto.matches) abrirHoja();
+  setTimeout(() => document.getElementById('nombreDepto').focus(), 60);
+}
+
+function cancelarEdicion() {
+  limpiarFormulario();
+  pintar();
+}
+
+async function guardar() {
   const nombre = document.getElementById('nombreDepto').value.trim();
   if (!nombre) { mostrarToast('El nombre es obligatorio', 'error'); return; }
+  const repetido = deptos.some(d => d.id !== editandoId && sinAcentos(d.nombre) === sinAcentos(nombre));
+  if (repetido) { mostrarToast('Ya existe un departamento con ese nombre', 'error'); return; }
   try {
-    await apiFetch('/departamentos', { method: 'POST', body: JSON.stringify({ nombre }) });
-    document.getElementById('nombreDepto').value = '';
-    cargarDeptos();
+    if (editandoId) {
+      await apiFetch(`/departamentos/${editandoId}`, { method: 'PUT', body: JSON.stringify({ nombre }) });
+      mostrarToast('Departamento actualizado', 'exito');
+    } else {
+      // Va al final de la lista.
+      const orden = deptos.reduce((m, d) => Math.max(m, Number(d.orden) || 0), 0) + 1;
+      await apiFetch('/departamentos', { method: 'POST', body: JSON.stringify({ nombre, orden }) });
+      mostrarToast('Departamento creado', 'exito');
+    }
+    cerrarHoja();
+    await cargar();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-async function editarDepto(id, nombreActual) {
-  const nuevoNombre = await solicitarTexto('Nuevo nombre del departamento:', nombreActual);
-  if (!nuevoNombre) return;
+async function crearRapido(nombre) {
   try {
-    await apiFetch(`/departamentos/${id}`, { method: 'PUT', body: JSON.stringify({ nombre: nuevoNombre }) });
-    cargarDeptos();
+    const orden = deptos.reduce((m, d) => Math.max(m, Number(d.orden) || 0), 0) + 1;
+    await apiFetch('/departamentos', { method: 'POST', body: JSON.stringify({ nombre, orden }) });
+    mostrarToast(`“${nombre}” creado`, 'exito');
+    await cargar();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-async function eliminarDepto(id) {
-  const confirmado = await confirmarAccion('¿Eliminar este departamento? Los productos que lo usaban quedarán "Sin categoría".');
-  if (!confirmado) return;
+// ---------- Orden ----------
+// Se renumera toda la lista (1, 2, 3…) para que siempre haya un orden claro,
+// y solo se guardan los departamentos cuyo número cambió.
+async function mover(id, dir) {
+  const i = deptos.findIndex(d => d.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= deptos.length) return;
+  const nueva = deptos.slice();
+  [nueva[i], nueva[j]] = [nueva[j], nueva[i]];
+  const cambios = [];
+  nueva.forEach((d, idx) => {
+    if ((Number(d.orden) || 0) !== idx + 1) cambios.push({ id: d.id, orden: idx + 1 });
+    d.orden = idx + 1;
+  });
+  deptos = nueva;
+  pintar();
+  try {
+    await Promise.all(cambios.map(c => apiFetch(`/departamentos/${c.id}`, { method: 'PUT', body: JSON.stringify({ orden: c.orden }) })));
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    cargar();
+  }
+}
+
+async function eliminar(id) {
+  const d = deptos.find(x => x.id === id);
+  if (!d) return;
+  const n = conteos.get(id) || 0;
+  const aviso = n > 0
+    ? `¿Eliminar “${d.nombre}”? Sus ${n} ${n === 1 ? 'producto quedará' : 'productos quedarán'} como “Sin categoría”.`
+    : `¿Eliminar “${d.nombre}”?`;
+  if (!(await confirmarAccion(aviso))) return;
   try {
     await apiFetch(`/departamentos/${id}`, { method: 'DELETE' });
-    cargarDeptos();
+    if (editandoId === id) cerrarHoja();
+    await cargar();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-cargarDeptos();
+cargar();
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>
