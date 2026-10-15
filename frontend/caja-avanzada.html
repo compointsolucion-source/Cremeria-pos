@@ -267,6 +267,7 @@
             <button class="btn btn-primary" style="flex:1;" onclick="confirmarCobroAvanzada()">✅ Confirmar Pago</button>
             <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalCobrarAvanzada()">Cancelar</button>
           </div>
+          <button type="button" id="btnCobrarSinTicket" class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="confirmarCobroAvanzada(true)" title="Cobra, abre el cajón y no imprime el ticket">🧾 Cobrar sin ticket (abre cajón)</button>
         </div>
 
         <div class="teclado-cobro" id="tecladoCobro" style="display:none;">
@@ -1438,9 +1439,14 @@ async function abrirCajonManualAvanzada() {
   }
 }
 
-async function confirmarCobroAvanzada() {
+// sinTicket = true: cobra igual, abre el cajón y NO imprime el ticket.
+async function confirmarCobroAvanzada(sinTicket = false) {
+  // Si viene de un clic con el evento, no cuenta como "sin ticket"
+  sinTicket = sinTicket === true;
   const boton = document.querySelector('#modalCobrarAvanzada .btn-primary');
+  const botonSinTicket = document.getElementById('btnCobrarSinTicket');
   if (boton) { boton.disabled = true; boton.textContent = 'Procesando...'; }
+  if (botonSinTicket) botonSinTicket.disabled = true;
 
   try {
     // Sin turno abierto: se abre una ventana para abrirlo y declarar el efectivo en caja.
@@ -1494,11 +1500,15 @@ async function confirmarCobroAvanzada() {
     if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
       mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')}`, 'error');
     }
-    if ((configuracionCobrarAvanzada || {}).cajon_abrir_automatico) {
-      try { await abrirCajonDinero(); } catch (err) { console.error('No se pudo abrir el cajón automáticamente:', err.message); }
+    if (sinTicket || (configuracionCobrarAvanzada || {}).cajon_abrir_automatico) {
+      try { await abrirCajonDinero(); } catch (err) {
+        console.error('No se pudo abrir el cajón automáticamente:', err.message);
+        if (sinTicket) mostrarToast('No se pudo abrir el cajón: ' + err.message, 'error');
+      }
     }
 
-    await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada, recibidoEfectivoParaTicket, cambioParaTicket);
+    if (sinTicket) mostrarToast('Venta cobrada sin ticket', 'exito');
+    else await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada, recibidoEfectivoParaTicket, cambioParaTicket);
     actualizarPanelUltimaVenta();
 
     // Cerrar el ticket ya cobrado: quita esta pestaña (o la vacía si es la única)
@@ -1517,6 +1527,8 @@ async function confirmarCobroAvanzada() {
   } finally {
     const botonActual = document.querySelector('#modalCobrarAvanzada .btn-primary');
     if (botonActual) { botonActual.disabled = false; botonActual.textContent = '✅ Confirmar Pago'; }
+    const botonSinTicketFin = document.getElementById('btnCobrarSinTicket');
+    if (botonSinTicketFin) botonSinTicketFin.disabled = false;
   }
 }
 
