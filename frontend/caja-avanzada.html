@@ -532,7 +532,7 @@ function manejarEnterCampoCodigo() {
 // porque el ticket ya existe guardado tal cual en el servidor.
 async function cargarTicketMostradorEnPestana(folio) {
   try {
-    const ticket = await apiFetch(`/tickets/folio/${folio}`);
+    const ticket = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
     if (ticket.estado !== 'pendiente') {
       mostrarToast(`Ese ticket ya está ${ticket.estado}, no se puede volver a cargar`, 'error');
       return;

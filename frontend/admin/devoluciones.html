@@ -37,7 +37,7 @@
 
   <div class="contenido">
     <div class="buscar-ticket">
-      <input type="text" id="folioBusqueda" placeholder="Folio del ticket (ej. S1-A2F91)">
+      <input type="text" id="folioBusqueda" placeholder="Folio del ticket (ej. S1A2F91)">
       <button class="btn btn-primary" onclick="buscarTicket()">Buscar</button>
     </div>
 
@@ -60,7 +60,7 @@ async function buscarTicket() {
   if (!folio) { mostrarToast('Ingresa un folio', 'error'); return; }
 
   try {
-    ticketEncontrado = await apiFetch(`/tickets/folio/${folio}`);
+    ticketEncontrado = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
     if (ticketEncontrado.estado !== 'pagado') {
       mostrarToast('Este ticket no está pagado, no se puede procesar una devolución', 'error');
       document.getElementById('detalleTicket').innerHTML = '';

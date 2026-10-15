@@ -9,10 +9,12 @@ const bcrypt = require('bcryptjs');
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
 router.use(verificarToken, requiereSucursalId);
 
-// Generar folio corto único: M<sucursal>-<timestamp base36>
+// Generar folio corto único: S<sucursal><timestamp base36>, sin guion: muchos
+// lectores de código de barras cambian el "-" por otro carácter según la
+// distribución del teclado. (Los tickets viejos con guion se siguen encontrando.)
 function generarFolio(sucursalId) {
   const base = Date.now().toString(36).toUpperCase().slice(-6);
-  return `S${sucursalId}-${base}`;
+  return `S${sucursalId}${base}`;
 }
 
 // Crear ticket desde mostrador
@@ -81,10 +83,21 @@ router.get('/pendientes', verificarToken, async (req, res) => {
 // Buscar ticket por folio (escaneo en caja)
 router.get('/folio/:folio', verificarToken, async (req, res) => {
   try {
-    const ticketResult = await pool.query(
+    let ticketResult = await pool.query(
       'SELECT * FROM tickets WHERE folio = $1 AND sucursal_id = $2',
       [req.params.folio, req.sucursalId]
     );
+    if (ticketResult.rows.length === 0) {
+      // El lector pudo cambiar o quitar el guion (S1-ABC123 ↔ S1ABC123): se compara sin símbolos.
+      const limpio = String(req.params.folio).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (limpio) {
+        ticketResult = await pool.query(
+          `SELECT * FROM tickets WHERE sucursal_id = $2 AND REGEXP_REPLACE(UPPER(folio), '[^A-Z0-9]', '', 'g') = $1
+           ORDER BY id DESC LIMIT 1`,
+          [limpio, req.sucursalId]
+        );
+      }
+    }
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado' });
 
     const ticket = ticketResult.rows[0];

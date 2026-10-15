@@ -36,9 +36,9 @@ async function configuracionDeSucursal(sucursalId) {
 async function buscarTicketPagado(folio, total) {
   const r = await pool.query(
     `SELECT id, folio, total, metodo_pago, fecha_pago, sucursal_id FROM tickets
-     WHERE UPPER(folio) = $1 AND estado = 'pagado'
+     WHERE (UPPER(folio) = $1 OR REGEXP_REPLACE(UPPER(folio), '[^A-Z0-9]', '', 'g') = $2) AND estado = 'pagado'
      ORDER BY fecha_pago DESC NULLS LAST LIMIT 5`,
-    [String(folio).trim().toUpperCase()]
+    [String(folio).trim().toUpperCase(), String(folio).toUpperCase().replace(/[^A-Z0-9]/g, '')]
   );
   for (const t of r.rows) {
     const cfg = await configuracionDeSucursal(t.sucursal_id);
@@ -180,8 +180,8 @@ router.post('/publico/estado', limitadorEstado, async (req, res) => {
     if (!folio || !rfc) return res.status(400).json({ error: 'Escribe el folio y tu RFC' });
     const r = await pool.query(
       `SELECT estado, nota_admin, creado_en, actualizado_en FROM facturacion_solicitudes
-       WHERE UPPER(folio) = $1 AND rfc = $2 ORDER BY creado_en DESC LIMIT 1`,
-      [folio, rfc]
+       WHERE (UPPER(folio) = $1 OR REGEXP_REPLACE(UPPER(folio), '[^A-Z0-9]', '', 'g') = $3) AND rfc = $2 ORDER BY creado_en DESC LIMIT 1`,
+      [folio, rfc, folio.replace(/[^A-Z0-9]/g, '')]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'No encontramos una solicitud con ese folio y RFC.' });
     const s = r.rows[0];

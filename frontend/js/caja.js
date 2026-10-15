@@ -93,7 +93,7 @@ async function cargarBandeja() {
 
 async function cargarTicket(folio) {
   try {
-    ticketActual = await apiFetch(`/tickets/folio/${folio}`);
+    ticketActual = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
     clienteSeleccionado = null;
     renderPanelCobro();
   } catch (err) {
