@@ -212,6 +212,61 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
   }
 });
 
+// Ticket generado en el MOSTRADOR SIN INTERNET: el mostrador lo guardó en su computadora, imprimió el
+// ticket con su folio y lo manda aquí al regresar la conexión para que caja lo cobre.
+// Idempotente: si el folio ya existe, no lo duplica.
+router.post('/pendiente-offline', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
+  try {
+    const b = req.body || {};
+    const folio = String(b.folio || '').toUpperCase();
+    if (!/^[A-Z0-9-]{4,20}$/.test(folio)) return res.status(400).json({ error: 'Folio inválido' });
+    const items = Array.isArray(b.items) ? b.items : [];
+    if (!items.length || items.length > 500) return res.status(400).json({ error: 'El ticket necesita productos' });
+    for (const it of items) {
+      if (!(Number(it.cantidad) > 0) || !(Number(it.precio_unitario) >= 0) || !it.nombre_producto) return res.status(400).json({ error: 'Renglón de ticket inválido' });
+    }
+    const previo = await conexion.query('SELECT * FROM tickets WHERE folio = $1', [folio]);
+    if (previo.rows.length) return res.json({ ...previo.rows[0], duplicado: true });
+
+    let fecha = new Date(b.fecha);
+    const ahora = new Date();
+    if (isNaN(fecha.getTime()) || fecha > ahora) fecha = ahora;
+    if (ahora - fecha > 60 * 24 * 3600 * 1000) fecha = ahora;
+
+    const total = items.reduce((sum, it) => sum + Number(it.cantidad) * Number(it.precio_unitario), 0);
+    await conexion.query('BEGIN');
+    const ticket = (await conexion.query(
+      `INSERT INTO tickets (folio, sucursal_id, mostrador_usuario_id, estado, total, fecha_creacion)
+       VALUES ($1, $2, $3, 'pendiente', $4, $5::timestamptz) RETURNING *`,
+      [folio, req.sucursalId, req.usuario.id, total, fecha.toISOString()]
+    )).rows[0];
+    for (const item of items) {
+      const tipo = item.tipo === 'kit' ? 'kit' : 'producto';
+      await conexion.query(
+        `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [ticket.id, tipo, tipo === 'producto' ? (item.producto_id || null) : null, tipo === 'kit' ? (item.kit_id || null) : null,
+         String(item.nombre_producto).slice(0, 150), item.cantidad, item.precio_unitario, Number(item.cantidad) * Number(item.precio_unitario)]
+      );
+    }
+    await conexion.query('COMMIT');
+    const io = req.app.get('io');
+    if (io) io.to(`sucursal_${req.sucursalId}`).emit('nuevo_ticket', { folio, total });
+    res.json(ticket);
+  } catch (err) {
+    await conexion.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') {
+      const ya = await pool.query('SELECT * FROM tickets WHERE folio = $1', [String(req.body && req.body.folio || '').toUpperCase()]).catch(() => ({ rows: [] }));
+      if (ya.rows.length) return res.json({ ...ya.rows[0], duplicado: true });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar el ticket hecho sin internet' });
+  } finally {
+    conexion.release();
+  }
+});
+
 // Bandeja de tickets pendientes (caja)
 router.get('/pendientes', verificarToken, async (req, res) => {
   try {

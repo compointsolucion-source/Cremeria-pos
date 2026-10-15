@@ -11,32 +11,33 @@ const CADA_MS_SINCRONIZAR_VENTAS = 30 * 1000;
 
 function abrirBaseVentasOffline() {
   return new Promise((resolve, reject) => {
-    const p = indexedDB.open(BD_VENTAS_OFFLINE, 1);
+    const p = indexedDB.open(BD_VENTAS_OFFLINE, 2);
     p.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('ventas')) db.createObjectStore('ventas', { keyPath: 'folio' });
+      if (!db.objectStoreNames.contains('tickets')) db.createObjectStore('tickets', { keyPath: 'folio' });
     };
     p.onsuccess = () => resolve(p.result);
     p.onerror = () => reject(p.error);
   });
 }
 
-async function guardarVentaOffline(venta) {
+async function guardarVentaOffline(venta, almacen = 'ventas') {
   const db = await abrirBaseVentasOffline();
   await new Promise((resolve, reject) => {
-    const tx = db.transaction('ventas', 'readwrite');
-    tx.objectStore('ventas').put({ ...venta, guardada_en: new Date().toISOString(), error: '' });
+    const tx = db.transaction(almacen, 'readwrite');
+    tx.objectStore(almacen).put({ ...venta, guardada_en: new Date().toISOString(), error: '' });
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
   });
   db.close();
 }
 
-async function listarVentasOffline() {
+async function listarVentasOffline(almacen = 'ventas') {
   try {
     const db = await abrirBaseVentasOffline();
     const lista = await new Promise((resolve) => {
-      const r = db.transaction('ventas', 'readonly').objectStore('ventas').getAll();
+      const r = db.transaction(almacen, 'readonly').objectStore(almacen).getAll();
       r.onsuccess = () => resolve(r.result || []);
       r.onerror = () => resolve([]);
     });
@@ -45,18 +46,18 @@ async function listarVentasOffline() {
   } catch (e) { return []; }
 }
 
-async function borrarVentaOffline(folio) {
+async function borrarVentaOffline(folio, almacen = 'ventas') {
   const db = await abrirBaseVentasOffline();
   await new Promise((resolve) => {
-    const tx = db.transaction('ventas', 'readwrite');
-    tx.objectStore('ventas').delete(folio);
+    const tx = db.transaction(almacen, 'readwrite');
+    tx.objectStore(almacen).delete(folio);
     tx.oncomplete = resolve; tx.onerror = resolve;
   });
   db.close();
 }
 
-async function marcarErrorVentaOffline(venta, mensaje) {
-  try { await guardarVentaOffline({ ...venta, error: String(mensaje).slice(0, 200) }); } catch (e) { /* sin espacio */ }
+async function marcarErrorVentaOffline(venta, mensaje, almacen = 'ventas') {
+  try { await guardarVentaOffline({ ...venta, error: String(mensaje).slice(0, 200) }, almacen); } catch (e) { /* sin espacio */ }
 }
 
 // Folio igual que el del servidor (S + sucursal + 6 de tiempo) más 2 caracteres al azar,
@@ -99,34 +100,43 @@ let _sincronizandoVentas = false;
 async function sincronizarVentasOffline() {
   if (_sincronizandoVentas) return { subidas: 0 };
   _sincronizandoVentas = true;
-  let subidas = 0;
+  let subidas = 0, ticketsSubidos = 0;
   try {
-    const pendientes = await listarVentasOffline();
-    for (const v of pendientes) {
-      try {
-        const { guardada_en, error, ...cuerpo } = v;
-        await apiFetch('/tickets/venta-offline', { method: 'POST', body: JSON.stringify(cuerpo) });
-        await borrarVentaOffline(v.folio);
-        subidas++;
-      } catch (err) {
-        if (esErrorDeConexion(err)) break; // sigue sin internet: se reintenta luego
-        await marcarErrorVentaOffline(v, err.message); // la rechazó el servidor: queda a la vista
+    const trabajos = [
+      { almacen: 'ventas', ruta: '/tickets/venta-offline' },
+      { almacen: 'tickets', ruta: '/tickets/pendiente-offline' }
+    ];
+    for (const { almacen, ruta } of trabajos) {
+      const pendientes = await listarVentasOffline(almacen);
+      let sinInternet = false;
+      for (const v of pendientes) {
+        try {
+          const { guardada_en, error, ...cuerpo } = v;
+          await apiFetch(ruta, { method: 'POST', body: JSON.stringify(cuerpo) });
+          await borrarVentaOffline(v.folio, almacen);
+          if (almacen === 'ventas') subidas++; else ticketsSubidos++;
+        } catch (err) {
+          if (esErrorDeConexion(err)) { sinInternet = true; break; } // sigue sin internet: se reintenta luego
+          await marcarErrorVentaOffline(v, err.message, almacen); // la rechazó el servidor: queda a la vista
+        }
       }
+      if (sinInternet) break;
     }
   } finally {
     _sincronizandoVentas = false;
   }
-  if (subidas > 0 && typeof mostrarToast === 'function') {
-    mostrarToast(`✅ Se subieron ${subidas} venta(s) hechas sin internet`, 'exito', 5000);
+  if (typeof mostrarToast === 'function') {
+    if (subidas > 0) mostrarToast(`✅ Se subieron ${subidas} venta(s) hechas sin internet`, 'exito', 5000);
+    if (ticketsSubidos > 0) mostrarToast(`✅ Se subieron ${ticketsSubidos} ticket(s) hechos sin internet — ya están en caja`, 'exito', 5000);
   }
   await pintarAvisoVentasOffline();
-  return { subidas };
+  return { subidas, ticketsSubidos };
 }
 
 // ---------- Aviso en pantalla ----------
 async function pintarAvisoVentasOffline() {
   let el = document.getElementById('avisoVentasOffline');
-  const lista = await listarVentasOffline();
+  const lista = [...await listarVentasOffline('ventas'), ...await listarVentasOffline('tickets')];
   if (!lista.length) { if (el) el.remove(); return; }
   if (!el) {
     el = document.createElement('div');
@@ -134,7 +144,7 @@ async function pintarAvisoVentasOffline() {
     el.style.cssText = 'position:fixed; bottom:12px; left:52px; z-index:999; padding:8px 14px; border-radius:20px; font:700 14px sans-serif; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25);';
     el.onclick = async () => {
       await sincronizarVentasOffline();
-      const con = (await listarVentasOffline()).filter(v => v.error);
+      const con = [...await listarVentasOffline('ventas'), ...await listarVentasOffline('tickets')].filter(v => v.error);
       if (con.length && typeof mostrarToast === 'function') mostrarToast(`Venta ${con[0].folio} no se pudo subir: ${con[0].error}`, 'error', 8000);
     };
     document.body.appendChild(el);
@@ -142,10 +152,10 @@ async function pintarAvisoVentasOffline() {
   const conError = lista.filter(v => v.error).length;
   if (conError) {
     el.style.background = '#C62828'; el.style.color = '#fff';
-    el.textContent = `⚠️ ${conError} venta(s) sin internet con problema — toca para ver`;
+    el.textContent = `⚠️ ${conError} registro(s) sin internet con problema — toca para ver`;
   } else {
     el.style.background = '#FFB300'; el.style.color = '#222';
-    el.textContent = `🟠 ${lista.length} venta(s) sin subir — se suben solas al regresar el internet`;
+    el.textContent = `🟠 ${lista.length} venta(s)/ticket(s) sin subir — se suben solas al regresar el internet`;
   }
 }
 

@@ -1,5 +1,9 @@
 requiereLogin();
 
+// Imagen de respaldo (sin internet o liga rota): un cuadro gris con una caja, sin archivos externos.
+const IMAGEN_RESPALDO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="#eceff1"/><path d="M60 28l32 16v32L60 92 28 76V44z" fill="none" stroke="#90a4ae" stroke-width="5" stroke-linejoin="round"/><path d="M28 44l32 16 32-16M60 60v32" fill="none" stroke="#90a4ae" stroke-width="5" stroke-linejoin="round"/></svg>');
+
 let productos = [];
 let kits = [];
 let categorias = [];
@@ -83,7 +87,7 @@ function renderProductos() {
       card.className = 'producto-card';
       card.innerHTML = `
         <span class="badge-tipo badge-kit">KIT</span>
-        <img src="${k.imagen_url || 'img/kit-generico.png'}" alt="${k.nombre}">
+        <img src="${k.imagen_url || IMAGEN_RESPALDO}" alt="${k.nombre}">
         <div class="nombre">${k.nombre}</div>
         <div class="precio">$${parseFloat(k.precio_kit).toFixed(2)}</div>
       `;
@@ -96,7 +100,7 @@ function renderProductos() {
       card.className = 'producto-card';
       const badge = p.tipo_venta === 'unidad' ? '<span class="badge-tipo badge-unidad">PZA</span>' : '<span class="badge-tipo badge-peso">KG</span>';
       const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
-      card.innerHTML = `${badge}<img src="${p.imagen_url || 'img/producto-generico.png'}" alt="${p.nombre}"><div class="nombre">${p.nombre}</div><div class="precio">${precioLabel}</div>`;
+      card.innerHTML = `${badge}<img src="${p.imagen_url || IMAGEN_RESPALDO}" alt="${p.nombre}"><div class="nombre">${p.nombre}</div><div class="precio">${precioLabel}</div>`;
       card.onclick = () => seleccionarProducto(p);
       grid.appendChild(card);
     });
@@ -113,7 +117,7 @@ function renderProductos() {
       card.className = 'producto-card';
       card.innerHTML = `
         <span class="badge-tipo badge-kit">KIT</span>
-        <img src="${k.imagen_url || 'img/kit-generico.png'}" alt="${k.nombre}">
+        <img src="${k.imagen_url || IMAGEN_RESPALDO}" alt="${k.nombre}">
         <div class="nombre">${k.nombre}</div>
         <div class="precio">$${parseFloat(k.precio_kit).toFixed(2)}</div>
       `;
@@ -150,7 +154,7 @@ function renderProductos() {
     const avisoPromo = tienePromo ? `<div style="font-size:10px; color:#F9A825; font-weight:700;">🏷️ ${p.promociones[0].cantidad_minima}+ = $${parseFloat(p.promociones[0].precio_promocional).toFixed(2)}</div>` : '';
     card.innerHTML = `
       ${badge}
-      <img src="${p.imagen_url || 'img/producto-generico.png'}" alt="${p.nombre}">
+      <img src="${p.imagen_url || IMAGEN_RESPALDO}" alt="${p.nombre}">
       <div class="nombre">${p.nombre}</div>
       <div class="precio">${precioLabel}</div>
       ${avisoPromo}
@@ -600,9 +604,52 @@ async function generarTicket() {
     renderCarrito();
     mostrarToast(`Ticket ${ticket.folio} generado`, 'exito');
   } catch (err) {
+    if (esErrorDeConexion(err) && typeof guardarVentaOffline === 'function') {
+      await generarTicketSinInternet();
+      return;
+    }
     mostrarToast('Error al generar el ticket: ' + err.message, 'error');
   }
 }
+
+// Sin internet: el ticket se guarda en esta computadora, se imprime con su folio y se sube solo
+// al regresar la conexión (entonces aparece en la bandeja de caja).
+async function generarTicketSinInternet() {
+  const items = carrito.map(i => ({
+    tipo: i.tipo === 'kit' ? 'kit' : 'producto',
+    producto_id: i.producto_id || null,
+    kit_id: i.kit_id || null,
+    nombre_producto: i.nombre_producto,
+    cantidad: i.cantidad,
+    precio_unitario: i.precio_unitario
+  }));
+  const folio = generarFolioOffline();
+  const total = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+  const fecha = new Date().toISOString();
+  try {
+    await guardarVentaOffline({ folio, fecha, items }, 'tickets');
+  } catch (e) {
+    mostrarToast('No se pudo guardar el ticket en esta computadora: ' + e.message, 'error');
+    return;
+  }
+  const ticket = {
+    folio, total,
+    items: items.map(i => ({ ...i, subtotal: i.cantidad * i.precio_unitario }))
+  };
+  try { await imprimirTicket(ticket); } catch (e) { /* ya quedó guardado; se puede reimprimir */ }
+  carrito = [];
+  renderCarrito();
+  if (typeof pintarAvisoVentasOffline === 'function') pintarAvisoVentasOffline();
+  mostrarToast(`Sin internet: ticket ${folio} guardado. Caja lo verá cuando regrese la conexión.`, 'exito', 7000);
+}
+
+document.addEventListener('error', (e) => {
+  const el = e.target;
+  if (el && el.tagName === 'IMG' && el.src !== IMAGEN_RESPALDO && !el.dataset.respaldo) {
+    el.dataset.respaldo = '1';
+    el.src = IMAGEN_RESPALDO;
+  }
+}, true);
 
 async function imprimirTicket(ticket) {
   const config = configuracionNegocio || {};
