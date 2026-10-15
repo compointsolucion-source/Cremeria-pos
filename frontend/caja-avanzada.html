@@ -57,6 +57,63 @@
   .pestana-ticket .cerrar-pestana { border: none; background: transparent; color: #999; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; cursor: pointer; border-radius: 50%; width: 18px; height: 18px; }
   .pestana-ticket .cerrar-pestana:hover { background: #C62828; color: white; }
   .pestana-ticket.activa .contador-pestana { background: var(--primary, #5FAE46); color: white; }
+
+  /* ---- Selector de vista ---- */
+  .selector-vista { display: flex; background: rgba(255,255,255,0.14); border-radius: 12px; padding: 4px; gap: 4px; margin-left: auto; margin-right: 10px; }
+  .selector-vista button { border: none; background: transparent; color: #DDD; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
+  .selector-vista button.activa { background: var(--primary, #5FAE46); color: white; }
+
+  /* ---- Vista Caja Mostrador ---- */
+  #vistaMostrador { display: none; }
+  body.vista-mostrador #vistaClasica { display: none; }
+  body.vista-mostrador #vistaMostrador { display: flex; gap: 14px; padding: 12px 16px; flex: 1 1 auto; min-height: 0; }
+  body.vista-mostrador { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  body.vista-mostrador .sugerencias-avanzada { display: none !important; }
+  .vm-izq { flex: 2; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .vm-der { flex: 1; min-width: 340px; max-width: 520px; display: flex; flex-direction: column; overflow-y: auto; }
+  .vm-categorias { display: flex; gap: 8px; margin-bottom: 10px; overflow-x: auto; flex: 0 0 auto; }
+  .vm-cat { padding: 9px 16px; border-radius: 20px; background: #E0E0E0; white-space: nowrap; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .vm-cat.activa { background: #5FAE46; color: white; }
+  .vm-cat.kits { background: #F9A825; color: white; }
+  .vm-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); grid-auto-rows: max-content; gap: 12px; align-content: start; padding-bottom: 8px; }
+  .vm-card { background: white; border-radius: 14px; overflow: hidden; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.08); text-align: center; user-select: none; position: relative; }
+  .vm-card:active { transform: scale(0.96); background: #E8F5E9; }
+  .vm-card img, .vm-sinfoto { width: 100%; height: 88px; object-fit: cover; background: #EEF3EA; display: flex; align-items: center; justify-content: center; font-size: 38px; }
+  .vm-nombre { padding: 8px 6px 2px; font-size: 13px; font-weight: 600; }
+  .vm-precio { padding: 0 6px 8px; font-size: 12px; color: #555; }
+  .vm-badge { position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; color: white; z-index: 1; }
+  .vm-b-peso { background: #1565C0; } .vm-b-uni { background: #6A1B9A; } .vm-b-kit { background: #F9A825; }
+  .vm-ticket { background: white; border-radius: 14px; padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .vm-ticket h3 { margin: 0 0 6px; font-size: 16px; display: flex; justify-content: space-between; align-items: baseline; }
+  .vm-ticket h3 small { font-weight: 500; color: #777; font-size: 12px; }
+  .vm-cliente { font-size: 13px; background: #E8F5E9; border-radius: 8px; padding: 5px 10px; margin-bottom: 6px; }
+  .vm-filas { max-height: 38vh; overflow-y: auto; }
+  .vm-fila { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid #EEE; font-size: 13px; cursor: pointer; }
+  .vm-fila.sel { background: #E3F2FD; }
+  .vm-fila-t { flex: 1; min-width: 0; }
+  .vm-fila-t span { color: #666; }
+  .vm-desc { display: block; color: #C62828; font-size: 12px; }
+  .vm-desc a, .vm-t-desc a { color: #C62828; margin-left: 4px; }
+  .vm-fila-b { display: flex; gap: 4px; align-items: center; }
+  .vm-fila-b button { border: none; background: #F0F0F0; border-radius: 7px; min-width: 28px; height: 28px; font-weight: 700; cursor: pointer; font-size: 14px; }
+  .vm-fila-b button.vm-x { background: transparent; color: #C62828; font-size: 16px; }
+  .vm-fila-s { font-weight: 700; min-width: 64px; text-align: right; }
+  .vm-botones { display: flex; gap: 6px; margin: 10px 0 6px; }
+  .vm-botones .btn { flex: 1; padding: 9px 4px; font-size: 12px; }
+  .vm-totales { font-size: 13px; margin-top: 6px; }
+  .vm-totales > div { display: flex; justify-content: space-between; padding: 2px 0; }
+  .vm-t-desc { color: #C62828; }
+  .vm-gran { font-size: 28px; font-weight: 800; color: var(--primary, #5FAE46); margin-top: 4px; }
+  .vm-cobrar { margin-top: 10px; width: 100%; padding: 16px; font-size: 18px; }
+  body.vista-mostrador .barra-atajos, body.vista-mostrador .zona-inferior-btns { margin-top: 8px; margin-bottom: 0; flex: 0 0 auto; }
+  body.vista-mostrador #vmSlotArriba .barra-superior-avanzada { margin-bottom: 10px; }
+  @media (max-width: 900px) {
+    body.vista-mostrador { height: auto; overflow: auto; }
+    body.vista-mostrador #vistaMostrador { flex-direction: column; }
+    .vm-der { max-width: none; min-width: 0; }
+    .vm-grid { max-height: 50vh; }
+    .selector-vista button { padding: 8px 10px; font-size: 13px; }
+  }
 </style>
 </head>
 <body>
@@ -65,11 +122,15 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>🖥️ Caja Avanzada</h1></div>
+    <div class="selector-vista" role="group" aria-label="Vista de la caja">
+      <button type="button" id="selVistaClasica" class="activa" onclick="cambiarVistaCaja('clasica')" title="Tabla de productos y teclas rápidas">⌨️ Clásica</button>
+      <button type="button" id="selVistaMostrador" onclick="cambiarVistaCaja('mostrador')" title="Productos con fotos y ticket con descuentos, como en Mostrador">🛒 Caja Mostrador</button>
+    </div>
     <a class="btn btn-secondary" href="admin/dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
-  <div class="contenido-avanzada">
+  <div class="contenido-avanzada" id="vistaClasica">
 
     <div class="barra-pestanas" id="barraPestanas" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
 
@@ -131,6 +192,19 @@
         <div class="total-grande" id="totalVentaAvanzada">$0.00</div>
         <button class="btn btn-primary" style="margin-top:6px; width:100%;" onclick="irACobrarAvanzada()">💰 Cobrar</button>
       </div>
+    </div>
+  </div>
+
+  <div id="vistaMostrador">
+    <div class="vm-izq">
+      <div id="vmSlotArriba"></div>
+      <div class="vm-categorias" id="vmCategorias"></div>
+      <div class="vm-grid" id="vmGrid"></div>
+      <div id="vmSlotAbajo"></div>
+    </div>
+    <div class="vm-der">
+      <div id="vmTicket" class="vm-ticket"></div>
+      <div id="vmSlotUltima"></div>
     </div>
   </div>
 
@@ -336,6 +410,7 @@ async function cargarCatalogoAvanzada() {
     catalogoAvanzada = await apiFetch('/productos');
     kitsAvanzada = await apiFetch('/kits');
     guardarCatalogoLocal(catalogoAvanzada, kitsAvanzada); // respaldo para cuando no haya internet (sin tocar categorías)
+    renderVistaMostrador();
   } catch (err) {
     if (esErrorDeConexion(err)) {
       const local = await obtenerCatalogoLocal();
@@ -344,6 +419,7 @@ async function cargarCatalogoAvanzada() {
         kitsAvanzada = local.kits;
         const fecha = local.fecha_guardado ? new Date(local.fecha_guardado).toLocaleString() : 'fecha desconocida';
         mostrarToast(`Sin conexión — usando el catálogo guardado del ${fecha}`, 'error');
+        renderVistaMostrador();
         return;
       }
     }
@@ -542,6 +618,9 @@ async function cargarTicketMostradorEnPestana(folio) {
       id: siguienteNumeroPestana,
       nombre: `📥 ${ticket.folio}`,
       carrito: ticket.items.map(i => ({
+        id: i.id,
+        descuento_monto: parseFloat(i.descuento_monto || 0),
+        descuento_motivo: i.descuento_motivo || '',
         tipo: i.tipo,
         producto_id: i.producto_id,
         kit_id: i.kit_id,
@@ -552,7 +631,8 @@ async function cargarTicketMostradorEnPestana(folio) {
         existencia_referencia: null
       })),
       clienteAsignado: null,
-      ticketIdExistente: ticket.id
+      ticketIdExistente: ticket.id,
+      descuento_monto_ticket: parseFloat(ticket.descuento_monto || 0)
     };
     siguienteNumeroPestana++;
     pestanas.push(nuevaPestana);
@@ -654,9 +734,11 @@ function renderTablaVentaAvanzada() {
     `;
   }).join('') || '<tr><td colspan="6" style="text-align:center; color:#888;">Sin productos en la venta actual</td></tr>';
 
-  document.getElementById('totalVentaAvanzada').textContent = `$${total.toFixed(2)}`;
+  const totalesVenta = totalesPestanaAv(pestanas[pestanaActivaIndex]);
+  document.getElementById('totalVentaAvanzada').textContent = `$${totalesVenta.neto.toFixed(2)}`;
   document.getElementById('contadorArticulosAvanzada').textContent = carritoActivo().length;
   renderPestanas();
+  renderVistaMostrador();
 }
 
 function seleccionarFilaAvanzada(idx) {
@@ -837,13 +919,13 @@ async function actualizarPanelUltimaVenta() {
 
     let detalleExtra = '';
     if (ticket.metodo_pago === 'efectivo' && ticket.efectivo_recibido) {
-      const cambio = parseFloat(ticket.efectivo_recibido) - parseFloat(ticket.total);
+      const cambio = parseFloat(ticket.efectivo_recibido) - totalNetoTicketAv(ticket);
       detalleExtra = ` — Pagó con $${parseFloat(ticket.efectivo_recibido).toFixed(2)}, cambio $${Math.max(0, cambio).toFixed(2)}`;
     } else if (ticket.metodo_pago === 'mixto') {
       detalleExtra = ` — Efectivo $${parseFloat(ticket.monto_efectivo).toFixed(2)} + Tarjeta $${parseFloat(ticket.monto_tarjeta).toFixed(2)}`;
     }
 
-    contenido.innerHTML = `Folio <b>${ticket.folio}</b> — Total <b>$${parseFloat(ticket.total).toFixed(2)}</b> — Pagado con <b>${metodoLegible}</b>${detalleExtra}`;
+    contenido.innerHTML = `Folio <b>${ticket.folio}</b> — Total <b>$${totalNetoTicketAv(ticket).toFixed(2)}</b> — Pagado con <b>${metodoLegible}</b>${detalleExtra}`;
     panel.style.display = 'block';
   } catch (err) {
     // Si nunca se ha cobrado nada en esta sucursal, no hay "última venta"
@@ -861,12 +943,16 @@ async function reimprimirUltimoTicketAvanzada() {
       negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
       folio: ticket.folio,
       fecha: new Date(ticket.fecha_pago).toLocaleString(),
-      items: ticket.items.map(i => ({
-        nombre_producto: i.nombre_producto,
-        detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
-        subtotal: parseFloat(i.subtotal).toFixed(2)
-      })),
-      total: parseFloat(ticket.total).toFixed(2),
+      items: [
+        ...ticket.items.map(i => ({
+          nombre_producto: i.nombre_producto,
+          detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+          subtotal: parseFloat(i.subtotal).toFixed(2)
+        })),
+        ...((parseFloat(ticket.total) - totalNetoTicketAv(ticket)) > 0.004
+          ? [{ nombre_producto: 'Descuentos', detalle: '', subtotal: (-(parseFloat(ticket.total) - totalNetoTicketAv(ticket))).toFixed(2) }] : [])
+      ],
+      total: totalNetoTicketAv(ticket).toFixed(2),
       piePagina: `Pagado con ${ticket.metodo_pago.toUpperCase()} — REIMPRESIÓN`,
       lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
       incluirPrecioUnitario: config.incluir_precio_unitario !== false,
@@ -1062,17 +1148,32 @@ async function irACobrarAvanzada() {
   if (carritoActivo().length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
 
   const pestanaActual = pestanas[pestanaActivaIndex];
+  let ticketCreado = null;
 
   try {
     let ticket;
     if (pestanaActual.ticketIdExistente) {
       // Ya es un ticket real guardado (vino de Mostrador) — se usa tal cual, sin duplicarlo.
-      ticket = await apiFetch(`/tickets/folio/${pestanaActual.nombre.replace('📥 ', '')}`);
+      ticket = await apiFetch(`/tickets/folio/${encodeURIComponent(pestanaActual.nombre.replace('📥 ', ''))}`);
     } else {
-      ticket = await apiFetch('/tickets', { method: 'POST', body: JSON.stringify({ items: carritoActivo() }) });
+      ticket = await apiFetch('/tickets', { method: 'POST', body: JSON.stringify({ items: carritoActivo().map(itemParaServidorAv) }) });
+      ticketCreado = ticket;
+      if (hayDescuentosPendientesAv(pestanaActual)) {
+        ticket = await aplicarDescuentosPendientesAv(ticket, pestanaActual);
+      }
     }
     await abrirModalCobrar(ticket);
   } catch (err) {
+    if (ticketCreado) {
+      // El ticket ya se creó pero un descuento no se pudo aplicar: la pestaña pasa a ser ese ticket guardado.
+      try {
+        const guardado = await apiFetch(`/tickets/folio/${encodeURIComponent(ticketCreado.folio)}`);
+        convertirPestanaEnTicketGuardadoAv(pestanaActual, guardado);
+        renderTablaVentaAvanzada();
+        mostrarToast(`No se pudo aplicar un descuento (${err.message}). El ticket ${ticketCreado.folio} quedó guardado: puedes cobrarlo o volver a aplicar el descuento.`, 'error');
+        return;
+      } catch (e2) { /* si tampoco se puede leer, se muestra el error original */ }
+    }
     mostrarToast(err.message, 'error');
   }
 }
@@ -1089,7 +1190,7 @@ async function abrirModalCobrar(ticket) {
     configuracionCobrarAvanzada = await apiFetch('/configuracion');
   }
 
-  document.getElementById('totalCobrarModal').textContent = `$${parseFloat(ticket.total).toFixed(2)}`;
+  document.getElementById('totalCobrarModal').textContent = `$${totalNetoTicketAv(ticket).toFixed(2)}`;
   renderMetodosPagoModalCobrar();
   document.getElementById('modalCobrarAvanzada').style.display = 'flex';
 }
@@ -1128,7 +1229,7 @@ function setMetodoCobrarAvanzada(m) {
     btn.classList.toggle('activo', btn.id === 'btnCobrarAv' + m);
   });
 
-  const total = parseFloat(ticketParaCobrarAvanzada.total);
+  const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
   const campos = document.getElementById('camposPagoModalCobrar');
   const config = configuracionCobrarAvanzada || {};
 
@@ -1183,14 +1284,14 @@ function setMetodoCobrarAvanzada(m) {
 
 function calcularCambioCobrarAvanzada() {
   const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
-  const cambio = recibido - parseFloat(ticketParaCobrarAvanzada.total);
+  const cambio = recibido - totalNetoTicketAv(ticketParaCobrarAvanzada);
   document.getElementById('cambioCobrarAvTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Falta: $${Math.abs(cambio).toFixed(2)}`;
 }
 
 function calcularCambioDolaresCobrarAvanzada() {
   const config = configuracionCobrarAvanzada || {};
   const tipoCambio = parseFloat(config.tipo_cambio_dolar || 0);
-  const totalDolares = tipoCambio > 0 ? (parseFloat(ticketParaCobrarAvanzada.total) / tipoCambio) : 0;
+  const totalDolares = tipoCambio > 0 ? (totalNetoTicketAv(ticketParaCobrarAvanzada) / tipoCambio) : 0;
   const recibido = parseFloat(document.getElementById('dolaresRecibidosCobrarAv').value || 0);
   const cambio = recibido - totalDolares;
   document.getElementById('cambioDolaresCobrarAvTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)} USD` : `Falta: $${Math.abs(cambio).toFixed(2)} USD`;
@@ -1243,7 +1344,7 @@ async function confirmarCobroAvanzada() {
     const turno = await asegurarTurnoAbierto();
     if (!turno) return;
 
-    const total = parseFloat(ticketParaCobrarAvanzada.total);
+    const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
     let recibidoEfectivoParaTicket = null, cambioParaTicket = null;
 
@@ -1320,13 +1421,18 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
   const config = configuracionCobrarAvanzada || {};
   const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
   const aplicaComision = metodoPagoUsado === 'tarjeta' && comision > 0;
-  const montoComision = aplicaComision ? parseFloat(ticket.total) * comision / 100 : 0;
+  const totalNetoImpresion = totalNetoTicketAv(ticket);
+  const montoComision = aplicaComision ? totalNetoImpresion * comision / 100 : 0;
 
   const itemsComprobante = ticket.items.map(i => ({
     nombre_producto: i.nombre_producto,
     detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
     subtotal: parseFloat(i.subtotal).toFixed(2)
   }));
+  const descuentosImpresion = parseFloat(ticket.total) - totalNetoImpresion;
+  if (descuentosImpresion > 0.004) {
+    itemsComprobante.push({ nombre_producto: 'Descuentos', detalle: '', subtotal: (-descuentosImpresion).toFixed(2) });
+  }
   if (aplicaComision) {
     itemsComprobante.push({ nombre_producto: `Comisión tarjeta (${comision}%)`, detalle: '', subtotal: montoComision.toFixed(2) });
   }
@@ -1337,7 +1443,7 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
     folio: ticket.folio,
     fecha: new Date().toLocaleString(),
     items: itemsComprobante,
-    total: (parseFloat(ticket.total) + montoComision).toFixed(2),
+    total: (totalNetoImpresion + montoComision).toFixed(2),
     montoRecibido,
     cambio,
     piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
@@ -1387,6 +1493,12 @@ document.addEventListener('keydown', (e) => {
 renderPestanas();
 cargarCatalogoAvanzada();
 actualizarPanelUltimaVenta();
+</script>
+<script src="js/caja-avanzada-mostrador.js"></script>
+<script>
+// Vista elegida en este equipo (Clásica o Caja Mostrador) y categorías para la cuadrícula.
+cargarCategoriasAv();
+cambiarVistaCaja(leerVistaGuardada());
 </script>
 <script src="js/registrar-sw.js"></script>
 <script src="js/sidebar-nav.js"></script>
