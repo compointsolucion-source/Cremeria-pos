@@ -1326,8 +1326,9 @@ function setMetodoCobrarAvanzada(m) {
     `;
   } else if (m === 'mixto') {
     campos.innerHTML = `
-      <input type="text" inputmode="decimal" autocomplete="off" id="montoEfectivoCobrarAv" placeholder="Monto en efectivo" style="margin-bottom:8px;">
-      <input type="text" inputmode="decimal" autocomplete="off" id="montoTarjetaCobrarAv" placeholder="Monto en tarjeta">
+      <input type="text" inputmode="decimal" autocomplete="off" id="montoEfectivoCobrarAv" placeholder="Monto en efectivo" style="margin-bottom:8px;" oninput="calcularFaltanteMixtoAv()">
+      <input type="text" inputmode="decimal" autocomplete="off" id="montoTarjetaCobrarAv" placeholder="Monto en tarjeta" oninput="calcularFaltanteMixtoAv()">
+      <div id="faltanteMixtoAvTexto" class="cambio-grande" style="margin-top:12px;"></div>
     `;
   } else if (m === 'credito') {
     campos.innerHTML = `
@@ -1363,6 +1364,7 @@ function setMetodoCobrarAvanzada(m) {
   if (tecladoEl) tecladoEl.style.display = ['efectivo', 'mixto', 'dolares'].includes(m) ? 'grid' : 'none';
   campoNumericoCobroAv = null;
   if (m === 'efectivo') pintarCambioAv('cambioCobrarAvTexto', 0, 0, '');
+  if (m === 'mixto') calcularFaltanteMixtoAv();
   if (m === 'dolares') pintarCambioAv('cambioDolaresCobrarAvTexto', 0, 0, ' USD');
   const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv' }[m];
   if (idCampoPrincipal) {
@@ -1409,6 +1411,7 @@ function tecladoCobroAv(tecla) {
       if (!tarjetaMixto.value) {
         const resto = totalNetoTicketAv(ticketParaCobrarAvanzada) - (parseFloat(efectivoMixto.value) || 0);
         if (resto > 0) tarjetaMixto.value = resto.toFixed(2);
+        calcularFaltanteMixtoAv();
       }
       tarjetaMixto.focus();
       return;
@@ -1450,6 +1453,21 @@ function pintarCambioAv(idElemento, recibido, cambio, sufijo) {
     el.className = 'cambio-grande falta';
     el.innerHTML = '<span class="cg-etiqueta">FALTA</span><span class="cg-monto">$' + Math.abs(redondeado).toFixed(2) + sufijo + '</span>';
   }
+}
+
+// Pago mixto: muestra grande lo que FALTA por cubrir (rojo), o PAGO COMPLETO (verde).
+function calcularFaltanteMixtoAv() {
+  const el = document.getElementById('faltanteMixtoAvTexto');
+  if (!el || !ticketParaCobrarAvanzada) return;
+  const ef = parseFloat(document.getElementById('montoEfectivoCobrarAv').value || 0) || 0;
+  const tj = parseFloat(document.getElementById('montoTarjetaCobrarAv').value || 0) || 0;
+  const dif = Math.round((totalNetoTicketAv(ticketParaCobrarAvanzada) - ef - tj) * 100) / 100; // >0 falta, <0 sobra
+  let clase, etiqueta, monto;
+  if (Math.abs(dif) < 0.005) { clase = 'ok'; etiqueta = 'PAGO COMPLETO'; monto = 0; }
+  else if (dif > 0) { clase = 'falta'; etiqueta = 'FALTA'; monto = dif; }
+  else { clase = 'falta'; etiqueta = 'SOBRA'; monto = -dif; }
+  el.className = 'cambio-grande ' + clase;
+  el.innerHTML = '<span class="cg-etiqueta">' + etiqueta + '</span><span class="cg-monto">$' + monto.toFixed(2) + '</span>';
 }
 
 function calcularCambioCobrarAvanzada() {
