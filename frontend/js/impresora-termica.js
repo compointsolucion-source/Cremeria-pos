@@ -817,6 +817,14 @@ function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
   return lineas;
 }
 
+// Leyenda fija de Compoint al pie de TODOS los tickets (venta, reimpresión, devolución…).
+// Está escrita aquí a propósito: no se configura ni se puede quitar desde el sistema.
+const LEYENDA_COMPOINT = [
+  'COMPOINT PUNTO - Venta y soporte del sistema',
+  'WhatsApp 33 25 90 70 90',
+  'www.compoint.com.mx'
+];
+
 function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items, total, piePagina, textoLegal = '', incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null }) {
   const columnas = columnasForzadas || (ancho_ticket === '58mm' ? 32 : 48);
   const centrar = (texto) => {
@@ -897,7 +905,9 @@ function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items
 // Mantiene compatibilidad con quien todavía use formatearTicket() completo
 // (ej. el respaldo de texto compartido, que no imprime imagen QR).
 function formatearTicket(datosTicket) {
-  return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket)];
+  const cols = datosTicket.ancho_ticket === '58mm' ? 32 : 48;
+  const centrarL = (t) => ' '.repeat(Math.max(0, Math.floor((cols - t.length) / 2))) + t;
+  return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket), '='.repeat(cols), ...LEYENDA_COMPOINT.map(centrarL), ''];
 }
 
 // Imprime un ticket completo (logo, nombre, datos, código del folio, productos,
@@ -1048,6 +1058,11 @@ async function imprimirTicketBLE(datosTicket) {
     }
   }
 
+  // ---- Leyenda fija de Compoint (negritas, centrada) ----
+  partes.push(ESCPOS_CENTRAR, linea('='.repeat(columnas)), negritaOn);
+  LEYENDA_COMPOINT.forEach(t => envolver(t, columnas).forEach(r => partes.push(linea(r))));
+  partes.push(negritaOff, ESCPOS_IZQUIERDA);
+
   // ---- Cierre: espacio y corte ----
   partes.push(
     bytesDeLineas(new Array(d.lineasInferiores !== undefined ? d.lineasInferiores : 3).fill('')),
@@ -1160,6 +1175,9 @@ async function construirHtmlTicket(datosTicket) {
       console.error('No se pudo generar el QR de facturación:', err.message);
     }
   }
+
+  // Leyenda fija de Compoint (negritas, centrada)
+  partes.push(`<div class="c" style="font-weight:800; border-top:2px solid #000; margin-top:10px; padding-top:5px; line-height:1.35;">${LEYENDA_COMPOINT.map(esc).join('<br>')}</div>`);
 
   return { css, html: `<div class="tk">${partes.join('')}</div>` };
 }
