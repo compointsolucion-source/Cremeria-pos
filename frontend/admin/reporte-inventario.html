@@ -12,27 +12,95 @@
 <script src="../js/tema.js"></script>
 <script src="../js/vendor/xlsx.full.min.js"></script>
 <style>
-  .contenido { max-width: 1000px; margin: 20px auto; padding: 0 14px; }
-  .tarjetas-resumen-reporte { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
-  .tarjeta-resumen-reporte { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: var(--shadow); }
-  .tarjeta-resumen-reporte .valor { font-size: 24px; font-weight: 700; }
-  .tarjeta-resumen-reporte .etiqueta { font-size: 13px; color: #666; margin-top: 4px; }
-  .filtros-reporte { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
-  .filtros-reporte select { flex: 1; min-width: 180px; }
-  .tabla-reporte-inv { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; font-size: 13px; }
-  .tabla-reporte-inv th, .tabla-reporte-inv td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #EEE; white-space: nowrap; }
-  .tabla-reporte-inv th { background: #F4F5F6; position: sticky; top: 0; cursor: pointer; user-select: none; }
-  .tabla-reporte-inv th:hover { background: #E8E8E8; }
-  .tabla-reporte-inv th.checkbox-col { cursor: default; }
-  .tabla-reporte-inv th.checkbox-col:hover { background: #F4F5F6; }
-  .tabla-reporte-inv td.numero { text-align: right; }
-  .contenedor-tabla { max-height: 65vh; overflow: auto; border-radius: 12px; }
-  .valor-bajo { color: #C62828; font-weight: 700; }
-  .valor-alerta { color: #F9A825; font-weight: 700; }
+  .contenido { max-width: 1400px; margin: 16px auto; padding: 0 14px 30px; }
+
+  /* ---- Totales ---- */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .kpi { background: var(--surface, #fff); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); border-left: 4px solid var(--primary, #5FAE46); }
+  .kpi b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+  .kpi span { color: var(--muted, #7A7D83); font-size: 12px; }
+  .kpi.amarillo { border-left-color: #F9A825; }
+  .kpi.rojo { border-left-color: #E53935; }
+
+  /* ---- Barra de herramientas ---- */
+  .barra { background: var(--surface, #fff); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .barra .buscar { flex: 1 1 260px; min-width: 200px; position: relative; }
+  .barra .buscar input { width: 100%; padding-left: 34px; }
+  .barra .buscar::before { content: "🔍"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; }
+  .barra select { width: auto; min-width: 150px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 7px 12px; border-radius: 20px; border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); font-size: 13px; font-weight: 600; color: var(--muted, #7A7D83); cursor: pointer; }
+  .chip i { font-style: normal; font-weight: 500; opacity: 0.85; margin-left: 4px; }
+  .chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+  .chip.amarillo.activo { background: #F9A825; border-color: #F9A825; color: #222; }
+  .chip.rojo.activo { background: #E53935; border-color: #E53935; color: #fff; }
+  .espaciador { flex: 1; }
+  .menu-mas { position: relative; }
+  .menu-mas .lista { display: none; position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface, #fff); border: 1px solid var(--border, #E4E6E9); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); min-width: 210px; z-index: 30; overflow: hidden; }
+  .menu-mas.abierto .lista { display: block; }
+  .menu-mas .lista button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 11px 14px; font-size: 14px; cursor: pointer; color: inherit; }
+  .menu-mas .lista button:hover { background: rgba(95,174,70,0.12); }
+  .solo-movil { display: none; }
+
+  /* ---- Barra de selección (aparece solo al marcar productos) ---- */
+  .seleccion { display: none; background: #1F2933; color: #fff; border-radius: 12px; padding: 10px 14px; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+  .seleccion.visible { display: flex; position: sticky; top: 8px; z-index: 20; }
+  .seleccion b { margin-right: auto; }
+  .seleccion .btn-secondary { background: #2D3A45; color: #fff; border-color: #3D4B58; }
+
+  /* ---- Tabla ---- */
+  .caja-tabla { background: var(--surface, #fff); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  .contenedor-tabla { max-height: 68vh; overflow: auto; }
+  .tabla-reporte-inv { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tabla-reporte-inv th { background: var(--surface, #fff); box-shadow: inset 0 -1px 0 var(--border, #E4E6E9); text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, #7A7D83); padding: 10px 12px; white-space: nowrap; position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none; }
+  .tabla-reporte-inv th:hover { color: var(--text, #1F2023); }
+  .tabla-reporte-inv th.checkbox-col { cursor: default; width: 34px; }
+  .tabla-reporte-inv td { padding: 9px 12px; border-bottom: 1px solid var(--border, #E4E6E9); vertical-align: middle; }
+  .tabla-reporte-inv th.numero, .tabla-reporte-inv td.numero { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabla-reporte-inv tr:hover td { background: rgba(95,174,70,0.05); }
+  .tabla-reporte-inv tr.marcada td { background: rgba(95,174,70,0.14); }
+  .nom { font-weight: 600; }
+  .cod { color: var(--muted, #7A7D83); font-size: 12px; font-family: Consolas, monospace; }
+  .depto { color: var(--muted, #7A7D83); font-size: 12px; }
+  .etiqueta-tipo { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .etiqueta-tipo.unidad { background: rgba(33,150,243,0.16); color: #1976D2; }
+  .etiqueta-tipo.peso { background: rgba(249,168,37,0.20); color: #B45309; }
+  .existencia-celda { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .existencia-celda b { min-width: 52px; text-align: right; }
+  .medidor { width: 70px; height: 7px; background: rgba(128,128,128,0.25); border-radius: 5px; overflow: hidden; flex: none; }
+  .medidor i { display: block; height: 100%; border-radius: 5px; }
+  .estado { display: inline-block; min-width: 66px; text-align: center; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .estado.agotado { background: rgba(229,57,53,0.16); color: #D32F2F; }
+  .estado.bajo { background: rgba(249,168,37,0.22); color: #A86400; }
+  .estado.orden { background: rgba(95,174,70,0.18); color: #2E7D32; }
+  .margen { color: #2E7D32; font-weight: 600; }
+  .margen.bajo { color: #B45309; }
+  .margen.negativo { color: #D32F2F; }
+  .tarjetas { display: none; }
+  .pie-reporte { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted, #7A7D83); font-size: 12px; padding: 8px 4px; }
+
+  @media (max-width: 760px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpi b { font-size: 19px; }
+    .contenido { padding: 0 10px 30px; }
+    .barra select { flex: 1; min-width: 130px; }
+    .solo-movil { display: block; }
+    .seleccion { padding: 8px 10px; gap: 6px; }
+    .seleccion .btn { padding: 7px 10px; font-size: 13px; }
+    .contenedor-tabla { display: none; }
+    .tarjetas { display: block; }
+    .tarjeta-prod { padding: 11px 12px; border-bottom: 1px solid var(--border, #E4E6E9); display: grid; grid-template-columns: auto 1fr auto; gap: 3px 10px; align-items: center; }
+    .tarjeta-prod.marcada { background: rgba(95,174,70,0.14); }
+    .tarjeta-prod .grande { font-size: 20px; font-weight: 800; text-align: right; }
+    .tarjeta-prod .sub { grid-column: 2 / 4; display: flex; gap: 8px 10px; flex-wrap: wrap; color: var(--muted, #7A7D83); font-size: 12px; align-items: center; }
+    .pie-reporte .ayuda { display: none; }
+  }
 
   @media print {
-    .top-bar, .filtros-reporte, .pantalla-completa-btn { display: none !important; }
-    .contenedor-tabla { max-height: none; overflow: visible; }
+    .top-bar, .barra, .seleccion, .pie-reporte .ayuda, .checkbox-col, .col-check, #progresoImportacion, .btn-abrir-sidebar { display: none !important; }
+    .contenedor-tabla { max-height: none; overflow: visible; display: block !important; }
+    .tarjetas { display: none !important; }
+    .tabla-reporte-inv th { position: static; }
     body { background: white; }
   }
 </style>
@@ -48,31 +116,51 @@
   </div>
 
   <div class="contenido">
-    <div class="tarjetas-resumen-reporte">
-      <div class="tarjeta-resumen-reporte">
-        <div class="valor" id="costoTotalReporte">$0.00</div>
-        <div class="etiqueta">Costo del inventario</div>
-      </div>
-      <div class="tarjeta-resumen-reporte">
-        <div class="valor" id="cantidadTotalReporte">0</div>
-        <div class="etiqueta">Cantidad total en existencia</div>
-      </div>
+    <div class="kpis">
+      <div class="kpi"><b id="costoTotalReporte">$0.00</b><span>Costo del inventario</span></div>
+      <div class="kpi"><b id="valorVentaReporte">$0.00</b><span>Valor a precio de venta</span></div>
+      <div class="kpi amarillo"><b id="kpiBajo">0</b><span>Productos con existencia baja</span></div>
+      <div class="kpi rojo"><b id="kpiAgotados">0</b><span>Productos agotados</span></div>
     </div>
 
-    <input type="text" id="buscadorReporte" placeholder="🔍 Buscar por nombre o código..." style="width:100%; margin-bottom:10px;" oninput="filtrarReporteEnPantalla()">
-
-    <div class="filtros-reporte">
+    <div class="barra">
+      <div class="buscar"><input type="text" id="buscadorReporte" placeholder="Buscar por nombre, código o departamento…" oninput="aplicarFiltrosReporte()"></div>
       <select id="filtroCategoria" onchange="cargarReporteInventario()">
         <option value="">Departamento: Todos</option>
       </select>
-      <button class="btn btn-secondary" onclick="exportarReporteCSV()">⬇️ Exportar CSV</button>
-      <button class="btn btn-secondary" onclick="document.getElementById('inputImportar').click()">📥 Importar Excel</button>
+      <select id="filtroTipoVenta" onchange="aplicarFiltrosReporte()">
+        <option value="">Tipo: Todos</option>
+        <option value="unidad">Por pieza</option>
+        <option value="peso">A granel (kg)</option>
+      </select>
+      <select id="ordenMovil" class="solo-movil" onchange="ordenarDesdeSelectMovil()">
+        <option value="nombre|1">Ordenar: Nombre A-Z</option>
+        <option value="existencia|1">Existencia: menor primero</option>
+        <option value="existencia|0">Existencia: mayor primero</option>
+        <option value="precio|0">Precio: mayor primero</option>
+        <option value="precio|1">Precio: menor primero</option>
+        <option value="estado|1">Estado: urgentes primero</option>
+      </select>
+      <div class="chips" id="chipsEstado">
+        <span class="chip activo" data-estado="todos" onclick="elegirEstadoReporte('todos')">Todos<i id="cntTodos"></i></span>
+        <span class="chip amarillo" data-estado="bajo" onclick="elegirEstadoReporte('bajo')">⚠ Bajo mínimo<i id="cntBajo"></i></span>
+        <span class="chip rojo" data-estado="agotado" onclick="elegirEstadoReporte('agotado')">⛔ Agotados<i id="cntAgotado"></i></span>
+        <span class="chip" data-estado="orden" onclick="elegirEstadoReporte('orden')">En orden<i id="cntOrden"></i></span>
+      </div>
+      <span class="espaciador"></span>
+      <button class="btn btn-primary" onclick="exportarReporteCSV()">⬇️ Exportar CSV</button>
+      <div class="menu-mas" id="menuMas">
+        <button class="btn btn-secondary" onclick="document.getElementById('menuMas').classList.toggle('abierto'); event.stopPropagation();">⋯ Más</button>
+        <div class="lista">
+          <button onclick="document.getElementById('inputImportar').click()">📥 Importar Excel</button>
+          <button onclick="actualizarImagenesMasivo()">🖼️ Actualizar imágenes</button>
+          <button onclick="window.print()">🖨️ Imprimir</button>
+        </div>
+      </div>
       <input type="file" id="inputImportar" accept=".xlsx,.xls" style="display:none;" onchange="importarExcel(event)">
-      <button class="btn btn-secondary" onclick="actualizarImagenesMasivo()">🖼️ Actualizar Imágenes</button>
-      <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir</button>
     </div>
 
-    <div id="progresoImportacion" style="display:none; background:white; border-radius:12px; padding:14px 18px; margin-bottom:14px; box-shadow: var(--shadow);">
+    <div id="progresoImportacion" style="display:none; background:var(--surface,#fff); border-radius:12px; padding:14px 18px; margin-bottom:14px; box-shadow: var(--shadow);">
       <div style="display:flex; justify-content:space-between; font-size:13px; color:#666; margin-bottom:6px;">
         <span id="textoProgresoImportacion">Preparando...</span>
         <span id="porcentajeProgresoImportacion">0%</span>
@@ -82,32 +170,41 @@
       </div>
     </div>
 
-    <div style="background:white; border-radius:12px; padding:12px 16px; margin-bottom:14px; box-shadow: var(--shadow); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <b style="font-size:13px;">Corregir Tipo de Venta en lote:</b>
-      <span id="contadorSeleccionTipoVenta" style="font-size:13px; color:#666;">0 seleccionados</span>
-      <button class="btn btn-secondary" onclick="seleccionarTodosTipoVenta()">Seleccionar todos</button>
-      <button class="btn btn-secondary" onclick="seleccionarNingunoTipoVenta()">Quitar selección</button>
+    <!-- Aparece solo cuando hay productos marcados: corrección de tipo de venta en lote -->
+    <div class="seleccion" id="barraSeleccion">
+      <b id="contadorSeleccionTipoVenta">0 seleccionados</b>
+      <button class="btn btn-secondary" onclick="seleccionarTodosVisibles()">Seleccionar todos los que se ven</button>
       <button class="btn btn-primary" onclick="cambiarTipoVentaLote('unidad')">Marcar como Por Pieza</button>
       <button class="btn btn-primary" onclick="cambiarTipoVentaLote('peso')">Marcar como A Granel</button>
+      <button class="btn btn-secondary" onclick="quitarSeleccionReporte()">Quitar selección</button>
     </div>
 
-    <div class="contenedor-tabla">
-      <table class="tabla-reporte-inv">
-        <thead>
-          <tr>
-            <th class="checkbox-col"><input type="checkbox" id="checkTodosTipoVenta" onchange="toggleTodosCheckbox(this.checked)"></th>
-            <th onclick="ordenarReportePor('codigo_barras')">Código <span id="flechaOrden-codigo_barras"></span></th>
-            <th onclick="ordenarReportePor('nombre')">Descripción del Producto <span id="flechaOrden-nombre"></span></th>
-            <th onclick="ordenarReportePor('tipo_venta')">Tipo de Venta <span id="flechaOrden-tipo_venta"></span></th>
-            <th class="numero" onclick="ordenarReportePor('precio_costo')">Costo <span id="flechaOrden-precio_costo"></span></th>
-            <th class="numero" onclick="ordenarReportePor('precio')">Precio Venta <span id="flechaOrden-precio"></span></th>
-            <th class="numero" onclick="ordenarReportePor('existencia')">Existencia <span id="flechaOrden-existencia"></span></th>
-            <th class="numero" onclick="ordenarReportePor('stock_minimo')">Inv. Mínimo <span id="flechaOrden-stock_minimo"></span></th>
-            <th class="numero" onclick="ordenarReportePor('stock_maximo')">Inv. Máximo <span id="flechaOrden-stock_maximo"></span></th>
-          </tr>
-        </thead>
-        <tbody id="tablaReporteInventario"></tbody>
-      </table>
+    <div class="caja-tabla">
+      <div class="contenedor-tabla">
+        <table class="tabla-reporte-inv">
+          <thead>
+            <tr>
+              <th class="checkbox-col"><input type="checkbox" id="checkTodosTipoVenta" onchange="toggleTodosVisibles(this.checked)" title="Marcar todos los que se ven"></th>
+              <th onclick="ordenarReportePor('nombre')">Producto <span id="flechaOrden-nombre"></span></th>
+              <th onclick="ordenarReportePor('categoria_nombre')">Departamento <span id="flechaOrden-categoria_nombre"></span></th>
+              <th onclick="ordenarReportePor('tipo_venta')">Tipo <span id="flechaOrden-tipo_venta"></span></th>
+              <th class="numero" onclick="ordenarReportePor('precio_costo')">Costo <span id="flechaOrden-precio_costo"></span></th>
+              <th class="numero" onclick="ordenarReportePor('precio')">Precio <span id="flechaOrden-precio"></span></th>
+              <th class="numero" onclick="ordenarReportePor('margen')">Margen <span id="flechaOrden-margen"></span></th>
+              <th class="numero" onclick="ordenarReportePor('existencia')">Existencia <span id="flechaOrden-existencia"></span></th>
+              <th onclick="ordenarReportePor('estado')">Estado <span id="flechaOrden-estado"></span></th>
+              <th class="numero" onclick="ordenarReportePor('stock_minimo')">Mín. <span id="flechaOrden-stock_minimo"></span></th>
+              <th class="numero" onclick="ordenarReportePor('stock_maximo')">Máx. <span id="flechaOrden-stock_maximo"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tablaReporteInventario"></tbody>
+        </table>
+      </div>
+      <div class="tarjetas" id="tarjetasReporteInventario"></div>
+    </div>
+    <div class="pie-reporte">
+      <span id="pieReporte"></span>
+      <span class="ayuda">Clic en un encabezado para ordenar · Casilla para corregir el tipo de venta en lote</span>
     </div>
   </div>
 
@@ -117,13 +214,36 @@
 <script src="../js/ui-components.js"></script>
 <script>
 requiereLogin();
-let filasReporteActual = [];
+let filasReporteActual = [];      // todo lo que trae el servidor para el departamento elegido
+let filasVisibles = [];           // lo que se ve después de buscar / filtrar / ordenar
+let estadoFiltro = 'todos';       // todos | bajo | agotado | orden
+let columnaOrdenActual = 'nombre';
+let ordenAscendente = true;
+const seleccionados = new Set();  // ids marcados (se conservan al buscar o filtrar)
+const esMovil = window.matchMedia('(max-width: 760px)');
+
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+function estadoDe(p) {
+  const e = parseFloat(p.existencia), m = parseFloat(p.stock_minimo);
+  if (e <= 0) return 'agotado';
+  if (e <= m) return 'bajo';
+  return 'orden';
+}
+const RANGO_ESTADO = { agotado: 0, bajo: 1, orden: 2 };
+function margenDe(p) {
+  const costo = parseFloat(p.precio_costo), precio = parseFloat(p.precio);
+  if (!p.precio_costo || !(precio > 0)) return null;
+  return (precio - costo) / precio * 100;
+}
 
 async function cargarDepartamentosFiltro() {
   try {
     const deptos = await apiFetch('/departamentos');
     const select = document.getElementById('filtroCategoria');
-    select.innerHTML = '<option value="">Departamento: Todos</option>' + deptos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+    select.innerHTML = '<option value="">Departamento: Todos</option>' + deptos.map(d => `<option value="${d.id}">${escapar(d.nombre)}</option>`).join('');
   } catch (err) {
     console.error(err);
   }
@@ -134,100 +254,156 @@ async function cargarReporteInventario() {
     const categoriaId = document.getElementById('filtroCategoria').value;
     const query = categoriaId ? `?categoria_id=${categoriaId}` : '';
     const data = await apiFetch(`/inventario/reporte${query}`);
-    filasReporteActual = data.productos;
+    filasReporteActual = data.productos.map(p => ({ ...p, _estado: estadoDe(p), _margen: margenDe(p) }));
+    seleccionados.clear();
 
-    document.getElementById('costoTotalReporte').textContent = `$${data.totales.costo_total.toFixed(2)}`;
-    document.getElementById('cantidadTotalReporte').textContent = data.totales.cantidad_total.toFixed(2);
+    const valorVenta = filasReporteActual.reduce((s, p) => s + Math.max(0, parseFloat(p.existencia)) * parseFloat(p.precio || 0), 0);
+    document.getElementById('costoTotalReporte').textContent = dinero(data.totales.costo_total);
+    document.getElementById('valorVentaReporte').textContent = dinero(valorVenta);
+    document.getElementById('kpiBajo').textContent = filasReporteActual.filter(p => p._estado === 'bajo').length.toLocaleString('en-US');
+    document.getElementById('kpiAgotados').textContent = filasReporteActual.filter(p => p._estado === 'agotado').length.toLocaleString('en-US');
+    window._cantidadTotalReporte = data.totales.cantidad_total;
+
+    document.getElementById('cntTodos').textContent = filasReporteActual.length.toLocaleString('en-US');
+    document.getElementById('cntBajo').textContent = filasReporteActual.filter(p => p._estado === 'bajo').length.toLocaleString('en-US');
+    document.getElementById('cntAgotado').textContent = filasReporteActual.filter(p => p._estado === 'agotado').length.toLocaleString('en-US');
+    document.getElementById('cntOrden').textContent = filasReporteActual.filter(p => p._estado === 'orden').length.toLocaleString('en-US');
 
     document.getElementById('buscadorReporte').value = '';
-    renderFilasReporte(filasReporteActual);
+    aplicarFiltrosReporte();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
 }
 
-function renderFilasReporte(lista) {
-  document.getElementById('tablaReporteInventario').innerHTML = lista.map(p => {
-    const existencia = parseFloat(p.existencia);
-    const minimo = parseFloat(p.stock_minimo);
-    let claseExistencia = '';
-    if (existencia <= 0) claseExistencia = 'valor-bajo';
-    else if (existencia <= minimo) claseExistencia = 'valor-alerta';
-    const etiquetaTipoVenta = p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel (kg)';
+// Busca, filtra por estado y tipo, ordena y dibuja. Todo sobre lo que ya está en el navegador.
+function aplicarFiltrosReporte() {
+  const texto = sinAcentos(document.getElementById('buscadorReporte').value.trim());
+  const tipo = document.getElementById('filtroTipoVenta').value;
 
-    return `
-      <tr>
-        <td><input type="checkbox" class="check-tipo-venta" data-id="${p.id}" onchange="actualizarContadorSeleccionTipoVenta()"></td>
-        <td>${p.codigo_barras || '—'}</td>
-        <td>${p.nombre}</td>
-        <td>${etiquetaTipoVenta}</td>
-        <td class="numero">${p.precio_costo ? '$' + parseFloat(p.precio_costo).toFixed(2) : 'N/D'}</td>
-        <td class="numero">$${parseFloat(p.precio).toFixed(2)}</td>
-        <td class="numero ${claseExistencia}">${existencia.toFixed(2)}</td>
-        <td class="numero">${minimo.toFixed(2)}</td>
-        <td class="numero">${parseFloat(p.stock_maximo).toFixed(2)}</td>
-      </tr>
-    `;
-  }).join('') || '<tr><td colspan="9" style="text-align:center; color:#888;">Sin productos que coincidan</td></tr>';
+  let lista = filasReporteActual.filter(p => {
+    if (estadoFiltro !== 'todos' && p._estado !== estadoFiltro) return false;
+    if (tipo && p.tipo_venta !== tipo) return false;
+    if (texto && !(sinAcentos(p.nombre).includes(texto) || sinAcentos(p.codigo_barras).includes(texto) || sinAcentos(p.categoria_nombre).includes(texto))) return false;
+    return true;
+  });
+
+  const camposTexto = ['codigo_barras', 'nombre', 'tipo_venta', 'categoria_nombre'];
+  const campo = columnaOrdenActual;
+  lista = lista.sort((a, b) => {
+    let va, vb;
+    if (campo === 'estado') { va = RANGO_ESTADO[a._estado]; vb = RANGO_ESTADO[b._estado]; }
+    else if (campo === 'margen') { va = a._margen == null ? -Infinity : a._margen; vb = b._margen == null ? -Infinity : b._margen; }
+    else if (camposTexto.includes(campo)) {
+      const r = String(a[campo] || '').localeCompare(String(b[campo] || ''), 'es', { sensitivity: 'base' });
+      return ordenAscendente ? r : -r;
+    } else { va = parseFloat(a[campo]) || 0; vb = parseFloat(b[campo]) || 0; }
+    return ordenAscendente ? va - vb : vb - va;
+  });
+
+  filasVisibles = lista;
+  renderFilasReporte(lista);
+}
+
+function renderFilasReporte(lista) {
+  if (esMovil.matches) {
+    document.getElementById('tarjetasReporteInventario').innerHTML = lista.map(p => {
+      const e = parseFloat(p.existencia);
+      const color = p._estado === 'agotado' ? '#E53935' : p._estado === 'bajo' ? '#F9A825' : 'var(--primary,#5FAE46)';
+      const rotulo = { agotado: 'Agotado', bajo: 'Bajo', orden: 'En orden' }[p._estado];
+      return `
+        <div class="tarjeta-prod ${seleccionados.has(p.id) ? 'marcada' : ''}">
+          <input type="checkbox" class="check-tipo-venta" data-id="${p.id}" ${seleccionados.has(p.id) ? 'checked' : ''} onchange="marcarProducto(${p.id}, this.checked)">
+          <div class="nom">${escapar(p.nombre)}</div>
+          <div class="grande" style="color:${color}">${e.toFixed(2)}</div>
+          <div class="sub">
+            <span class="cod">${escapar(p.codigo_barras || '—')}</span>
+            <span class="etiqueta-tipo ${p.tipo_venta}">${p.tipo_venta === 'unidad' ? 'Pieza' : 'Granel'}</span>
+            <span class="estado ${p._estado}">${rotulo}</span>
+            <span>Precio <b>${dinero(p.precio)}</b></span>
+            ${p.precio_costo ? `<span>Costo ${dinero(p.precio_costo)}</span>` : ''}
+            <span>Mín ${parseFloat(p.stock_minimo).toFixed(0)}</span>
+          </div>
+        </div>`;
+    }).join('') || '<p style="text-align:center; color:#888; padding:20px;">Sin productos que coincidan</p>';
+    document.getElementById('tablaReporteInventario').innerHTML = '';
+  } else {
+    document.getElementById('tablaReporteInventario').innerHTML = lista.map(p => {
+      const e = parseFloat(p.existencia), min = parseFloat(p.stock_minimo), max = parseFloat(p.stock_maximo);
+      const base = max > 0 ? max : (min > 0 ? min * 2 : 0);
+      const pct = base > 0 ? Math.max(0, Math.min(100, e / base * 100)) : 0;
+      const color = p._estado === 'agotado' ? '#E53935' : p._estado === 'bajo' ? '#F9A825' : '#5FAE46';
+      const rotulo = { agotado: 'Agotado', bajo: 'Bajo', orden: 'En orden' }[p._estado];
+      const m = p._margen;
+      const claseMargen = m == null ? '' : m < 0 ? 'negativo' : m < 20 ? 'bajo' : '';
+      return `
+        <tr class="${seleccionados.has(p.id) ? 'marcada' : ''}">
+          <td><input type="checkbox" class="check-tipo-venta" data-id="${p.id}" ${seleccionados.has(p.id) ? 'checked' : ''} onchange="marcarProducto(${p.id}, this.checked)"></td>
+          <td><div class="nom">${escapar(p.nombre)}</div><div class="cod">${escapar(p.codigo_barras || '—')}</div></td>
+          <td class="depto">${escapar(p.categoria_nombre || '—')}</td>
+          <td><span class="etiqueta-tipo ${p.tipo_venta}">${p.tipo_venta === 'unidad' ? 'Pieza' : 'Granel'}</span></td>
+          <td class="numero">${p.precio_costo ? dinero(p.precio_costo) : 'N/D'}</td>
+          <td class="numero"><b>${dinero(p.precio)}</b></td>
+          <td class="numero">${m == null ? '—' : `<span class="margen ${claseMargen}">${m.toFixed(0)}%</span>`}</td>
+          <td class="numero"><div class="existencia-celda"><b style="color:${p._estado === 'orden' ? 'inherit' : color}">${e.toFixed(2)}</b>${base > 0 ? `<div class="medidor"><i style="width:${pct}%; background:${color}"></i></div>` : '<div class="medidor" style="visibility:hidden"></div>'}</div></td>
+          <td><span class="estado ${p._estado}">${rotulo}</span></td>
+          <td class="numero">${min.toFixed(2)}</td>
+          <td class="numero">${max.toFixed(2)}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="11" style="text-align:center; color:#888; padding:24px;">Sin productos que coincidan</td></tr>';
+    document.getElementById('tarjetasReporteInventario').innerHTML = '';
+  }
+
+  document.getElementById('pieReporte').textContent =
+    `Mostrando ${lista.length.toLocaleString('en-US')} de ${filasReporteActual.length.toLocaleString('en-US')} productos · Cantidad total en existencia: ${Number(window._cantidadTotalReporte || 0).toFixed(2)}`;
   actualizarContadorSeleccionTipoVenta();
 }
+esMovil.addEventListener('change', () => aplicarFiltrosReporte());
 
-// Filtra sobre lo que ya está cargado en el navegador — no vuelve a pedirle
-// nada al servidor, así que responde al instante mientras escribes.
-function filtrarReporteEnPantalla() {
-  const texto = document.getElementById('buscadorReporte').value.trim().toLowerCase();
-  if (!texto) { renderFilasReporte(filasReporteActual); return; }
-
-  const filtradas = filasReporteActual.filter(p =>
-    p.nombre.toLowerCase().includes(texto) ||
-    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto))
-  );
-  renderFilasReporte(filtradas);
+// ---------- Filtros y orden ----------
+function elegirEstadoReporte(estado) {
+  estadoFiltro = estado;
+  document.querySelectorAll('#chipsEstado .chip').forEach(c => c.classList.toggle('activo', c.dataset.estado === estado));
+  aplicarFiltrosReporte();
 }
 
-// Ordena al hacer clic en un encabezado — alterna ascendente/descendente si
-// vuelves a hacer clic en la misma columna. Ordena sobre lo que se está
-// viendo actualmente (respeta el filtro de búsqueda si hay uno activo).
-let columnaOrdenActual = null;
-let ordenAscendente = true;
+// Compatibilidad: el buscador llamaba a esta función.
+function filtrarReporteEnPantalla() { aplicarFiltrosReporte(); }
 
+// Clic en un encabezado: ordena; otro clic en el mismo, invierte.
 function ordenarReportePor(campo) {
   ordenAscendente = (columnaOrdenActual === campo) ? !ordenAscendente : true;
   columnaOrdenActual = campo;
-
+  pintarFlechasOrden();
+  aplicarFiltrosReporte();
+}
+function pintarFlechasOrden() {
   document.querySelectorAll('[id^="flechaOrden-"]').forEach(el => el.textContent = '');
-  document.getElementById(`flechaOrden-${campo}`).textContent = ordenAscendente ? '▲' : '▼';
-
-  const texto = document.getElementById('buscadorReporte').value.trim().toLowerCase();
-  const base = texto
-    ? filasReporteActual.filter(p => p.nombre.toLowerCase().includes(texto) || (p.codigo_barras && p.codigo_barras.toLowerCase().includes(texto)))
-    : filasReporteActual;
-
-  const camposTexto = ['codigo_barras', 'nombre', 'tipo_venta'];
-  const ordenadas = [...base].sort((a, b) => {
-    let valorA = a[campo], valorB = b[campo];
-    if (camposTexto.includes(campo)) {
-      valorA = (valorA || '').toString().toLowerCase();
-      valorB = (valorB || '').toString().toLowerCase();
-      return ordenAscendente ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA);
-    }
-    valorA = parseFloat(valorA) || 0;
-    valorB = parseFloat(valorB) || 0;
-    return ordenAscendente ? valorA - valorB : valorB - valorA;
-  });
-
-  renderFilasReporte(ordenadas);
+  const f = document.getElementById(`flechaOrden-${columnaOrdenActual}`);
+  if (f) f.textContent = ordenAscendente ? '▲' : '▼';
+}
+function ordenarDesdeSelectMovil() {
+  const [campo, asc] = document.getElementById('ordenMovil').value.split('|');
+  columnaOrdenActual = campo;
+  ordenAscendente = asc === '1';
+  pintarFlechasOrden();
+  aplicarFiltrosReporte();
 }
 
+// ---------- Exportar ----------
+// Exporta lo que se está viendo (con la búsqueda y los filtros activos).
 function exportarReporteCSV() {
-  if (filasReporteActual.length === 0) { mostrarToast('No hay datos para exportar', 'error'); return; }
+  const lista = filasVisibles;
+  if (lista.length === 0) { mostrarToast('No hay datos para exportar', 'error'); return; }
 
-  const encabezado = 'Codigo,Descripcion,Tipo Venta,Costo,Precio Venta,Existencia,Inv Minimo,Inv Maximo\n';
-  const filas = filasReporteActual.map(p =>
-    `${p.codigo_barras || ''},"${p.nombre}",${p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel'},${p.precio_costo || 0},${p.precio},${p.existencia},${p.stock_minimo},${p.stock_maximo}`
+  const celda = (t) => `"${String(t == null ? '' : t).replace(/"/g, '""')}"`;
+  const encabezado = 'Codigo,Descripcion,Departamento,Tipo Venta,Costo,Precio Venta,Existencia,Estado,Inv Minimo,Inv Maximo\n';
+  const filas = lista.map(p =>
+    [celda(p.codigo_barras), celda(p.nombre), celda(p.categoria_nombre), p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel',
+     p.precio_costo || 0, p.precio, p.existencia, { agotado: 'Agotado', bajo: 'Bajo', orden: 'En orden' }[p._estado], p.stock_minimo, p.stock_maximo].join(',')
   ).join('\n');
 
-  const blob = new Blob([encabezado + filas], { type: 'text/csv' });
+  const blob = new Blob(['\ufeff' + encabezado + filas], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -246,31 +422,40 @@ function parsearNumeroExcel(valor) {
   return isNaN(numero) ? null : numero;
 }
 
-function toggleTodosCheckbox(marcado) {
-  document.querySelectorAll('.check-tipo-venta').forEach(chk => chk.checked = marcado);
+// ---------- Selección para corregir el tipo de venta en lote ----------
+function marcarProducto(id, marcado) {
+  if (marcado) seleccionados.add(id); else seleccionados.delete(id);
+  const fila = document.querySelector(`.check-tipo-venta[data-id="${id}"]`);
+  if (fila) { const contenedor = fila.closest('tr, .tarjeta-prod'); if (contenedor) contenedor.classList.toggle('marcada', marcado); }
   actualizarContadorSeleccionTipoVenta();
 }
-
-function seleccionarTodosTipoVenta() { toggleTodosCheckbox(true); document.getElementById('checkTodosTipoVenta').checked = true; }
-function seleccionarNingunoTipoVenta() { toggleTodosCheckbox(false); document.getElementById('checkTodosTipoVenta').checked = false; }
+function toggleTodosVisibles(marcado) {
+  filasVisibles.forEach(p => { if (marcado) seleccionados.add(p.id); else seleccionados.delete(p.id); });
+  renderFilasReporte(filasVisibles);
+}
+function seleccionarTodosVisibles() { toggleTodosVisibles(true); }
+function quitarSeleccionReporte() { seleccionados.clear(); renderFilasReporte(filasVisibles); }
 
 function actualizarContadorSeleccionTipoVenta() {
-  const total = document.querySelectorAll('.check-tipo-venta:checked').length;
-  document.getElementById('contadorSeleccionTipoVenta').textContent = `${total} seleccionados`;
+  const total = seleccionados.size;
+  document.getElementById('contadorSeleccionTipoVenta').textContent = `${total} seleccionado${total === 1 ? '' : 's'}`;
+  document.getElementById('barraSeleccion').classList.toggle('visible', total > 0);
+  const todos = document.getElementById('checkTodosTipoVenta');
+  if (todos) todos.checked = filasVisibles.length > 0 && filasVisibles.every(p => seleccionados.has(p.id));
 }
 
 async function cambiarTipoVentaLote(tipoVenta) {
-  const seleccionados = [...document.querySelectorAll('.check-tipo-venta:checked')].map(chk => parseInt(chk.dataset.id));
-  if (seleccionados.length === 0) { mostrarToast('Selecciona al menos un producto primero', 'error'); return; }
+  const ids = [...seleccionados];
+  if (ids.length === 0) { mostrarToast('Selecciona al menos un producto primero', 'error'); return; }
 
   const etiqueta = tipoVenta === 'unidad' ? 'Por Pieza' : 'A Granel (kg)';
-  const confirmado = await confirmarAccion(`¿Marcar ${seleccionados.length} productos como "${etiqueta}"?`);
+  const confirmado = await confirmarAccion(`¿Marcar ${ids.length} productos como "${etiqueta}"?`);
   if (!confirmado) return;
 
   try {
     const resultado = await apiFetch('/productos/cambiar-tipo-venta-lote', {
       method: 'POST',
-      body: JSON.stringify({ producto_ids: seleccionados, tipo_venta: tipoVenta })
+      body: JSON.stringify({ producto_ids: ids, tipo_venta: tipoVenta })
     });
     mostrarToast(`${resultado.actualizados} productos actualizados a "${etiqueta}"`, 'exito');
     cargarReporteInventario();
@@ -278,6 +463,9 @@ async function cambiarTipoVentaLote(tipoVenta) {
     mostrarToast(err.message, 'error');
   }
 }
+
+// Cierra el menú "Más" al hacer clic fuera
+document.addEventListener('click', () => document.getElementById('menuMas').classList.remove('abierto'));
 
 async function actualizarImagenesMasivo() {
   try {
@@ -407,6 +595,7 @@ async function importarExcel(evento) {
   }
 }
 
+pintarFlechasOrden();
 cargarDepartamentosFiltro();
 cargarReporteInventario();
 </script>
