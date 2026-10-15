@@ -1,5 +1,27 @@
 requiereLogin();
 const usuario = getUsuario();
+
+// Imagen de respaldo (sin foto, sin internet o liga rota): cuadro gris con una cajita.
+const IMAGEN_RESPALDO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="#eceff1"/><path d="M60 28l32 16v32L60 92 28 76V44z" fill="none" stroke="#90a4ae" stroke-width="5" stroke-linejoin="round"/><path d="M28 44l32 16 32-16M60 60v32" fill="none" stroke="#90a4ae" stroke-width="5" stroke-linejoin="round"/></svg>');
+document.addEventListener('error', (e) => {
+  const el = e.target;
+  if (el && el.tagName === 'IMG' && !el.dataset.respaldo) { el.dataset.respaldo = '1'; el.src = IMAGEN_RESPALDO; }
+}, true);
+
+const pantallaAngosta = () => window.innerWidth < 900;
+
+function limpiarPanelCobro() {
+  const panel = document.getElementById('panelCobro');
+  panel.classList.remove('abierto');
+  panel.innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+  document.querySelectorAll('.ticket-pendiente.sel').forEach(el => el.classList.remove('sel'));
+}
+
+// En celular el cobro se abre a pantalla completa; este botón regresa a la bandeja.
+function volverABandeja() {
+  document.getElementById('panelCobro').classList.remove('abierto');
+}
 let ticketActual = null;
 let metodoPago = 'efectivo';
 let clienteSeleccionado = null;
@@ -47,7 +69,7 @@ async function confirmarMotivoCancelacion(motivo) {
     if (ticketActual && ticketActual.folio === folio) {
       ticketActual = null;
       clienteSeleccionado = null;
-      document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+      limpiarPanelCobro();
     }
     cargarBandeja();
   } catch (err) {
@@ -79,6 +101,7 @@ async function cargarBandeja() {
           <button class="btn-cancelar-ticket-pendiente" title="Cancelar (el cliente ya no lo requiere)" data-id="${t.id}" data-folio="${t.folio}">✕</button>
         </span>
       `;
+      if (ticketActual && ticketActual.folio === t.folio) div.classList.add('sel');
       div.onclick = () => cargarTicket(t.folio);
       div.querySelector('.btn-cancelar-ticket-pendiente').onclick = (evento) => {
         evento.stopPropagation(); // no debe abrir el ticket para cobrar, solo cancelarlo
@@ -93,9 +116,11 @@ async function cargarBandeja() {
 
 async function cargarTicket(folio) {
   try {
-    ticketActual = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
-    clienteSeleccionado = null;
+    const nuevo = await apiFetch(`/tickets/folio/${encodeURIComponent(folio)}`);
+    if (!ticketActual || ticketActual.folio !== nuevo.folio) clienteSeleccionado = null; // al editar el mismo ticket se conserva el cliente
+    ticketActual = nuevo;
     renderPanelCobro();
+    cargarBandeja();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
@@ -118,7 +143,7 @@ function renderPanelCobro() {
       : '';
     return `
       <div class="detalle-item">
-        <span>${i.nombre_producto}<br><small>${detalle}</small>${lineaDescuentoItem}</span>
+        <span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${detalle}</small>${lineaDescuentoItem}</span></span>
         <span class="acciones">
           $${parseFloat(i.subtotal).toFixed(2)}
           ${puedeEditar ? `<button onclick="editarCantidad(${i.id}, ${i.cantidad})">✏️</button>` : ''}
@@ -135,19 +160,36 @@ function renderPanelCobro() {
   ` : '';
 
   panel.innerHTML = `
-    <h3>Ticket ${t.folio}</h3>
+    <div class="encabezado-ticket">
+      <span style="display:flex; align-items:center; gap:8px;">
+        <button class="btn btn-secondary btn-volver-cobro" onclick="volverABandeja()">← Volver</button>
+        <h3>Ticket ${t.folio}</h3>
+      </span>
+      <button class="btn btn-secondary" id="btnAsignarCliente" onclick="asignarClienteCaja()">👤 ${clienteSeleccionado ? clienteSeleccionado.nombre : 'Asignar cliente'}</button>
+    </div>
     ${itemsHtml}
     ${filasDescuento}
-    <div class="total-box" style="font-size:24px; font-weight:700; text-align:right; margin:14px 0;">Total: $${totalNetoActual().toFixed(2)}</div>
+    <div class="total-box" style="font-size:28px; font-weight:800; color:var(--primary,#5FAE46); text-align:right; margin:12px 0;">Total: $${totalNetoActual().toFixed(2)}</div>
 
     <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="abrirDescuento()">🏷️ Aplicar descuento</button>
 
     <div class="metodo-pago-btns" id="metodoPagoBtns"></div>
 
-    <div id="camposPago"></div>
-
-    <button class="btn btn-primary" id="btnConfirmarPago" style="width:100%; margin-top:14px;" onclick="cobrar()">✅ Confirmar Pago</button>
+    <div class="cobro-cols">
+      <div class="cobro-izq">
+        <div id="camposPago"></div>
+        <button class="btn btn-primary" id="btnConfirmarPago" style="width:100%; margin-top:14px;" onclick="cobrar()">✅ Confirmar Pago</button>
+      </div>
+      <div class="teclado-cobro" id="tecladoCobro">
+        ${['7','8','9','4','5','6','1','2','3','0','.'].map(k => `<button type="button" onmousedown="event.preventDefault()" onclick="tecladoCobro('${k}')">${k}</button>`).join('')}
+        <button type="button" class="tc-borrar" onmousedown="event.preventDefault()" onclick="tecladoCobro('borrar')">Borrar</button>
+        <button type="button" class="tc-exacto" onmousedown="event.preventDefault()" onclick="tecladoCobro('exacto')">Exacto</button>
+        <button type="button" class="tc-enter" onmousedown="event.preventDefault()" onclick="tecladoCobro('enter')">ENTER</button>
+      </div>
+    </div>
   `;
+  panel.classList.toggle('abierto', pantallaAngosta());
+  if (pantallaAngosta()) panel.scrollTop = 0;
   renderBotonesMetodoPago();
 }
 
@@ -214,31 +256,44 @@ function setMetodo(m) {
     if (btn) btn.classList.toggle('activo', (nombre === 'Vale' ? 'vale_despensa' : nombre.toLowerCase()) === m);
   });
 
+  // En celular no se abre el teclado del teléfono: se usa el teclado grande de la pantalla.
+  const modo = pantallaAngosta() ? 'none' : 'decimal';
+  const teclado = document.getElementById('tecladoCobro');
+  if (teclado) teclado.style.display = (m === 'efectivo' || m === 'mixto' || m === 'dolares') ? '' : 'none';
+
+  let idCampoPrincipal = null;
   const camposDiv = document.getElementById('camposPago');
   if (m === 'mixto') {
     camposDiv.innerHTML = `
-      <input type="number" id="montoEfectivo" placeholder="Monto en efectivo" style="margin-bottom:8px;">
-      <input type="number" id="montoTarjeta" placeholder="Monto en tarjeta">
+      <input type="text" class="campo-num" inputmode="${modo}" autocomplete="off" id="montoEfectivo" placeholder="Monto en efectivo" style="margin-bottom:8px;" oninput="calcularFaltanteMixto()">
+      <input type="text" class="campo-num" inputmode="${modo}" autocomplete="off" id="montoTarjeta" placeholder="Monto en tarjeta" oninput="calcularFaltanteMixto()">
+      <div id="faltanteMixtoTexto" class="cambio-grande" style="margin-top:12px;"></div>
     `;
+    calcularFaltanteMixto();
+    idCampoPrincipal = 'montoEfectivo';
   } else if (m === 'efectivo') {
     camposDiv.innerHTML = `
-      <input type="number" id="montoRecibido" placeholder="Efectivo recibido" oninput="calcularCambio()">
-      <p id="cambioTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+      <input type="text" class="campo-num" inputmode="${modo}" autocomplete="off" id="montoRecibido" placeholder="Efectivo recibido" oninput="calcularCambio()">
+      <div id="cambioTexto" class="cambio-grande"></div>
     `;
+    pintarCambio('cambioTexto', 0, 0, '');
+    idCampoPrincipal = 'montoRecibido';
   } else if (m === 'credito') {
     camposDiv.innerHTML = `
       <input type="text" id="buscarCliente" placeholder="Buscar cliente por nombre..." oninput="buscarClientes()">
       <div id="resultadosCliente"></div>
-      <div id="clienteElegido" style="margin-top:8px; font-weight:600;"></div>
+      <div id="clienteElegido" style="margin-top:8px; font-weight:600;">${clienteSeleccionado ? 'Cliente seleccionado: ' + clienteSeleccionado.nombre : ''}</div>
     `;
   } else if (m === 'dolares') {
     const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
     const totalDolares = tipoCambio > 0 ? (totalNetoActual() / tipoCambio) : 0;
     camposDiv.innerHTML = `
       <p style="font-size:14px; color:#666;">Tipo de cambio: $${tipoCambio.toFixed(4)} MXN/USD — Total a cobrar: <b>$${totalDolares.toFixed(2)} USD</b></p>
-      <input type="number" id="dolaresRecibidos" placeholder="Dólares recibidos" step="0.01" oninput="calcularCambioDolares()">
-      <p id="cambioDolaresTexto" style="text-align:right; font-weight:600; margin-top:6px;"></p>
+      <input type="text" class="campo-num" inputmode="${modo}" autocomplete="off" id="dolaresRecibidos" placeholder="Dólares recibidos" oninput="calcularCambioDolares()">
+      <div id="cambioDolaresTexto" class="cambio-grande"></div>
     `;
+    pintarCambio('cambioDolaresTexto', 0, 0, ' USD');
+    idCampoPrincipal = 'dolaresRecibidos';
   } else if (m === 'tarjeta') {
     const comision = parseFloat((configuracionNegocioCaja || {}).tarjeta_comision_porcentaje || 0);
     if (comision > 0) {
@@ -257,16 +312,114 @@ function setMetodo(m) {
   } else {
     camposDiv.innerHTML = '';
   }
+
+  campoNumericoCobro = null;
+  // En computadora el cursor queda listo en el campo principal; en celular no (para no tapar la pantalla).
+  if (idCampoPrincipal && !pantallaAngosta()) {
+    setTimeout(() => { const c = document.getElementById(idCampoPrincipal); if (c) c.focus(); }, 0);
+  }
 }
 
-// Calcula el cambio cuando se cobra en dólares — el cambio se da en dólares
-// (lo más común en la práctica cuando el cliente paga en efectivo dólar).
+// ---------- Teclado en pantalla (cobro) ----------
+// Escribe en el campo numérico activo (efectivo recibido, montos del pago mixto o dólares).
+// ENTER confirma el pago (en mixto, de efectivo pasa a tarjeta); "Exacto" pone el total justo.
+let campoNumericoCobro = null;
+
+(function () {
+  const panel = document.getElementById('panelCobro');
+  panel.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('campo-num')) campoNumericoCobro = e.target; });
+  // Solo números y un punto, escriba quien escriba (teclado físico o en pantalla)
+  panel.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!el.classList || !el.classList.contains('campo-num')) return;
+    let v = el.value.replace(/[^0-9.]/g, '');
+    const i = v.indexOf('.');
+    if (i !== -1) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '');
+    if (v !== el.value) el.value = v;
+  }, true);
+  // Enter del teclado físico = ENTER del teclado en pantalla
+  panel.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('campo-num')) { e.preventDefault(); tecladoCobro('enter'); }
+  });
+})();
+
+function tecladoCobro(tecla) {
+  if (!ticketActual) return;
+  let campo = campoNumericoCobro && document.body.contains(campoNumericoCobro) ? campoNumericoCobro : null;
+  if (!campo) campo = document.querySelector('#camposPago .campo-num');
+
+  if (tecla === 'enter') {
+    const ef = document.getElementById('montoEfectivo');
+    const tj = document.getElementById('montoTarjeta');
+    if (ef && tj && campo === ef) {
+      if (!tj.value) {
+        const resto = totalNetoActual() - (parseFloat(ef.value) || 0);
+        if (resto > 0) tj.value = resto.toFixed(2);
+        calcularFaltanteMixto();
+      }
+      tj.focus();
+      return;
+    }
+    cobrar();
+    return;
+  }
+  if (!campo) return;
+
+  if (tecla === 'exacto') {
+    const total = totalNetoActual();
+    if (campo.id === 'dolaresRecibidos') {
+      const tc = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
+      campo.value = tc > 0 ? (total / tc).toFixed(2) : '';
+    } else {
+      campo.value = total.toFixed(2);
+    }
+  } else if (tecla === 'borrar') {
+    campo.value = campo.value.slice(0, -1);
+  } else if (tecla === '.') {
+    if (!campo.value.includes('.')) campo.value = (campo.value || '0') + '.';
+  } else {
+    campo.value += tecla;
+  }
+  if (!pantallaAngosta()) campo.focus();
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Cambio (o lo que falta) grande y con color: verde = cambio a entregar, rojo = falta dinero.
+function pintarCambio(idElemento, recibido, cambio, sufijo) {
+  const el = document.getElementById(idElemento);
+  if (!el) return;
+  const redondeado = Math.round(cambio * 100) / 100;
+  if (!recibido) { el.className = 'cambio-grande vacio'; el.innerHTML = '<span class="cg-etiqueta">CAMBIO</span><span class="cg-monto">$0.00' + sufijo + '</span>'; return; }
+  if (redondeado >= 0) {
+    el.className = 'cambio-grande ok';
+    el.innerHTML = '<span class="cg-etiqueta">CAMBIO A ENTREGAR</span><span class="cg-monto">$' + redondeado.toFixed(2) + sufijo + '</span>';
+  } else {
+    el.className = 'cambio-grande falta';
+    el.innerHTML = '<span class="cg-etiqueta">FALTA</span><span class="cg-monto">$' + Math.abs(redondeado).toFixed(2) + sufijo + '</span>';
+  }
+}
+
+// Pago mixto: lo que FALTA por cubrir (rojo), o PAGO COMPLETO (verde).
+function calcularFaltanteMixto() {
+  const el = document.getElementById('faltanteMixtoTexto');
+  if (!el || !ticketActual) return;
+  const ef = parseFloat(document.getElementById('montoEfectivo').value || 0) || 0;
+  const tj = parseFloat(document.getElementById('montoTarjeta').value || 0) || 0;
+  const dif = Math.round((totalNetoActual() - ef - tj) * 100) / 100; // >0 falta, <0 sobra
+  let clase, etiqueta, monto;
+  if (Math.abs(dif) < 0.005) { clase = 'ok'; etiqueta = 'PAGO COMPLETO'; monto = 0; }
+  else if (dif > 0) { clase = 'falta'; etiqueta = 'FALTA'; monto = dif; }
+  else { clase = 'falta'; etiqueta = 'SOBRA'; monto = -dif; }
+  el.className = 'cambio-grande ' + clase;
+  el.innerHTML = '<span class="cg-etiqueta">' + etiqueta + '</span><span class="cg-monto">$' + monto.toFixed(2) + '</span>';
+}
+
+// Cambio en dólares (se entrega en dólares).
 function calcularCambioDolares() {
   const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
   const totalDolares = tipoCambio > 0 ? (totalNetoActual() / tipoCambio) : 0;
   const recibido = parseFloat(document.getElementById('dolaresRecibidos').value || 0);
-  const cambio = recibido - totalDolares;
-  document.getElementById('cambioDolaresTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)} USD` : `Falta: $${Math.abs(cambio).toFixed(2)} USD`;
+  pintarCambio('cambioDolaresTexto', recibido, recibido - totalDolares, ' USD');
 }
 
 async function abrirDescuentoItem(itemId) {
@@ -341,8 +494,7 @@ async function intentarAplicarDescuento(body) {
 
 function calcularCambio() {
   const recibido = parseFloat(document.getElementById('montoRecibido').value || 0);
-  const cambio = recibido - totalNetoActual();
-  document.getElementById('cambioTexto').textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Falta: $${Math.abs(cambio).toFixed(2)}`;
+  pintarCambio('cambioTexto', recibido, recibido - totalNetoActual(), '');
 }
 
 let debounceBusqueda;
@@ -365,6 +517,7 @@ function elegirCliente(cliente) {
   document.getElementById('resultadosCliente').innerHTML = '';
   document.getElementById('buscarCliente').value = '';
   document.getElementById('clienteElegido').textContent = `Cliente seleccionado: ${cliente.nombre}`;
+  const bc = document.getElementById('btnAsignarCliente'); if (bc) bc.textContent = '👤 ' + cliente.nombre;
 }
 
 async function abrirCajonManual() {
@@ -377,6 +530,162 @@ async function abrirCajonManual() {
   } catch (err) {
     mostrarToast(err.message, 'error');
   }
+}
+
+// Asigna un cliente al ticket (sale en el comprobante y sirve para el fiado).
+async function asignarClienteCaja() {
+  if (!ticketActual) return;
+  const texto = await solicitarTexto('Buscar cliente por nombre:');
+  if (!texto) return;
+  try {
+    const resultados = await apiFetch(`/clientes/buscar/${encodeURIComponent(texto)}`);
+    if (resultados.length === 0) { mostrarToast('No se encontró ningún cliente con ese nombre', 'error'); return; }
+    let elegido = resultados[0];
+    if (resultados.length > 1) {
+      const nombres = resultados.map(c => c.nombre).join(', ');
+      const eleccion = await solicitarTexto(`Varios clientes coinciden (${nombres}). Escribe el nombre exacto:`);
+      if (!eleccion) return;
+      const encontrado = resultados.find(c => c.nombre.toLowerCase() === eleccion.trim().toLowerCase());
+      if (!encontrado) { mostrarToast('Ese nombre no coincide exactamente con ninguno', 'error'); return; }
+      elegido = encontrado;
+    }
+    clienteSeleccionado = elegido;
+    const bc = document.getElementById('btnAsignarCliente'); if (bc) bc.textContent = '👤 ' + elegido.nombre;
+    const ce = document.getElementById('clienteElegido'); if (ce) ce.textContent = `Cliente seleccionado: ${elegido.nombre}`;
+    mostrarToast(`Cliente "${elegido.nombre}" asignado`, 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Entradas y salidas de dinero de la caja (requiere turno abierto).
+async function registrarMovimientoRapido(tipo) {
+  try {
+    const turno = await apiFetch('/turnos/actual');
+    if (!turno) { mostrarToast('No hay un turno de caja abierto', 'error'); return; }
+    const etiqueta = tipo === 'ingreso' ? 'Entrada' : 'Salida';
+    const montoTexto = await solicitarTexto(`Monto de la ${etiqueta.toLowerCase()}:`);
+    if (!montoTexto) return;
+    const monto = parseFloat(montoTexto);
+    if (isNaN(monto) || monto <= 0) { mostrarToast('Monto inválido', 'error'); return; }
+    const concepto = await solicitarTexto(`Concepto de la ${etiqueta.toLowerCase()}:`);
+    if (!concepto) return;
+    await apiFetch('/movimientos', { method: 'POST', body: JSON.stringify({ turno_id: turno.id, tipo, monto, concepto }) });
+    mostrarToast(`${etiqueta} de $${monto.toFixed(2)} registrada`, 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// Estado del turno en la barra de arriba.
+async function actualizarChipTurno() {
+  const chip = document.getElementById('chipTurno');
+  try {
+    const turno = await apiFetch('/turnos/actual');
+    chip.textContent = turno ? '🟢 Turno abierto' : '🔴 Sin turno (se abre al cobrar)';
+    chip.classList.toggle('cerrado', !turno);
+  } catch (err) {
+    chip.textContent = '⚪ Turno: sin conexión';
+    chip.classList.add('cerrado');
+  }
+}
+
+function totalNetoDeTicket(t) {
+  const di = (t.items || []).reduce((s, i) => s + parseFloat(i.descuento_monto || 0), 0);
+  return parseFloat(t.total) - parseFloat(t.descuento_monto || 0) - di;
+}
+
+// Imprime una copia de un ticket ya cobrado (reimpresión o copia del historial).
+async function imprimirCopiaTicketCaja(ticket, pie) {
+  const config = configuracionNegocioCaja || await apiFetch('/configuracion');
+  const neto = totalNetoDeTicket(ticket);
+  const datosTicket = {
+    ancho_ticket: obtenerAnchoTicketDispositivo(config),
+    negocio: { nombre: 'Compoint Punto de Soluciones', direccion: config.direccion, telefono: config.telefono },
+    folio: ticket.folio,
+    fecha: new Date(ticket.fecha_pago || ticket.fecha_creacion).toLocaleString(),
+    items: [
+      ...ticket.items.map(i => ({
+        nombre_producto: i.nombre_producto,
+        detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+        subtotal: parseFloat(i.subtotal).toFixed(2)
+      })),
+      ...((parseFloat(ticket.total) - neto) > 0.004
+        ? [{ nombre_producto: 'Descuentos', detalle: '', subtotal: (-(parseFloat(ticket.total) - neto)).toFixed(2) }] : [])
+    ],
+    total: neto.toFixed(2),
+    piePagina: pie,
+    lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
+    incluirPrecioUnitario: config.incluir_precio_unitario !== false,
+    descripcionCompleta: config.descripcion_completa !== false,
+    ...estiloTicketDesdeConfig(config, true)
+  };
+  const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
+  if (modoImpresion === 'sistema') await imprimirConDialogoDelSistema(datosTicket);
+  else await imprimirTicketBLE(datosTicket);
+}
+
+async function reimprimirUltimoTicketCaja() {
+  try {
+    const ticket = await apiFetch('/tickets/ultimo-pagado');
+    await imprimirCopiaTicketCaja(ticket, `Pagado con ${String(ticket.metodo_pago || '').toUpperCase()} — REIMPRESIÓN`);
+    mostrarToast(`Reimprimiendo ticket ${ticket.folio}`, 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ---------- Historial de ventas y devoluciones del día ----------
+let ticketHistorialCaja = null;
+
+function abrirHistorialCaja() {
+  document.getElementById('modalHistorialCaja').style.display = 'flex';
+  document.getElementById('fechaHistorialCaja').value = new Date().toISOString().split('T')[0];
+  cargarHistorialCaja();
+}
+function cerrarHistorialCaja() {
+  document.getElementById('modalHistorialCaja').style.display = 'none';
+}
+
+async function cargarHistorialCaja() {
+  try {
+    const fecha = document.getElementById('fechaHistorialCaja').value;
+    const ventas = await apiFetch(`/tickets/historial-dia?fecha=${fecha}`);
+    document.getElementById('listaHistorialCaja').innerHTML = ventas.map(v => `
+      <div class="hist-fila" data-id="${v.id}" data-folio="${v.folio}">
+        <span><b>${v.folio}</b>${v.estado === 'cancelado' ? ' <span style="color:#C62828;">(cancelado)</span>' : ''}<br><small>${v.cajero_nombre || '—'} · ${new Date(v.fecha_pago || v.fecha_creacion).toLocaleTimeString()}</small></span>
+        <b>$${parseFloat(v.total).toFixed(2)}</b>
+      </div>`).join('') || '<p style="color:#888; text-align:center;">Sin ventas en esta fecha</p>';
+    document.querySelectorAll('#listaHistorialCaja .hist-fila').forEach(f => { f.onclick = () => verTicketHistorialCaja(f); });
+    document.getElementById('detalleHistorialCaja').innerHTML = '<p style="color:#888; text-align:center;">Selecciona un ticket para ver el detalle</p>';
+    ticketHistorialCaja = null;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function verTicketHistorialCaja(fila) {
+  try {
+    document.querySelectorAll('#listaHistorialCaja .hist-fila').forEach(f => f.classList.toggle('sel', f === fila));
+    const t = await apiFetch(`/tickets/folio/${encodeURIComponent(fila.dataset.folio)}`);
+    ticketHistorialCaja = t;
+    document.getElementById('detalleHistorialCaja').innerHTML = `
+      <h4>Folio: ${t.folio}</h4>
+      <p style="font-size:13px; color:#666;">Estado: ${t.estado} — Método: ${t.metodo_pago || '—'}</p>
+      ${t.items.map(i => `<div class="detalle-item"><span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}</small></span></span><span>$${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}
+      <p style="text-align:right; font-weight:700; margin:10px 0;">Total: $${totalNetoDeTicket(t).toFixed(2)}</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="imprimirCopiaHistorialCaja()">🖨️ Imprimir copia</button>
+        ${t.estado === 'pagado' ? `<button class="btn btn-secondary" onclick="window.location.href='admin/devoluciones.html?folio=${encodeURIComponent(t.folio)}'">↩️ Devolver producto / cancelar</button>` : ''}
+      </div>`;
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function imprimirCopiaHistorialCaja() {
+  if (!ticketHistorialCaja) return;
+  try { await imprimirCopiaTicketCaja(ticketHistorialCaja, 'COPIA'); } catch (err) { mostrarToast(err.message, 'error'); }
 }
 
 async function cobrar() {
@@ -455,8 +764,9 @@ async function cobrar() {
     await imprimirComprobante(ticketActual, metodoPago, recibidoEfectivoParaTicket, cambioParaTicket);
     ticketActual = null;
     clienteSeleccionado = null;
-    document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+    limpiarPanelCobro();
     cargarBandeja();
+    actualizarChipTurno();
   } catch (err) {
     mostrarToast('Error al cobrar: ' + err.message, 'error');
   } finally {
@@ -668,6 +978,8 @@ if (campoLectorCaja) {
 
 cargarBandeja();
 setInterval(cargarBandeja, 15000);
+actualizarChipTurno();
+setInterval(actualizarChipTurno, 60000);
 
 // Si se llegó desde Caja Avanzada con un folio en la URL, cargarlo directo
 // para continuar el cobro sin tener que buscarlo en la bandeja.
@@ -686,7 +998,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     ticketActual = null;
     clienteSeleccionado = null;
-    document.getElementById('panelCobro').innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+    limpiarPanelCobro();
     return;
   }
   if (enCampoDeTexto) return;

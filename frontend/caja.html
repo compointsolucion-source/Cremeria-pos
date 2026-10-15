@@ -42,6 +42,51 @@
   .detalle-item .quitar { color: #C62828; background: none; }
   .resultado-cliente { background: white; border-radius: 10px; padding: 10px; margin-top: 8px; cursor: pointer; }
   .resultado-cliente:active { background: #F0F0F0; }
+
+  /* ---- Cobro con cambio grande y teclado (igual que Caja Avanzada) ---- */
+  .cambio-grande { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 18px; border-radius: 14px; border: 3px solid transparent; }
+  .cambio-grande .cg-etiqueta { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+  .cambio-grande .cg-monto { font-size: 40px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .cambio-grande.vacio { background: #F4F5F6; color: #9AA0A6; border-color: #E3E5E8; }
+  .cambio-grande.ok { background: #E8F5E9; color: #1B5E20; border-color: #5FAE46; box-shadow: 0 0 14px rgba(95,174,70,0.45); }
+  .cambio-grande.falta { background: #FDECEA; color: #B71C1C; border-color: #E53935; box-shadow: 0 0 14px rgba(229,57,53,0.35); }
+  .cobro-cols { display: flex; gap: 16px; align-items: flex-start; }
+  .cobro-izq { flex: 1; min-width: 0; }
+  .teclado-cobro { width: 250px; flex: 0 0 250px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .panel-cobro { padding-bottom: 80px; } /* deja espacio para los botones flotantes del sistema */
+  .teclado-cobro button { border: none; border-radius: 12px; background: #E8F5E9; color: #2E5E1E; font-size: 24px; font-weight: 800; padding: 10px 0; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .teclado-cobro button:active { background: #5FAE46; color: white; transform: scale(0.97); }
+  .teclado-cobro .tc-borrar { font-size: 14px; background: #FFE0B2; color: #7A4B00; }
+  .teclado-cobro .tc-exacto { font-size: 14px; background: #E3F2FD; color: #0D47A1; }
+  .teclado-cobro .tc-enter { grid-column: 2 / span 2; background: #5FAE46; color: white; font-size: 20px; }
+  .mini-foto { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: #ECEFF1; flex: none; }
+  .detalle-item .info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .encabezado-ticket { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .encabezado-ticket h3 { margin: 0; }
+  .btn-volver-cobro { display: none; }
+  .barra-acciones { display: flex; gap: 8px; padding: 8px 14px; background: #ECEFF1; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid #DDD; align-items: center; }
+  .barra-acciones .btn { flex: none; padding: 7px 12px; font-size: 14px; }
+  .chip-turno { flex: none; margin-left: auto; padding: 6px 12px; border-radius: 18px; font-size: 13px; font-weight: 700; background: #E8F5E9; color: #1B5E20; }
+  .chip-turno.cerrado { background: #FDECEA; color: #B71C1C; }
+  .layout { height: calc(100vh - 60px - 48px); }
+  .ticket-pendiente.sel { outline: 2px solid var(--primary, #5FAE46); }
+  @media (max-width: 899px) {
+    .layout { flex-direction: column; height: auto; min-height: calc(100vh - 110px); }
+    .panel-bandeja { border-right: none; overflow: visible; }
+    .panel-cobro { display: none; }
+    .panel-cobro.abierto { display: block; position: fixed; inset: 0; z-index: 60; border-radius: 0; padding: 12px; background: white; overflow-y: auto; padding-bottom: 100px; }
+    .btn-volver-cobro { display: inline-flex; }
+    .cobro-cols { flex-direction: column; }
+    .teclado-cobro { width: 100%; flex: none; }
+    .cambio-grande .cg-monto { font-size: 34px; }
+  }
+  .hist-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100; padding:10px; }
+  .hist-caja { background:white; border-radius:14px; width:min(900px,100%); max-height:94vh; overflow:auto; padding:14px; }
+  .hist-cols { display:flex; gap:14px; flex-wrap:wrap; }
+  .hist-lista { flex:1 1 300px; min-width:260px; }
+  .hist-detalle { flex:1 1 300px; min-width:260px; }
+  .hist-fila { padding:8px 10px; border-bottom:1px solid #EEE; cursor:pointer; display:flex; justify-content:space-between; font-size:14px; }
+  .hist-fila:hover, .hist-fila.sel { background:#E8F5E9; }
 </style>
 </head>
 <body>
@@ -50,9 +95,17 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>💰 Caja</h1></div>
-    <button class="btn btn-secondary" onclick="abrirCajonManual()">🗄️ Abrir Cajón</button>
     <a class="btn btn-secondary" href="admin/dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="barra-acciones">
+    <button class="btn btn-secondary" onclick="abrirCajonManual()">🗄️ Cajón</button>
+    <button class="btn btn-secondary" onclick="registrarMovimientoRapido('ingreso')">💰 Entrada</button>
+    <button class="btn btn-secondary" onclick="registrarMovimientoRapido('egreso')">💸 Salida</button>
+    <button class="btn btn-secondary" onclick="abrirHistorialCaja()">📜 Historial / Devoluciones</button>
+    <button class="btn btn-secondary" onclick="reimprimirUltimoTicketCaja()">🖨️ Reimprimir último</button>
+    <span class="chip-turno cerrado" id="chipTurno">Turno: …</span>
   </div>
 
   <div id="bannerImpresoraCaja" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
@@ -72,6 +125,22 @@
 
     <div class="panel-cobro card" id="panelCobro">
       <p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>
+    </div>
+  </div>
+
+  <div class="hist-overlay" id="modalHistorialCaja">
+    <div class="hist-caja">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
+        <h3 style="margin:0;">📜 Ventas y Devoluciones del Día</h3>
+        <span style="display:flex; gap:8px; align-items:center;">
+          <input type="date" id="fechaHistorialCaja" onchange="cargarHistorialCaja()">
+          <button class="btn btn-secondary" onclick="cerrarHistorialCaja()">✕ Cerrar</button>
+        </span>
+      </div>
+      <div class="hist-cols">
+        <div class="hist-lista" id="listaHistorialCaja"></div>
+        <div class="hist-detalle" id="detalleHistorialCaja"><p style="color:#888; text-align:center;">Selecciona un ticket para ver el detalle</p></div>
+      </div>
     </div>
   </div>
 

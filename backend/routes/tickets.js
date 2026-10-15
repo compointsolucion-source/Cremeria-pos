@@ -302,8 +302,13 @@ router.get('/folio/:folio', verificarToken, async (req, res) => {
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado' });
 
     const ticket = ticketResult.rows[0];
+    // Cada renglón trae la foto del producto o kit (si tiene) para mostrarla en Caja.
     const detalleResult = await pool.query(
-      'SELECT * FROM ticket_detalle WHERE ticket_id = $1',
+      `SELECT d.*, COALESCE(p.imagen_url, k.imagen_url) AS imagen_url
+         FROM ticket_detalle d
+         LEFT JOIN productos p ON p.id = d.producto_id
+         LEFT JOIN kits k ON k.id = d.kit_id
+        WHERE d.ticket_id = $1 ORDER BY d.id`,
       [ticket.id]
     );
     res.json({ ...ticket, items: detalleResult.rows });
