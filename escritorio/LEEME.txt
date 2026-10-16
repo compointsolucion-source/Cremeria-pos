@@ -117,6 +117,22 @@ MODO SERVIDOR (trabajar sin internet)
   "Permitir acceso" en red privada, si no las otras cajas no se conectan.
 - Panel del servidor: Ctrl+Alt+S o clic derecho en el icono junto al reloj.
 
+SINCRONIZAR CON LA NUBE (sin entrar a Render)
+- Panel del servidor -> "Sincronizar con la nube" -> "Conectar o cambiar la nube".
+- Se escribe la direccion del sistema en la nube y el USUARIO Y CONTRASENA DEL
+  DUENO (los mismos con los que se entra a ese sistema). Se usan una sola vez:
+  la nube crea sola una clave, guarda solo su "hash" (tabla sync_vinculo) y se
+  la entrega a este servidor, que la guarda cifrada. La contrasena no se guarda.
+- Asi el cliente no necesita acceso a Render. Para que la nube sepa vincular,
+  su servidor debe tener la migracion 006 (se aplica sola al publicar a
+  "estable" y que Render termine de desplegar).
+- Vincular otra vez (otra computadora, o reconectar) reemplaza la clave: la
+  computadora anterior deja de subir. "Dejar de sincronizar" borra la clave en la nube.
+- La primera copia deja a la nube como espejo del servidor, incluidos los
+  usuarios: despues en la nube se entra con los usuarios del servidor.
+- Alternativa manual (opciones avanzadas del panel): clave en la variable
+  SYNC_KEY del servidor en Render. Sigue funcionando.
+
 RESPALDOS
 - Al elegir "Salir por completo" se guarda un respaldo en la carpeta de
   respaldos (se conservan los ultimos 30).

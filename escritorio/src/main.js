@@ -708,10 +708,10 @@ ipcMain.handle('srv-sync-guardar', async (e, d) => {
   const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
     type: 'warning', buttons: ['Conectar y copiar todo', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Sincronizar con la nube',
     message: yaHay ? 'Se volverá a copiar TODA la información de esta computadora a la nube.' : 'La nube será una copia de lo que se registra en esta computadora.',
-    detail: 'IMPORTANTE: lo que haya capturado directamente en el sistema de la nube se reemplaza con la información de este servidor. A partir de ahora, captura todo aquí (en el servidor del negocio); la nube sirve para consultar y como respaldo.\n\nSi se va el internet, el negocio sigue trabajando normal y todo se sube solo al regresar.'
+    detail: 'IMPORTANTE: lo que haya capturado directamente en el sistema de la nube se reemplaza con la información de este servidor, incluidos los usuarios: después, en la nube se entra con los mismos usuarios y contraseñas de este servidor. A partir de ahora, captura todo aquí (en el servidor del negocio); la nube sirve para consultar y como respaldo.\n\nSi se va el internet, el negocio sigue trabajando normal y todo se sube solo al regresar.'
   });
   if (conf.response !== 0) return { ok: false };
-  try { await servidorLocal.guardarSync({ texto: d && d.texto, clave: d && d.clave }); return { ok: true }; }
+  try { await servidorLocal.guardarSync({ texto: d && d.texto, clave: d && d.clave, usuario: d && d.usuario, password: d && d.password }); return { ok: true }; }
   catch (err) {
     const msg = String(err && err.message || err);
     log('Sync guardar: ' + msg);

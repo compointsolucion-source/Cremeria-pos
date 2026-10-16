@@ -14,7 +14,8 @@ const { Pool } = require('pg');
 const { leerJson, guardarJson } = require('./rutas');
 
 const ESQ = 'compoint_sync';
-const EXCLUIDAS = new Set(['licencia', 'schema_migrations']);
+// sync_vinculo es la clave de la NUBE: no existe en la base local, pero por si acaso nunca se copia.
+const EXCLUIDAS = new Set(['licencia', 'schema_migrations', 'sync_vinculo']);
 const LOTE = 300;
 const MAX_LOTES_POR_VUELTA = 60;
 const CADA_MS = 30 * 1000;
@@ -41,6 +42,46 @@ async function resolverApi(texto) {
     }
   } catch (e) { /* se prueba como dirección del servidor */ }
   return u.origin + '/api';
+}
+
+// ---------------------------------------------------------------- vincular con el usuario dueño
+// El dueño escribe una sola vez su usuario y contraseña de la nube. Con ellos se inicia sesión y se le pide
+// a la nube una clave de sincronización nueva (la nube guarda solo su hash). La contraseña NO se guarda.
+// Los errores con respuesta de la nube llevan .http; los de red (sin internet / nube dormida) no.
+async function llamarNube(api, ruta, { cuerpo, token, timeout = 90000 } = {}) {
+  const r = await fetch(api + ruta, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: JSON.stringify(cuerpo || {}),
+    signal: AbortSignal.timeout(timeout)
+  });
+  let datos = {};
+  try { datos = await r.json(); } catch (e) { /* respuesta sin JSON */ }
+  return { ok: r.ok, status: r.status, datos };
+}
+const errorNube = (mensaje, http) => { const e = new Error(mensaje); e.http = http; return e; };
+
+async function vincularConUsuario(api, usuario, password) {
+  const u = String(usuario || '').trim();
+  if (!u || !password) throw errorNube('Escribe el usuario y la contraseña del dueño de tu sistema en la nube.', 400);
+  const login = await llamarNube(api, '/auth/login', { cuerpo: { usuario: u, password: String(password) } });
+  if (!login.ok) {
+    if (login.status === 401) throw errorNube('Usuario o contraseña incorrectos. Usa los del dueño con los que entras a tu sistema en la nube.', 401);
+    if (login.status === 429) throw errorNube(login.datos.error || 'Demasiados intentos. Espera unos minutos e intenta de nuevo.', 429);
+    if (login.status === 404) throw errorNube('No se encontró el sistema en esa dirección. Revisa que sea la dirección de tu sistema en la nube.', 404);
+    throw errorNube(login.datos.error || ('La nube respondió con error ' + login.status + '.'), login.status);
+  }
+  const rol = login.datos.usuario && login.datos.usuario.rol;
+  if (!login.datos.token) throw errorNube('La nube no devolvió una sesión válida. Revisa la dirección.', 502);
+  if (rol !== 'dueno' && rol !== 'jefe_general') throw errorNube('Ese usuario no es el dueño del negocio. Usa el usuario del dueño.', 403);
+  const v = await llamarNube(api, '/sync/vincular', { token: login.datos.token });
+  if (!v.ok) {
+    if (v.status === 404) throw errorNube('Tu sistema en la nube todavía no tiene la actualización para sincronizar. Pídele a Compoint que lo actualice.', 404);
+    if (v.status === 403) throw errorNube('Solo el dueño puede conectar la sincronización.', 403);
+    throw errorNube(v.datos.error || ('La nube respondió con error ' + v.status + '.'), v.status);
+  }
+  if (typeof v.datos.clave !== 'string' || v.datos.clave.length < 16) throw errorNube('La nube no devolvió una clave válida.', 502);
+  return { clave: v.datos.clave, reemplazo: !!v.datos.reemplazo };
 }
 
 async function pedir(api, clave, ruta, opciones = {}) {
@@ -266,6 +307,13 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
       programar();
     },
     async probar(api, clave) { return pedir(api, clave, '/estado', { timeout: 90000 }); },
+    // Avisa a la nube que se deja de sincronizar (borra la clave guardada allá). Si no hay internet, no pasa nada.
+    async desvincular() {
+      const c = conf();
+      if (!c) return false;
+      try { await pedir(c.api, c.clave, '/desvincular', { cuerpo: {}, timeout: 10000 }); return true; }
+      catch (e) { log('Sincronización: no se pudo avisar a la nube al desvincular (' + e.message + ').'); return false; }
+    },
     resolverApi,
     // Guarda y arranca. La primera vez se hace una copia completa.
     async activar() {
@@ -308,4 +356,4 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
   };
 }
 
-module.exports = { crearSincronizador, resolverApi };
+module.exports = { crearSincronizador, resolverApi, vincularConUsuario };

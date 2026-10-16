@@ -25,10 +25,15 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{pa
 <div id="estadoSync"></div>
 <details id="detSync"><summary style="cursor:pointer;font-size:13px">Conectar o cambiar la nube</summary>
 <label>Dirección de tu sistema en la nube</label><input id="syDir" autocomplete="off" placeholder="https://minegocio.onrender.com">
-<label>Clave de sincronización (la misma que pondrás en la nube)</label>
-<input id="syClave" type="password" autocomplete="off" placeholder="(déjala vacía para conservar la actual)">
+<label>Usuario dueño de ese sistema</label><input id="syUsuario" autocomplete="off" placeholder="Admin">
+<label>Contraseña</label><input id="syPass" type="password" autocomplete="new-password">
+<label style="font-weight:400;font-size:13px;display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="syVerPass" style="width:auto;margin:0"> Mostrar contraseña</label>
+<div class="nota">Escribe el usuario y la contraseña del <b>dueño</b>, los mismos con los que entras a tu sistema en la nube. Se usan <b>una sola vez</b> para vincular esta computadora: la contraseña no se guarda y no hay que entrar a Render.</div>
+<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;color:#666">Opciones avanzadas: usar una clave manual</summary>
+<div class="nota">Solo si Compoint te dio una clave (variable <b>SYNC_KEY</b> del servidor en Render). Si la escribes aquí, se usa en lugar del usuario y la contraseña.</div>
+<input id="syClave" type="password" autocomplete="off" placeholder="Clave manual (opcional)">
 <div class="fila"><button class="sec" id="syGenerar">Generar una clave nueva</button><button class="sec" id="syVer">Mostrar / ocultar</button></div>
-<div class="nota">Pasos: 1) pulsa «Generar una clave nueva» y cópiala. 2) En Render, abre el <b>servidor</b> de tu negocio (no la página) → Environment → agrega la variable <b>SYNC_KEY</b> con esa clave y guarda. 3) Aquí escribe la dirección de tu sistema y pulsa «Conectar». Más detalle en «Ayuda y soporte».</div>
+</details>
 <div class="fila"><button id="syGuardar">Conectar y copiar todo</button></div></details>
 <div class="fila"><button class="sec" id="syAhora">Sincronizar ahora</button><button class="sec" id="syCompleto">Copiar todo de nuevo</button><button class="sec" id="syQuitar">Dejar de sincronizar</button></div>
 
@@ -85,6 +90,7 @@ async function cargar(){
 }
 function pintarSync(y){
   const el=$('estadoSync');
+  window._syConectada=!!y.configurado;
   if(!y.configurado){el.innerHTML='<span class="aviso">No conectada. La nube no recibe la información de este negocio.</span>';if(!window._abSync){$('detSync').open=true;window._abSync=true;}return;}
   const l=[`<div>Nube: <b>${esc(y.direccion)}</b></div>`];
   if(y.ocupado)l.push(`<div class="aviso">Sincronizando… ${esc(y.progreso||'')}</div>`);
@@ -96,15 +102,22 @@ function pintarSync(y){
   if(y.ultimo_ok)l.push(`<div>Última subida: ${fecha(y.ultimo_ok)}</div>`);
   el.innerHTML=l.join('');
 }
-$('syGenerar').onclick=()=>{const b=new Uint8Array(24);crypto.getRandomValues(b);const k=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');$('syClave').type='text';$('syClave').value=k;$('msg').className='ok';$('msg').textContent='Clave generada: cópiala ahora (Ctrl+C) y pégala en Render como SYNC_KEY.';$('syClave').select();};
+$('syGenerar').onclick=()=>{const b=new Uint8Array(24);crypto.getRandomValues(b);const k=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');$('syClave').type='text';$('syClave').value=k;$('msg').className='ok';$('msg').textContent='Clave generada: cópiala (Ctrl+C) y pégala en Render como SYNC_KEY del servidor; luego pulsa «Conectar».';$('syClave').select();};
 $('syVer').onclick=()=>{$('syClave').type=$('syClave').type==='password'?'text':'password';};
-$('syGuardar').onclick=async()=>{$('msg').className='';$('msg').textContent='Conectando con la nube (puede tardar hasta 1 minuto)…';$('syGuardar').disabled=true;
-  const r=await compointServidor.syncGuardar({texto:$('syDir').value,clave:$('syClave').value});$('syGuardar').disabled=false;
-  if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('syClave').value='';$('syClave').type='password';$('msg').className='ok';$('msg').textContent='Conectado. Se está copiando la información a la nube.';$('detSync').open=false;}else{$('msg').textContent='';}cargar();};
+$('syVerPass').onchange=()=>{$('syPass').type=$('syVerPass').checked?'text':'password';};
+$('syGuardar').onclick=async()=>{
+  const direccion=$('syDir').value.trim(),usuario=$('syUsuario').value.trim(),password=$('syPass').value,clave=$('syClave').value.trim();
+  const falla=(t)=>{$('msg').className='err';$('msg').textContent=t;};
+  if(!direccion)return falla('Escribe la dirección de tu sistema en la nube.');
+  if(!clave&&!usuario&&!password&&!window._syConectada)return falla('Escribe el usuario y la contraseña del dueño de tu sistema en la nube.');
+  if(!clave&&(usuario||password)&&(!usuario||!password))return falla('Escribe el usuario y también la contraseña del dueño.');
+  $('msg').className='';$('msg').textContent='Conectando con la nube (puede tardar hasta 1 minuto)…';$('syGuardar').disabled=true;
+  const r=await compointServidor.syncGuardar({texto:direccion,usuario,password,clave});$('syGuardar').disabled=false;
+  if(r&&r.error){falla(r.error);}else if(r&&r.ok){$('syPass').value='';$('syPass').type='password';$('syVerPass').checked=false;$('syClave').value='';$('syClave').type='password';$('msg').className='ok';$('msg').textContent='Conectado. Se está copiando la información a la nube.';$('detSync').open=false;}else{$('msg').textContent='';}cargar();};
 $('syAhora').onclick=async()=>{$('msg').className='';$('msg').textContent='Sincronizando…';const r=await compointServidor.syncAhora();
   $('msg').className=r&&r.ok?'ok':'err';$('msg').textContent=r&&r.ok?'Listo.':(r&&r.error)||'No se pudo.';cargar();};
 $('syCompleto').onclick=async()=>{const r=await compointServidor.syncCompleto();if(r&&r.ok===false&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('msg').className='ok';$('msg').textContent='Copia completa enviada.';}cargar();};
-$('syQuitar').onclick=async()=>{const r=await compointServidor.syncQuitar();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('syDir').value='';$('msg').className='ok';$('msg').textContent='Sincronización desactivada.';}cargar();};
+$('syQuitar').onclick=async()=>{const r=await compointServidor.syncQuitar();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('syDir').value='';$('syUsuario').value='';$('syPass').value='';$('msg').className='ok';$('msg').textContent='Sincronización desactivada.';}cargar();};
 $('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled=true;$('respaldar').textContent='Respaldando…';
   const r=await compointServidor.respaldar();$('respaldar').disabled=false;$('respaldar').textContent='Respaldar ahora';
   $('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?('Respaldo listo ('+r.archivo+')'+(r.nube&&r.nube.estado==='ok'?' y copia en la nube guardada.':(r.nube&&r.nube.estado==='pendiente'?'. La copia en la nube quedó pendiente.':'.'))):('No se pudo respaldar: '+r.error);cargar();};

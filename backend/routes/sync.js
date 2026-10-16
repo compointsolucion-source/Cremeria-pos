@@ -4,29 +4,69 @@
 // por lotes, todo lo que registra. Así la nube queda como COPIA / CONSULTA de lo que pasa en
 // el local, aunque el internet se haya ido por horas o días: al regresar, se pone al día sola.
 //
-// Seguridad: solo funciona si el servidor de la nube tiene la variable SYNC_KEY (mínimo 16
-// caracteres) y el local manda esa misma clave en el encabezado X-Sync-Key.
-// Sin SYNC_KEY este módulo está apagado (responde 503).
+// Seguridad: el local manda una clave en el encabezado X-Sync-Key. Esa clave puede venir de dos lados:
+//  1) Vinculación con el usuario dueño (lo normal): el dueño inicia sesión una vez desde el panel del
+//     servidor local (POST /api/sync/vincular); la nube crea una clave al azar, guarda solo su hash en la
+//     tabla sync_vinculo y se la entrega al local. No hay que entrar a Render.
+//  2) Variable SYNC_KEY (mínimo 16 caracteres) en el servidor de la nube: sigue funcionando como antes.
+// Sin ninguna de las dos, este módulo está apagado (responde 503).
 //
 // IMPORTANTE: la nube que recibe esta copia es un ESPEJO: lo que se capture directamente en
 // ella se sobrescribe con lo del servidor local.
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
+const { verificarToken, requiereRol } = require('../middleware/auth');
+const { registrarBitacora } = require('../utils/bitacora');
 
 const router = express.Router();
-const EXCLUIDAS = new Set(['licencia', 'schema_migrations']);
+// sync_vinculo guarda la clave de ESTA nube: nunca se copia ni se vacía con el espejo.
+const EXCLUIDAS = new Set(['licencia', 'schema_migrations', 'sync_vinculo']);
 const q = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 
 // ------------------------------------------------------------ autenticación
 function hash(t) { return crypto.createHash('sha256').update(String(t || '')).digest(); }
-function autenticar(req, res, next) {
-  const clave = process.env.SYNC_KEY || '';
-  if (clave.length < 16) return res.status(503).json({ error: 'La sincronización no está activada en este servidor (falta SYNC_KEY).' });
-  if (!crypto.timingSafeEqual(hash(clave), hash(req.get('X-Sync-Key')))) {
-    return res.status(401).json({ error: 'Clave de sincronización incorrecta.' });
+
+// La tabla normalmente la crea la migración 006; esto la asegura por si esa no corrió.
+let tablaLista = null;
+function asegurarTabla() {
+  if (!tablaLista) {
+    tablaLista = pool.query(`CREATE TABLE IF NOT EXISTS sync_vinculo (
+      id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      clave_hash TEXT NOT NULL,
+      vinculado_por TEXT,
+      vinculado_en TIMESTAMP NOT NULL DEFAULT NOW())`).catch((e) => { tablaLista = null; throw e; });
   }
-  next();
+  return tablaLista;
+}
+async function hashGuardado() {
+  await asegurarTabla();
+  const r = await pool.query('SELECT clave_hash FROM sync_vinculo WHERE id = 1');
+  return r.rows.length ? String(r.rows[0].clave_hash || '') : '';
+}
+
+async function autenticar(req, res, next) {
+  const recibida = req.get('X-Sync-Key') || '';
+  const env = process.env.SYNC_KEY || '';
+  try {
+    if (recibida && env.length >= 16 && crypto.timingSafeEqual(hash(env), hash(recibida))) {
+      req.syncVia = 'variable';
+      return next();
+    }
+    const guardado = await hashGuardado();
+    const esperado = /^[0-9a-f]{64}$/i.test(guardado) ? Buffer.from(guardado, 'hex') : null;
+    if (recibida && esperado && crypto.timingSafeEqual(esperado, hash(recibida))) {
+      req.syncVia = 'guardada';
+      return next();
+    }
+    if (env.length < 16 && !esperado) {
+      return res.status(503).json({ error: 'La sincronización todavía no está vinculada con esta nube. Conéctala desde el panel del servidor con el usuario dueño.' });
+    }
+    return res.status(401).json({ error: 'La nube ya no reconoce a esta computadora (se vinculó otra o se cambió la clave). Vuelve a conectar con el usuario dueño.' });
+  } catch (e) {
+    console.error('sync/autenticar:', e.message);
+    return res.status(500).json({ error: 'No se pudo leer la base de datos de la nube.' });
+  }
 }
 
 // ------------------------------------------------------------ estructura de la base
@@ -83,6 +123,39 @@ async function ajustarContadores(c, m, tablas) {
 }
 
 // ------------------------------------------------------------ rutas
+// Vincular con el usuario dueño: el panel del servidor local inicia sesión (POST /api/auth/login) y con ese
+// token pide aquí una clave nueva. Se guarda solo su hash; la clave en claro se entrega UNA vez.
+// Vincular otra vez reemplaza la clave anterior (la computadora vinculada antes deja de poder subir).
+router.post('/vincular', verificarToken, requiereRol('dueno', 'jefe_general'), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const previa = await pool.query('SELECT 1 FROM sync_vinculo WHERE id = 1');
+    const clave = crypto.randomBytes(24).toString('hex');
+    await pool.query(
+      `INSERT INTO sync_vinculo (id, clave_hash, vinculado_por, vinculado_en) VALUES (1, $1, $2, NOW())
+       ON CONFLICT (id) DO UPDATE SET clave_hash = EXCLUDED.clave_hash, vinculado_por = EXCLUDED.vinculado_por, vinculado_en = NOW()`,
+      [hash(clave).toString('hex'), String(req.usuario.usuario || req.usuario.nombre || '')]
+    );
+    await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'sync_vincular', modulo: 'sistema' });
+    res.json({ ok: true, clave, reemplazo: previa.rows.length > 0 });
+  } catch (e) {
+    console.error('sync/vincular:', e.message);
+    res.status(500).json({ error: 'No se pudo vincular con la nube. Intenta de nuevo.' });
+  }
+});
+
+// Desvincular (lo usa el panel al «Dejar de sincronizar»): borra la clave guardada. Solo con esa misma clave.
+// Si la clave vino de la variable SYNC_KEY de Render, no hay nada guardado que borrar.
+router.post('/desvincular', autenticar, async (req, res) => {
+  try {
+    if (req.syncVia === 'guardada') await pool.query('DELETE FROM sync_vinculo WHERE id = 1');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('sync/desvincular:', e.message);
+    res.status(500).json({ error: 'No se pudo desvincular en la nube.' });
+  }
+});
+
 // Probar conexión y clave.
 router.get('/estado', autenticar, async (req, res) => {
   try {

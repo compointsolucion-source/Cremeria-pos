@@ -239,14 +239,15 @@
                 <li>Con la sincronización activa, todo lo que se registra (ventas, productos, inventario, turnos…) se anota en una fila de espera y se sube a la nube <b>cada 30 segundos</b>. Sin internet la fila solo crece; al regresar se vacía sola.</li>
                 <li>La nube queda como <b>copia para consultar</b> (reportes desde cualquier lugar) y respaldo. <b>Captura todo en el servidor</b>: lo que se capture directo en la nube se reemplaza con lo del servidor.</li>
               </ul>
-              <p><b>Para activarla (una sola vez):</b></p>
+              <p><b>Para activarla (una sola vez, sin entrar a Render):</b></p>
               <ol>
-                <li>En el panel del servidor (Ctrl+Alt+S) → <b>Sincronizar con la nube</b> → <b>Conectar o cambiar la nube</b> → pulsa <b>Generar una clave nueva</b> y cópiala.</li>
-                <li>En <b>Render</b> abre el <b>servidor</b> de tu negocio (el que termina en <code>-pos</code>, no la página) → <b>Environment</b> → agrega la variable <code>SYNC_KEY</code> con esa clave → guarda (se reinicia solo).</li>
-                <li>Regresa al panel, escribe la dirección de tu sistema en la nube (ej. <code>https://minegocio.onrender.com</code>) y pulsa <b>Conectar y copiar todo</b>.</li>
+                <li>En el panel del servidor (Ctrl+Alt+S) → <b>Sincronizar con la nube</b> → <b>Conectar o cambiar la nube</b>.</li>
+                <li>Escribe la <b>dirección de tu sistema en la nube</b> (ej. <code>https://minegocio.onrender.com</code>) y el <b>usuario y la contraseña del dueño</b>, los mismos con los que entras a tu sistema en la nube. La contraseña se usa <b>una sola vez</b> para vincular esta computadora y <b>no se guarda</b>.</li>
+                <li>Pulsa <b>Conectar y copiar todo</b>. La nube crea sola la clave de sincronización.</li>
                 <li>Verás <b>"Al día con la nube"</b> y cuántos cambios están en espera de subir.</li>
               </ol>
-              <div class="aviso amarillo">La primera copia vacía y vuelve a llenar la nube con lo del servidor. Si el plan gratis de Render está "dormido", la primera conexión puede tardar cerca de 1 minuto.</div>
+              <div class="aviso amarillo">La primera copia vacía y vuelve a llenar la nube con lo del servidor, <b>incluidos los usuarios</b>: después, en la nube se entra con los mismos usuarios y contraseñas del servidor. Si el plan gratis de Render está "dormido", la primera conexión puede tardar cerca de 1 minuto.</div>
+              <p style="font-size:13px;color:#666">¿Cambiaste de computadora o quieres reconectar? Repite los mismos pasos: la computadora anterior deja de subir y la nueva toma su lugar. Si Compoint te dio una clave manual (<code>SYNC_KEY</code>), se escribe en <b>Opciones avanzadas</b> del mismo panel.</p>
             </div>
           </details>
         </section>
