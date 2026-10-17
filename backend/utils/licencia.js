@@ -111,7 +111,7 @@ function escribirMarcas(idEq, i, v) {
 // ---------- lectura de la fila ----------
 async function leerFila() {
   const r = await pool.query(
-    `SELECT cliente, tipo, plan, max_sucursales, codigo_activacion, serial,
+    `SELECT cliente, tipo, plan, max_sucursales, codigo_activacion, serial, desde_nube, nube_id_equipo,
             to_char(fecha_inicio,'YYYY-MM-DD') AS inicio,
             to_char(fecha_vencimiento,'YYYY-MM-DD') AS vence,
             to_char(ultima_fecha_vista,'YYYY-MM-DD') AS visto
@@ -193,7 +193,9 @@ async function calcular() {
   let codigoInvalido = null;
   if (fila.codigo_activacion) {
     const r = codigo.verificarCodigo(fila.codigo_activacion, llavePublica);
-    if (r.ok && r.datos.idEquipoValor === eq.valor) {
+    // Un código tomado de la nube del cliente está ligado al ID de ESA nube, no al de esta computadora.
+    const valorEsperado = fila.nube_id_equipo ? codigo.leerIdEquipo(fila.nube_id_equipo) : eq.valor;
+    if (r.ok && valorEsperado !== null && r.datos.idEquipoValor === valorEsperado) {
       lic = { tipo: r.datos.tipo, plan: r.datos.plan, maxSucursales: r.datos.maxSucursales, inicio: r.datos.emitida, vence: r.datos.vence || SIN_FIN, origen: 'codigo', serial: r.datos.serial };
     } else {
       codigoInvalido = r.ok ? 'equipo' : r.motivo;
@@ -238,6 +240,7 @@ async function calcular() {
     cliente: fila.cliente || null,
     serial: lic.serial || (fila.serial != null ? Number(fila.serial) : null),
     con_codigo: lic.origen === 'codigo',
+    desde_nube: fila.desde_nube || null,
     id_equipo: eq.texto,
     local,
     tiene_llave: !!llavePublica,
@@ -304,11 +307,92 @@ async function activar(texto, { usuarioId } = {}) {
      ON CONFLICT (id) DO UPDATE SET fecha_inicio = EXCLUDED.fecha_inicio, fecha_vencimiento = EXCLUDED.fecha_vencimiento,
        tipo = EXCLUDED.tipo, plan = EXCLUDED.plan, max_sucursales = EXCLUDED.max_sucursales,
        codigo_activacion = EXCLUDED.codigo_activacion, serial = EXCLUDED.serial, actualizado_en = NOW(),
+       desde_nube = NULL, nube_id_equipo = NULL,
        ultima_fecha_vista = GREATEST(licencia.ultima_fecha_vista, EXCLUDED.ultima_fecha_vista)`,
     [d.emitida, vence, d.tipo, d.plan, d.maxSucursales, textoLimpio(texto), d.serial, hoyReal]);
   invalidarCache();
   const nuevo = await estado();
   return { estado: nuevo, datos: d, anterior: actual };
+}
+
+// ---------- licencia que viene de la nube del cliente ----------
+// Lado NUBE: lo que se le entrega al servidor local del cliente cuando se conecta con el usuario dueño.
+async function infoParaNube() {
+  const eq = await idEquipo();
+  const est = await estado();
+  if (!est.control) return { control: false, cliente: null, id_equipo: eq.texto };
+  const fila = await leerFila();
+  const codigoValido = fila && fila.codigo_activacion && est.con_codigo && !est.codigo_invalido;
+  return {
+    control: true,
+    cliente: est.cliente || null,
+    tipo: est.tipo,
+    plan: est.plan,
+    vence: est.permanente ? null : est.vence,
+    estado: est.estado,
+    max_sucursales: est.max_sucursales || null,
+    codigo: codigoValido ? fila.codigo_activacion : null,
+    id_equipo: eq.texto
+  };
+}
+
+// Lado LOCAL: el servidor del cliente toma la licencia de su nube y deja la prueba. Devuelve { adoptada, motivo }.
+// - Código firmado de la nube: se comprueba la firma aquí también (no se confía a ciegas) y que sea de ESA nube.
+// - Nube sin control de licencia: es un sistema propio de Compoint; la computadora queda sin prueba.
+// - Licencia vigente sin código (puesta a mano por Compoint en la nube): se copia tipo, plan y vencimiento.
+// Nunca se baja de categoría: si esta computadora ya tiene una licencia propia igual o más larga, se queda con ella.
+async function adoptarDeNube(info) {
+  if (!info || typeof info !== 'object') return { adoptada: false, motivo: 'sin_datos' };
+  const hoyReal = hoy();
+  let nueva;
+  if (info.codigo) {
+    const r = codigo.verificarCodigo(String(info.codigo), llavePublica);
+    if (!r.ok) return { adoptada: false, motivo: 'codigo_invalido', detalle: r.mensaje };
+    const d = r.datos;
+    const idNube = codigo.leerIdEquipo(info.id_equipo);
+    if (idNube === null || d.idEquipoValor !== idNube) return { adoptada: false, motivo: 'codigo_de_otra_nube' };
+    if (d.tipo === 'demo') return { adoptada: false, motivo: 'es_prueba' };
+    nueva = { tipo: d.tipo, plan: d.plan, maxSuc: d.maxSucursales, inicio: d.emitida, vence: d.vence || SIN_FIN, codigo: textoLimpio(info.codigo),
+      serial: d.serial, origen: 'codigo', idNube: codigo.formatearIdEquipo(idNube) };
+  } else if (info.control === false) {
+    nueva = { tipo: 'permanente', plan: 'nube', maxSuc: null, inicio: hoyReal, vence: SIN_FIN, codigo: null, serial: null, origen: 'sin_control', idNube: null };
+  } else if (info.control === true && (info.tipo === 'anual' || info.tipo === 'permanente')) {
+    const vence = info.tipo === 'permanente' || !info.vence ? SIN_FIN : String(info.vence);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(vence)) return { adoptada: false, motivo: 'datos_invalidos' };
+    nueva = { tipo: info.tipo, plan: info.plan === 'local' ? 'local' : 'nube', maxSuc: Number(info.max_sucursales) > 0 ? Number(info.max_sucursales) : null,
+      inicio: hoyReal, vence, codigo: null, serial: null, origen: 'fila', idNube: null };
+  } else {
+    return { adoptada: false, motivo: 'sin_licencia_de_cliente' };
+  }
+
+  // ¿Esta computadora ya tiene algo igual o mejor?
+  const actual = await estado();
+  const venceActual = actual.control ? (actual.permanente ? SIN_FIN : actual.vence) : null;
+  const sirveActual = actual.control && actual.tipo !== 'demo' && !actual.codigo_invalido && actual.estado !== 'solo_consulta' && !actual.en_gracia;
+  const demoVigente = actual.control && actual.tipo === 'demo' && actual.estado === 'demo';
+  // Una licencia ya vencida en la nube solo se toma si esta computadora no tiene nada vigente (para mostrar el aviso correcto).
+  if (nueva.vence < hoyReal && (sirveActual || demoVigente)) return { adoptada: false, motivo: 'vencida' };
+  // La licencia activada aquí con un código propio no se cambia por otra igual o más corta.
+  if (sirveActual && !actual.desde_nube && venceActual >= nueva.vence) return { adoptada: false, motivo: 'ya_tiene_licencia_propia' };
+  // Las que vienen de la nube con código firmado no retroceden. Las que vienen "a mano" (sin código) siguen lo que diga la nube.
+  if (sirveActual && actual.desde_nube === 'codigo') {
+    if (venceActual > nueva.vence) return { adoptada: false, motivo: 'ya_tiene_una_mas_larga' };
+    if (venceActual === nueva.vence && nueva.serial !== null && nueva.serial < (actual.serial || 0)) return { adoptada: false, motivo: 'ya_tiene_una_mas_reciente' };
+  }
+
+  const cliente = info.cliente ? String(info.cliente).slice(0, 200) : null;
+  await pool.query(
+    `INSERT INTO licencia (id, cliente, fecha_inicio, fecha_vencimiento, tipo, plan, max_sucursales, codigo_activacion, serial,
+        ultima_fecha_vista, desde_nube, nube_id_equipo, actualizado_en)
+     VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+     ON CONFLICT (id) DO UPDATE SET cliente = COALESCE(EXCLUDED.cliente, licencia.cliente),
+       fecha_inicio = EXCLUDED.fecha_inicio, fecha_vencimiento = EXCLUDED.fecha_vencimiento, tipo = EXCLUDED.tipo, plan = EXCLUDED.plan,
+       max_sucursales = EXCLUDED.max_sucursales, codigo_activacion = EXCLUDED.codigo_activacion, serial = EXCLUDED.serial,
+       desde_nube = EXCLUDED.desde_nube, nube_id_equipo = EXCLUDED.nube_id_equipo, actualizado_en = NOW(),
+       ultima_fecha_vista = GREATEST(licencia.ultima_fecha_vista, EXCLUDED.ultima_fecha_vista)`,
+    [cliente, nueva.inicio, nueva.vence, nueva.tipo, nueva.plan, nueva.maxSuc, nueva.codigo, nueva.serial, hoyReal, nueva.origen, nueva.idNube]);
+  invalidarCache();
+  return { adoptada: true, origen: nueva.origen, estado: await estado() };
 }
 
 // Guarda el código en su forma estándar (sin el texto que lo rodeaba).
@@ -331,7 +415,7 @@ function _reiniciar() { cache = { t: 0, valor: null }; enCurso = null; idInstala
 
 module.exports = {
   DIAS_AVISO, GRACIA_PAGO, GRACIA_DEMO, DEMO_DIAS, SIN_FIN, CONTACTO,
-  estado, activar, limiteSucursales, idEquipo, invalidarCache, calcularEstado, mensajeEstado, ErrorLicencia,
+  estado, activar, adoptarDeNube, infoParaNube, limiteSucursales, idEquipo, invalidarCache, calcularEstado, mensajeEstado, ErrorLicencia,
   hoy, sumarDias, diferenciaDias, fechaBonita,
   _usarClavePublica, _fijarReloj, _reiniciar
 };

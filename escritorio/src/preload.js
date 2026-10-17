@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('compointDesktop', {
 // Modo servidor del negocio (solo las páginas del programa, no el sistema web).
 contextBridge.exposeInMainWorld('compointServidor', {
   altaGuardar: (d) => ipcRenderer.invoke('srv-alta-guardar', d),
+  nubeRevisar: (d) => ipcRenderer.invoke('srv-nube-revisar', d),
+  traerNube: () => ipcRenderer.invoke('srv-traer-nube'),
+  licenciaRevisar: () => ipcRenderer.invoke('srv-licencia-revisar'),
   altaCancelar: () => ipcRenderer.invoke('srv-alta-cancelar'),
   estado: () => ipcRenderer.invoke('srv-estado'),
   respaldar: () => ipcRenderer.invoke('srv-respaldar'),

@@ -542,7 +542,7 @@ function pedirDatosNegocio() {
     });
     ventanaAlta.setMenu(null);
     ventanaAlta.loadFile(path.join(__dirname, 'servidor-alta.html'));
-    ventanaAlta.on('closed', () => { ventanaAlta = null; if (resolverAlta) { const r = resolverAlta; resolverAlta = null; r(null); } });
+    ventanaAlta.on('closed', () => { ventanaAlta = null; sesionNube = null; if (resolverAlta) { const r = resolverAlta; resolverAlta = null; r(null); } });
   });
 }
 
@@ -574,7 +574,7 @@ function abrirPanel() {
   });
   ventanaPanel.setMenu(null);
   ventanaPanel.loadFile(path.join(__dirname, 'servidor-panel.html'));
-  ventanaPanel.on('closed', () => { ventanaPanel = null; });
+  ventanaPanel.on('closed', () => { ventanaPanel = null; sesionNube = null; });
 }
 
 async function respaldarAhora() {
@@ -618,8 +618,35 @@ ipcMain.handle('srv-elegir-modo', (e) => {
   iniciarModoServidor();
 });
 
+// Conectar con el sistema en la nube del cliente (dirección + usuario y contraseña del dueño) para TRAER su información.
+// Es un paso aparte para poder mostrar qué hay en la nube antes de bajarlo. La contraseña no se guarda; la sesión queda
+// solo en memoria hasta que se baje la información o se cierre la ventana.
+let sesionNube = null;
+ipcMain.handle('srv-nube-revisar', async (e, d) => {
+  if (!esLocal(e)) return { error: 'No permitido' };
+  const { abrirSesionNube, mensajeAmable } = require('./servidor/traer');
+  try {
+    sesionNube = await abrirSesionNube({ texto: d && d.direccion, usuario: d && d.usuario, password: d && d.password });
+  } catch (err) {
+    sesionNube = null;
+    log('Conectar con la nube para traer información: ' + (err && err.message));
+    return { error: mensajeAmable(err) };
+  }
+  const l = sesionNube.licencia || {};
+  return { ok: true, resumen: sesionNube.resumen, licencia: { control: l.control !== false, cliente: l.cliente || '', tipo: l.tipo || '', vence: l.vence || '', estado: l.estado || '' } };
+});
+
 ipcMain.handle('srv-alta-guardar', async (e, datos) => {
   if (!esLocal(e) || !resolverAlta) return { error: 'No permitido' };
+  if (datos && datos.modo === 'nube') {
+    if (!sesionNube) return { error: 'Primero conecta con tu sistema en la nube.' };
+    const sesion = sesionNube; sesionNube = null;
+    const r = resolverAlta; resolverAlta = null;
+    r({ modo: 'nube', sesion });
+    if (ventanaAlta) { const v = ventanaAlta; ventanaAlta = null; v.destroy(); }
+    mostrarEstado('Bajando tu información de la nube… (puede tardar unos minutos)');
+    return { ok: true };
+  }
   const { validar } = require('./servidor/negocio');
   const errores = validar(datos);
   if (errores.length) return { error: errores.join(' ') };
@@ -629,7 +656,7 @@ ipcMain.handle('srv-alta-guardar', async (e, datos) => {
   mostrarEstado('Creando el negocio…');
   return { ok: true };
 });
-ipcMain.handle('srv-alta-cancelar', (e) => { if (esLocal(e) && ventanaAlta) ventanaAlta.close(); });
+ipcMain.handle('srv-alta-cancelar', (e) => { if (esLocal(e) && ventanaAlta) { sesionNube = null; ventanaAlta.close(); } });
 
 ipcMain.handle('srv-estado', async (e) => {
   if (!esLocal(e) || !servidorLocal) return null;
@@ -717,6 +744,40 @@ ipcMain.handle('srv-sync-guardar', async (e, d) => {
     log('Sync guardar: ' + msg);
     return { error: err && err.http ? msg : (/fetch failed|abort|timeout|ENOTFOUND|ECONN/i.test(msg) ? 'No hay conexión con la nube (revisa el internet y la dirección). Si usas el plan gratis de Render puede tardar ~1 minuto en despertar: intenta de nuevo.' : msg) };
   }
+});
+// Traer a esta computadora (que ya es servidor) la información de la nube: reemplaza lo que haya aquí.
+ipcMain.handle('srv-traer-nube', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  if (!sesionNube) return { error: 'Primero conecta con tu sistema en la nube.' };
+  const { mensajeAmable } = require('./servidor/traer');
+  const x = sesionNube.resumen;
+  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
+    type: 'warning', buttons: ['Traer y reemplazar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Traer información de la nube',
+    message: 'Se reemplazará TODA la información de esta computadora por la de tu nube.',
+    detail: `En la nube hay: ${x.productos} productos, ${x.ventas} ventas y ${x.clientes} clientes.\n\nAntes se guarda un respaldo de lo que hay ahora en esta computadora. Después, esta computadora queda como la principal: lo que registres aquí se sube a la nube y la nube queda como copia. El programa se reiniciará.`
+  });
+  if (conf.response !== 0) return { ok: false };
+  const sesion = sesionNube; sesionNube = null;
+  try {
+    mostrarEstado('Bajando tu información de la nube… no apagues la computadora');
+    const previo = await servidorLocal.respaldos.hacerRespaldo('antes-de-traer-nube');
+    if (!previo.ok) throw new Error('No se pudo guardar el respaldo de seguridad previo: ' + previo.error);
+    await servidorLocal.reemplazarConNube(sesion);
+    log('Información traída de la nube; el programa se reinicia.');
+    cierreListo = true; servidorLocal = null;
+    intermediario.detener();
+    app.relaunch(); app.exit(0);
+  } catch (err) {
+    cerrarEstado();
+    log('Traer de la nube falló: ' + (err && err.stack || err));
+    dialog.showErrorBox('No se pudo traer la información', mensajeAmable(err) + '\n\nTu información de esta computadora quedó como estaba. El programa se reiniciará.');
+    app.relaunch(); app.exit(1);
+  }
+  return { ok: true };
+});
+ipcMain.handle('srv-licencia-revisar', async (e) => {
+  if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
+  try { return { ok: true, ...(await servidorLocal.revisarLicencia()) }; } catch (err) { return { error: String(err && err.message || err) }; }
 });
 ipcMain.handle('srv-sync-ahora', async (e) => { if (!esLocal(e) || !servidorLocal) return { ok: false, error: 'No permitido' }; return servidorLocal.sync.ahora(false); });
 ipcMain.handle('srv-sync-completo', async (e) => {

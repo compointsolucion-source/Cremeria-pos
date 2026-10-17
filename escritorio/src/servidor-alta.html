@@ -15,19 +15,101 @@ const $ = (s, r = document) => r.querySelector(s);
 const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const GIROS = [['cremeria', 'Cremería'], ['carniceria', 'Carnicería'], ['abarrotes', 'Abarrotes'], ['fruteria', 'Frutería'], ['polleria', 'Pollería'], ['tortilleria', 'Tortillería'], ['panaderia', 'Panadería'], ['dulceria', 'Dulcería'], ['rosticeria', 'Rosticería']];
 
-// Los datos se conservan al ir y venir entre las dos pantallas.
+// Los datos se conservan al ir y venir entre las pantallas.
 const D = { negocio: '', giro: 'cremeria', telefono: '', direccion: '', dueno: '', usuario: '', password: '', repetir: '' };
-const S = { pant: 'negocio', rutas: null, enviando: false };
+const N = { direccion: '', usuario: '', password: '' }; // conexión con la nube (la contraseña solo vive en esta pantalla)
+const S = { pant: 'elegir', ruta: 'nuevo', rutas: null, enviando: false, revision: null };
 
+const PASOS = { nuevo: ['Cómo empezar', 'Tu negocio', 'Dueño y acceso'], nube: ['Cómo empezar', 'Tu sistema en la nube', 'Traer la información'] };
+const NUM = { elegir: 1, negocio: 2, dueno: 3, nube: 2, nube2: 3 };
 function pintarLado() {
-  const n = S.pant === 'negocio' ? 1 : 2;
-  $('#pasosLado').innerHTML = ['Tu negocio', 'Dueño y acceso'].map((t, i) => {
+  const n = NUM[S.pant] || 1;
+  $('#pasosLado').innerHTML = PASOS[S.ruta].map((t, i) => {
     const k = i + 1;
     return '<div class="' + (k === n ? 'on' : (k < n ? 'hecho' : '')) + '"><i>' + (k < n ? '✓' : k) + '</i>' + t + '</div>';
   }).join('');
 }
 function guardarCampos() { document.querySelectorAll('[data-k]').forEach((el) => { D[el.dataset.k] = el.value; }); }
-function dibujar() { pintarLado(); (S.pant === 'negocio' ? pantallaNegocio : pantallaDueno)(); $('#main').scrollTop = 0; }
+function guardarNube() { document.querySelectorAll('[data-n]').forEach((el) => { N[el.dataset.n] = el.value; }); }
+const PANTALLAS = { elegir: () => pantallaElegir(), negocio: () => pantallaNegocio(), dueno: () => pantallaDueno(), nube: () => pantallaNube(), nube2: () => pantallaNube2() };
+function dibujar() { pintarLado(); PANTALLAS[S.pant](); $('#main').scrollTop = 0; }
+const fechaBonita = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
+const num = (n) => Number(n || 0).toLocaleString('es-MX');
+
+/* ------------------------------------------------------------ 0 · Cómo empezar */
+function pantallaElegir() {
+  const nube = S.ruta === 'nube';
+  $('#main').innerHTML =
+    '<h1>Preparar el servidor del negocio</h1>' +
+    '<p class="s">Esta computadora guardará la información y las demás cajas se conectarán a ella. ¿Cómo quieres empezar?</p>' +
+    '<div class="opc">' +
+      '<button class="op' + (!nube ? ' sel' : '') + '" data-ruta="nuevo"><span class="rd"></span><span class="ic">🆕</span><div><h3>Negocio nuevo</h3><p>Todavía no uso Compoint Punto en internet. Empiezo desde cero en esta computadora.</p></div></button>' +
+      '<button class="op' + (nube ? ' sel' : '') + '" data-ruta="nube"><span class="rd"></span><span class="ic">☁️</span><div><h3>Ya tengo mi sistema en la nube <em>Trae tu información</em></h3><p>Ya uso Compoint Punto en internet. Quiero traer a esta computadora mis productos, clientes, ventas y usuarios, y que mi licencia se tome sola.</p></div></button>' +
+    '</div>' +
+    '<div class="pie"><small>Se hace una sola vez en este equipo.</small><div class="der"><button class="sec" id="cancelar">Cancelar</button><button class="pri" id="sig">Siguiente</button></div></div>';
+  document.querySelectorAll('[data-ruta]').forEach((b) => { b.onclick = () => { S.ruta = b.dataset.ruta; dibujar(); }; });
+  $('#cancelar').onclick = () => compointServidor.altaCancelar();
+  $('#sig').onclick = () => { S.pant = S.ruta === 'nube' ? 'nube' : 'negocio'; dibujar(); };
+}
+
+/* ------------------------------------------------------------ Nube 1 · Conectar con tu sistema en la nube */
+function pantallaNube() {
+  $('#main').innerHTML =
+    '<h1>Conectar con tu sistema en la nube</h1>' +
+    '<p class="s">Escribe la dirección de tu sistema en internet y el usuario y contraseña del <b>dueño</b> (los mismos con los que entras ahí).</p>' +
+    '<div class="camp"><label>Dirección de tu sistema</label><input data-n="direccion" placeholder="https://minegocio.onrender.com" autofocus></div>' +
+    '<div class="f2"><div class="camp"><label>Usuario del dueño</label><input data-n="usuario" autocomplete="off"></div>' +
+    '<div class="camp"><label>Contraseña</label><input data-n="password" type="password" autocomplete="off"></div></div>' +
+    '<div class="nota">La contraseña solo se usa para entrar a tu sistema ahora; no se guarda en esta computadora.</div>' +
+    '<div class="err" id="err"></div>' +
+    '<div class="pie"><small>Si tu sistema está en el plan gratis de Render puede tardar ~1 minuto en despertar.</small><div class="der"><button class="sec" id="atras">Atrás</button><button class="pri" id="ok">Conectar y revisar</button></div></div>';
+  document.querySelectorAll('[data-n]').forEach((el) => { el.value = N[el.dataset.n]; });
+  $('#atras').onclick = () => { guardarNube(); S.pant = 'elegir'; dibujar(); };
+  $('#ok').onclick = revisarNube;
+  $('[data-n=direccion]').focus();
+}
+
+async function revisarNube() {
+  if (S.enviando) return;
+  guardarNube();
+  const err = (t) => { $('#err').textContent = t; };
+  if (!N.direccion.trim()) return err('Escribe la dirección de tu sistema en la nube.');
+  if (!N.usuario.trim() || !N.password) return err('Escribe el usuario y la contraseña del dueño.');
+  S.enviando = true; err('');
+  $('#ok').disabled = true; $('#ok').textContent = 'Conectando…';
+  const r = await compointServidor.nubeRevisar({ direccion: N.direccion, usuario: N.usuario, password: N.password });
+  S.enviando = false;
+  if (!r || r.error) { err((r && r.error) || 'No se pudo conectar.'); $('#ok').disabled = false; $('#ok').textContent = 'Conectar y revisar'; return; }
+  N.password = '';
+  S.revision = r; S.pant = 'nube2'; dibujar();
+}
+
+/* ------------------------------------------------------------ Nube 2 · Qué se va a traer */
+function pantallaNube2() {
+  const r = S.revision || { resumen: {}, licencia: {} };
+  const x = r.resumen, l = r.licencia;
+  let lic;
+  if (l && l.control === false) lic = 'Sistema propio de Compoint: esta computadora quedará sin la versión de prueba.';
+  else if (l && l.tipo && l.tipo !== 'demo') lic = 'Licencia ' + esc(l.tipo) + (l.vence ? ' · vigente hasta <b>' + fechaBonita(l.vence) + '</b>' : ' · permanente') + (l.cliente ? ' · ' + esc(l.cliente) : '') + '. Se tomará sola y se quita la versión de prueba.';
+  else lic = 'Tu nube todavía no tiene una licencia de cliente. Esta computadora empezará con la versión de prueba de 30 días y tomará tu licencia sola cuando Compoint la active.';
+  $('#main').innerHTML =
+    '<h1>Esto es lo que se traerá</h1>' +
+    '<p class="s">Encontramos tu sistema en la nube:</p>' +
+    '<div class="f2" style="grid-template-columns:repeat(4,1fr)">' +
+      [['Productos', x.productos], ['Ventas', x.ventas], ['Clientes', x.clientes], ['Usuarios', x.usuarios]].map((c) => '<div class="op" style="display:block;text-align:center;cursor:default"><h3 style="justify-content:center;font-size:22px">' + num(c[1]) + '</h3><p>' + c[0] + '</p></div>').join('') +
+    '</div>' +
+    '<div class="aviso azul">🔑 ' + lic + '</div>' +
+    '<div class="aviso">A partir de ahora <b>captura todo en esta computadora</b>: lo que registres aquí se sube solo a la nube (que queda como copia). Entra con los mismos usuarios y contraseñas de la nube. Lo que se capture directo en la nube después de este paso se reemplaza.</div>' +
+    '<div class="err" id="err"></div>' +
+    '<div class="pie"><small>Puede tardar unos minutos según cuánta información tengas.</small><div class="der"><button class="sec" id="atras">Atrás</button><button class="pri" id="ok">Traer mi información</button></div></div>';
+  $('#atras').onclick = () => { S.pant = 'nube'; dibujar(); };
+  $('#ok').onclick = async () => {
+    if (S.enviando) return;
+    S.enviando = true; $('#ok').disabled = true; $('#ok').textContent = 'Preparando…';
+    const rr = await compointServidor.altaGuardar({ modo: 'nube' });
+    if (rr && rr.error) { S.enviando = false; $('#err').textContent = rr.error; $('#ok').disabled = false; $('#ok').textContent = 'Traer mi información'; }
+  };
+}
 
 /* ------------------------------------------------------------ 1 · Tu negocio */
 function pantallaNegocio() {
@@ -39,9 +121,9 @@ function pantallaNegocio() {
     '<div class="camp"><label>Teléfono (opcional)</label><input data-k="telefono"></div></div>' +
     '<div class="camp"><label>Dirección (opcional)</label><input data-k="direccion"></div>' +
     '<div class="err" id="err"></div>' +
-    '<div class="pie"><small>Se hace una sola vez en este equipo.</small><div class="der"><button class="sec" id="cancelar">Cancelar</button><button class="pri" id="sig">Siguiente</button></div></div>';
+    '<div class="pie"><small>Se hace una sola vez en este equipo.</small><div class="der"><button class="sec" id="atras">Atrás</button><button class="pri" id="sig">Siguiente</button></div></div>';
   document.querySelectorAll('[data-k]').forEach((el) => { el.value = D[el.dataset.k]; });
-  $('#cancelar').onclick = () => compointServidor.altaCancelar();
+  $('#atras').onclick = () => { guardarCampos(); S.pant = 'elegir'; dibujar(); };
   $('#sig').onclick = () => {
     guardarCampos();
     if (!D.negocio.trim()) { $('#err').textContent = 'Escribe el nombre del negocio.'; return; }
@@ -86,7 +168,8 @@ async function crear() {
 
 document.addEventListener('keyup', (e) => {
   if (e.key !== 'Enter' || !document.activeElement || document.activeElement.tagName !== 'INPUT') return;
-  (S.pant === 'negocio' ? $('#sig') : $('#ok')).click();
+  const b = S.pant === 'negocio' ? $('#sig') : $('#ok');
+  if (b && !b.disabled) b.click();
 });
 
 (async () => {

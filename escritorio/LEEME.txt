@@ -133,6 +133,47 @@ SINCRONIZAR CON LA NUBE (sin entrar a Render)
 - Alternativa manual (opciones avanzadas del panel): clave en la variable
   SYNC_KEY del servidor en Render. Sigue funcionando.
 
+TRAER LA INFORMACION DE LA NUBE A LA COMPUTADORA (cliente que ya usa el sistema en internet)
+- "Caja o equipo normal" SOLO ABRE la direccion de la nube en una ventana: la
+  informacion se queda en la nube. Para tenerla en la computadora hay que
+  usar "Servidor del negocio" y traerla.
+- Primera vez: elegir "Servidor del negocio" -> "Ya tengo mi sistema en la
+  nube" -> direccion + usuario y contrasena del DUENO -> "Conectar y revisar"
+  (muestra cuantos productos, ventas, clientes y usuarios hay) -> "Traer mi
+  informacion". Despues el dueno entra con los mismos usuario y contrasena.
+- Si el equipo ya era servidor: Panel del servidor -> "Traer mi informacion de
+  la nube a esta computadora". REEMPLAZA lo que haya (antes guarda un
+  respaldo) y reinicia el programa.
+- Se baja por pedazos y se escribe en una sola operacion: si falla (se va el
+  internet, la nube esta dormida) no se guarda nada. En una computadora nueva la
+  base queda vacia para volver a intentar; en una que ya tenia datos queda igual.
+- Al terminar, la computadora queda como la PRINCIPAL: se vincula la
+  sincronizacion (sin volver a copiar todo) y lo que se registre se sube a la
+  nube, que queda como copia.
+- Requisito: el sistema en la nube debe tener la actualizacion con las rutas
+  /api/sync/exportar y /api/sync/licencia (se publica a "estable" y Render
+  termina de desplegar). Si no, el programa avisa que falta actualizarlo.
+- Seguro: al conectar la sincronizacion desde el panel, si la nube ya tiene
+  informacion y esta computadora esta vacia, se DETIENE (conectar asi vaciaria
+  la nube) y se indica usar "Traer mi informacion de la nube".
+
+LICENCIA QUE SE TOMA DE LA NUBE (modo servidor)
+- Al traer la informacion, o al conectar la sincronizacion con el usuario
+  dueno, la computadora pide a la nube del cliente su licencia y la adopta: se
+  quita la prueba de 30 dias. Se revisa de nuevo cada 6 horas y al abrir el
+  programa (renovaciones). Necesita internet solo en ese momento.
+- Con codigo firmado (CPT1-...) en la nube: es lo seguro; la firma se
+  comprueba tambien en la computadora y debe ser del ID de ESA nube. Para eso
+  la licencia de la nube se activa con el Activador igual que siempre.
+- Licencia puesta a mano en la nube (sin codigo): se copia tipo, plan y fecha.
+- Nube sin control de licencia (sistema propio de Compoint): la computadora
+  queda sin prueba (permanente) y toma la licencia cuando la nube tenga una.
+- Una licencia activada en la computadora con codigo propio no se baja por una
+  igual o mas corta de la nube. Si la licencia de la nube ya vencio y aqui hay
+  prueba vigente, se ignora.
+- Ayuda -> "Mi servicio con Compoint" muestra cliente, estado, vigencia, plan
+  y sucursales cuando el sistema detecta que ya es cliente (no sale en prueba).
+
 LICENCIA Y PRUEBA DE 30 DIAS (modo servidor)
 - La PRIMERA vez que abre el servidor de un cliente empieza sola una prueba de
   30 dias con el sistema completo. Arriba se ve cuantos dias quedan y los

@@ -20,6 +20,17 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{pa
 <label>Dirección del sistema en la nube</label><input id="urlNube" placeholder="https://minegocio.onrender.com">
 <div class="fila"><button class="sec" id="cambiarCliente">Cambiar a la nube</button></div></details>
 
+<h2>Traer mi información de la nube a esta computadora</h2>
+<p style="margin:0 0 6px">Si ya usas Compoint Punto en internet, aquí bajas a esta computadora tus productos, clientes, ventas y usuarios. Tu licencia de cliente se toma sola y se quita la versión de prueba.</p>
+<details id="detTraer"><summary style="cursor:pointer;font-size:13px">Traer mi información…</summary>
+<label>Dirección de tu sistema en la nube</label><input id="trDir" autocomplete="off" placeholder="https://minegocio.onrender.com">
+<label>Usuario del dueño</label><input id="trUsuario" autocomplete="off">
+<label>Contraseña</label><input id="trPass" type="password" autocomplete="new-password">
+<div class="nota">La contraseña se usa una sola vez y no se guarda. <b>Se reemplaza TODO lo que hay en esta computadora</b> por lo de la nube (antes se guarda un respaldo). Después esta computadora queda como la principal y lo que registres aquí se sube a la nube.</div>
+<div class="fila"><button id="trRevisar">Conectar y revisar</button></div>
+<div id="trResumen" style="margin-top:8px"></div>
+<div class="fila"><button class="peligro" id="trTraer" style="display:none">Traer y reemplazar lo de esta computadora</button></div></details>
+
 <h2>Sincronizar con la nube</h2>
 <p style="margin:0 0 6px">El negocio trabaja aquí, <b>sin depender del internet</b>. Si el internet se va, todo sigue funcionando y lo registrado se guarda en una fila de espera; cuando regresa, se sube solo a tu sistema en la nube.</p>
 <div id="estadoSync"></div>
@@ -118,6 +129,27 @@ $('syAhora').onclick=async()=>{$('msg').className='';$('msg').textContent='Sincr
   $('msg').className=r&&r.ok?'ok':'err';$('msg').textContent=r&&r.ok?'Listo.':(r&&r.error)||'No se pudo.';cargar();};
 $('syCompleto').onclick=async()=>{const r=await compointServidor.syncCompleto();if(r&&r.ok===false&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('msg').className='ok';$('msg').textContent='Copia completa enviada.';}cargar();};
 $('syQuitar').onclick=async()=>{const r=await compointServidor.syncQuitar();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('syDir').value='';$('syUsuario').value='';$('syPass').value='';$('msg').className='ok';$('msg').textContent='Sincronización desactivada.';}cargar();};
+const num=n=>Number(n||0).toLocaleString('es-MX');
+$('trRevisar').onclick=async()=>{
+  const direccion=$('trDir').value.trim(),usuario=$('trUsuario').value.trim(),password=$('trPass').value;
+  const falla=(t)=>{$('msg').className='err';$('msg').textContent=t;};
+  $('trTraer').style.display='none';$('trResumen').innerHTML='';
+  if(!direccion)return falla('Escribe la dirección de tu sistema en la nube.');
+  if(!usuario||!password)return falla('Escribe el usuario y la contraseña del dueño.');
+  $('msg').className='';$('msg').textContent='Conectando con la nube (puede tardar hasta 1 minuto)…';$('trRevisar').disabled=true;
+  const r=await compointServidor.nubeRevisar({direccion,usuario,password});$('trRevisar').disabled=false;
+  if(!r||r.error)return falla((r&&r.error)||'No se pudo conectar.');
+  $('trPass').value='';$('msg').textContent='';
+  const x=r.resumen||{},l=r.licencia||{};
+  const lic=l.control===false?'Sistema propio de Compoint (sin versión de prueba).':(l.tipo&&l.tipo!=='demo'?('Licencia '+esc(l.tipo)+(l.vence?' hasta '+esc(l.vence.split('-').reverse().join('/')):' permanente')+(l.cliente?' · '+esc(l.cliente):'')):'La nube todavía no tiene licencia de cliente.');
+  $('trResumen').innerHTML='<div class="ok">Encontramos tu sistema:</div><div>'+num(x.productos)+' productos · '+num(x.ventas)+' ventas · '+num(x.clientes)+' clientes · '+num(x.usuarios)+' usuarios</div><div class="nota">'+lic+'</div>';
+  $('trTraer').style.display='';
+};
+$('trTraer').onclick=async()=>{
+  $('msg').className='';$('msg').textContent='';$('trTraer').disabled=true;
+  const r=await compointServidor.traerNube();$('trTraer').disabled=false;
+  if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}
+};
 $('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled=true;$('respaldar').textContent='Respaldando…';
   const r=await compointServidor.respaldar();$('respaldar').disabled=false;$('respaldar').textContent='Respaldar ahora';
   $('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?('Respaldo listo ('+r.archivo+')'+(r.nube&&r.nube.estado==='ok'?' y copia en la nube guardada.':(r.nube&&r.nube.estado==='pendiente'?'. La copia en la nube quedó pendiente.':'.'))):('No se pudo respaldar: '+r.error);cargar();};

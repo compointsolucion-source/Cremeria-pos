@@ -7,7 +7,7 @@ button { font-family: inherit; border: 0; border-radius: 9px; padding: 11px 20px
 button:hover:not(:disabled) { filter: brightness(.96); }
 button:active:not(:disabled) { transform: translateY(1px); }
 button:disabled { opacity: .5; cursor: not-allowed; }
-.op, .hallado { white-space: normal; }
+.op, .hallado, .enlace { white-space: normal; }
 .pri { background: var(--verde); color: #fff; }
 .sec { background: #e9ecef; color: #333; }
 input, select { font-family: inherit; border: 1px solid #cfd4da; border-radius: 8px; padding: 9px 11px; font-size: 14px; width: 100%; background: #fff; color: #222; }

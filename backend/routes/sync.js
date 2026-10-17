@@ -69,6 +69,16 @@ async function autenticar(req, res, next) {
   }
 }
 
+// Para BAJAR información y licencia a la computadora del negocio: sirve la clave de sincronización o el
+// usuario dueño (iniciando sesión una vez, sin necesidad de vincular todavía).
+function claveODueno(req, res, next) {
+  if (req.get('X-Sync-Key')) return autenticar(req, res, next);
+  return verificarToken(req, res, (err) => {
+    if (err) return next(err);
+    return requiereRol('dueno', 'jefe_general')(req, res, next);
+  });
+}
+
 // ------------------------------------------------------------ estructura de la base
 let cache = null;
 async function estructura() {
@@ -164,6 +174,59 @@ router.get('/estado', autenticar, async (req, res) => {
   } catch (e) {
     console.error('sync/estado:', e.message);
     res.status(500).json({ error: 'No se pudo leer la base de datos de la nube.' });
+  }
+});
+
+// ------------------------------------------------------------ bajar la información a la computadora del negocio
+// El camino contrario al espejo: la computadora del negocio pide TODA la información de esta nube,
+// tabla por tabla y por pedazos, para tenerla en su propia base. Solo lectura; no modifica nada aquí.
+const LOTE_EXPORTAR = 1000;
+
+// Qué tablas hay, con qué columnas y cuántos registros (para saber cuánto falta y para validar).
+router.get('/exportar/estructura', claveODueno, async (req, res) => {
+  try {
+    const m = await estructura();
+    const tablas = {};
+    for (const t of m.orden) {
+      if (!m.pk[t]) continue;
+      const n = (await pool.query(`SELECT COUNT(*)::int AS n FROM ${q(t)}`)).rows[0].n;
+      tablas[t] = { pk: m.pk[t], cols: m.cols[t], filas: n };
+    }
+    const orden = m.orden.filter((t) => tablas[t]);
+    res.json({ ok: true, version: 1, orden, tablas, total: orden.reduce((a, t) => a + tablas[t].filas, 0) });
+  } catch (e) {
+    console.error('sync/exportar/estructura:', e.message);
+    res.status(500).json({ error: 'No se pudo leer la información de la nube.' });
+  }
+});
+
+// Un pedazo de una tabla, en orden de su llave: ?desde=<última llave recibida>&limite=<máx. registros>
+router.get('/exportar/:tabla', claveODueno, async (req, res) => {
+  try {
+    const m = await estructura();
+    const t = String(req.params.tabla);
+    if (!m.pk[t]) return res.status(404).json({ error: 'Esa tabla no existe en la nube.' });
+    const limite = Math.min(Math.max(parseInt(req.query.limite, 10) || LOTE_EXPORTAR, 1), 2000);
+    const col = q(m.pk[t]);
+    const hayDesde = req.query.desde !== undefined && req.query.desde !== '';
+    const r = hayDesde
+      ? await pool.query(`SELECT row_to_json(x) AS j, x.${col}::text AS k FROM ${q(t)} x WHERE x.${col} > $1 ORDER BY x.${col} LIMIT ${limite}`, [String(req.query.desde)])
+      : await pool.query(`SELECT row_to_json(x) AS j, x.${col}::text AS k FROM ${q(t)} x ORDER BY x.${col} LIMIT ${limite}`);
+    res.json({ ok: true, filas: r.rows.map((x) => x.j), siguiente: r.rows.length === limite ? r.rows[r.rows.length - 1].k : null });
+  } catch (e) {
+    console.error('sync/exportar/tabla:', e.message);
+    res.status(500).json({ error: 'No se pudo leer esa parte de la información de la nube.' });
+  }
+});
+
+// La licencia de esta nube (para que la computadora del negocio la tome y deje la prueba).
+// Nunca devuelve secretos: el código de activación es firmado y solo sirve para el ID de esta nube.
+router.get('/licencia', claveODueno, async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await require('../utils/licencia').infoParaNube()) });
+  } catch (e) {
+    console.error('sync/licencia:', e.message);
+    res.status(500).json({ error: 'No se pudo consultar la licencia de la nube.' });
   }
 });
 

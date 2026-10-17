@@ -61,7 +61,8 @@ async function llamarNube(api, ruta, { cuerpo, token, timeout = 90000 } = {}) {
 }
 const errorNube = (mensaje, http) => { const e = new Error(mensaje); e.http = http; return e; };
 
-async function vincularConUsuario(api, usuario, password) {
+// Inicia sesión en la nube con el usuario dueño. Devuelve { token, usuario }. La contraseña NO se guarda.
+async function iniciarSesionDueno(api, usuario, password) {
   const u = String(usuario || '').trim();
   if (!u || !password) throw errorNube('Escribe el usuario y la contraseña del dueño de tu sistema en la nube.', 400);
   const login = await llamarNube(api, '/auth/login', { cuerpo: { usuario: u, password: String(password) } });
@@ -74,7 +75,12 @@ async function vincularConUsuario(api, usuario, password) {
   const rol = login.datos.usuario && login.datos.usuario.rol;
   if (!login.datos.token) throw errorNube('La nube no devolvió una sesión válida. Revisa la dirección.', 502);
   if (rol !== 'dueno' && rol !== 'jefe_general') throw errorNube('Ese usuario no es el dueño del negocio. Usa el usuario del dueño.', 403);
-  const v = await llamarNube(api, '/sync/vincular', { token: login.datos.token });
+  return { token: login.datos.token, usuario: login.datos.usuario };
+}
+
+// Con la sesión del dueño, la nube entrega una clave de sincronización nueva (guarda solo su hash).
+async function vincularConToken(api, token) {
+  const v = await llamarNube(api, '/sync/vincular', { token });
   if (!v.ok) {
     if (v.status === 404) throw errorNube('Tu sistema en la nube todavía no tiene la actualización para sincronizar. Pídele a Compoint que lo actualice.', 404);
     if (v.status === 403) throw errorNube('Solo el dueño puede conectar la sincronización.', 403);
@@ -82,6 +88,24 @@ async function vincularConUsuario(api, usuario, password) {
   }
   if (typeof v.datos.clave !== 'string' || v.datos.clave.length < 16) throw errorNube('La nube no devolvió una clave válida.', 502);
   return { clave: v.datos.clave, reemplazo: !!v.datos.reemplazo };
+}
+
+async function vincularConUsuario(api, usuario, password) {
+  const { token } = await iniciarSesionDueno(api, usuario, password);
+  return vincularConToken(api, token);
+}
+
+// Lectura (GET) de la nube con la sesión del dueño (token) o con la clave de sincronización.
+async function leerNube(api, ruta, { token, clave, timeout = 120000 } = {}) {
+  const r = await fetch(api + ruta, {
+    method: 'GET',
+    headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(clave ? { 'X-Sync-Key': clave } : {}) },
+    signal: AbortSignal.timeout(timeout)
+  });
+  let datos = {};
+  try { datos = await r.json(); } catch (e) { /* respuesta sin JSON */ }
+  if (!r.ok) throw errorNube(datos.error || ('La nube respondió con error ' + r.status + '.'), r.status);
+  return datos;
 }
 
 async function pedir(api, clave, ruta, opciones = {}) {
@@ -133,7 +157,13 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
       WHERE i.indisprimary AND c.relkind = 'r' AND c.relnamespace = 'public'::regnamespace`);
     return r.rows.filter((x) => !EXCLUIDAS.has(x.tabla));
   }
-  async function instalarDisparadores() {
+  // Si dos partes piden instalar a la vez (arranque + primera vuelta), se espera la misma tarea.
+  let instalando = null;
+  function instalarDisparadores() {
+    if (!instalando) instalando = instalarDisparadoresReal().finally(() => { instalando = null; });
+    return instalando;
+  }
+  async function instalarDisparadoresReal() {
     const p = getPool();
     await p.query(`CREATE SCHEMA IF NOT EXISTS ${ESQ}`);
     await p.query(`CREATE TABLE IF NOT EXISTS ${ESQ}.cola (id BIGSERIAL PRIMARY KEY, tabla TEXT NOT NULL, pk TEXT NOT NULL)`);
@@ -315,13 +345,23 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
       catch (e) { log('Sincronización: no se pudo avisar a la nube al desvincular (' + e.message + ').'); return false; }
     },
     resolverApi,
-    // Guarda y arranca. La primera vez se hace una copia completa.
-    async activar() {
+    // Guarda y arranca. La primera vez se hace una copia completa (copiarTodo = false: la nube y esta
+    // computadora ya tienen lo mismo, por ejemplo justo después de traer la información de la nube).
+    async activar({ copiarTodo = true } = {}) {
       detenido = false;
       await instalarDisparadores();
-      guardarEstado({ completo_pendiente: true, error: '', sin_conexion: false });
+      guardarEstado({ completo_pendiente: !!copiarTodo, error: '', sin_conexion: false, problemas: 0 });
       programar();
       vuelta().catch(() => {});
+    },
+    // Marca que no hace falta copia completa (se usa al traer la información de la nube).
+    marcarAlDia() { guardarEstado({ completo_pendiente: false, error: '', sin_conexion: false, problemas: 0 }); },
+    // Licencia de la nube del cliente (con la clave guardada). null si no hay conexión o la nube no la entrega.
+    async licenciaDeNube() {
+      const c = conf();
+      if (!c) return null;
+      try { return await pedir(c.api, c.clave, '/licencia', { timeout: 30000 }); }
+      catch (e) { if (!esRed(e)) log('Licencia de la nube: ' + e.message); return null; }
     },
     async desactivar() {
       clearInterval(timer); timer = null;
@@ -356,4 +396,4 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
   };
 }
 
-module.exports = { crearSincronizador, resolverApi, vincularConUsuario };
+module.exports = { crearSincronizador, resolverApi, vincularConUsuario, iniciarSesionDueno, vincularConToken, leerNube, llamarNube, errorNube, esRed, EXCLUIDAS };

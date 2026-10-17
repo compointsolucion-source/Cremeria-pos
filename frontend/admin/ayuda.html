@@ -61,6 +61,18 @@
   .cuerpo a.boton-descarga { display: inline-flex; align-items: center; gap: 8px; background: var(--primary, #5FAE46); color: #fff; padding: 11px 18px; border-radius: 10px; font-weight: 800; text-decoration: none; }
   .cuerpo a.boton-descarga:hover { text-decoration: none; filter: brightness(.95); }
 
+  /* ---- Mi servicio con Compoint (solo clientes con licencia) ---- */
+  .servicio-cuerpo { padding: 4px 16px 16px; display: grid; gap: 12px; }
+  .servicio-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .servicio-dato { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); min-width: 0; }
+  .servicio-dato small { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #7A7D83); margin-bottom: 3px; }
+  .servicio-dato b { display: block; font-size: 16px; overflow-wrap: anywhere; }
+  .servicio-dato .sub { display: block; font-size: 12.5px; color: var(--muted, #7A7D83); margin-top: 2px; }
+  .pastilla { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 800; background: rgba(95,174,70,.2); color: var(--primary-dark, #4C9439); }
+  .pastilla.ambar { background: rgba(249,168,37,.25); color: #8a5a00; }
+  .pastilla.rojo { background: rgba(198,40,40,.16); color: #b71c1c; }
+  .servicio-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+
   /* ---- Contacto ---- */
   .contacto-cuerpo { padding: 4px 16px 16px; display: grid; gap: 12px; }
   .contacto-cuerpo > p { margin: 0; font-size: 14px; }
@@ -114,6 +126,13 @@
       <nav class="caja temas" id="listaTemas" aria-label="Temas de ayuda"></nav>
 
       <div class="secciones">
+
+        <!-- ============ Mi servicio con Compoint (solo si ya es cliente con licencia) ============ -->
+        <section class="caja recorta tema" data-tema="servicio" data-item data-solo-cliente hidden data-claves="mi servicio compoint cliente licencia vigencia vence vencimiento plan renovar contratar estado activa sucursales id equipo">
+          <h3 class="tema-tit">🤝 Mi servicio con Compoint</h3>
+          <p class="intro">El estado de tu servicio y tu licencia. Compoint lo mantiene al día.</p>
+          <div class="servicio-cuerpo" id="servicioCuerpo"></div>
+        </section>
 
         <!-- ============ Impresoras ============ -->
         <section class="caja recorta tema" data-tema="impresoras">
@@ -365,6 +384,23 @@
             </div>
           </details>
 
+          <details class="guia" data-item data-claves="traer informacion nube computadora bajar descargar sincronizar productos clientes ventas usuarios ya uso internet servidor del negocio pasar migrar copiar">
+            <summary>Ya uso el sistema en internet: traer mi información a esta computadora</summary>
+            <div class="cuerpo">
+              <p>Sirve para tener en esta computadora tus productos, clientes, ventas y usuarios, y poder vender aunque se vaya el internet. <b>Abrir la dirección en una ventana no baja la información</b>: para eso hay que preparar la computadora como servidor y traerla.</p>
+              <ol>
+                <li>Abre el programa de escritorio. La primera vez elige <b>"Servidor del negocio"</b> (si ya lo tenías como caja: icono junto al reloj → <b>Cambiar dirección o usuario</b> → <b>Convertir esta computadora en el servidor</b>).</li>
+                <li>En "¿Cómo quieres empezar?" elige <b>"Ya tengo mi sistema en la nube"</b>.</li>
+                <li>Escribe la <b>dirección</b> de tu sistema y el <b>usuario y contraseña del dueño</b>. Pulsa <b>Conectar y revisar</b>: verás cuántos productos, ventas y clientes se van a traer.</li>
+                <li>Pulsa <b>Traer mi información</b>. Puede tardar unos minutos; no apagues la computadora.</li>
+                <li>Entra con el <b>mismo usuario y contraseña de siempre</b>. Tu licencia de cliente se toma sola y se quita la versión de prueba.</li>
+              </ol>
+              <p><b>Si esta computadora ya era servidor:</b> panel del servidor (Ctrl+Alt+S) → <b>Traer mi información de la nube…</b>. Reemplaza lo que haya en la computadora y antes guarda un respaldo.</p>
+              <div class="aviso amarillo">Desde ese momento <b>captura todo en esta computadora</b>: lo que registres se sube solo a la nube, que queda como copia. Lo que alguien capture directo en la nube después de traer la información se reemplaza.</div>
+              <div class="aviso amarillo">Si te dice que tu sistema en la nube "todavía no tiene la actualización", pide a Compoint que lo actualice y vuelve a intentar.</div>
+            </div>
+          </details>
+
           <details class="guia" data-item data-claves="otras cajas conectar servidor local buscar servidor red nombre ip puerto 3000 usb bluetooth">
             <summary>Conectar otras cajas al servidor local</summary>
             <div class="cuerpo">
@@ -410,6 +446,18 @@
                 <li>Al terminar los 30 días pasa a <b>solo consulta</b>: puedes entrar, ver reportes, exportar y respaldar tu información, pero no registrar ventas ni cambios. Al activar tu código vuelve todo al instante.</li>
               </ul>
               <p>Para contratar, entra a <b>Licencia</b> (menú Administración) y llena <b>«Quiero contratar»</b> (ver la guía de abajo).</p>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="licencia nube automatica tomar sola cliente vigencia renovacion renovar prueba quitar servidor computadora conectada">
+            <summary>Mi licencia se toma sola desde mi sistema en la nube</summary>
+            <div class="cuerpo">
+              <ul>
+                <li>Si esta computadora está conectada con <b>tu sistema en la nube</b> (al traer tu información o al conectar la sincronización), toma <b>sola</b> la licencia de cliente de ahí y <b>se quita la versión de prueba</b>. No tienes que escribir ningún código.</li>
+                <li>Cuando Compoint <b>renueva</b> tu servicio, esta computadora lo detecta sola (se revisa cada pocas horas y cada vez que se conecta). Necesita internet solo para ese momento.</li>
+                <li>Tu licencia y su vigencia las ves en <b>Ayuda → Mi servicio con Compoint</b> y en <b>Licencia</b>.</li>
+                <li>Si tu computadora no usa la nube, se activa con un código como siempre (ver la guía de abajo).</li>
+              </ul>
             </div>
           </details>
 
@@ -558,9 +606,12 @@ const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '
 
 // Las herramientas del servidor solo se muestran dentro del programa de escritorio (.exe).
 const esEscritorio = !!(window.compointDesktop && window.compointDesktop.esEscritorio);
+// «Mi servicio con Compoint» solo aparece cuando el sistema detecta que ya es cliente con licencia (no en la prueba).
+let esCliente = false;
 
 const TEMAS = [
   { id: 'todo', icono: '📚', nombre: 'Todo' },
+  { id: 'servicio', icono: '🤝', nombre: 'Mi servicio', sinNumero: true, soloCliente: true },
   { id: 'impresoras', icono: '🖨️', nombre: 'Impresoras' },
   { id: 'ventas', icono: '🛒', nombre: 'Ventas y pedidos' },
   { id: 'equipos', icono: '🖥️', nombre: 'Equipos y servidor' },
@@ -588,6 +639,7 @@ function aplicar() {
 
   items.forEach((el) => {
     if (el.hasAttribute('data-solo-escritorio') && !esEscritorio) { el.hidden = true; return; }
+    if (el.hasAttribute('data-solo-cliente') && !esCliente) { el.hidden = true; return; }
     const coincide = !buscando || palabras.every((w) => el.dataset.texto.includes(w));
     el.hidden = !coincide;
     if (el.tagName === 'DETAILS') {
@@ -614,7 +666,7 @@ function aplicar() {
 
 function pintarTemas(conteo, buscando) {
   const total = TEMAS.filter((t) => t.id !== 'todo' && !t.sinNumero).reduce((s, t) => s + (conteo[t.id] || 0), 0);
-  const botones = TEMAS.map((t) => {
+  const botones = TEMAS.filter((t) => !t.soloCliente || esCliente).map((t) => {
     const n = t.id === 'todo' ? total : (conteo[t.id] || 0);
     const numero = t.sinNumero ? '' : '<i>' + n + '</i>';
     const apagado = buscando && t.id !== 'todo' && !(conteo[t.id] > 0) ? ' vacio-tema' : '';
@@ -653,6 +705,57 @@ function limpiarBusqueda() {
 const deHash = (location.hash || '').replace('#', '');
 if (TEMAS.some((t) => t.id === deHash)) temaActual = deHash;
 aplicar();
+
+// ---- Mi servicio con Compoint ----
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fechaBonita = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
+
+function pintarServicio(l) {
+  const estados = {
+    activa: ['Activa', ''], por_vencer: ['Por vencer', 'ambar'], gracia: ['Venció: aún puedes vender unos días', 'ambar'], solo_consulta: ['Vencida: solo consulta', 'rojo']
+  };
+  const [textoEstado, claseEstado] = l.codigo_invalido ? ['Revisar con Compoint', 'rojo'] : (estados[l.estado] || ['Activa', '']);
+  let vigencia, detalleVig = '';
+  if (l.permanente) vigencia = 'Sin vencimiento';
+  else {
+    vigencia = 'Hasta el ' + fechaBonita(l.vence);
+    if (l.dias != null) detalleVig = l.dias > 1 ? 'Te quedan ' + l.dias + ' días' : (l.dias === 1 ? 'Vence mañana' : (l.dias === 0 ? 'Vence hoy' : 'Venció hace ' + Math.abs(l.dias) + ' día' + (Math.abs(l.dias) === 1 ? '' : 's')));
+  }
+  const plan = l.plan === 'local' ? 'Servidor del negocio' : 'Sistema en la nube';
+  const planDetalle = l.plan === 'local' ? 'Funciona aunque no haya internet' : 'Se usa por internet';
+  const origen = l.desde_nube === 'sin_control'
+    ? 'Tu sistema en la nube es un sistema propio de Compoint (sin control de licencia).'
+    : (l.desde_nube ? 'Tu licencia se toma sola desde tu sistema en la nube y se actualiza cuando Compoint la renueva.' : (l.con_codigo ? 'Activada en esta computadora con un código de Compoint.' : 'Registrada por Compoint.'));
+  const nombre = l.cliente || 'Tu negocio';
+  const mensajeWa = encodeURIComponent('Hola, soy ' + nombre + '. Quiero consultar o renovar mi servicio de Compoint Punto' + (l.id_equipo ? ' (ID de equipo ' + l.id_equipo + ')' : '') + '.');
+  const dato = (titulo, valor, extra) => '<div class="servicio-dato"><small>' + titulo + '</small><b>' + valor + '</b>' + (extra ? '<span class="sub">' + extra + '</span>' : '') + '</div>';
+  document.getElementById('servicioCuerpo').innerHTML =
+    (l.mensaje ? '<div class="aviso amarillo">' + esc(l.mensaje) + '</div>' : '') +
+    '<div class="servicio-datos">' +
+      dato('Cliente', esc(nombre)) +
+      dato('Estado', '<span class="pastilla ' + claseEstado + '">' + esc(textoEstado) + '</span>') +
+      dato('Vigencia', esc(vigencia), esc(detalleVig)) +
+      dato('Servicio', esc(plan), esc(planDetalle)) +
+      (l.limite_sucursales ? dato('Sucursales incluidas', esc(l.limite_sucursales)) : '') +
+    '</div>' +
+    '<p style="margin:0;font-size:13px;color:var(--muted,#7A7D83)">' + esc(origen) + (l.id_equipo ? ' · ID de este equipo: <b>' + esc(l.id_equipo) + '</b>' : '') + '</p>' +
+    '<div class="servicio-acciones">' +
+      '<a class="btn btn-primary" href="https://wa.me/523325907090?text=' + mensajeWa + '" target="_blank" rel="noopener">💬 Renovar o consultar por WhatsApp</a>' +
+      '<a class="btn btn-secondary" href="licencia.html">🛡️ Ver mi licencia</a>' +
+    '</div>';
+}
+
+(async () => {
+  try {
+    const l = await apiFetch('/licencia');
+    // Cliente = hay control de licencia y no es la prueba. En la prueba (o sin control) este apartado no aparece.
+    if (l && l.control && l.tipo && l.tipo !== 'demo') {
+      esCliente = true;
+      pintarServicio(l);
+      aplicar();
+    }
+  } catch (e) { /* sin conexión o sin permiso: el apartado simplemente no aparece */ }
+})();
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>

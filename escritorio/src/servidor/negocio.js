@@ -36,19 +36,72 @@ function validar(d) {
   return err;
 }
 
-async function crearNegocio(url, d, dirServidor) {
-  const errores = validar(d);
-  if (errores.length) throw new Error(errores.join(' '));
+// Las tablas base del sistema (schema.sql + el ajuste de configuración que ya traen los negocios nuevos).
+async function aplicarEsquema(c, dirServidor) {
   const schema = fs.readFileSync(path.join(dirServidor, 'backend', 'scripts', 'schema.sql'), 'utf8');
+  await c.query(schema);
+  await c.query(`ALTER TABLE configuracion
+      ADD COLUMN IF NOT EXISTS etiqueta_modo TEXT NOT NULL DEFAULT 'auto',
+      ADD COLUMN IF NOT EXISTS ancho_etiqueta TEXT NOT NULL DEFAULT '50mm',
+      ADD COLUMN IF NOT EXISTS bascula_tipo_dato TEXT NOT NULL DEFAULT 'peso'`);
+}
+
+// Aplica las migraciones del sistema (backend/migrations) igual que lo hace el servidor al arrancar,
+// con el mismo registro en schema_migrations: cuando el servidor arranque, no tendrá nada pendiente.
+async function aplicarMigraciones(c, dirServidor) {
+  const dir = path.join(dirServidor, 'backend', 'migrations');
+  if (!fs.existsSync(dir)) return;
+  await c.query(`CREATE TABLE IF NOT EXISTS schema_migrations (nombre TEXT PRIMARY KEY, aplicada_en TIMESTAMP NOT NULL DEFAULT NOW())`);
+  for (const archivo of fs.readdirSync(dir).filter((f) => /^\d+.*\.sql$/.test(f)).sort()) {
+    const ya = await c.query('SELECT 1 FROM schema_migrations WHERE nombre = $1', [archivo]);
+    if (ya.rows.length) continue;
+    await c.query('BEGIN');
+    try {
+      await c.query(fs.readFileSync(path.join(dir, archivo), 'utf8'));
+      await c.query('INSERT INTO schema_migrations (nombre) VALUES ($1)', [archivo]);
+      await c.query('COMMIT');
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => {});
+      throw new Error(`Migración ${archivo}: ${e.message}`);
+    }
+  }
+}
+
+// Deja la base lista (tablas y migraciones) pero SIN datos del negocio: es donde se pone lo que viene de la nube.
+async function prepararBase(url, dirServidor) {
   const c = new Client({ connectionString: url });
   await c.connect();
   try {
     await c.query('BEGIN');
-    await c.query(schema);
-    await c.query(`ALTER TABLE configuracion
-      ADD COLUMN IF NOT EXISTS etiqueta_modo TEXT NOT NULL DEFAULT 'auto',
-      ADD COLUMN IF NOT EXISTS ancho_etiqueta TEXT NOT NULL DEFAULT '50mm',
-      ADD COLUMN IF NOT EXISTS bascula_tipo_dato TEXT NOT NULL DEFAULT 'peso'`);
+    await aplicarEsquema(c, dirServidor);
+    await c.query('COMMIT');
+    await aplicarMigraciones(c, dirServidor);
+  } catch (e) {
+    await c.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally { await c.end(); }
+}
+
+// Borra todo lo de la base (queda como recién creada). Se usa si algo falla a la mitad de traer la nube,
+// para que el siguiente intento empiece limpio en lugar de quedarse con un negocio a medias.
+async function vaciarBase(url) {
+  const c = new Client({ connectionString: url });
+  await c.connect();
+  try {
+    await c.query('DROP SCHEMA IF EXISTS compoint_sync CASCADE');
+    await c.query('DROP SCHEMA public CASCADE');
+    await c.query('CREATE SCHEMA public');
+  } finally { await c.end(); }
+}
+
+async function crearNegocio(url, d, dirServidor) {
+  const errores = validar(d);
+  if (errores.length) throw new Error(errores.join(' '));
+  const c = new Client({ connectionString: url });
+  await c.connect();
+  try {
+    await c.query('BEGIN');
+    await aplicarEsquema(c, dirServidor);
     const suc = await c.query('INSERT INTO sucursales (nombre, direccion, telefono, activo) VALUES ($1,$2,$3,true) RETURNING id',
       [d.negocio.trim(), d.direccion || null, d.telefono || null]);
     const sucursalId = suc.rows[0].id;
@@ -76,4 +129,4 @@ async function crearNegocio(url, d, dirServidor) {
   } finally { await c.end(); }
 }
 
-module.exports = { GIROS, baseVacia, crearNegocio, validar };
+module.exports = { GIROS, baseVacia, crearNegocio, validar, prepararBase, vaciarBase, aplicarEsquema, aplicarMigraciones };

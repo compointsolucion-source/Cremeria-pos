@@ -53,6 +53,7 @@ function pantallaConexion() {
   $('#main').innerHTML =
     '<h1>Conectar con el sistema del negocio</h1>' +
     '<p class="s">Escribe la dirección del sistema de este negocio (te la da Compoint). Solo se hace una vez en este equipo.</p>' +
+    (window.compointServidor ? '<div class="aviso azul">Esta opción <b>solo abre tu sistema de internet</b> en una ventana: la información se queda en la nube. Si quieres tenerla en esta computadora (y vender aunque se vaya el internet), ' + (S.vinoDeUso ? 'vuelve atrás y elige <b>«Servidor del negocio»</b>' : 'convierte esta computadora en servidor con el enlace de abajo') + ' → <b>«Ya tengo mi sistema en la nube»</b>.</div>' : '') +
     '<div class="camp"><label>Dirección del sistema</label><input id="url" placeholder="https://minegocio.onrender.com  (o la del servidor: http://192.168.1.10:3000)" autofocus></div>' +
     '<div class="fila-busca"><button class="sec" id="buscar" type="button">Buscar servidor en la red</button><span id="busq"></span></div>' +
     '<div id="hallados" style="display:grid;gap:6px"></div>' +
@@ -61,7 +62,7 @@ function pantallaConexion() {
       '<div class="f2"><div class="camp"><label>Usuario</label><input id="usuario" autocomplete="off"></div><div class="camp"><label>Contraseña</label><input id="password" type="password" autocomplete="off"></div></div>' +
       '<div class="nota">Solo para equipos de una sola persona. La contraseña se guarda cifrada con tu cuenta de Windows y solo entra sola al abrir el programa; si cierras sesión, la siguiente vez la escribes tú.</div></div></details>' +
     '<div class="err" id="err"></div>' +
-    (c.configurado && window.compointServidor ? '<button class="enlace" id="esServidor" type="button">Convertir esta computadora en el servidor del negocio…</button>' : '') +
+    (c.configurado && window.compointServidor ? '<button class="enlace" id="esServidor" type="button">Quiero la información en esta computadora: convertirla en el servidor del negocio (y traer mi información de la nube)…</button>' : '') +
     '<div class="pie"><small>Los datos se guardan solo en este equipo.</small><div class="der">' +
       (S.vinoDeUso ? '<button class="sec" id="atras">Atrás</button>' : '') +
       (c.configurado ? '<button class="sec" id="cancelar">Cancelar</button>' : '') +
