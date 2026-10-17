@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Pedidos - Compoint Punto</title>
+<link rel="stylesheet" href="css/app-theme.css">
+<link rel="stylesheet" href="css/sidebar.css">
+<link rel="stylesheet" href="css/pedidos.css">
+<script src="js/tema.js"></script>
+<script src="js/vendor/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>🛵 Pedidos</h1></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a class="btn btn-primary" href="mostrador.html?modo=domicilio">＋ Pedido a domicilio</a>
+      <a class="btn btn-secondary" href="mostrador.html?modo=recoger">🏪 Para recoger</a>
+      <a class="btn btn-secondary" href="admin/dashboard.html">🏠 Inicio</a>
+    </div>
+  </div>
+
+  <div class="pt-pagina">
+    <div class="pt-barra">
+      <button class="pt-tab activo" data-tab="hoy" onclick="PT.tab('hoy')" id="tabHoy">📅 Hoy</button>
+      <button class="pt-tab" data-tab="manana" onclick="PT.tab('manana')">Mañana</button>
+      <button class="pt-tab" data-tab="semana" onclick="PT.tab('semana')">Esta semana</button>
+      <button class="pt-tab" data-tab="fijos" onclick="PT.tab('fijos')">🔁 Pedidos fijos</button>
+      <span class="pt-espacio"></span>
+      <button class="btn btn-secondary" onclick="PTX.abrirReporte()">📊 Repartidores</button>
+      <button class="btn btn-secondary" onclick="PTX.abrirLiquidaciones()">💵 Liquidaciones</button>
+      <button class="btn btn-secondary" id="btnAjustesPedidos" style="display:none" onclick="PTX.abrirAjustes()">⚙ Zonas y ajustes</button>
+      <a class="btn btn-secondary" id="btnVistaRepartidor" style="display:none" href="repartidor.html" title="Así lo ve el repartidor en su celular">📱 Vista del repartidor</a>
+      <span class="pt-vivo" id="indicadorVivo">se actualiza solo, en vivo</span>
+    </div>
+
+    <!-- HOY: tablero -->
+    <section id="vistaHoy">
+      <div class="pt-herramientas">
+        <input type="search" id="filtroTexto" placeholder="🔍 Buscar cliente, colonia o número…" oninput="PT.filtrar()">
+        <select id="filtroTipo" onchange="PT.filtrar()"><option value="todos">Domicilio y recoger</option><option value="domicilio">Solo a domicilio</option><option value="recoger">Solo para recoger</option></select>
+        <span class="pt-espacio"></span>
+        <button class="btn btn-secondary" onclick="PTX.abrirRuta(PT.estado.hoy)">🗺 Ruta de hoy</button>
+        <button class="btn btn-secondary" onclick="PTX.abrirProduccion(PT.estado.hoy)">📋 Hoja de producción</button>
+      </div>
+      <div class="pt-kpis" id="kpis"></div>
+      <div class="pt-tablero" id="tablero"></div>
+    </section>
+
+    <!-- MAÑANA / OTRO DÍA: agenda -->
+    <section id="vistaManana" style="display:none">
+      <div class="pt-herramientas">
+        <b id="tituloAgenda" style="font-size:18px">Mañana</b>
+        <input type="date" id="fechaAgenda" style="width:auto; min-height:38px;" onchange="PT.cambiarFechaAgenda(this.value)">
+        <span class="pt-espacio"></span>
+        <button class="btn btn-secondary" onclick="PTX.abrirRuta(PT.estado.agendaFecha)">🗺 Ruta del día</button>
+        <button class="btn btn-secondary" onclick="PTX.abrirProduccion(PT.estado.agendaFecha)">📋 Hoja de producción</button>
+        <a class="btn btn-primary" href="mostrador.html?modo=domicilio">＋ Programar pedido</a>
+      </div>
+      <div class="pt-agenda">
+        <div class="pt-bloque" style="padding:0"><div id="listaAgenda"></div></div>
+        <div>
+          <div class="pt-bloque"><h4>Lo que hay que preparar</h4><div id="resumenProduccion"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ESTA SEMANA -->
+    <section id="vistaSemana" style="display:none">
+      <div class="pt-herramientas"><b style="font-size:18px" id="tituloSemana">Esta semana</b><span class="pt-espacio"></span>
+        <span style="font-size:13px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <span><span class="pt-t fijo">fijo</span> se repite solo</span><span><span class="pt-t credito">una vez</span> programado</span><span><span class="pt-t pagado">hoy</span></span></span></div>
+      <div class="pt-semana" id="semana"></div>
+    </section>
+
+    <!-- PEDIDOS FIJOS -->
+    <section id="vistaFijos" style="display:none">
+      <div class="pt-herramientas">
+        <b style="font-size:18px">Pedidos fijos de tiendas</b><span class="pt-espacio"></span>
+        <button class="btn btn-secondary" id="btnGenerarFijos" style="display:none" onclick="PTX.generarFijosAhora()">⚡ Crear ahora los pedidos de mañana</button>
+        <button class="btn btn-primary" id="btnNuevoFijo" style="display:none" onclick="PTX.editarFijo(null)">＋ Nuevo pedido fijo</button>
+      </div>
+      <div class="pt-aviso">Para tiendas y negocios que piden <b>lo mismo cada semana</b>: lo capturas una vez y el sistema crea el pedido solo, a la hora que toca. Puedes cambiar cantidades de un día sin tocar el pedido fijo.</div>
+      <div id="listaFijos"></div>
+    </section>
+  </div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/estado-conexion.js"></script>
+<script src="js/ui-components.js"></script>
+<script src="js/granel.js"></script>
+<script src="js/ubicacion.js"></script>
+<script src="js/pedidos.js"></script>
+<script src="js/pedidos-extra.js"></script>
+<script src="js/registrar-sw.js"></script>
+<script src="js/sidebar-nav.js"></script>
+</body>
+</html>

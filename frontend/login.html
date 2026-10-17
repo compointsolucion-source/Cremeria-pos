@@ -75,6 +75,7 @@ async function login() {
     if (data.usuario.rol === 'jefe_general') window.location.href = 'admin/sucursales.html';
     else if (data.usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
     else if (data.usuario.rol === 'cajero') window.location.href = 'caja.html';
+    else if (data.usuario.rol === 'repartidor') window.location.href = 'repartidor.html';
     else window.location.href = 'admin/dashboard.html';
   } catch (err) {
     errorDiv.textContent = err.message;

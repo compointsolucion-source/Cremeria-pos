@@ -59,6 +59,9 @@ app.use('/api', verificarLicencia);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/productos', require('./routes/productos'));
 app.use('/api/tickets', require('./routes/tickets'));
+// Pedidos a domicilio / para recoger / programados + módulo del repartidor.
+const rutaPedidos = require('./routes/pedidos');
+app.use('/api/pedidos', rutaPedidos);
 app.use('/api/turnos', require('./routes/turnos'));
 app.use('/api/movimientos', require('./routes/movimientos'));
 app.use('/api/kits', require('./routes/kits'));
@@ -128,6 +131,8 @@ migrar()
     console.log(`Servidor corriendo en puerto ${PORT}`);
     // Solicitudes de licencia que no se pudieron mandar por falta de internet: se reintentan solas.
     require('./utils/licenciaEnvio').iniciarReintentos(process.env.COMPOINT_ID_EQUIPO ? 'local' : 'nube');
+    // Pedidos programados que ya toca preparar y pedidos fijos de tiendas (cada minuto).
+    rutaPedidos.iniciarTemporizador(io);
   }));
 
 // Para el modo servidor local (la app de escritorio lo arranca y lo detiene).

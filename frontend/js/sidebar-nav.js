@@ -69,6 +69,7 @@ const GRUPOS_SIDEBAR = [
     titulo: 'Ventas',
     items: [
       { icono: 'carrito', texto: 'Mostrador', href: 'mostrador.html' },
+      { icono: 'camion', texto: 'Pedidos a domicilio', href: 'pedidos.html' },
       { icono: 'billetera', texto: 'Caja', href: 'caja.html' },
       { icono: 'monitor', texto: 'Caja Avanzada', href: 'caja-avanzada.html' },
       { icono: 'deshacer', texto: 'Devoluciones', href: 'devoluciones.html' },
@@ -124,7 +125,7 @@ function estaEnCarpetaAdmin() {
 }
 
 function rutaSidebar(href) {
-  const enRaiz = ['mostrador.html', 'caja.html', 'caja-avanzada.html', 'pantalla-turnos.html', 'kiosco-fichas.html'];
+  const enRaiz = ['mostrador.html', 'pedidos.html', 'repartidor.html', 'caja.html', 'caja-avanzada.html', 'pantalla-turnos.html', 'kiosco-fichas.html'];
   const destinoEnRaiz = enRaiz.includes(href);
   if (estaEnCarpetaAdmin()) {
     return destinoEnRaiz ? `../${href}` : href;

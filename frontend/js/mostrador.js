@@ -674,6 +674,8 @@ async function conectarImpresoraMostradorUSB() {
 
 async function generarTicket() {
   if (carrito.length === 0) { mostrarToast('Agrega al menos un producto', 'error'); return; }
+  // En modo "A domicilio" / "Para recoger" se abre la ventana de pedido (js/pedido-domicilio.js).
+  if (window.PedidoDom && PedidoDom.modo !== 'mostrador') { PedidoDom.abrir(); return; }
 
   try {
     const ticket = await apiFetch('/tickets', {
@@ -754,7 +756,7 @@ async function imprimirTicket(ticket) {
       subtotal: parseFloat(i.subtotal).toFixed(2)
     })),
     total: parseFloat(ticket.total).toFixed(2),
-    piePagina: 'Presenta este ticket en caja para pagar',
+    piePagina: ticket.pie_pagina || 'Presenta este ticket en caja para pagar',
     lineasSuperiores: config.lineas_superiores || 0,
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,

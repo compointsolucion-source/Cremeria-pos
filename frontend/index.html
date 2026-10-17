@@ -12,6 +12,7 @@
     const usuario = JSON.parse(usuarioStr);
     if (usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
     else if (usuario.rol === 'cajero') window.location.href = 'caja.html';
+    else if (usuario.rol === 'repartidor') window.location.href = 'repartidor.html';
     else window.location.href = 'admin/dashboard.html';
   } else {
     window.location.href = 'login.html';

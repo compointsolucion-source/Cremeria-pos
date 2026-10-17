@@ -1,5 +1,16 @@
 const jwt = require('jsonwebtoken');
 
+// El repartidor SOLO puede usar su propio módulo (sus entregas y su corte) y lo
+// básico de la sesión (cambiar su contraseña, cerrar sesión). Se corta aquí, en un
+// solo lugar, para que ninguna ruta del sistema (clientes, ventas, reportes...) le
+// responda aunque alguien intente llamarla a mano con su sesión.
+const PREFIJOS_REPARTIDOR = ['/api/pedidos/repartidor', '/api/auth'];
+function rutaPermitidaParaRepartidor(url) {
+  const ruta = String(url || '').split('?')[0];
+  if (ruta.includes('..') || ruta.includes('//')) return false;
+  return PREFIJOS_REPARTIDOR.some((p) => ruta === p || ruta.startsWith(p + '/'));
+}
+
 function verificarToken(req, res, next) {
   const header = req.headers['authorization'];
   const token = header && header.split(' ')[1];
@@ -7,6 +18,9 @@ function verificarToken(req, res, next) {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
     if (err) return res.status(401).json({ error: 'Token inválido o expirado' });
+    if (usuario.rol === 'repartidor' && !rutaPermitidaParaRepartidor(req.originalUrl)) {
+      return res.status(403).json({ error: 'Tu usuario de repartidor solo puede usar el módulo de entregas' });
+    }
     req.usuario = usuario;
     next();
   });

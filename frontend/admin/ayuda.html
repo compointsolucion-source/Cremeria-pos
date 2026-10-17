@@ -169,7 +169,7 @@
         <!-- ============ Ventas y pedidos ============ -->
         <section class="caja recorta tema" data-tema="ventas">
           <h3 class="tema-tit">🛒 Ventas y pedidos</h3>
-          <p class="intro">Vender a granel por importe o por cantidad, y (próximamente aquí) pedidos a domicilio y programados.</p>
+          <p class="intro">Vender a granel por importe o por cantidad, pedidos a domicilio y para recoger, el repartidor, pedidos programados y pedidos fijos de tiendas.</p>
 
           <details class="guia" data-item data-claves="granel importe cantidad peso kilo kilos gramos dame pesos de queso costo precio unitario botones rapidos importe exacto centavos 99.94 mostrador caja avanzada">
             <summary>Vender a granel por importe («dame $100 de queso») o por cantidad</summary>
@@ -187,6 +187,150 @@
                 <li><b>Devoluciones:</b> si devuelves un producto vendido por importe, se regresa la parte proporcional de lo cobrado; devolver todo regresa exactamente los $100.00.</li>
                 <li>Si cambias la cantidad o el precio de un renglón ya capturado (por ejemplo con mayoreo), el importe exacto deja de aplicar y se cobra cantidad × precio.</li>
               </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="pedido domicilio recoger crear nuevo mostrador cliente direccion ubicacion whatsapp waze zona envio costo paga al recibir pagado credito programar repartidor guardar sin enviar">
+            <summary>Hacer un pedido a domicilio o para recoger</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>En <b>Mostrador</b> arma el carrito como siempre (productos, kilos, importes).</li>
+                <li>Arriba elige <b>🛵 A domicilio</b> o <b>🏪 Para recoger</b>. El botón de cobrar cambia a <b>«Continuar con el pedido»</b>; tócalo.</li>
+                <li><b>Cliente:</b> busca por nombre o teléfono. Si no existe, toca <b>«Cliente nuevo»</b> y escribe nombre y teléfono (queda guardado para la próxima).</li>
+                <li><b>Dirección</b> (solo a domicilio): elige una de las guardadas o escribe una nueva (calle y número es lo único obligatorio). Si el cliente te mandó su <b>ubicación por WhatsApp</b>, pégala en el cuadro de ubicación: el sistema lee las coordenadas y el repartidor navega directo a la puerta. Con los botones <b>Waze</b> y <b>Google Maps</b> puedes probar que abre bien.</li>
+                <li><b>Zona de envío:</b> se elige sola si la dirección ya tiene una; si no, escógela. El costo del envío se suma al total (puede ser gratis si la compra llega al mínimo que tú definas).</li>
+                <li><b>¿Cuándo?</b> «Lo antes posible» o programado (hoy más tarde o en otro día). Un pedido programado aparece en <b>Pedidos</b> pero no estorba en Caja hasta que toca prepararlo.</li>
+                <li><b>¿Cómo paga?</b>
+                  <ul>
+                    <li><b>Paga al recibir</b> (solo domicilio): el repartidor cobra en la puerta. Anota con cuánto va a pagar el cliente para que lleve el cambio.</li>
+                    <li><b>Se cobra en Caja</b> (o «Paga al recoger»): el ticket llega a la bandeja de Caja y se cobra normal.</li>
+                    <li><b>A crédito del cliente</b>: necesita un cliente guardado con límite de crédito.</li>
+                  </ul></li>
+                <li>Toca <b>✓ Enviar pedido a preparar</b> (imprime el ticket) o <b>📝 Guardar sin enviar</b> si todavía no quieres que se prepare.</li>
+              </ol>
+              <ul>
+                <li>Si el cliente es <b>tienda con mayoreo</b> (se activa en Clientes), el pedido ya calcula con los precios de mayoreo.</li>
+                <li>Los pedidos necesitan internet: no se pueden capturar sin conexión.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="tablero pedidos hoy columnas programados preparando listos en camino entregados mover cancelar editar detalle asignar repartidor en vivo kpis">
+            <summary>Usar el tablero de Pedidos (Hoy)</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>Abre <b>Pedidos a domicilio</b> en el menú. En <b>📅 Hoy</b> ves las columnas: <b>Programados → Preparando → Listos → En camino → Entregados hoy</b>.</li>
+                <li>Cada tarjeta tiene un <b>botón grande</b> con el siguiente paso: «Empezar a preparar», «Listo para salir», «Salió con (repartidor)», «Entregado». Un toque y pasa a la siguiente columna; todos los equipos lo ven al instante.</li>
+                <li>En <b>Listos</b>, si no tiene repartidor, el botón es <b>«Asignar repartidor»</b>. Los pedidos para recoger muestran <b>«Ya lo recogió»</b>.</li>
+                <li>Toca la tarjeta para ver el <b>detalle</b>: productos, dirección, avisos, evidencias (foto / firma) y para <b>editar</b> los datos y los productos del pedido (mientras no se cobre en Caja) o <b>cancelarlo</b>.</li>
+                <li>Arriba tienes un buscador (cliente, colonia o número) y un filtro de domicilio / recoger. Los cuadros de arriba resumen cuántos pedidos hay, cuántos van en camino, el dinero por cobrar y los que van <b>con retraso</b>.</li>
+              </ol>
+              <ul>
+                <li>Un pedido ya cobrado en Caja no se cancela desde aquí: se regresa el dinero con una <b>devolución</b>.</li>
+                <li>Si el repartidor marca <b>«No pude entregar»</b>, el pedido aparece con el motivo y puedes regresarlo a «Listo» para intentar de nuevo o cancelarlo.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="repartidor usuario equipo rol celular entregas waze google maps cobrar entregado no pude entregar corte foto firma internet pantalla de inicio">
+            <summary>Dar de alta a un repartidor y cómo usa su celular</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>En <b>Equipo</b> toca <b>＋ Nuevo empleado</b>, elige el rol <b>Repartidor</b>, escribe nombre, usuario, contraseña y su <b>teléfono</b>.</li>
+                <li>Al guardarlo, el panel te muestra la <b>dirección para su celular</b> (termina en <code>/repartidor.html</code>) con un botón <b>Copiar</b>. Mándasela por WhatsApp. Que la abra, inicie sesión y en el menú del navegador elija <b>«Agregar a pantalla de inicio»</b>.</li>
+                <li>Al entrar solo ve <b>sus entregas</b>: cliente, dirección, referencias, productos y <b>cuánto cobrar</b> (y el cambio que lleva). No puede ver ventas, reportes ni nada más.</li>
+                <li>Botones de cada entrega: <b>🧭 Waze</b> o <b>🗺 Google Maps</b> (abren la app con la dirección ya escrita), <b>📞 Llamar</b>, <b>💬 WhatsApp</b>.</li>
+                <li>Su recorrido: <b>«Ya salí con el pedido» → «Ya llegué» → «Entregado y cobrado»</b>. Al entregar elige cómo le pagaron (efectivo, transferencia o tarjeta) y, si lo pides, toma <b>foto</b> y pide <b>firma</b>.</li>
+                <li>Si no pudo entregar, toca <b>«No pude entregar»</b> y elige el motivo; el pedido regresa a la tienda.</li>
+                <li>Los pedidos <b>listos sin repartidor</b> le aparecen con el botón <b>«Tomar este pedido»</b>.</li>
+                <li>En <b>Mi corte</b> ve cuánto efectivo debe entregar en Caja.</li>
+              </ol>
+              <div class="aviso amarillo">El celular del repartidor necesita <b>internet</b>. Si pierde señal, sigue viendo lo último que cargó, pero no puede registrar entregas hasta que regrese. Si prefieres no usar la pantalla del repartidor, en el detalle del pedido hay un botón para <b>mandarle el pedido por WhatsApp</b> con la dirección y el enlace de Waze.</div>
+              <ul>
+                <li>Si un empleado de la tienda entrega pedidos que cobran al recibir, también debe tener su usuario con rol <b>Repartidor</b> (así queda registrado quién cobró).</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="liquidar liquidacion repartidor efectivo caja turno corte diferencia faltante sobrante entregar dinero">
+            <summary>Recibir el dinero del repartidor (liquidación)</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>Cuando el repartidor vuelve, en <b>Pedidos</b> (columna Entregados o el panel de repartidores) toca <b>«Liquidar a (nombre)»</b>. También puedes ver el historial en <b>💵 Liquidaciones</b>.</li>
+                <li>Necesitas tener <b>tu turno de Caja abierto</b>: el dinero entra a tu turno.</li>
+                <li>Verás lo entregado: efectivo cobrado, transferencias, tarjetas, pedidos pagados antes y a crédito. Cuenta el efectivo y <b>escribe cuánto te entregó</b>. El sistema te dice si <b>falta o sobra</b> dinero.</li>
+                <li>Confirma. Queda registrado quién entregó, quién recibió y a qué hora, y el repartidor queda en ceros.</li>
+              </ol>
+              <ul>
+                <li>El inventario de los pedidos que se cobran al recibir se descuenta <b>al liquidar</b>.</li>
+                <li>El reporte <b>📊 Repartidores</b> (dueño y gerente) muestra entregas, tiempos y efectivo por repartidor.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="programado programar agenda mañana semana ruta del dia hoja de produccion preparar anticipacion minutos">
+            <summary>Pedidos programados: agenda, ruta del día y hoja de producción</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>Al hacer un pedido elige la fecha y hora de entrega. Queda en estado <b>Programado</b>.</li>
+                <li>En <b>Pedidos</b> usa las pestañas <b>Mañana</b> (o elige otra fecha) y <b>Esta semana</b> para ver lo que viene. Los pedidos <b>fijos</b> salen marcados.</li>
+                <li><b>📋 Hoja de producción:</b> la suma de todo lo que hay que preparar ese día (por producto, en kilos o piezas) y para quién. Se puede imprimir.</li>
+                <li><b>🗺 Ruta del día:</b> ordena las entregas por repartidor, puedes cambiar el orden y abrir <b>toda la ruta en Google Maps</b>.</li>
+              </ol>
+              <ul>
+                <li>Un pedido programado pasa solo a <b>Preparando</b> unos minutos antes de su hora (tú defines cuántos en <b>⚙ Zonas y ajustes</b>) y entonces aparece en Caja.</li>
+                <li>«Guardar sin enviar» deja el pedido programado pero sin que se prepare solo: tú lo mueves cuando quieras.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="pedido fijo fijos tienda tiendas abarrotes semanal repetir dias generar automatico mayoreo">
+            <summary>Pedidos fijos de tiendas (lo mismo cada semana)</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>En <b>Pedidos</b> abre la pestaña <b>🔁 Pedidos fijos</b> y toca <b>＋ Nuevo pedido fijo</b> (dueño o gerente).</li>
+                <li>Busca a la tienda (si no existe, créala en <b>Clientes</b> como <b>Tienda</b> con su dirección y mayoreo).</li>
+                <li>Elige los <b>días de la semana</b>, la <b>hora</b>, si es a domicilio o para recoger y captura los productos con sus cantidades.</li>
+                <li>Listo: el sistema crea el pedido solo. Cada día, a la hora que definas en <b>⚙ Zonas y ajustes</b> (normalmente 6 pm), crea los pedidos fijos <b>del día siguiente</b>. También puedes tocar <b>«⚡ Crear ahora los pedidos de mañana»</b>.</li>
+              </ol>
+              <ul>
+                <li>Si un día la tienda pide distinto, abre <b>ese pedido ya creado</b> y toca <b>✏ Editar</b>: ahí cambias cantidades, quitas o agregas productos, sin tocar el pedido fijo.</li>
+                <li>Para pausar una tienda (vacaciones) usa <b>pausar</b>; para volver, <b>reanudar</b>. Los pedidos fijos pausados no se crean.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="zonas envio costo gratis ajustes foto obligatoria firma minutos preparar hora fijos configurar">
+            <summary>Zonas de envío y ajustes de pedidos (dueño y gerente)</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>En <b>Pedidos</b> toca <b>⚙ Zonas y ajustes</b>.</li>
+                <li><b>Zonas:</b> escribe el nombre (por ejemplo «Zona 1: hasta 3 km»), el <b>costo del envío</b> y, si quieres, desde qué compra el envío es <b>gratis</b> en esa zona. Para quitar una zona, apágala.</li>
+                <li><b>Ajustes generales:</b> envío gratis general, minutos de anticipación para preparar los programados, hora en que se crean los pedidos fijos y si el repartidor <b>debe tomar foto</b> o el cliente <b>debe firmar</b> al recibir.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="clientes direcciones tienda tipo mayoreo guardar direccion principal ubicacion waze maps referencias">
+            <summary>Direcciones de los clientes y tipo «Tienda»</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>En <b>Clientes/Créditos</b> abre un cliente: abajo del abono está <b>📍 Direcciones de entrega</b>.</li>
+                <li><b>＋ Agregar</b> para escribir una dirección nueva (calle, colonia, ciudad, C.P., referencias, zona de envío y ubicación exacta). Cada dirección tiene botones <b>Waze</b> y <b>Google Maps</b> para probarla, <b>✏️ Editar</b>, <b>⭐ Principal</b> y <b>🗑 Quitar</b>.</li>
+                <li>Las direcciones también se guardan solas cuando haces un pedido a domicilio con una dirección nueva.</li>
+                <li>Al <b>✏️ Editar</b> el cliente puedes marcarlo como <b>🏪 Tienda / negocio</b> y activar <b>Usa precio de mayoreo</b>. Los pedidos de ese cliente salen con precio de mayoreo y puedes crearle pedidos fijos.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="avisar cliente whatsapp mensaje en camino pedido listo repartidor mandar direccion">
+            <summary>Avisos por WhatsApp (al cliente y al repartidor)</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>Abre el pedido en <b>Pedidos</b> (toca la tarjeta). Verás botones de <b>WhatsApp</b> con el mensaje ya escrito: avisarle al cliente que su pedido va en camino o está listo, o mandarle al repartidor el pedido con dirección, ubicación y monto a cobrar.</li>
+                <li>Se abre WhatsApp con el mensaje preparado; tú solo lo envías. El sistema anota que ya avisaste.</li>
+              </ol>
+              <div class="aviso azul">Los mensajes salen de tu propio WhatsApp. No hace falta contratar nada extra.</div>
             </div>
           </details>
         </section>

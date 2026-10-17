@@ -40,7 +40,27 @@
   .movs .linea { padding: 8px 0; }
   .movs .linea b { white-space: nowrap; }
 
+  /* ---- Panel: direcciones de entrega ---- */
+  .dir-card { border: 1px solid var(--border, #E4E6E9); border-radius: 11px; padding: 10px 12px; display: grid; gap: 3px; font-size: 13.5px; background: var(--surface, #fff); }
+  .dir-card + .dir-card { margin-top: 8px; }
+  .dir-card .dir-tit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+  .dir-card small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .dir-card .dir-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .dir-form { display: grid; gap: 8px; border: 2px solid var(--primary, #5FAE46); border-radius: 11px; padding: 12px; margin-top: 8px; background: var(--surface, #fff); }
+  .dir-form .dos, .dir-form .tres { display: grid; gap: 8px; }
+  .dir-form .dos { grid-template-columns: 1fr 1fr; }
+  .dir-form .tres { grid-template-columns: 2fr 2fr 1fr; }
+  .dir-estado { font-size: 12.5px; color: var(--muted, #7A7D83); }
+  .dir-estado.ok { color: #2E7D32; font-weight: 700; }
+  .dir-estado.mal { color: #C62828; }
+  .interruptor-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .interruptor-fila b { display: block; font-size: 14px; }
+  .interruptor-fila small { display: block; color: var(--muted, #7A7D83); font-size: 12px; }
+  .tag-tienda { white-space: nowrap; display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 9px; background: rgba(21,101,192,.12); color: #1565C0; margin-left: 4px; vertical-align: 1px; }
+  [data-tema="oscuro"] .tag-tienda { color: #9CC9F7; background: rgba(156,201,247,.14); }
+
   @media (max-width: 1000px) {
+    .dir-form .tres { grid-template-columns: 1fr 1fr; }
     .cli-cab { display: none; }
     .cli-fila { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom debe" "uso uso"; row-gap: 7px; }
     .cli-btns { display: none; }
@@ -95,6 +115,7 @@
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
+<script src="../js/ubicacion.js"></script>
 <script>
 requiereLogin();
 
@@ -106,6 +127,11 @@ let clienteId = null;           // cliente abierto en el panel
 let cuenta = null;              // respuesta de /estado-cuenta
 let metodoAbono = 'efectivo';
 let verTodosMovs = false;
+let direcciones = [];           // direcciones de entrega del cliente abierto
+let zonas = null;               // zonas de envío (se cargan la primera vez que hacen falta)
+let dirForm = null;             // formulario de dirección abierto (null = cerrado)
+let tipoForm = 'publico';       // tipo de cliente en el formulario
+let mayoreoTocado = false;      // si la persona ya decidió a mano lo del mayoreo
 const esAngosto = window.matchMedia('(max-width: 1000px)');
 const COLORES = ['#1565C0', '#C62828', '#2E7D32', '#8E24AA', '#EF6C00', '#00838F', '#6D4C41', '#5C6BC0'];
 const METODOS = { efectivo: '💵 Efectivo', tarjeta: '💳 Tarjeta', transferencia: '🏦 Transf.' };
@@ -168,6 +194,7 @@ function filtrados() {
     if (filtro === 'deuda') return saldoDe(c) > 0.005;
     if (filtro === 'corriente') return saldoDe(c) <= 0.005;
     if (filtro === 'cerca') return cercaDelLimite(c);
+    if (filtro === 'tienda') return c.tipo === 'tienda';
     return true;
   });
 }
@@ -178,7 +205,9 @@ function ponerFiltro(f) { filtro = f; reiniciarLista(); }
 function pintarLista() {
   const conDeuda = clientes.filter(c => saldoDe(c) > 0.005).length;
   const cerca = clientes.filter(cercaDelLimite).length;
+  const tiendas = clientes.filter(c => c.tipo === 'tienda').length;
   const defs = [['todos', 'Todos', clientes.length], ['deuda', 'Con deuda', conDeuda], ['corriente', 'Al corriente', clientes.length - conDeuda], ['cerca', '⚠️ Cerca del límite', cerca]];
+  if (tiendas) defs.push(['tienda', '🏪 Tiendas', tiendas]);
   document.getElementById('chipsFiltro').innerHTML = defs
     .map(([k, t, n]) => `<button class="chip ${filtro === k ? 'activo' : ''}" onclick="ponerFiltro('${k}')">${t}<i>${n}</i></button>`).join('');
 
@@ -200,7 +229,7 @@ function pintarLista() {
     return `
     <div class="cli-fila ${clienteId === c.id ? 'sel' : ''}" onclick="abrirCuenta(${c.id})">
       <div class="cli-nom"><div class="avatar" style="background:${COLORES[c.id % COLORES.length]}">${escapar(iniciales(c.nombre))}</div>
-        <div class="txt"><b>${escapar(c.nombre)}${cercaDelLimite(c) ? ' <span class="pill rojo" style="margin-left:4px">Cerca del límite</span>' : ''}</b><small>${escapar(c.telefono || 'Sin teléfono')}</small></div></div>
+        <div class="txt"><b>${escapar(c.nombre)}${c.tipo === 'tienda' ? '<span class="tag-tienda">🏪 Tienda</span>' : ''}${cercaDelLimite(c) ? ' <span class="pill rojo" style="margin-left:4px">Cerca del límite</span>' : ''}</b><small>${escapar(c.telefono || 'Sin teléfono')}</small></div></div>
       <div class="cli-debe">${debe}</div>
       <div class="cli-uso"><div class="prog ${claseBarra}"><i style="width:${pct.toFixed(0)}%"></i></div><small>${lim > 0 ? pct.toFixed(0) + '% de ' + entero(lim) : 'Sin límite de crédito'}</small></div>
       <div class="cli-btns" onclick="event.stopPropagation()">
@@ -241,7 +270,7 @@ function pintarPanel() {
     cuerpo.innerHTML = `
       <div class="persona">
         <div class="avatar grande" style="background:${COLORES[c.id % COLORES.length]}">${escapar(iniciales(c.nombre))}</div>
-        <div><div class="nombre">${escapar(c.nombre)}</div><div class="sub">${c.telefono ? '📞 ' + escapar(c.telefono) : 'Sin teléfono'}</div></div>
+        <div><div class="nombre">${escapar(c.nombre)}${c.tipo === 'tienda' ? '<span class="tag-tienda">🏪 Tienda</span>' : ''}</div><div class="sub">${c.telefono ? '📞 ' + escapar(c.telefono) : 'Sin teléfono'}${c.usa_mayoreo ? ' · precio de mayoreo' : ''}</div></div>
       </div>
       <div class="estadisticas">
         <div class="stat"><small>Debe</small><b class="${saldo > 0.005 ? 'rojo-t' : ''}">${entero(saldo)}</b></div>
@@ -255,6 +284,7 @@ function pintarPanel() {
         <div class="seg">${Object.entries(METODOS).map(([k, t]) => `<button type="button" class="${metodoAbono === k ? 'activo' : ''}" onclick="ponerMetodo('${k}')">${t}</button>`).join('')}</div>
         <button class="btn btn-primary btn-grande" onclick="registrarAbono()">Registrar abono</button>
       </div>
+      <div id="bloqueDirecciones">${htmlDirecciones()}</div>
       <div>
         <div class="entre" style="margin-bottom:2px;"><b style="font-size:13px;">Movimientos recientes</b><button class="btn btn-secondary btn-chico" onclick="generarComprobante()">🧾 Comprobante</button></div>
         <div class="movs">${mostrados.map(m => `
@@ -279,13 +309,31 @@ function pintarPanel() {
       <div class="campo"><label for="telefonoCliente">Teléfono</label><input type="tel" id="telefonoCliente" placeholder="33 0000 0000" maxlength="20" value="${escapar(c.telefono || '')}"></div>
       <div class="campo"><label for="limiteCredito">Límite de crédito ($)</label><input type="number" id="limiteCredito" placeholder="0.00" step="0.01" min="0" inputmode="decimal" value="${editando ? limiteDe(c) : ''}" onkeydown="if (event.key === 'Enter') guardarCliente()"></div>
     </div>
+    <div class="campo"><label>Tipo de cliente</label>
+      <div class="seg" id="segTipo">
+        <button type="button" data-t="publico" class="${tipoForm === 'publico' ? 'activo' : ''}" onclick="elegirTipoCliente('publico')">👤 Público</button>
+        <button type="button" data-t="tienda" class="${tipoForm === 'tienda' ? 'activo' : ''}" onclick="elegirTipoCliente('tienda')">🏪 Tienda / negocio</button>
+      </div>
+      <div class="ayuda">Las tiendas (abarrotes, restaurantes…) pueden tener pedidos fijos cada semana en Pedidos a domicilio.</div></div>
+    <div class="bloque blanco"><div class="interruptor-fila">
+      <div><b>Usa precio de mayoreo</b><small>En los pedidos a domicilio se le cobra el precio de mayoreo de cada producto que lo tenga</small></div>
+      <input type="checkbox" class="interruptor" id="usaMayoreo" ${editando && c.usa_mayoreo ? 'checked' : ''} onchange="mayoreoTocado = true">
+    </div></div>
     <div class="aviso azul">ℹ️ El límite es lo máximo que el cliente puede deber al comprar “a crédito”. Con límite en $0 no se le puede fiar.</div>`;
   pie.style.display = '';
   pie.innerHTML = `<button class="btn btn-primary btn-grande" onclick="guardarCliente()">${editando ? '💾 Guardar cambios' : '💾 Guardar cliente'}</button>`;
 }
 
+function elegirTipoCliente(t) {
+  tipoForm = t;
+  document.querySelectorAll('#segTipo button').forEach(b => b.classList.toggle('activo', b.dataset.t === t));
+  const chk = document.getElementById('usaMayoreo');
+  if (chk && !mayoreoTocado) chk.checked = (t === 'tienda');   // sugerencia: una tienda normalmente compra a mayoreo
+}
+
 function nuevoCliente() {
-  modo = 'nuevo'; clienteId = null; cuenta = null;
+  modo = 'nuevo'; clienteId = null; cuenta = null; direcciones = []; dirForm = null;
+  tipoForm = 'publico'; mayoreoTocado = false;
   pintarPanel(); pintarLista();
   if (esAngosto.matches) abrirHoja();
   setTimeout(() => { const i = document.getElementById('nombreCliente'); if (i) i.focus(); }, 60);
@@ -294,7 +342,8 @@ function nuevoCliente() {
 async function abrirCuenta(id, enfocarAbono = false) {
   try {
     const data = await apiFetch(`/clientes/${id}/estado-cuenta`);
-    cuenta = data; clienteId = id; modo = 'cuenta'; verTodosMovs = false;
+    await cargarDirecciones(id);
+    cuenta = data; clienteId = id; modo = 'cuenta'; verTodosMovs = false; dirForm = null;
     pintarPanel(); pintarLista();
     if (esAngosto.matches) abrirHoja();
     if (enfocarAbono) setTimeout(() => { const i = document.getElementById('montoAbono'); if (i) i.focus(); }, 80);
@@ -306,6 +355,7 @@ async function abrirCuenta(id, enfocarAbono = false) {
 function editarCliente() {
   if (!cuenta) return;
   modo = 'editar';
+  tipoForm = cuenta.cliente.tipo === 'tienda' ? 'tienda' : 'publico'; mayoreoTocado = true;
   pintarPanel();
   setTimeout(() => { const i = document.getElementById('nombreCliente'); if (i) i.focus(); }, 60);
 }
@@ -316,18 +366,168 @@ async function guardarCliente() {
   const limite_credito = parseFloat(document.getElementById('limiteCredito').value || 0);
   if (!nombre) { mostrarToast('El nombre es obligatorio', 'error'); return; }
   if (limite_credito < 0) { mostrarToast('El límite no puede ser negativo', 'error'); return; }
+  const usa_mayoreo = !!document.getElementById('usaMayoreo').checked;
   try {
     if (modo === 'editar' && clienteId) {
-      await apiFetch(`/clientes/${clienteId}`, { method: 'PUT', body: JSON.stringify({ nombre, telefono, limite_credito }) });
+      await apiFetch(`/clientes/${clienteId}`, { method: 'PUT', body: JSON.stringify({ nombre, telefono, limite_credito, tipo: tipoForm, usa_mayoreo }) });
       mostrarToast('Cliente actualizado', 'exito');
       await cargarClientes();
       await abrirCuenta(clienteId);
     } else {
-      await apiFetch('/clientes', { method: 'POST', body: JSON.stringify({ nombre, telefono, limite_credito }) });
+      await apiFetch('/clientes', { method: 'POST', body: JSON.stringify({ nombre, telefono, limite_credito, tipo: tipoForm, usa_mayoreo }) });
       mostrarToast('Cliente guardado', 'exito');
       await cargarClientes();
       if (esAngosto.matches) cerrarHoja(); else nuevoCliente();
     }
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+// ---------- Direcciones de entrega ----------
+async function cargarDirecciones(id) {
+  try { direcciones = await apiFetch(`/clientes/${id}/direcciones`); } catch (e) { direcciones = []; }
+  if (zonas === null) {
+    try { zonas = (await apiFetch('/pedidos/zonas')).zonas || []; } catch (e) { zonas = []; }
+  }
+}
+
+function pintarDirecciones() {
+  const b = document.getElementById('bloqueDirecciones');
+  if (b) b.innerHTML = htmlDirecciones();
+}
+
+function htmlDirecciones() {
+  const lista = direcciones.map(d => (dirForm && dirForm.id === d.id ? htmlFormDir() : tarjetaDir(d))).join('');
+  const nueva = dirForm && dirForm.id === null ? htmlFormDir() : '';
+  const vacio = !lista && !nueva ? '<div class="vacio" style="padding:10px;">Sin direcciones guardadas. Se guardan solas al hacer un pedido a domicilio, o agrégalas aquí.</div>' : '';
+  return `<div>
+    <div class="entre" style="margin-bottom:6px;"><b style="font-size:13px;">📍 Direcciones de entrega</b>${dirForm ? '' : '<button class="btn btn-secondary btn-chico" onclick="abrirFormDir(null)">＋ Agregar</button>'}</div>
+    ${lista}${nueva}${vacio}</div>`;
+}
+
+function tarjetaDir(d) {
+  const zona = (zonas || []).find(z => z.id === d.zona_id);
+  const exacta = UBICACION.tieneCoordenadas(d);
+  const texto2 = [d.colonia, d.cp ? 'C.P. ' + d.cp : '', d.ciudad].filter(Boolean).join(', ');
+  return `<div class="dir-card">
+    <div class="dir-tit"><b>${escapar(d.alias || 'Dirección')}</b>${d.principal ? '<span class="pill verde">Principal</span>' : ''}${zona ? `<span class="pill amarillo">${escapar(zona.nombre)}</span>` : ''}</div>
+    <div>${escapar(d.calle)}${texto2 ? '<br>' + escapar(texto2) : ''}</div>
+    ${d.referencias ? `<small>📌 ${escapar(d.referencias)}</small>` : ''}
+    <small>${exacta ? '✔ Con ubicación exacta' : 'Sin ubicación exacta (el mapa busca la dirección escrita)'}</small>
+    <div class="dir-btns">
+      <a class="btn btn-secondary btn-chico" target="_blank" rel="noopener" href="${escapar(UBICACION.urlWaze(d))}">🧭 Waze</a>
+      <a class="btn btn-secondary btn-chico" target="_blank" rel="noopener" href="${escapar(UBICACION.urlGoogleMaps(d))}">🗺 Google Maps</a>
+      <button class="btn btn-secondary btn-chico" onclick="abrirFormDir(${d.id})">✏️ Editar</button>
+      ${d.principal ? '' : `<button class="btn btn-secondary btn-chico" onclick="hacerPrincipalDir(${d.id})">⭐ Principal</button>`}
+      <button class="btn btn-secondary btn-chico" onclick="quitarDir(${d.id})">🗑 Quitar</button>
+    </div></div>`;
+}
+
+function htmlFormDir() {
+  const f = dirForm;
+  const campo = (k, etq, ph, extra) => `<div class="campo" ${extra || ''}><label for="df_${k}">${etq}</label><input type="text" id="df_${k}" value="${escapar(f[k] || '')}" placeholder="${escapar(ph || '')}" oninput="dirForm.${k} = this.value"></div>`;
+  return `<div class="dir-form" id="dirFormulario">
+    <b>${f.id === null ? '＋ Nueva dirección' : '✏️ Editar dirección'}</b>
+    ${campo('calle', 'Calle y número *', 'Av. Patria 1234')}
+    <div class="tres">${campo('colonia', 'Colonia', 'Jardines Universidad')}${campo('ciudad', 'Ciudad', 'Zapopan')}${campo('cp', 'C.P.', '45110')}</div>
+    <div class="dos">${campo('alias', 'Nombre de la dirección', 'Casa, Trabajo…')}
+      <div class="campo"><label for="df_zona">Zona de envío</label><select id="df_zona" onchange="dirForm.zona_id = this.value ? Number(this.value) : null">
+        <option value="">Sin zona</option>${(zonas || []).map(z => `<option value="${z.id}" ${f.zona_id === z.id ? 'selected' : ''}>${escapar(z.nombre)} · ${dinero(z.costo)}</option>`).join('')}</select></div></div>
+    ${campo('referencias', 'Referencias para el repartidor', 'Portón negro, esquina con Av. Aviación. Tocar el timbre.')}
+    <div class="campo"><label for="df_ubicacion">📍 Ubicación exacta (opcional, pero ayuda mucho)</label>
+      <input type="text" id="df_ubicacion" value="${escapar(f.ubicacion || '')}" placeholder="Pega aquí la ubicación que mandó el cliente por WhatsApp o un enlace de Google Maps" oninput="cambiarUbicDir(this.value)">
+      <div class="dir-estado" id="dfEstado"></div></div>
+    <label style="display:flex; gap:8px; align-items:center; font-size:13.5px;"><input type="checkbox" ${f.principal ? 'checked' : ''} onchange="dirForm.principal = this.checked"> Es la dirección principal de este cliente</label>
+    <div class="dir-btns"><button class="btn btn-primary btn-chico" onclick="guardarDir()">💾 Guardar dirección</button><button class="btn btn-secondary btn-chico" onclick="cerrarFormDir()">Cancelar</button></div>
+  </div>`;
+}
+
+function estadoUbicDir() {
+  const e = document.getElementById('dfEstado');
+  if (!e || !dirForm) return;
+  const f = dirForm;
+  e.className = 'dir-estado';
+  if (UBICACION.tieneCoordenadas(f)) { e.classList.add('ok'); e.textContent = `✔ Ubicación exacta leída (${f.latitud}, ${f.longitud})`; }
+  else if (f.ubicacion_enlace) e.textContent = 'Se guarda el enlace para que el repartidor lo abra. Si pegas las coordenadas, Waze navega directo.';
+  else if ((f.ubicacion || '').trim()) { e.classList.add('mal'); e.textContent = 'No pude leer una ubicación ahí. Pega el enlace de Google Maps o las coordenadas (ej. 20.6736, -103.3440).'; }
+  else e.textContent = 'Sin ubicación exacta: Waze y Maps buscarán la dirección escrita.';
+}
+
+function cambiarUbicDir(v) {
+  const f = dirForm, t = String(v || '').trim();
+  f.ubicacion = v;
+  const c = UBICACION.extraerCoordenadas(t);
+  f.latitud = c ? c.latitud : null; f.longitud = c ? c.longitud : null;
+  f.ubicacion_enlace = /^https?:\/\//i.test(t) ? t.slice(0, 500) : null;
+  estadoUbicDir();
+}
+
+function abrirFormDir(id) {
+  if (id === null) {
+    dirForm = { id: null, alias: '', calle: '', colonia: '', cp: '', ciudad: '', referencias: '', ubicacion: '', latitud: null, longitud: null, ubicacion_enlace: null, zona_id: null, principal: direcciones.length === 0 };
+  } else {
+    const d = direcciones.find(x => x.id === id);
+    if (!d) return;
+    const exacta = UBICACION.tieneCoordenadas(d);
+    dirForm = {
+      id: d.id, alias: d.alias || '', calle: d.calle || '', colonia: d.colonia || '', cp: d.cp || '', ciudad: d.ciudad || '', referencias: d.referencias || '',
+      ubicacion: d.ubicacion_enlace || (exacta ? `${Number(d.latitud)}, ${Number(d.longitud)}` : ''),
+      latitud: exacta ? Number(d.latitud) : null, longitud: exacta ? Number(d.longitud) : null, ubicacion_enlace: d.ubicacion_enlace || null,
+      zona_id: d.zona_id || null, principal: !!d.principal
+    };
+  }
+  pintarDirecciones();
+  estadoUbicDir();
+  const el = document.getElementById('dirFormulario');
+  if (el) { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); const i = document.getElementById('df_calle'); if (i) i.focus({ preventScroll: true }); }
+}
+
+function cerrarFormDir() { dirForm = null; pintarDirecciones(); }
+
+function cuerpoDir(f) {
+  return {
+    alias: (f.alias || '').trim(), calle: (f.calle || '').trim(), colonia: (f.colonia || '').trim(), cp: (f.cp || '').trim(), ciudad: (f.ciudad || '').trim(),
+    referencias: (f.referencias || '').trim(), latitud: f.latitud, longitud: f.longitud, ubicacion_enlace: f.ubicacion_enlace, zona_id: f.zona_id, principal: !!f.principal
+  };
+}
+
+async function guardarDir() {
+  const f = dirForm;
+  if (!f) return;
+  if (!(f.calle || '').trim()) { mostrarToast('Escribe la calle y número', 'error'); return; }
+  try {
+    const url = f.id === null ? `/clientes/${clienteId}/direcciones` : `/clientes/${clienteId}/direcciones/${f.id}`;
+    await apiFetch(url, { method: f.id === null ? 'POST' : 'PUT', body: JSON.stringify(cuerpoDir(f)) });
+    mostrarToast('Dirección guardada', 'exito');
+    dirForm = null;
+    await cargarDirecciones(clienteId);
+    pintarDirecciones();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function hacerPrincipalDir(id) {
+  const d = direcciones.find(x => x.id === id);
+  if (!d) return;
+  try {
+    await apiFetch(`/clientes/${clienteId}/direcciones/${id}`, { method: 'PUT', body: JSON.stringify({ ...cuerpoDir(d), latitud: UBICACION.tieneCoordenadas(d) ? Number(d.latitud) : null, longitud: UBICACION.tieneCoordenadas(d) ? Number(d.longitud) : null, principal: true }) });
+    mostrarToast('Ahora es la dirección principal', 'exito');
+    await cargarDirecciones(clienteId);
+    pintarDirecciones();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+}
+
+async function quitarDir(id) {
+  if (!(await confirmarAccion('¿Quitar esta dirección? Los pedidos que ya se hicieron no cambian.'))) return;
+  try {
+    await apiFetch(`/clientes/${clienteId}/direcciones/${id}`, { method: 'DELETE' });
+    mostrarToast('Dirección quitada', 'exito');
+    await cargarDirecciones(clienteId);
+    pintarDirecciones();
   } catch (err) {
     mostrarToast(err.message, 'error');
   }

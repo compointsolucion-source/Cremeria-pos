@@ -17,7 +17,7 @@ router.use(verificarToken, requiereSucursalId);
 router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador
+      `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador, telefono
        FROM usuarios WHERE sucursal_id = $1 ORDER BY creado_en ASC`,
       [req.sucursalId]
     );
@@ -37,11 +37,11 @@ router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'),
 // Crear un nuevo empleado
 router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    const { nombre, usuario, password, rol } = req.body;
+    const { nombre, usuario, password, rol, telefono } = req.body;
     if (!nombre || !usuario || !password || !rol) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
-    if (!['gerente', 'cajero', 'mostrador'].includes(rol)) {
+    if (!['gerente', 'cajero', 'mostrador', 'repartidor'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
     if (password.length < 6) {
@@ -51,10 +51,10 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo)
-       VALUES ($1, $2, $3, $4, $5, true)
-       RETURNING id, nombre, usuario, rol, activo, creado_en`,
-      [req.sucursalId, nombre, usuario, passwordHash, rol]
+      `INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo, telefono)
+       VALUES ($1, $2, $3, $4, $5, true, $6)
+       RETURNING id, nombre, usuario, rol, activo, creado_en, telefono`,
+      [req.sucursalId, nombre, usuario, passwordHash, rol, telefono ? String(telefono).slice(0, 20) : null]
     );
 
     await registrarBitacora(pool, {
@@ -76,8 +76,8 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
 // Editar nombre/rol/activo/permisos de un empleado (dueño/gerente)
 router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    const { nombre, rol, activo, permisos, nombre_mostrador } = req.body;
-    if (rol && !['gerente', 'cajero', 'mostrador'].includes(rol)) {
+    const { nombre, rol, activo, permisos, nombre_mostrador, telefono } = req.body;
+    if (rol && !['gerente', 'cajero', 'mostrador', 'repartidor'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
 
@@ -93,10 +93,12 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
         rol = COALESCE($2, rol),
         activo = COALESCE($3, activo),
         permisos = COALESCE(permisos, '{}'::jsonb) || COALESCE($4::jsonb, '{}'::jsonb),
-        nombre_mostrador = CASE WHEN $7::boolean THEN $8 ELSE nombre_mostrador END
+        nombre_mostrador = CASE WHEN $7::boolean THEN $8 ELSE nombre_mostrador END,
+        telefono = CASE WHEN $9::boolean THEN $10 ELSE telefono END
        WHERE id = $5 AND sucursal_id = $6
-       RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador`,
-      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.sucursalId, nombre_mostrador !== undefined, nombre_mostrador || null]
+       RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador, telefono`,
+      [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.sucursalId, nombre_mostrador !== undefined, nombre_mostrador || null,
+       telefono !== undefined, telefono ? String(telefono).slice(0, 20) : null]
     );
 
     await registrarBitacora(pool, {

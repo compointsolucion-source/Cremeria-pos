@@ -78,7 +78,15 @@ const VALORES_POR_DEFECTO = {
   // importe ya calculado en pesos (2 decimales implícitos). Es política de
   // negocio (debe coincidir con cómo está configurada la báscula física),
   // por eso vive aquí y no en localStorage.
-  bascula_tipo_dato: 'peso'
+  bascula_tipo_dato: 'peso',
+  // Pedidos a domicilio: envío gratis desde cierto monto (0 = nunca), minutos de anticipación para
+  // avisar que hay que preparar un pedido programado, hora en que se generan los pedidos fijos de
+  // mañana, y si el repartidor debe tomar foto / pedir firma al entregar.
+  pedidos_envio_gratis_desde: 0,
+  pedidos_min_preparacion: 30,
+  pedidos_hora_aviso_fijos: '18:00',
+  pedidos_foto_obligatoria: false,
+  pedidos_firma_obligatoria: false
 };
 
 // Campos cuyo valor es un objeto/arreglo (columna JSONB) — el driver de
@@ -136,7 +144,10 @@ const VALIDACIONES = {
   promos_intervalo_segundos: validarIntervaloPromos,
   etiqueta_modo: (v) => ['auto', 'sistema'].includes(v) || 'Modo de etiqueta inválido',
   ancho_etiqueta: (v) => ['40mm', '50mm', '58mm'].includes(v) || 'Ancho de etiqueta inválido',
-  bascula_tipo_dato: (v) => ['peso', 'precio'].includes(v) || 'Tipo de dato de báscula inválido'
+  bascula_tipo_dato: (v) => ['peso', 'precio'].includes(v) || 'Tipo de dato de báscula inválido',
+  pedidos_envio_gratis_desde: (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1000000) || 'El monto para envío gratis debe ser 0 o más (0 = sin envío gratis)',
+  pedidos_min_preparacion: (v) => (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 1440) || 'Los minutos de preparación deben ser un número entre 0 y 1440',
+  pedidos_hora_aviso_fijos: (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v)) || 'La hora debe verse así: 18:00'
 };
 
 // Obtener la configuración de la sucursal (valores por defecto si no existe)

@@ -18,6 +18,7 @@
   .rol-gerente { background: #1565C0; }
   .rol-cajero { background: #5FAE46; }
   .rol-mostrador { background: #6A1B9A; }
+  .rol-repartidor { background: #EF6C00; }
   .fila .info b { overflow-wrap: anywhere; }
   .perfil { display: flex; align-items: center; gap: 12px; }
   .perfil b { display: block; font-size: 17px; }
@@ -84,8 +85,8 @@
 <script>
 requiereLogin();
 
-const rolNombres = { jefe_general: 'Jefe general', dueno: 'Dueño', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador' };
-const ROLES_EDITABLES = ['mostrador', 'cajero', 'gerente'];
+const rolNombres = { jefe_general: 'Jefe general', dueno: 'Dueño', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador', repartidor: 'Repartidor' };
+const ROLES_EDITABLES = ['mostrador', 'cajero', 'gerente', 'repartidor'];
 const esDueno = (u) => u.rol === 'dueno' || u.rol === 'jefe_general';
 
 // Agrupados por tema, solo para que se vean ordenados en pantalla — el
@@ -157,6 +158,7 @@ function pintarLista() {
   cont.innerHTML = visibles.map((u) => {
     const partes = ['@' + escapar(u.usuario)];
     if (u.nombre_mostrador) partes.push('mostrador: <strong>' + escapar(u.nombre_mostrador) + '</strong>');
+    if (u.rol === 'repartidor' && u.telefono) partes.push('📞 ' + escapar(u.telefono));
     if (!u.activo) partes.push('desactivado');
     return `<div class="fila ${modo === 'editar' && selId === u.id ? 'sel' : ''} ${u.activo ? '' : 'apagada'}" onclick="seleccionar(${u.id})">
       <div class="avatar" style="background:${colorDe(u.nombre)}">${escapar(iniciales(u.nombre))}</div>
@@ -198,6 +200,17 @@ function pintarPanel() {
     return;
   }
   const efectivos = u.permisos_efectivos || [];
+  const esRepartidor = u.rol === 'repartidor';
+  const enlaceRepartidor = new URL('../repartidor.html', location.href).href;
+  const bloqueRepartidor = `
+    <div class="campo"><label for="telefonoRepartidor">Teléfono del repartidor</label>
+      <input type="tel" id="telefonoRepartidor" value="${escapar(u.telefono || '')}" placeholder="Ej. 33 1234 5678" maxlength="20" inputmode="tel" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarTelefono(${u.id}, this)">
+      <div class="ayuda">Sirve para que la tienda le mande el pedido por WhatsApp y para saber a quién llamar.</div></div>
+    <div class="aviso azul">🛵 <b>Este usuario solo ve su pantalla de entregas</b> (sus pedidos, Waze / Google Maps, cobro y su corte). No puede entrar al resto del sistema, por eso no tiene permisos que ajustar.
+      <br>Dirección para abrir en su celular:
+      <div style="display:flex; gap:6px; margin-top:6px; align-items:center;"><input type="text" readonly value="${escapar(enlaceRepartidor)}" style="min-height:36px; font-size:13px;" onclick="this.select()">
+        <button class="btn btn-secondary" style="min-height:36px; padding:4px 12px;" onclick="copiarEnlaceRepartidor()">Copiar</button></div>
+      <div class="ayuda" style="margin-top:6px;">Necesita internet en su celular. Recomiéndale abrirla y elegir «Agregar a pantalla de inicio».</div></div>`;
   cuerpo.innerHTML = perfil + `
     <div class="bloque blanco"><div class="interruptor-fila">
       <div><b>Cuenta activa</b><small>Si la apagas, ya no podrá entrar</small></div>
@@ -205,6 +218,7 @@ function pintarPanel() {
     </div></div>
     <div class="campo"><label>Rol</label>
       <div class="seg">${ROLES_EDITABLES.map((r) => `<button class="${u.rol === r ? 'activo' : ''}" onclick="elegirRol(${u.id}, '${r}')">${rolNombres[r]}</button>`).join('')}</div></div>
+    ${esRepartidor ? bloqueRepartidor : `
     <div class="campo"><label for="mostradorNombre">Nombre que aparece en el mostrador</label>
       <input type="text" id="mostradorNombre" value="${escapar(u.nombre_mostrador || '')}" placeholder="Ej. Mostrador 1" maxlength="40" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarMostrador(${u.id}, this)">
       <div class="ayuda">Cuando esta persona inicie sesión en cualquier computadora, el sistema ya sabe cuál mostrador es. Déjalo vacío para quitarlo.</div></div>
@@ -216,7 +230,7 @@ function pintarPanel() {
         <div class="grupo-cuerpo">${claves.map((c) => `<label class="perm"><span>${escapar(ETIQUETAS_PERMISOS[c])}</span>
           <input type="checkbox" class="interruptor" ${efectivos.includes(c) ? 'checked' : ''} onchange="alternarPermiso(${u.id}, '${c}', this.checked, this)"></label>`).join('')}</div>
       </div>`;
-    }).join('')}`;
+    }).join('')}`}`;
   pie.style.display = '';
   pie.innerHTML = `<button class="btn btn-secondary btn-grande" onclick="restablecerPassword(${u.id})">🔑 Restablecer contraseña</button>`;
 }
@@ -246,13 +260,40 @@ function pintarNuevo(cab, cuerpo, pie) {
     <div class="campo"><label for="passwordEmpleado">Contraseña</label><input type="password" id="passwordEmpleado" placeholder="Mínimo 6 caracteres" autocomplete="new-password" onkeydown="if (event.key === 'Enter') crearEmpleado()"></div>
     <div class="campo"><label>Rol</label>
       <div class="seg">${ROLES_EDITABLES.map((r) => `<button class="${rolNuevo === r ? 'activo' : ''}" onclick="elegirRolNuevo('${r}', this)">${rolNombres[r]}</button>`).join('')}</div></div>
-    <div class="aviso azul">Después de guardarlo podrás ajustar sus permisos y su mostrador.</div>`;
+    <div class="campo" id="campoTelefonoNuevo" style="display:${rolNuevo === 'repartidor' ? '' : 'none'}"><label for="telefonoEmpleado">Teléfono del repartidor</label>
+      <input type="tel" id="telefonoEmpleado" placeholder="Ej. 33 1234 5678" maxlength="20" inputmode="tel" autocomplete="off"></div>
+    <div class="aviso azul" id="avisoNuevo">${rolNuevo === 'repartidor' ? textoAvisoRepartidor : textoAvisoNuevo}</div>`;
   pie.style.display = '';
   pie.innerHTML = '<button class="btn btn-primary btn-grande" id="btnCrear" onclick="crearEmpleado()">Guardar empleado</button>';
 }
+const textoAvisoNuevo = 'Después de guardarlo podrás ajustar sus permisos y su mostrador.';
+const textoAvisoRepartidor = '🛵 El repartidor entra con su usuario y contraseña desde su celular y solo ve sus entregas. Después de guardarlo te damos la dirección para su celular.';
 function elegirRolNuevo(rol, boton) {
   rolNuevo = rol;
   boton.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('activo', b === boton));
+  document.getElementById('campoTelefonoNuevo').style.display = rol === 'repartidor' ? '' : 'none';
+  document.getElementById('avisoNuevo').textContent = rol === 'repartidor' ? textoAvisoRepartidor : textoAvisoNuevo;
+}
+
+async function guardarTelefono(id, campo) {
+  const u = buscar(id);
+  const nuevo = campo.value.trim();
+  if (u && (u.telefono || '') === nuevo) return;
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ telefono: nuevo }) });
+    if (u) u.telefono = nuevo;
+    mostrarToast(nuevo ? 'Teléfono guardado' : 'Teléfono quitado', 'exito');
+    pintarLista();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    campo.value = (u && u.telefono) || '';
+  }
+}
+
+async function copiarEnlaceRepartidor() {
+  const enlace = new URL('../repartidor.html', location.href).href;
+  try { await navigator.clipboard.writeText(enlace); mostrarToast('Dirección copiada', 'exito'); }
+  catch (e) { mostrarToast('Mantén presionada la dirección para copiarla', 'info'); }
 }
 
 // ---------- Acciones ----------
@@ -265,7 +306,9 @@ async function crearEmpleado() {
   const btn = document.getElementById('btnCrear');
   btn.disabled = true;
   try {
-    const creado = await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify({ nombre, usuario, password, rol: rolNuevo }) });
+    const cuerpoNuevo = { nombre, usuario, password, rol: rolNuevo };
+    if (rolNuevo === 'repartidor') cuerpoNuevo.telefono = (document.getElementById('telefonoEmpleado').value || '').trim();
+    const creado = await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify(cuerpoNuevo) });
     mostrarToast('Empleado guardado', 'exito');
     equipo = await apiFetch('/usuarios');
     const nuevo = (creado && creado.id && buscar(creado.id)) || equipo.find((u) => u.usuario === usuario);

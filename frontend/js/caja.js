@@ -32,6 +32,8 @@ const socket = io(API_URL.replace('/api', ''));
 socket.emit('unirse_sucursal', usuario.sucursal_id);
 socket.on('nuevo_ticket', () => cargarBandeja());
 socket.on('ticket_pagado', () => cargarBandeja());
+// Un pedido que pasó de "programado" a "preparando" (o que regresó de "no entregado") aparece en la bandeja.
+socket.on('pedido_actualizado', () => cargarBandeja());
 
 // Cancela un ticket que aún está pendiente de pago — para cuando el
 // cliente ya no lo requiere. Antes de cancelar, pide el motivo con
@@ -92,10 +94,16 @@ async function cargarBandeja() {
 
       const textoEspera = minutosEspera <= 0 ? 'Hace un momento' : `Hace ${minutosEspera} min`;
 
+      // Si el ticket viene de un pedido (para recoger o a domicilio), se marca para que el cajero lo distinga.
+      const quien = String(t.pedido_contacto || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const marcaPedido = t.pedido_id
+        ? `<br><small style="display:inline-block; margin-top:2px; padding:1px 7px; border-radius:8px; font-weight:700; background:rgba(21,101,192,.16);">${t.pedido_tipo === 'recoger' ? '🏪 Recoge' : '🛵 Domicilio'}${quien ? ' · ' + quien : ''}</small>`
+        : '';
+
       const div = document.createElement('div');
       div.className = `ticket-pendiente ${claseEspera}`;
       div.innerHTML = `
-        <span><b>${t.folio}</b><br><small>${textoEspera}</small></span>
+        <span><b>${t.folio}</b>${marcaPedido}<br><small>${textoEspera}</small></span>
         <span style="display:flex; align-items:center; gap:10px;">
           $${parseFloat(t.total).toFixed(2)}
           <button class="btn-cancelar-ticket-pendiente" title="Cancelar (el cliente ya no lo requiere)" data-id="${t.id}" data-folio="${t.folio}">✕</button>
