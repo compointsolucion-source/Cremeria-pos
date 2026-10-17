@@ -10,6 +10,7 @@ const { iniciarPostgres } = require('./postgres');
 const { baseVacia, crearNegocio } = require('./negocio');
 const { crearGestor, restaurarRespaldo } = require('./respaldos');
 const { crearSincronizador, resolverApi, vincularConUsuario } = require('./sync');
+const { idDeEquipo, rutasMarcas } = require('./equipo');
 
 const PUERTO_WEB = 3000;
 const PUERTO_PG = 54329;
@@ -91,6 +92,9 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
   process.env.COMPOINT_EQUIPO = os.hostname();
   process.env.FRONTEND_DIR = path.join(dirServidor, 'frontend');
   process.env.MAX_SUCURSALES = String(cfg.max_sucursales || 1);
+  // Licencia: identificador de ESTA computadora (liga el código de activación) y marcas de la prueba de 30 días.
+  process.env.COMPOINT_ID_EQUIPO = idDeEquipo({ obtenerPropio: () => cfg.id_equipo, guardarPropio: (id) => guardarCfg({ id_equipo: id }) });
+  process.env.COMPOINT_MARCAS = JSON.stringify(rutasMarcas());
   const nubeActual = () => { const n = cfg.nube || {}; let secreto = ''; try { secreto = n.api_secret_cifrado ? descifrar(n.api_secret_cifrado) : (n.api_secret || ''); } catch (e) { secreto = ''; } return { cloud_name: n.cloud_name || '', api_key: n.api_key || '', api_secret: secreto }; };
   const nube = nubeActual();
   if (nube.cloud_name) { process.env.CLOUDINARY_CLOUD_NAME = nube.cloud_name; process.env.CLOUDINARY_API_KEY = nube.api_key || ''; process.env.CLOUDINARY_API_SECRET = nube.api_secret || ''; }

@@ -21,7 +21,7 @@ const { registrarBitacora } = require('../utils/bitacora');
 
 const router = express.Router();
 // sync_vinculo guarda la clave de ESTA nube: nunca se copia ni se vacía con el espejo.
-const EXCLUIDAS = new Set(['licencia', 'schema_migrations', 'sync_vinculo']);
+const EXCLUIDAS = new Set(['licencia', 'instalacion', 'schema_migrations', 'sync_vinculo']);
 const q = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 
 // ------------------------------------------------------------ autenticación

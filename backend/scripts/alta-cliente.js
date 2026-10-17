@@ -7,7 +7,8 @@
 // Uso:
 //   DATABASE_URL="postgresql://(base NUEVA del cliente)" node scripts/alta-cliente.js \
 //     --negocio "Cremería La Esperanza" --dueno "Juan Pérez" --usuario juan \
-//     --password "Clave-segura-123" [--sucursales 2] [--giro cremeria] [--licencia-meses 12] [--direccion "..."] [--telefono "..."]
+//     --password "Clave-segura-123" [--sucursales 2] [--giro cremeria] [--licencia-meses 12] [--demo] [--direccion "..."] [--telefono "..."]
+//   --demo  crea el sistema como PRUEBA de 30 días (en vez de la licencia de 12 meses).
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -82,17 +83,27 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localh
       for (let i = 0; i < GIROS[a.giro].length; i++) await c.query('INSERT INTO categorias (nombre, orden) VALUES ($1,$2)', [GIROS[a.giro][i], i + 1]);
     }
 
-    // Licencia (renta anual): por defecto 12 meses desde hoy. Con
-    // --licencia-meses 0 se crea SIN control de licencia.
+    // Licencia: por defecto 12 meses desde hoy; con --demo es una PRUEBA de 30 días
+    // (después queda en "solo consulta" hasta que se active con un código).
+    // Con --licencia-meses 0 se crea SIN control de licencia.
+    const esDemo = !!a.demo;
     const mesesLic = a['licencia-meses'] === undefined ? 12 : parseInt(a['licencia-meses'], 10);
-    if (mesesLic > 0) {
+    if (esDemo || mesesLic > 0) {
       await c.query(`CREATE TABLE IF NOT EXISTS licencia (
         id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
         cliente TEXT, fecha_inicio DATE NOT NULL, fecha_vencimiento DATE NOT NULL,
         actualizado_en TIMESTAMP NOT NULL DEFAULT NOW())`);
-      await c.query(`INSERT INTO licencia (id, cliente, fecha_inicio, fecha_vencimiento)
-        VALUES (1, $1, (NOW() AT TIME ZONE 'America/Mexico_City')::date,
-                (NOW() AT TIME ZONE 'America/Mexico_City')::date + ($2 || ' months')::interval)`, [a.negocio, String(mesesLic)]);
+      // columnas de tipo/plan/código (la migración 007 se puede correr más de una vez sin problema)
+      await c.query(fs.readFileSync(path.join(__dirname, '..', 'migrations', '007_licencia_demo.sql'), 'utf8'));
+      if (esDemo) {
+        await c.query(`INSERT INTO licencia (id, cliente, fecha_inicio, fecha_vencimiento, tipo, plan)
+          VALUES (1, $1, (NOW() AT TIME ZONE 'America/Mexico_City')::date,
+                  (NOW() AT TIME ZONE 'America/Mexico_City')::date + 30, 'demo', 'nube')`, [a.negocio]);
+      } else {
+        await c.query(`INSERT INTO licencia (id, cliente, fecha_inicio, fecha_vencimiento, tipo, plan)
+          VALUES (1, $1, (NOW() AT TIME ZONE 'America/Mexico_City')::date,
+                  (NOW() AT TIME ZONE 'America/Mexico_City')::date + ($2 || ' months')::interval, 'anual', 'nube')`, [a.negocio, String(mesesLic)]);
+      }
     }
     await c.query('COMMIT');
 
@@ -100,7 +111,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localh
     console.log(`Negocio: ${a.negocio}  (sucursal #${sucursalId})`);
     console.log(`Usuario: ${a.usuario} (${totalSucursales > 1 ? 'jefe_general: ve todas las sucursales' : 'dueño'}) - la contraseña es la que escribiste`);
     if (totalSucursales > 1) console.log(`Sucursal #1 creada. Las otras ${totalSucursales - 1} se crean desde el sistema (Sucursales) con este usuario.`);
-    console.log(mesesLic > 0 ? `Licencia: ${mesesLic} meses desde hoy (se bloquea al vencer; avisa 7 días antes)` : 'Licencia: SIN control');
+    if (esDemo) console.log('Licencia: PRUEBA de 30 días desde hoy (al terminar queda en "solo consulta" hasta activarla con un código)');
+    else console.log(mesesLic > 0 ? `Licencia: ${mesesLic} meses desde hoy (avisa 7 días antes; al vencer hay 5 días de gracia y luego "solo consulta")` : 'Licencia: SIN control');
     console.log('\n--- Variables de entorno para el backend en Render ---');
     console.log('DATABASE_URL=' + process.env.DATABASE_URL);
     console.log('JWT_SECRET=' + crypto.randomBytes(32).toString('hex'));

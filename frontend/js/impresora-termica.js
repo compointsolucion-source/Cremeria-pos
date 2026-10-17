@@ -810,6 +810,7 @@ function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
   if (negocio.nombre) lineas.push(centrar(negocio.nombre));
   if (negocio.direccion) lineas.push(centrar(negocio.direccion));
   if (negocio.telefono) lineas.push(centrar(`Tel: ${negocio.telefono}`));
+  if (ticketEsPrueba()) lineas.push(centrar(TEXTO_VERSION_PRUEBA));
   lineas.push(separador);
   lineas.push(`Folio: ${folio}`);
   lineas.push(`Fecha: ${fecha}`);
@@ -819,11 +820,16 @@ function formatearEncabezadoTicket({ ancho_ticket, negocio, folio, fecha }) {
 
 // Leyenda fija de Compoint al pie de TODOS los tickets (venta, reimpresión, devolución…).
 // Está escrita aquí a propósito: no se configura ni se puede quitar desde el sistema.
-const LEYENDA_COMPOINT = [
+const LEYENDA_COMPOINT_BASE = [
   'COMPOINT PUNTO - Venta y soporte del sistema',
   'WhatsApp 33 25 90 70 90',
   'www.compoint.com.mx'
 ];
+// Durante la prueba de 30 días TODOS los tickets llevan la leyenda «VERSIÓN DE PRUEBA»
+// (arriba, al pie y como marca de agua en la impresión del sistema). Se quita sola al activar la licencia.
+const TEXTO_VERSION_PRUEBA = '*** VERSIÓN DE PRUEBA ***';
+function ticketEsPrueba() { return typeof licenciaEsPrueba === 'function' && licenciaEsPrueba(); }
+function leyendaCompoint() { return ticketEsPrueba() ? [TEXTO_VERSION_PRUEBA, ...LEYENDA_COMPOINT_BASE] : LEYENDA_COMPOINT_BASE; }
 
 function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items, total, piePagina, textoLegal = '', incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null }) {
   const columnas = columnasForzadas || (ancho_ticket === '58mm' ? 32 : 48);
@@ -907,7 +913,7 @@ function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items
 function formatearTicket(datosTicket) {
   const cols = datosTicket.ancho_ticket === '58mm' ? 32 : 48;
   const centrarL = (t) => ' '.repeat(Math.max(0, Math.floor((cols - t.length) / 2))) + t;
-  return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket), '='.repeat(cols), ...LEYENDA_COMPOINT.map(centrarL), ''];
+  return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket), '='.repeat(cols), ...leyendaCompoint().map(centrarL), ''];
 }
 
 // Imprime un ticket completo (logo, nombre, datos, código del folio, productos,
@@ -979,6 +985,7 @@ async function imprimirTicketBLE(datosTicket) {
   if (d.negocio.telefono) datosNegocio.push(`Tel: ${d.negocio.telefono}`);
   if (d.negocio.rfc) datosNegocio.push(`RFC: ${d.negocio.rfc}`);
   datosNegocio.forEach(t => envolver(t, columnas).forEach(r => partes.push(linea(r))));
+  if (ticketEsPrueba()) partes.push(negritaOn, linea(TEXTO_VERSION_PRUEBA), negritaOff);
 
   // ---- Folio y fecha (alineados a la izquierda) ----
   const separador = '-'.repeat(columnas);
@@ -1060,7 +1067,7 @@ async function imprimirTicketBLE(datosTicket) {
 
   // ---- Leyenda fija de Compoint (negritas, centrada) ----
   partes.push(ESCPOS_CENTRAR, linea('='.repeat(columnas)), negritaOn);
-  LEYENDA_COMPOINT.forEach(t => envolver(t, columnas).forEach(r => partes.push(linea(r))));
+  leyendaCompoint().forEach(t => envolver(t, columnas).forEach(r => partes.push(linea(r))));
   partes.push(negritaOff, ESCPOS_IZQUIERDA);
 
   // ---- Cierre: espacio y corte ----
@@ -1107,6 +1114,8 @@ async function construirHtmlTicket(datosTicket) {
     .tk .nombre { font-weight: ${d.negocioNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.nombreTamano === 'grande' ? 1.9 : 1)).toFixed(1)}px; line-height: 1.15; margin: 2px 0; }
     .tk .total { display: flex; justify-content: space-between; font-weight: ${d.totalNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.totalTamano === 'grande' ? 1.6 : 1)).toFixed(1)}px; margin: 2px 0; }
     .tk img { display: block; margin: 4px auto; max-width: 100%; }
+    .tk { position: relative; overflow: hidden; }
+    .tk .marca-prueba { position: absolute; left: -20%; right: -20%; top: 38%; text-align: center; transform: rotate(-20deg); font-family: Arial, sans-serif; font-weight: 900; font-size: ${(fuentePx * 2.1).toFixed(1)}px; letter-spacing: 2px; color: rgba(0,0,0,.14); pointer-events: none; white-space: nowrap; }
   `;
 
   const partes = [];
@@ -1122,6 +1131,7 @@ async function construirHtmlTicket(datosTicket) {
   if (d.negocio.telefono) datosNegocio.push(`Tel: ${d.negocio.telefono}`);
   if (d.negocio.rfc) datosNegocio.push(`RFC: ${d.negocio.rfc}`);
   datosNegocio.forEach(t => partes.push(`<div class="c">${esc(t)}</div>`));
+  if (ticketEsPrueba()) partes.push(`<div class="c" style="font-weight:800;">${esc(TEXTO_VERSION_PRUEBA)}</div>`);
 
   const sep = '-'.repeat(columnas);
   partes.push(`<div class="l">${sep}\nFolio: ${esc(d.folio)}\nFecha: ${esc(d.fecha)}\n${sep}</div>`);
@@ -1177,7 +1187,9 @@ async function construirHtmlTicket(datosTicket) {
   }
 
   // Leyenda fija de Compoint (negritas, centrada)
-  partes.push(`<div class="c" style="font-weight:800; border-top:2px solid #000; margin-top:10px; padding-top:5px; line-height:1.35;">${LEYENDA_COMPOINT.map(esc).join('<br>')}</div>`);
+  partes.push(`<div class="c" style="font-weight:800; border-top:2px solid #000; margin-top:10px; padding-top:5px; line-height:1.35;">${leyendaCompoint().map(esc).join('<br>')}</div>`);
+
+  if (ticketEsPrueba()) partes.push('<div class="marca-prueba">VERSIÓN DE PRUEBA</div>');
 
   return { css, html: `<div class="tk">${partes.join('')}</div>` };
 }

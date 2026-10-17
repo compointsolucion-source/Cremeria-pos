@@ -1,28 +1,70 @@
-LICENCIA (RENTA ANUAL) - COMO FUNCIONA
-======================================
-- Cada cliente tiene UNA fila en la tabla "licencia" de SU base de datos (Neon).
-- 7 dias antes de vencer: barra amarilla arriba en todas las pantallas.
-- Al pasar la fecha de vencimiento: pantalla "Licencia vencida" y el login se
-  bloquea. Los datos NO se borran.
-- Hasta 1 minuto despues de renovar/cambiar la fecha ya funciona de nuevo.
-- Sin fila en la tabla = sin control (tu sistema propio y el demo).
+LICENCIA (PRUEBA DE 30 DIAS, RENTA ANUAL O PERMANENTE) - COMO FUNCIONA
+=====================================================================
+Cada instalacion tiene UNA fila en la tabla "licencia" de SU base de datos.
+Hay tres tipos:
+  - prueba (demo): 30 dias con el sistema COMPLETO. Al terminar queda en
+    "solo consulta" (ver abajo) hasta que se active con un codigo.
+  - anual: vence en la fecha del codigo.
+  - permanente: no vence.
+Y dos planes: "local" (sin nube) y "nube" (con servicio en la nube).
 
-Todo se maneja en el SQL Editor de Neon del cliente:
+QUE VE EL CLIENTE
+  - Prueba: barra con los dias que le quedan (verde; naranja los ultimos 7)
+    y la leyenda "VERSION DE PRUEBA" en los tickets.
+  - 7 dias antes de vencer: barra naranja con el aviso.
+  - Despues de vencer: 5 DIAS DE GRACIA (la licencia de pago sigue vendiendo
+    normal, con barra roja). La prueba NO tiene gracia.
+  - Pasada la gracia: "SOLO CONSULTA". Puede entrar, ver reportes, ver su
+    inventario, exportar y respaldar su informacion, cerrar el turno abierto.
+    NO puede registrar ventas ni cambios. Los datos NUNCA se borran.
+  - Con un codigo nuevo (Configuracion -> Licencia) todo vuelve al instante.
+
+CODIGOS DE ACTIVACION (funcionan SIN internet)
+  - Los crea el "Activador Compoint" en tu computadora. Son una firma:
+    nadie puede fabricar uno ni cambiarle la fecha sin que el programa lo note.
+  - Cada codigo va ligado al "ID del equipo" (aparece en Configuracion ->
+    Licencia, tipo 7KQ2-9XMA-4TPL). Si el cliente cambia de computadora o
+    reinstala el sistema en otra, necesita un codigo nuevo con su ID nuevo.
+  - Lleva: tipo, plan, cuantas sucursales, fecha de emision y de vencimiento.
+    El tope de sucursales sale del codigo (ya no hay que tocar MAX_SUCURSALES).
+  - Cuando una licencia se activo con codigo, los datos salen DEL CODIGO: si
+    alguien cambia las columnas de la tabla a mano, no sirve de nada.
+  - Hasta que pongas tu llave publica en backend/utils/licencia-clave-publica.js
+    el sistema NO acepta codigos (la prueba de 30 dias si funciona).
+
+SIN FILA EN LA TABLA
+  - En la nube (Render): SIN CONTROL (tu sistema propio, demos manuales).
+  - En una computadora de cliente (servidor local): empieza sola la prueba
+    de 30 dias, y deja marcas en la computadora para que reinstalar no la reinicie.
+  - Limite conocido: no es a prueba de todo. Borrar la base de datos Y las
+    marcas reinicia la prueba, y se puede repetir en otra computadora.
+
+CANDADO DEL RELOJ (solo servidor local)
+  Si alguien atrasa la fecha de la computadora, el sistema se queda con la
+  fecha mas reciente que ya vio (y con la de la ultima venta). Se avisa en
+  Configuracion -> Licencia que la fecha esta atrasada.
+
+CLIENTE EN LA NUBE (Neon): todo se puede ver/manejar en el SQL Editor de Neon:
 
 VER ESTADO
-  SELECT * FROM licencia;
+  SELECT tipo, plan, cliente, fecha_inicio, fecha_vencimiento, max_sucursales, (codigo_activacion IS NOT NULL) AS con_codigo FROM licencia;
 
-RENOVAR 1 ANO MAS (suma 12 meses a la fecha de vencimiento actual)
-  UPDATE licencia SET fecha_vencimiento = fecha_vencimiento + INTERVAL '12 months', actualizado_en = NOW();
-
+RENOVAR 1 ANO MAS (solo filas SIN codigo; suma 12 meses a la fecha actual)
+  UPDATE licencia SET fecha_vencimiento = fecha_vencimiento + INTERVAL '12 months', actualizado_en = NOW() WHERE codigo_activacion IS NULL;
   Si ya estaba vencida hace tiempo y quieres contar desde hoy:
-  UPDATE licencia SET fecha_inicio = CURRENT_DATE, fecha_vencimiento = CURRENT_DATE + INTERVAL '12 months', actualizado_en = NOW();
+  UPDATE licencia SET fecha_inicio = CURRENT_DATE, fecha_vencimiento = CURRENT_DATE + INTERVAL '12 months', actualizado_en = NOW() WHERE codigo_activacion IS NULL;
+  (Si tiene codigo, renueva con un codigo nuevo del Activador.)
 
 SUSPENDER AHORA (por falta de pago)
-  UPDATE licencia SET fecha_vencimiento = CURRENT_DATE - 1, actualizado_en = NOW();
+  UPDATE licencia SET fecha_vencimiento = CURRENT_DATE - 6, actualizado_en = NOW() WHERE codigo_activacion IS NULL;
+  (queda en "solo consulta" de inmediato; con -1 quedaria en los 5 dias de gracia)
+
+PASAR UNA PRUEBA A ANUAL SIN CODIGO (solo en la nube, tu propia base)
+  UPDATE licencia SET tipo = 'anual', fecha_vencimiento = CURRENT_DATE + INTERVAL '12 months', actualizado_en = NOW();
 
 QUITAR EL CONTROL
   DELETE FROM licencia;
 
-CLIENTE NUEVO: alta-cliente.js crea la licencia de 12 meses automaticamente
-(o --licencia-meses N; con 0 queda sin control).
+CLIENTE NUEVO: alta-cliente.js crea la licencia de 12 meses automaticamente.
+  --licencia-meses N  otra duracion (con 0 queda sin control)
+  --demo              crea el sistema como PRUEBA de 30 dias

@@ -1,67 +1,60 @@
-// Control de licencia (renta anual) de ESTA instalación.
+// Control de licencia de ESTA instalación (prueba de 30 días, renta anual o permanente).
+// La lógica de los estados vive en utils/licencia.js; aquí solo se aplica a cada petición.
 //
-// - Si la tabla "licencia" no tiene ninguna fila, NO hay control (así tu
-//   propio sistema, el demo y las instalaciones sin renta no se ven afectados).
-// - Si hay fila: al pasar fecha_vencimiento (inclusive ese día) el sistema se
-//   bloquea con código 402 y un mensaje claro. Desde 7 días antes, cada
-//   respuesta lleva el encabezado X-Licencia-Dias para que la pantalla
-//   muestre el aviso.
-// - Si la base de datos falla al consultar, NO se bloquea (nunca dejar a un
-//   cliente sin sistema por un error técnico nuestro).
-// Para renovar: ver backend/scripts/LEEME-LICENCIA.txt
-const pool = require('../db');
+// - Sin fila en la tabla "licencia" y en la nube: NO hay control (tu sistema propio).
+// - En cada respuesta lleva encabezados para que la pantalla muestre su barra de aviso:
+//     X-Licencia-Estado  demo | por_vencer | gracia | solo_consulta   (no se manda si todo está normal)
+//     X-Licencia-Tipo    demo | anual | permanente
+//     X-Licencia-Dias    días que faltan (negativo si ya venció)
+//     X-Licencia-Vence   fecha de vencimiento
+// - "solo_consulta" (venció y se acabó la gracia): se puede entrar, ver reportes y respaldar,
+//   pero las peticiones que registran o cambian algo se rechazan con 402.
+// - Si la base de datos falla al consultar, NO se bloquea.
+// Para renovar o cambiar algo: ver backend/scripts/LEEME-LICENCIA.txt
+const licencia = require('../utils/licencia');
 
-const DIAS_AVISO = 7;
-const CACHE_MS = 60 * 1000;
-let cache = { t: 0, valor: null };
+// Lo que SÍ se puede hacer aun en "solo consulta" (aunque cambie datos).
+const PERMITIDAS_EN_SOLO_CONSULTA = [
+  /^\/api\/auth\//,                 // iniciar y cerrar sesión, cambiar contraseña
+  /^\/api\/licencia(\/|$)/,         // meter el código de activación, pedir contratar
+  /^\/api\/turnos\/\d+\/cerrar$/,   // cerrar el turno que estaba abierto
+  /^\/api\/facturacion\/publico\//  // la página pública para pedir factura
+];
 
-async function asegurarTabla() {
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS licencia (
-      id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-      cliente TEXT,
-      fecha_inicio DATE NOT NULL,
-      fecha_vencimiento DATE NOT NULL,
-      actualizado_en TIMESTAMP NOT NULL DEFAULT NOW()
-    )`);
-  } catch (err) {
-    console.error('No se pudo asegurar la tabla licencia:', err.message);
-  }
-}
+function rutaSinParametros(req) { return String(req.originalUrl || req.url || '').split('?')[0]; }
 
-async function estadoLicencia() {
-  if (Date.now() - cache.t < CACHE_MS) return cache.valor;
-  let valor = null; // null = sin control de licencia
-  try {
-    const r = await pool.query(
-      `SELECT to_char(fecha_vencimiento,'YYYY-MM-DD') AS vence,
-              (fecha_vencimiento - (NOW() AT TIME ZONE 'America/Mexico_City')::date) AS dias
-       FROM licencia WHERE id = 1`);
-    if (r.rows.length) valor = { vence: r.rows[0].vence, dias: Number(r.rows[0].dias) };
-  } catch (err) {
-    return cache.valor; // ante error, conserva lo último conocido (o sin control)
-  }
-  cache = { t: Date.now(), valor };
-  return valor;
+function esEscritura(req) { return !['GET', 'HEAD', 'OPTIONS'].includes(req.method); }
+
+function ponerEncabezados(res, est) {
+  if (est.estado === 'activa') return; // todo normal: sin barra
+  res.set('X-Licencia-Estado', est.estado);
+  res.set('X-Licencia-Tipo', est.tipo);
+  if (est.dias != null) res.set('X-Licencia-Dias', String(est.dias));
+  if (est.vence) res.set('X-Licencia-Vence', est.vence);
 }
 
 async function verificarLicencia(req, res, next) {
   if (req.method === 'OPTIONS') return next();
   // Cerrar sesión siempre debe poder hacerse.
   if (req.originalUrl.startsWith('/api/auth/logout')) return next();
-  const est = await estadoLicencia();
-  if (!est) return next();
-  if (est.dias < 0) {
-    return res.status(402).json({
-      error: 'Licencia vencida el ' + est.vence + '. Para renovar, comunícate con Compoint: WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx',
-      licencia_vencida: true
-    });
-  }
-  if (est.dias <= DIAS_AVISO) {
-    res.set('X-Licencia-Dias', String(est.dias));
-    res.set('X-Licencia-Vence', est.vence);
+  let est;
+  try { est = await licencia.estado(); } catch (e) { return next(); }
+  if (!est || !est.control) return next();
+
+  ponerEncabezados(res, est);
+
+  if (est.solo_consulta && esEscritura(req)) {
+    const ruta = rutaSinParametros(req);
+    if (!PERMITIDAS_EN_SOLO_CONSULTA.some((re) => re.test(ruta))) {
+      return res.status(402).json({
+        error: est.mensaje,
+        licencia_vencida: true,
+        solo_consulta: true,
+        tipo: est.tipo
+      });
+    }
   }
   next();
 }
 
-module.exports = { verificarLicencia, asegurarTabla };
+module.exports = { verificarLicencia, PERMITIDAS_EN_SOLO_CONSULTA };

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Licencia - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
+<script src="../js/tema.js"></script>
+<style>
+  [hidden] { display: none !important; }
+  .rejilla { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .rejilla > * { min-width: 0; }
+  .tarjeta { padding: 18px; }
+  .tarjeta + .tarjeta { margin-top: 14px; }
+  .tarjeta h3 { font-size: 15.5px; margin-bottom: 4px; }
+  .nota { font-size: 12.5px; color: var(--muted, #7A7D83); line-height: 1.45; }
+
+  .lic-etq { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 800; letter-spacing: .03em; }
+  .e-demo { background: rgba(249,168,37,.22); color: #7a5200; }
+  .e-ok { background: rgba(95,174,70,.2); color: #2e7d32; }
+  .e-aviso { background: rgba(245,124,0,.2); color: #9a5200; }
+  .e-mal { background: rgba(198,40,40,.16); color: #8E1B1B; }
+  .e-neutro { background: rgba(128,128,128,.18); color: var(--muted, #7A7D83); }
+  [data-tema="oscuro"] .e-demo { color: #ffd37a; } [data-tema="oscuro"] .e-ok { color: #8BD97A; }
+  [data-tema="oscuro"] .e-aviso { color: #ffbf73; } [data-tema="oscuro"] .e-mal { color: #ff9a96; }
+
+  .grande { font-size: 30px; font-weight: 800; margin-top: 8px; line-height: 1.15; }
+  .lic-prog { height: 10px; background: rgba(128,128,128,.2); border-radius: 6px; overflow: hidden; margin: 10px 0 4px; }
+  .lic-prog i { display: block; height: 100%; width: 0; background: var(--primary, #5FAE46); transition: width .4s; }
+  .lic-prog.naranja i { background: #F57C00; } .lic-prog.roja i { background: #C62828; }
+  .datos { margin-top: 12px; }
+  .lic-fila { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border, #E4E6E9); font-size: 13.5px; align-items: center; }
+  .lic-fila:last-child { border: 0; }
+  .lic-fila > span:first-child { color: var(--muted, #7A7D83); }
+  .lic-fila > span:last-child { text-align: right; font-weight: 600; }
+  .codigo { font-family: Consolas, 'Courier New', monospace; background: rgba(95,174,70,.13); border: 1px solid rgba(95,174,70,.35); border-radius: 8px; padding: 3px 9px; font-size: 14px; letter-spacing: .5px; font-weight: 700; }
+  .lic-mini { border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 8px; padding: 3px 9px; font-size: 12px; font-weight: 700; cursor: pointer; margin-left: 6px; }
+
+  textarea.pegar { width: 100%; min-height: 86px; font-family: Consolas, 'Courier New', monospace; font-size: 12.5px; border-radius: 10px; border: 1px solid var(--border, #E4E6E9); padding: 10px 12px; background: var(--surface, #fff); color: var(--text, #1F2023); resize: vertical; margin: 8px 0 10px; }
+  .resultado { margin-top: 10px; }
+
+  .pasos { display: grid; gap: 10px; margin: 12px 0 14px; padding: 0; list-style: none; counter-reset: p; }
+  .pasos li { counter-increment: p; position: relative; padding-left: 34px; font-size: 14px; line-height: 1.45; }
+  .pasos li::before { content: counter(p); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; background: rgba(95,174,70,.2); color: var(--primary-dark, #4C9439); font-weight: 800; font-size: 12.5px; display: flex; align-items: center; justify-content: center; }
+  .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .acciones .btn { flex: none; }
+  .btn-wa { background: #25D366; color: #fff; border-color: #25D366; }
+
+  @media (max-width: 900px) { .rejilla { grid-template-columns: minmax(0, 1fr); } .grande { font-size: 26px; } }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>🛡️ Licencia</h1></div>
+    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
+    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="contenido">
+    <div id="avisos"></div>
+    <div class="rejilla">
+      <div>
+        <div class="caja tarjeta" id="tarjetaEstado">
+          <span class="lic-etq e-neutro" id="etqEstado">Cargando…</span>
+          <div class="grande" id="grande">…</div>
+          <div class="lic-prog" id="barra"><i></i></div>
+          <div class="nota" id="notaBarra"></div>
+          <div class="datos" id="datos"></div>
+        </div>
+
+        <div class="caja tarjeta" id="tarjetaCodigo">
+          <h3>¿Ya tienes tu código?</h3>
+          <p class="nota">Pégalo aquí. Funciona <b>sin internet</b> y conserva todo lo que ya capturaste.</p>
+          <textarea class="pegar" id="codigo" placeholder="CPT1-MFRGG-ZDFMZ-TIQ3L-NBSXE-…" spellcheck="false" autocomplete="off"></textarea>
+          <button class="btn btn-primary" id="btnActivar">Activar</button>
+          <div class="resultado" id="resultado"></div>
+          <p class="nota" id="soloDueno" hidden style="margin-top:10px">Solo el <b>dueño</b> del negocio puede activar un código.</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="caja tarjeta" id="contratar">
+          <h3>Quiero contratar o renovar Compoint Punto</h3>
+          <p class="nota">Con tu ID de equipo, Compoint te prepara el código de activación en minutos. Funciona <b>sin nube</b> (trabaja sin internet) o <b>con nube</b> (además, copia y consulta desde cualquier lugar).</p>
+          <ol class="pasos">
+            <li>Mándanos el <b>ID de este equipo</b> por WhatsApp (el botón de abajo lo escribe por ti).</li>
+            <li>Compoint te confirma el plan y el pago, y te manda tu <b>código de activación</b>.</li>
+            <li>Lo pegas en <b>«¿Ya tienes tu código?»</b> y listo. No necesitas internet para activarlo.</li>
+          </ol>
+          <div class="acciones">
+            <a class="btn btn-wa" id="btnWa" href="https://wa.me/523325907090" target="_blank" rel="noopener">WhatsApp</a>
+            <button class="btn btn-secondary" id="btnCopiarId">Copiar mi ID de equipo</button>
+            <a class="btn btn-secondary" href="mailto:contacto@compoint.com.mx" id="btnCorreo">Correo</a>
+          </div>
+          <p class="nota" style="margin-top:12px">WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx</p>
+        </div>
+
+        <div class="aviso azul separa" style="margin-top:14px">
+          🔒 <b>Tus datos son tuyos.</b> Aunque la licencia venza, siempre podrás entrar, ver tus reportes, exportar tu información y respaldarla. Lo único que se pausa es registrar ventas y cambios. Al activar un código nuevo, todo vuelve al instante.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script>
+requiereLogin();
+
+const usuario = getUsuario() || {};
+const puedeActivar = ['dueno', 'jefe_general'].includes(usuario.rol);
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+let lic = null;
+
+function esc(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
+function fechaLarga(iso) { if (!iso) return '—'; const [a, m, d] = iso.split('-').map(Number); return `${d} de ${MESES[m - 1]} de ${a}`; }
+function plural(n, s, p) { return `${n} ${Math.abs(n) === 1 ? s : p}`; }
+function diasEntre(a, b) { const f = (x) => { const [y, m, d] = x.split('-').map(Number); return Date.UTC(y, m - 1, d); }; return Math.round((f(b) - f(a)) / 86400000); }
+
+function textoPlan(l) {
+  if (l.tipo === 'demo') return 'Prueba completa (todo incluido)';
+  return l.plan === 'local' ? 'Sin nube (trabaja sin internet)' : 'Con nube';
+}
+
+function pintarEstado(l) {
+  const etq = document.getElementById('etqEstado');
+  const grande = document.getElementById('grande');
+  const barra = document.getElementById('barra');
+  const nota = document.getElementById('notaBarra');
+  const datos = document.getElementById('datos');
+  barra.className = 'lic-prog';
+  barra.hidden = false;
+
+  if (!l.control) {
+    etq.className = 'lic-etq e-neutro'; etq.textContent = 'SIN LÍMITE';
+    grande.textContent = 'Sin vencimiento';
+    barra.hidden = true;
+    nota.textContent = 'Este sistema no tiene una licencia con fecha de vencimiento.';
+  } else if (l.permanente) {
+    etq.className = 'lic-etq e-ok'; etq.textContent = 'ACTIVA';
+    grande.textContent = 'Licencia permanente';
+    barra.querySelector('i').style.width = '100%';
+    nota.textContent = 'No vence.';
+  } else {
+    const total = Math.max(1, diasEntre(l.inicio, l.vence));
+    const restante = Math.max(0, l.dias);
+    barra.querySelector('i').style.width = Math.min(100, Math.round((restante / total) * 100)) + '%';
+    if (l.estado === 'demo') { etq.className = 'lic-etq e-demo'; etq.textContent = 'PRUEBA'; }
+    else if (l.estado === 'activa') { etq.className = 'lic-etq e-ok'; etq.textContent = 'ACTIVA'; }
+    else if (l.estado === 'por_vencer') { etq.className = 'lic-etq e-aviso'; etq.textContent = 'POR VENCER'; barra.classList.add('naranja'); }
+    else if (l.estado === 'gracia') { etq.className = 'lic-etq e-aviso'; etq.textContent = 'VENCIDA · EN GRACIA'; barra.classList.add('naranja'); }
+    else { etq.className = 'lic-etq e-mal'; etq.textContent = 'SOLO CONSULTA'; barra.classList.add('roja'); }
+
+    if (l.estado === 'solo_consulta') {
+      grande.textContent = l.codigo_invalido ? 'Código no válido' : (l.tipo === 'demo' ? 'Prueba terminada' : 'Licencia vencida');
+      nota.textContent = l.codigo_invalido ? '' : `Venció el ${fechaLarga(l.vence)}.`;
+    } else if (l.estado === 'gracia') {
+      grande.textContent = l.gracia_restante === 0 ? 'Último día de gracia' : plural(l.gracia_restante, 'día de gracia', 'días de gracia');
+      nota.textContent = `Venció el ${fechaLarga(l.vence)}. Todavía puedes vender; después queda en solo consulta.`;
+    } else {
+      grande.textContent = l.dias === 0 ? 'Último día' : plural(l.dias, 'día', 'días');
+      nota.textContent = `${l.estado === 'demo' ? 'de ' + total + ' · termina' : 'vence'} el ${fechaLarga(l.vence)}`;
+    }
+  }
+
+  const filas = [
+    ['Plan', esc(l.control ? textoPlan(l) : 'Sistema propio')],
+    ['Sucursales permitidas', esc(l.limite_sucursales)],
+    ['ID de este equipo', `<span class="codigo">${esc(l.id_equipo)}</span><button class="lic-mini" id="btnCopiarId2">Copiar</button>`]
+  ];
+  if (l.control && l.cliente) filas.splice(1, 0, ['Cliente', esc(l.cliente)]);
+  if (l.control) filas.push(['Activada con código', l.con_codigo ? 'Sí' : (l.tipo === 'demo' ? 'No (es la prueba)' : 'No')]);
+  datos.innerHTML = filas.map(([a, b]) => `<div class="lic-fila"><span>${a}</span><span>${b}</span></div>`).join('');
+  const copiar2 = document.getElementById('btnCopiarId2');
+  if (copiar2) copiar2.onclick = copiarId;
+
+  // Avisos
+  const av = [];
+  if (l.reloj_atrasado) av.push('<div class="aviso amarillo separa">⚠️ <b>La fecha de esta computadora parece atrasada.</b> El sistema se queda con la fecha más reciente que ya vio, así que los días no se regresan. Revisa la fecha y hora de Windows (conviene activar «Establecer la hora automáticamente»).</div>');
+  if (l.codigo_invalido === 'equipo') av.push('<div class="aviso rojo separa">🔒 <b>El código guardado es de otra computadora.</b> Si cambiaste de equipo o reinstalaste, manda a Compoint el ID de este equipo para recibir uno nuevo.</div>');
+  else if (l.codigo_invalido) av.push('<div class="aviso rojo separa">🔒 <b>El código guardado ya no se puede comprobar.</b> Pide uno nuevo a Compoint.</div>');
+  document.getElementById('avisos').innerHTML = av.join('');
+
+  // WhatsApp con el ID escrito
+  const quien = l.cliente ? ` de ${l.cliente}` : '';
+  const texto = `Hola, quiero ${l.control && l.tipo !== 'demo' ? 'renovar' : 'contratar'} Compoint Punto${quien}.\nID de equipo: ${l.id_equipo}`;
+  document.getElementById('btnWa').href = 'https://wa.me/523325907090?text=' + encodeURIComponent(texto);
+  document.getElementById('btnCorreo').href = 'mailto:contacto@compoint.com.mx?subject=' + encodeURIComponent('Compoint Punto — ID de equipo ' + l.id_equipo) + '&body=' + encodeURIComponent(texto);
+}
+
+async function copiarId() {
+  if (!lic) return;
+  try { await navigator.clipboard.writeText(lic.id_equipo); mostrarToast('ID copiado: ' + lic.id_equipo, 'exito'); }
+  catch (e) { prompt('Copia este ID de equipo:', lic.id_equipo); }
+}
+
+async function cargar() {
+  try {
+    lic = await apiFetch('/licencia');
+    pintarEstado(lic);
+  } catch (err) {
+    document.getElementById('grande').textContent = 'No se pudo consultar';
+    document.getElementById('notaBarra').textContent = err.message;
+  }
+}
+
+async function activar() {
+  const caja = document.getElementById('codigo');
+  const res = document.getElementById('resultado');
+  const btn = document.getElementById('btnActivar');
+  res.innerHTML = '';
+  if (!caja.value.trim()) { res.innerHTML = '<div class="aviso rojo">Pega primero el código que te mandó Compoint.</div>'; return; }
+  btn.disabled = true; btn.textContent = 'Comprobando…';
+  try {
+    const r = await apiFetch('/licencia/activar', { method: 'POST', body: JSON.stringify({ codigo: caja.value }) });
+    caja.value = '';
+    lic = { ...r.estado, limite_sucursales: r.limite_sucursales };
+    pintarEstado(lic);
+    const e = r.estado;
+    res.innerHTML = `<div class="aviso verde">✅ <b>¡Listo! Tu licencia quedó activa.</b> ${e.permanente ? 'Es permanente.' : 'Vence el ' + fechaLarga(e.vence) + '.'} Plan: ${esc(textoPlan(e))} · hasta ${esc(r.limite_sucursales)} sucursal(es).</div>`;
+    mostrarToast('Licencia activada', 'exito');
+    // Quitar la barra de aviso de inmediato
+    guardarInfoLicencia({ estado: e.estado === 'activa' ? 'activa' : e.estado, tipo: e.tipo, dias: e.dias, vence: e.vence });
+    pintarBarraLicencia();
+  } catch (err) {
+    res.innerHTML = `<div class="aviso rojo">❌ ${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Activar';
+  }
+}
+
+document.getElementById('btnActivar').onclick = activar;
+document.getElementById('btnCopiarId').onclick = copiarId;
+if (!puedeActivar) {
+  document.getElementById('codigo').disabled = true;
+  document.getElementById('btnActivar').disabled = true;
+  document.getElementById('soloDueno').hidden = false;
+}
+cargar();
+</script>
+<script src="../js/sidebar-nav.js"></script>
+</body>
+</html>

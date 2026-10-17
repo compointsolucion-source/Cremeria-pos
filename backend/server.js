@@ -16,7 +16,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 // lo que rompería el límite de intentos de login (afectaría a todos por igual).
 app.set('trust proxy', 1);
 
-app.use(cors({ exposedHeaders: ['X-Licencia-Dias', 'X-Licencia-Vence'] }));
+app.use(cors({ exposedHeaders: ['X-Licencia-Estado', 'X-Licencia-Tipo', 'X-Licencia-Dias', 'X-Licencia-Vence'] }));
 app.use(express.json({ limit: '15mb' }));
 app.set('io', io);
 
@@ -51,8 +51,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// Licencia (renta anual): bloquea todo /api si venció y avisa 7 días antes.
-// Sin fila en la tabla "licencia" no hay control.
+// Licencia (prueba de 30 días / renta anual / permanente): avisa antes de vencer y, ya vencida
+// (y pasada la gracia), deja el sistema en "solo consulta". Sin fila en la tabla "licencia" y en la nube no hay control.
 app.use('/api', verificarLicencia);
 
 // Rutas
@@ -79,6 +79,7 @@ app.use('/api/imagenes', require('./routes/imagenes'));
 app.use('/api/fichas', require('./routes/fichas'));
 app.use('/api/sistema', require('./routes/sistema'));
 app.use('/api/sucursales', require('./routes/sucursales'));
+app.use('/api/licencia', require('./routes/licencia'));
 // Copia espejo del servidor local del negocio (apagada hasta que el dueño la vincule desde el panel del servidor, o exista SYNC_KEY).
 app.use('/api/sync', require('./routes/sync'));
 // Facturación: página pública para que el cliente pida su factura (+ administración de solicitudes).

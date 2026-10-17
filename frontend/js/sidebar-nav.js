@@ -25,6 +25,7 @@ const ICONOS_SIDEBAR = {
   usuario_config: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="18" cy="16" r="2.3"/><path d="M18 12.5v1M18 18.5v1M14.5 16h1M20.5 16h1"/>',
   ajustes: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   candado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  escudo: '<path d="M12 3l8 3v6c0 4.5-3.2 8.3-8 9-4.8-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   sucursal: '<path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/><path d="M4 21h16"/>',
   ayuda: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/>',
   base_datos: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
@@ -107,6 +108,7 @@ const GRUPOS_SIDEBAR = [
       { icono: 'sucursal', texto: 'Sucursales', href: 'sucursales.html', soloJefeGeneral: true },
       { icono: 'usuario_config', texto: 'Equipo', href: 'equipo.html' },
       { icono: 'ajustes', texto: 'Configuración', href: 'configuracion.html' },
+      { icono: 'escudo', texto: 'Licencia', href: 'licencia.html', roles: ['dueno', 'jefe_general', 'gerente'] },
       { icono: 'candado', texto: 'Cambiar Contraseña', href: 'cambiar-password.html' },
       { icono: 'base_datos', texto: 'Backups', href: 'backups.html' },
       { icono: 'ayuda', texto: 'Ayuda y soporte', href: 'ayuda.html' }
@@ -142,7 +144,7 @@ function construirSidebar() {
   const esJefeGeneral = !!(usuario && usuario.rol === 'jefe_general');
 
   const gruposHTML = GRUPOS_SIDEBAR.map(grupo => {
-    const items = grupo.items.filter(item => !item.soloJefeGeneral || esJefeGeneral);
+    const items = grupo.items.filter(item => (!item.soloJefeGeneral || esJefeGeneral) && (!item.roles || (usuario && item.roles.includes(usuario.rol))));
     if (items.length === 0) return '';
     return `
     <div class="sidebar-grupo">

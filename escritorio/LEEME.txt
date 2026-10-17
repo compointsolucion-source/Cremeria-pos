@@ -133,6 +133,30 @@ SINCRONIZAR CON LA NUBE (sin entrar a Render)
 - Alternativa manual (opciones avanzadas del panel): clave en la variable
   SYNC_KEY del servidor en Render. Sigue funcionando.
 
+LICENCIA Y PRUEBA DE 30 DIAS (modo servidor)
+- La PRIMERA vez que abre el servidor de un cliente empieza sola una prueba de
+  30 dias con el sistema completo. Arriba se ve cuantos dias quedan y los
+  tickets salen con "VERSION DE PRUEBA". Todo lo capturado se conserva al contratar.
+- Al terminar: modo "solo consulta" (ver reportes, exportar, respaldar; no
+  registrar ventas). Con un codigo de activacion todo vuelve al instante.
+- El codigo se pega en el sistema: Administracion -> Licencia. Funciona SIN
+  internet y va ligado al ID de la computadora (el MachineGuid de Windows, por
+  eso reinstalar el programa en la MISMA computadora no pide codigo nuevo).
+  Cambiar de computadora si pide codigo nuevo.
+- La licencia vive en la base de datos del servidor; las cajas que se conectan
+  por red local usan la licencia del servidor (no necesitan codigo propio).
+- Para que reinstalar no reinicie la prueba, el programa deja 2 o 3 archivos
+  pequenos "lic.dat" fuera de la carpeta de datos:
+    %LOCALAPPDATA%\CompointPunto   %APPDATA%\Compoint   %ProgramData%\Compoint
+  (estan firmados por el propio programa; si se editan a mano se ignoran).
+  Limite conocido: borrar la base de datos Y todos esos archivos reinicia la
+  prueba. No es a prueba de todo; es para el uso normal.
+- Si alguien atrasa el reloj de Windows, el sistema se queda con la fecha mas
+  reciente que ya vio. Mas detalles: backend/scripts/LEEME-LICENCIA.txt
+- La "llave publica" que comprueba los codigos va en
+  backend/utils/licencia-clave-publica.js (la saca el Activador Compoint).
+  Sin esa llave el programa funciona pero no acepta codigos.
+
 RESPALDOS
 - Al elegir "Salir por completo" se guarda un respaldo en la carpeta de
   respaldos (se conservan los ultimos 30).
@@ -185,7 +209,7 @@ en una PC real. Checklist:
 
 DESARROLLO
 - Probar la app en tu PC:  cd escritorio, npm install, npm start
-- Pruebas de la logica:  cd escritorio, node --test   (16 pruebas)
+- Pruebas de la logica:  cd escritorio, node --test
 - Archivos: src/main.js (ventana, bandeja, impresoras), src/intermediario.js,
   src/instalacion.js (lo que dejo el instalador), src/setup.html (primera
   configuracion), config-cliente.json (direccion), servidor/ (modo servidor).

@@ -4,18 +4,17 @@ const pool = require('../db');
 const { verificarToken, requiereRol } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
-// Tope de sucursales de ESTA instalación. No está fijo en el código: se lee
-// de una variable de entorno para poder subirlo/bajarlo sin tocar nada (y
-// para que, al vender el software a otro negocio, cada instalación pueda
-// tener su propio límite según lo que se le haya vendido).
-const MAX_SUCURSALES = parseInt(process.env.MAX_SUCURSALES, 10) || 4;
+// Tope de sucursales de ESTA instalación. No está fijo en el código: lo da la
+// licencia (el código de activación lleva cuántas sucursales se vendieron) y,
+// si la licencia no lo indica, la variable de entorno MAX_SUCURSALES.
+const { limiteSucursales } = require('../utils/licencia');
 
 // Listar todas las sucursales — solo jefe_general tiene por qué ver esto
 // (el resto del personal ya opera fijo en la suya).
 router.get('/', verificarToken, requiereRol('jefe_general'), async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM sucursales ORDER BY id ASC');
-    res.json({ sucursales: result.rows, tope: MAX_SUCURSALES });
+    res.json({ sucursales: result.rows, tope: await limiteSucursales() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener las sucursales' });
@@ -30,9 +29,10 @@ router.post('/', verificarToken, requiereRol('jefe_general'), async (req, res) =
       return res.status(400).json({ error: 'El nombre de la sucursal es requerido' });
     }
 
+    const tope = await limiteSucursales();
     const conteo = await pool.query('SELECT COUNT(*) FROM sucursales');
-    if (parseInt(conteo.rows[0].count, 10) >= MAX_SUCURSALES) {
-      return res.status(400).json({ error: `Ya alcanzaste el máximo de ${MAX_SUCURSALES} sucursales para esta instalación` });
+    if (parseInt(conteo.rows[0].count, 10) >= tope) {
+      return res.status(400).json({ error: `Ya alcanzaste el máximo de ${tope} sucursales para esta licencia. Para agregar más, comunícate con Compoint.` });
     }
 
     const result = await pool.query(

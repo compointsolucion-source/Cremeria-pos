@@ -15,7 +15,7 @@ const { leerJson, guardarJson } = require('./rutas');
 
 const ESQ = 'compoint_sync';
 // sync_vinculo es la clave de la NUBE: no existe en la base local, pero por si acaso nunca se copia.
-const EXCLUIDAS = new Set(['licencia', 'schema_migrations', 'sync_vinculo']);
+const EXCLUIDAS = new Set(['licencia', 'instalacion', 'schema_migrations', 'sync_vinculo']);
 const LOTE = 300;
 const MAX_LOTES_POR_VUELTA = 60;
 const CADA_MS = 30 * 1000;

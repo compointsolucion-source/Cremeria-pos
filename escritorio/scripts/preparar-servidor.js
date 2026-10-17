@@ -14,7 +14,7 @@ function copiar(origen, dest, excluir) {
 }
 
 fs.rmSync(destino, { recursive: true, force: true });
-copiar(path.join(raiz, 'backend'), path.join(destino, 'backend'), ['node_modules', '.env', 'package-lock.json']);
+copiar(path.join(raiz, 'backend'), path.join(destino, 'backend'), ['node_modules', '.env', 'package-lock.json', 'pruebas']);
 copiar(path.join(raiz, 'frontend'), path.join(destino, 'frontend'), ['node_modules', '.DS_Store']);
 if (!fs.existsSync(path.join(destino, 'backend', 'server.js')) || !fs.existsSync(path.join(destino, 'backend', 'scripts', 'schema.sql'))
   || !fs.existsSync(path.join(destino, 'frontend', 'login.html'))) {
