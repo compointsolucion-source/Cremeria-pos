@@ -513,6 +513,16 @@ async function actualizarImagenesMasivo() {
   }
 }
 
+// Columna opcional "Tipo de venta" del Excel: "Por Pieza" → unidad,
+// "A Granel" (o kg) → peso. Cualquier otra cosa o vacío → null (no se toca).
+function tipoVentaDeExcel(valor) {
+  const t = String(valor == null ? '' : valor).trim().toLowerCase();
+  if (!t) return null;
+  if (/granel|peso|^kg$|kilo/.test(t)) return 'peso';
+  if (/pieza|pza|unidad|paquete|botella|lata/.test(t)) return 'unidad';
+  return null;
+}
+
 async function importarExcel(evento) {
   const archivo = evento.target.files[0];
   if (!archivo) return;
@@ -536,6 +546,7 @@ async function importarExcel(evento) {
       stock_minimo: parsearNumeroExcel(fila['Inv. Mínimo']) || 0,
       stock_maximo: parsearNumeroExcel(fila['Inv. Máximo']),
       departamento: String(fila['Departamento'] || '').trim(),
+      tipo_venta: tipoVentaDeExcel(fila['Tipo de venta'] || fila['Tipo Venta']),
       imagen_url: String(fila['Imagen URL'] || '').trim()
     }));
 

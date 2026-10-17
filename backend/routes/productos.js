@@ -64,7 +64,8 @@ router.get('/categorias', verificarToken, async (req, res) => {
 });
 
 // Importación masiva desde Excel (formato: Código, Producto, P. Costo,
-// P. Venta, P. Mayoreo, Existencia, Inv. Mínimo, Inv. Máximo, Departamento).
+// P. Venta, P. Mayoreo, Existencia, Inv. Mínimo, Inv. Máximo, Departamento
+// y, opcional, Tipo de venta e Imagen URL).
 // El navegador ya convirtió el archivo a un arreglo de objetos — aquí solo
 // se procesa: si el código de barras (o si no hay código, el nombre) ya
 // existe, se ACTUALIZA; si no, se CREA. Los departamentos que no existan
@@ -119,6 +120,11 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
           const stock_maximo = fila.stock_maximo || null;
           const departamentoNombre = (fila.departamento || '').trim();
           const imagen_url = (fila.imagen_url || '').trim() || null;
+          // Columna opcional "Tipo de venta" del Excel: 'unidad' (por pieza) o
+          // 'peso' (a granel). Si viene vacía o con otra cosa, a los productos
+          // NUEVOS se les pone 'peso' como siempre y a los que ya existen no se
+          // les toca (así un Excel viejo, sin esa columna, no cambia nada).
+          const tipoVentaExcel = ['peso', 'unidad'].includes(fila.tipo_venta) ? fila.tipo_venta : null;
           const nombreLower = nombre.toLowerCase();
 
           let categoria_id = null;
@@ -142,16 +148,17 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
               `UPDATE productos SET
                 precio = COALESCE($1, precio), precio_costo = COALESCE($2, precio_costo),
                 precio_mayoreo = COALESCE($3, precio_mayoreo), categoria_id = COALESCE($4, categoria_id),
-                imagen_url = CASE WHEN (imagen_url IS NULL OR imagen_url = '') THEN COALESCE($6, imagen_url) ELSE imagen_url END
+                imagen_url = CASE WHEN (imagen_url IS NULL OR imagen_url = '') THEN COALESCE($6, imagen_url) ELSE imagen_url END,
+                tipo_venta = COALESCE($7, tipo_venta)
                WHERE id = $5`,
-              [precio, precio_costo, precio_mayoreo, categoria_id, productoId, imagen_url]
+              [precio, precio_costo, precio_mayoreo, categoria_id, productoId, imagen_url, tipoVentaExcel]
             );
             actualizados++;
           } else {
             const nuevoProducto = await conexion.query(
               `INSERT INTO productos (sucursal_id, nombre, precio, precio_costo, precio_mayoreo, categoria_id, codigo_barras, tipo_venta, usa_inventario, imagen_url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, 'peso', true, $8) RETURNING id`,
-              [req.sucursalId, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras, imagen_url]
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $9, true, $8) RETURNING id`,
+              [req.sucursalId, nombre, precio || 0, precio_costo, precio_mayoreo, categoria_id, codigo_barras, imagen_url, tipoVentaExcel || 'peso']
             );
             productoId = nuevoProducto.rows[0].id;
             // Se registra en memoria de inmediato para que, si el archivo
