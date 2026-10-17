@@ -1,7 +1,7 @@
 {
   "name": "compoint-punto-escritorio",
   "productName": "Compoint Punto",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Compoint Punto para Windows: abre el sistema en su propia ventana, arranca con Windows e incluye el intermediario de impresión por red.",
   "author": "Compoint, punto de soluciones",
   "main": "src/main.js",

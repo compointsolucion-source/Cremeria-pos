@@ -75,7 +75,14 @@ test('abrirSesionNube: si la nube no entrega licencia, igual sigue (licencia = n
 test('abrirSesionNube: nube sin la actualización (sin rutas de exportar) → mensaje claro', async () => {
   const n = await nubeFalsa((m, r) => (r === '/api/auth/login' ? loginOk() : null));
   try {
-    await assert.rejects(abrirSesionNube({ texto: n.url, usuario: 'juan', password: 'x' }), (e) => e.http === 404 && /todavía no tiene la actualización para bajar la información/.test(e.message));
+    await assert.rejects(abrirSesionNube({ texto: n.url, usuario: 'juan', password: 'x' }), (e) => e.http === 404 && e.sinActualizar === true && /todavía no tiene la actualización para bajar la información/.test(e.message));
+  } finally { await n.cerrar(); }
+});
+
+test('abrirSesionNube: una dirección equivocada (404 desde el inicio de sesión) NO se confunde con «nube sin actualizar»', async () => {
+  const n = await nubeFalsa(() => null);
+  try {
+    await assert.rejects(abrirSesionNube({ texto: n.url, usuario: 'juan', password: 'x' }), (e) => e.sinActualizar !== true);
   } finally { await n.cerrar(); }
 });
 

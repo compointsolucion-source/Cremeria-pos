@@ -6,9 +6,11 @@ body{align-items:flex-start;padding:16px 0}.caja{width:min(640px,95vw)}h2{font-s
 .ok{color:#2e7d32}.mal{color:#c62828}.aviso{color:#b26a00}
 table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}
 .fila{display:flex;gap:8px;flex-wrap:wrap}.fila button{width:auto;flex:1;min-width:150px;margin-top:8px;font-size:14px}
-.peligro{background:#c62828}.nota{margin-top:4px}details{margin-top:6px}
+.peligro{background:#c62828}.azul{background:#1565c0}.nota{margin-top:4px}details{margin-top:6px}
+.paso{margin-top:14px;font-size:14px}.dos{display:flex;gap:12px;flex-wrap:wrap}.op{flex:1;min-width:240px}
+.op button{margin-top:8px;font-size:15px}.op p{font-size:12.5px;color:#555;margin:6px 0 0}
 </style></head><body><div class="caja">
-<h1>Panel del servidor</h1><p id="negocio" style="margin-bottom:4px"></p>
+<h1>Panel del servidor</h1><p id="negocio" style="margin-bottom:4px"></p><p id="version" class="nota" style="margin:0"></p>
 <h2>Direcciones para las demás cajas</h2>
 <div id="dirs"></div>
 <div class="nota">En la otra computadora: instala Compoint Punto y en «Dirección del sistema» escribe una de estas (por nombre o por IP) o pulsa «Buscar servidor en la red». Si Windows pregunta por el Firewall, elige «Permitir acceso» (red privada).</div>
@@ -20,32 +22,29 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}td,th{pa
 <label>Dirección del sistema en la nube</label><input id="urlNube" placeholder="https://minegocio.onrender.com">
 <div class="fila"><button class="sec" id="cambiarCliente">Cambiar a la nube</button></div></details>
 
-<h2>Traer mi información de la nube a esta computadora</h2>
-<p style="margin:0 0 6px">Si ya usas Compoint Punto en internet, aquí bajas a esta computadora tus productos, clientes, ventas y usuarios. Tu licencia de cliente se toma sola y se quita la versión de prueba.</p>
-<details id="detTraer"><summary style="cursor:pointer;font-size:13px">Traer mi información…</summary>
-<label>Dirección de tu sistema en la nube</label><input id="trDir" autocomplete="off" placeholder="https://minegocio.onrender.com">
-<label>Usuario del dueño</label><input id="trUsuario" autocomplete="off">
-<label>Contraseña</label><input id="trPass" type="password" autocomplete="new-password">
-<div class="nota">La contraseña se usa una sola vez y no se guarda. <b>Se reemplaza TODO lo que hay en esta computadora</b> por lo de la nube (antes se guarda un respaldo). Después esta computadora queda como la principal y lo que registres aquí se sube a la nube.</div>
-<div class="fila"><button id="trRevisar">Conectar y revisar</button></div>
-<div id="trResumen" style="margin-top:8px"></div>
-<div class="fila"><button class="peligro" id="trTraer" style="display:none">Traer y reemplazar lo de esta computadora</button></div></details>
-
 <h2>Sincronizar con la nube</h2>
 <p style="margin:0 0 6px">El negocio trabaja aquí, <b>sin depender del internet</b>. Si el internet se va, todo sigue funcionando y lo registrado se guarda en una fila de espera; cuando regresa, se sube solo a tu sistema en la nube.</p>
 <div id="estadoSync"></div>
-<details id="detSync"><summary style="cursor:pointer;font-size:13px">Conectar o cambiar la nube</summary>
+
+<div class="paso"><b>Paso 1.</b> Escribe los datos de tu sistema en la nube (los mismos con los que entras como dueño):</div>
 <label>Dirección de tu sistema en la nube</label><input id="syDir" autocomplete="off" placeholder="https://minegocio.onrender.com">
 <label>Usuario dueño de ese sistema</label><input id="syUsuario" autocomplete="off" placeholder="Admin">
 <label>Contraseña</label><input id="syPass" type="password" autocomplete="new-password">
 <label style="font-weight:400;font-size:13px;display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="syVerPass" style="width:auto;margin:0"> Mostrar contraseña</label>
-<div class="nota">Escribe el usuario y la contraseña del <b>dueño</b>, los mismos con los que entras a tu sistema en la nube. Se usan <b>una sola vez</b> para vincular esta computadora: la contraseña no se guarda y no hay que entrar a Render.</div>
-<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;color:#666">Opciones avanzadas: usar una clave manual</summary>
-<div class="nota">Solo si Compoint te dio una clave (variable <b>SYNC_KEY</b> del servidor en Render). Si la escribes aquí, se usa en lugar del usuario y la contraseña.</div>
+<div class="nota">La contraseña se usa <b>una sola vez</b> y no se guarda; no hay que entrar a Render.</div>
+<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;color:#666">Opciones avanzadas: usar una clave manual</summary>
+<div class="nota">Solo si Compoint te dio una clave (variable <b>SYNC_KEY</b> del servidor en Render). Si la escribes aquí, se usa en lugar del usuario y la contraseña (solo sirve para subir).</div>
 <input id="syClave" type="password" autocomplete="off" placeholder="Clave manual (opcional)">
 <div class="fila"><button class="sec" id="syGenerar">Generar una clave nueva</button><button class="sec" id="syVer">Mostrar / ocultar</button></div>
 </details>
-<div class="fila"><button id="syGuardar">Conectar y copiar todo</button></div></details>
+
+<div class="paso"><b>Paso 2.</b> Elige qué quieres hacer. Antes de cambiar algo te mostramos qué se reemplaza y te preguntamos dos veces si estás seguro:</div>
+<div class="dos">
+<div class="op"><button id="syGuardar">⬆ SUBIR a la nube</button><p>La nube queda <b>igual que esta computadora</b>. Úsalo si la información buena está aquí.</p></div>
+<div class="op"><button class="azul" id="syBajar">⬇ BAJAR de la nube</button><p>Esta computadora queda <b>igual que la nube</b>. Úsalo si tu información está en tu sistema en internet. Se toma también tu licencia de cliente.</p></div>
+</div>
+
+<div class="paso">Otras acciones:</div>
 <div class="fila"><button class="sec" id="syAhora">Sincronizar ahora</button><button class="sec" id="syCompleto">Copiar todo de nuevo</button><button class="sec" id="syQuitar">Dejar de sincronizar</button></div>
 
 <h2>Dónde se guarda todo</h2>
@@ -79,6 +78,7 @@ const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','
 async function cargar(){
   const s=await compointServidor.estado();
   $('negocio').textContent=s.negocio||'';
+  $('version').textContent=s.version?('Versión del programa: '+s.version):'';
   $('dirs').innerHTML=(s.direcciones.length?s.direcciones:['(sin red detectada)']).map(d=>`<div class="dir">${esc(d)}</div>`).join('')+`<div class="nota">En esta computadora: ${esc(s.urlLocal)}</div>`;
   const l=s.estado.local||{};
   $('estadoResp').innerHTML=l.ultimo_ok?`<span class="ok">Último respaldo: ${fecha(l.ultimo_ok)}</span> (${mb(l.tamano||0)})`+(l.error?`<br><span class="mal">Último intento con error: ${esc(l.error)}</span>`:''):`<span class="aviso">Aún no hay respaldos.</span>`+(l.error?`<br><span class="mal">${esc(l.error)}</span>`:'');
@@ -102,7 +102,7 @@ async function cargar(){
 function pintarSync(y){
   const el=$('estadoSync');
   window._syConectada=!!y.configurado;
-  if(!y.configurado){el.innerHTML='<span class="aviso">No conectada. La nube no recibe la información de este negocio.</span>';if(!window._abSync){$('detSync').open=true;window._abSync=true;}return;}
+  if(!y.configurado){el.innerHTML='<span class="aviso">No conectada. La nube no recibe la información de este negocio.</span>';return;}
   const l=[`<div>Nube: <b>${esc(y.direccion)}</b></div>`];
   if(y.ocupado)l.push(`<div class="aviso">Sincronizando… ${esc(y.progreso||'')}</div>`);
   else if(y.sin_conexion)l.push(`<div class="aviso">Sin conexión con la nube. El negocio sigue trabajando; se subirá todo al regresar el internet.</div>`);
@@ -123,33 +123,22 @@ $('syGuardar').onclick=async()=>{
   if(!clave&&!usuario&&!password&&!window._syConectada)return falla('Escribe el usuario y la contraseña del dueño de tu sistema en la nube.');
   if(!clave&&(usuario||password)&&(!usuario||!password))return falla('Escribe el usuario y también la contraseña del dueño.');
   $('msg').className='';$('msg').textContent='Conectando con la nube (puede tardar hasta 1 minuto)…';$('syGuardar').disabled=true;
-  const r=await compointServidor.syncGuardar({texto:direccion,usuario,password,clave});$('syGuardar').disabled=false;
-  if(r&&r.error){falla(r.error);}else if(r&&r.ok){$('syPass').value='';$('syPass').type='password';$('syVerPass').checked=false;$('syClave').value='';$('syClave').type='password';$('msg').className='ok';$('msg').textContent='Conectado. Se está copiando la información a la nube.';$('detSync').open=false;}else{$('msg').textContent='';}cargar();};
+  $('syBajar').disabled=true;
+  const r=await compointServidor.syncGuardar({texto:direccion,usuario,password,clave});$('syGuardar').disabled=false;$('syBajar').disabled=false;
+  if(r&&r.error){falla(r.error);}else if(r&&r.ok){$('syPass').value='';$('syPass').type='password';$('syVerPass').checked=false;$('syClave').value='';$('syClave').type='password';$('msg').className='ok';$('msg').textContent='Listo. Se está subiendo la información a la nube.';}else{$('msg').className='';$('msg').textContent='No se hizo ningún cambio.';}cargar();};
+$('syBajar').onclick=async()=>{
+  const direccion=$('syDir').value.trim(),usuario=$('syUsuario').value.trim(),password=$('syPass').value;
+  const falla=(t)=>{$('msg').className='err';$('msg').textContent=t;};
+  if(!direccion)return falla('Escribe la dirección de tu sistema en la nube.');
+  if(!usuario||!password)return falla('Para bajar la información escribe el usuario y la contraseña del dueño de tu sistema en la nube.');
+  $('msg').className='';$('msg').textContent='Conectando con la nube (puede tardar hasta 1 minuto)…';$('syBajar').disabled=true;$('syGuardar').disabled=true;
+  const r=await compointServidor.traerNube({direccion,usuario,password});$('syBajar').disabled=false;$('syGuardar').disabled=false;
+  if(r&&r.error)return falla(r.error);
+  $('msg').className='';$('msg').textContent=(r&&r.ok===false)?'No se hizo ningún cambio.':'';};
 $('syAhora').onclick=async()=>{$('msg').className='';$('msg').textContent='Sincronizando…';const r=await compointServidor.syncAhora();
   $('msg').className=r&&r.ok?'ok':'err';$('msg').textContent=r&&r.ok?'Listo.':(r&&r.error)||'No se pudo.';cargar();};
 $('syCompleto').onclick=async()=>{const r=await compointServidor.syncCompleto();if(r&&r.ok===false&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('msg').className='ok';$('msg').textContent='Copia completa enviada.';}cargar();};
 $('syQuitar').onclick=async()=>{const r=await compointServidor.syncQuitar();if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}else if(r&&r.ok){$('syDir').value='';$('syUsuario').value='';$('syPass').value='';$('msg').className='ok';$('msg').textContent='Sincronización desactivada.';}cargar();};
-const num=n=>Number(n||0).toLocaleString('es-MX');
-$('trRevisar').onclick=async()=>{
-  const direccion=$('trDir').value.trim(),usuario=$('trUsuario').value.trim(),password=$('trPass').value;
-  const falla=(t)=>{$('msg').className='err';$('msg').textContent=t;};
-  $('trTraer').style.display='none';$('trResumen').innerHTML='';
-  if(!direccion)return falla('Escribe la dirección de tu sistema en la nube.');
-  if(!usuario||!password)return falla('Escribe el usuario y la contraseña del dueño.');
-  $('msg').className='';$('msg').textContent='Conectando con la nube (puede tardar hasta 1 minuto)…';$('trRevisar').disabled=true;
-  const r=await compointServidor.nubeRevisar({direccion,usuario,password});$('trRevisar').disabled=false;
-  if(!r||r.error)return falla((r&&r.error)||'No se pudo conectar.');
-  $('trPass').value='';$('msg').textContent='';
-  const x=r.resumen||{},l=r.licencia||{};
-  const lic=l.control===false?'Sistema propio de Compoint (sin versión de prueba).':(l.tipo&&l.tipo!=='demo'?('Licencia '+esc(l.tipo)+(l.vence?' hasta '+esc(l.vence.split('-').reverse().join('/')):' permanente')+(l.cliente?' · '+esc(l.cliente):'')):'La nube todavía no tiene licencia de cliente.');
-  $('trResumen').innerHTML='<div class="ok">Encontramos tu sistema:</div><div>'+num(x.productos)+' productos · '+num(x.ventas)+' ventas · '+num(x.clientes)+' clientes · '+num(x.usuarios)+' usuarios</div><div class="nota">'+lic+'</div>';
-  $('trTraer').style.display='';
-};
-$('trTraer').onclick=async()=>{
-  $('msg').className='';$('msg').textContent='';$('trTraer').disabled=true;
-  const r=await compointServidor.traerNube();$('trTraer').disabled=false;
-  if(r&&r.error){$('msg').className='err';$('msg').textContent=r.error;}
-};
 $('respaldar').onclick=async()=>{$('msg').textContent='';$('respaldar').disabled=true;$('respaldar').textContent='Respaldando…';
   const r=await compointServidor.respaldar();$('respaldar').disabled=false;$('respaldar').textContent='Respaldar ahora';
   $('msg').className=r.ok?'ok':'err';$('msg').textContent=r.ok?('Respaldo listo ('+r.archivo+')'+(r.nube&&r.nube.estado==='ok'?' y copia en la nube guardada.':(r.nube&&r.nube.estado==='pendiente'?'. La copia en la nube quedó pendiente.':'.'))):('No se pudo respaldar: '+r.error);cargar();};

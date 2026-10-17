@@ -669,7 +669,8 @@ ipcMain.handle('srv-estado', async (e) => {
     carpeta: servidorLocal.rutas.respaldos, estado: servidorLocal.respaldos.estado(), locales: servidorLocal.respaldos.listarLocales(),
     rutas: { datos: servidorLocal.rutas.datos, respaldos: servidorLocal.rutas.respaldos, copiaExtra: servidorLocal.rutas.copiaExtra || '', base: servidorLocal.rutas.base, avisos: servidorLocal.rutas.avisos || [] },
     nube: { cloud_name: n.cloud_name, api_key: n.api_key, tieneSecreto: !!n.api_secret },
-    sync: sincro
+    sync: sincro,
+    version: app.getVersion()
   };
 });
 ipcMain.handle('srv-respaldar', async (e) => { if (!esLocal(e)) return { ok: false, error: 'No permitido' }; return respaldarAhora(); });
@@ -732,32 +733,49 @@ ipcMain.handle('srv-quitar-nube', async (e) => {
 ipcMain.handle('srv-sync-guardar', async (e, d) => {
   if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
   const yaHay = !!(await servidorLocal.sync.estado()).configurado;
-  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
-    type: 'warning', buttons: ['Conectar y copiar todo', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Sincronizar con la nube',
-    message: yaHay ? 'Se volverá a copiar TODA la información de esta computadora a la nube.' : 'La nube será una copia de lo que se registra en esta computadora.',
-    detail: 'IMPORTANTE: lo que haya capturado directamente en el sistema de la nube se reemplaza con la información de este servidor, incluidos los usuarios: después, en la nube se entra con los mismos usuarios y contraseñas de este servidor. A partir de ahora, captura todo aquí (en el servidor del negocio); la nube sirve para consultar y como respaldo.\n\nSi se va el internet, el negocio sigue trabajando normal y todo se sube solo al regresar.'
-  });
-  if (conf.response !== 0) return { ok: false };
-  try { await servidorLocal.guardarSync({ texto: d && d.texto, clave: d && d.clave, usuario: d && d.usuario, password: d && d.password }); return { ok: true }; }
-  catch (err) {
+  const { abrirSesionNube } = require('./servidor/traer');
+  const conf = require('./servidor/confirmaciones');
+  const clave = String((d && d.clave) || '').trim();
+  const usuario = String((d && d.usuario) || '').trim();
+  const password = d && d.password;
+  try {
+    // Con usuario y contraseña, primero se entra a la nube para poder mostrar cuánta información tiene antes de preguntar.
+    let sesion = null;
+    if (!clave && usuario && password) {
+      try { sesion = await abrirSesionNube({ texto: d.texto, usuario, password }); }
+      catch (err) { if (!(err && err.sinActualizar)) throw err; /* nube sin la actualización: se sigue sin esos números */ }
+    }
+    const aqui = await servidorLocal.resumenLocal();
+    const bloqueo = sesion && conf.bloqueoNubeConDatos(aqui, sesion.resumen);
+    if (bloqueo) return { error: bloqueo };
+    const acepto = await conf.confirmarEnDosPasos(dialog, ventanaPanel, conf.textosSubir({ aqui, nube: sesion && sesion.resumen, yaConectada: yaHay }));
+    if (!acepto) return { ok: false };
+    await servidorLocal.guardarSync({ texto: d && d.texto, clave, usuario, password, sesion });
+    return { ok: true };
+  } catch (err) {
     const msg = String(err && err.message || err);
     log('Sync guardar: ' + msg);
     return { error: err && err.http ? msg : (/fetch failed|abort|timeout|ENOTFOUND|ECONN/i.test(msg) ? 'No hay conexión con la nube (revisa el internet y la dirección). Si usas el plan gratis de Render puede tardar ~1 minuto en despertar: intenta de nuevo.' : msg) };
   }
 });
 // Traer a esta computadora (que ya es servidor) la información de la nube: reemplaza lo que haya aquí.
-ipcMain.handle('srv-traer-nube', async (e) => {
+// Si llegan dirección, usuario y contraseña, aquí mismo se entra a la nube; si no, se usa la sesión que dejó «srv-nube-revisar».
+ipcMain.handle('srv-traer-nube', async (e, d) => {
   if (!esLocal(e) || !servidorLocal) return { error: 'No permitido' };
-  if (!sesionNube) return { error: 'Primero conecta con tu sistema en la nube.' };
-  const { mensajeAmable } = require('./servidor/traer');
-  const x = sesionNube.resumen;
-  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
-    type: 'warning', buttons: ['Traer y reemplazar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Traer información de la nube',
-    message: 'Se reemplazará TODA la información de esta computadora por la de tu nube.',
-    detail: `En la nube hay: ${x.productos} productos, ${x.ventas} ventas y ${x.clientes} clientes.\n\nAntes se guarda un respaldo de lo que hay ahora en esta computadora. Después, esta computadora queda como la principal: lo que registres aquí se sube a la nube y la nube queda como copia. El programa se reiniciará.`
-  });
-  if (conf.response !== 0) return { ok: false };
-  const sesion = sesionNube; sesionNube = null;
+  const { abrirSesionNube, mensajeAmable } = require('./servidor/traer');
+  const conf = require('./servidor/confirmaciones');
+  let sesion = null;
+  if (d && (d.direccion || d.usuario || d.password)) {
+    try { sesion = await abrirSesionNube({ texto: d.direccion, usuario: d.usuario, password: d.password }); }
+    catch (err) { log('Bajar de la nube: ' + (err && err.message)); return { error: mensajeAmable(err) }; }
+  } else { sesion = sesionNube; }
+  if (!sesion) return { error: 'Primero conecta con tu sistema en la nube.' };
+  const aqui = await servidorLocal.resumenLocal();
+  const bloqueo = conf.bloqueoPcConDatos(aqui, sesion.resumen);
+  if (bloqueo) { sesionNube = null; return { error: bloqueo }; }
+  const acepto = await conf.confirmarEnDosPasos(dialog, ventanaPanel, conf.textosBajar({ aqui, nube: sesion.resumen }));
+  if (!acepto) { sesionNube = null; return { ok: false }; }
+  sesionNube = null;
   try {
     mostrarEstado('Bajando tu información de la nube… no apagues la computadora');
     const previo = await servidorLocal.respaldos.hacerRespaldo('antes-de-traer-nube');
@@ -782,11 +800,11 @@ ipcMain.handle('srv-licencia-revisar', async (e) => {
 ipcMain.handle('srv-sync-ahora', async (e) => { if (!esLocal(e) || !servidorLocal) return { ok: false, error: 'No permitido' }; return servidorLocal.sync.ahora(false); });
 ipcMain.handle('srv-sync-completo', async (e) => {
   if (!esLocal(e) || !servidorLocal) return { ok: false, error: 'No permitido' };
-  const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
-    type: 'question', buttons: ['Copiar todo de nuevo', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Copia completa a la nube',
-    message: '¿Volver a copiar TODO a la nube?', detail: 'La nube se vacía y se llena otra vez con lo de esta computadora. Úsalo si notas diferencias.'
-  });
-  if (conf.response !== 0) return { ok: false };
+  const conf = require('./servidor/confirmaciones');
+  let aqui = null;
+  try { aqui = await servidorLocal.resumenLocal(); } catch (err) { /* se pregunta igual, sin números */ }
+  const acepto = await conf.confirmarEnDosPasos(dialog, ventanaPanel, conf.textosCompleto({ aqui }));
+  if (!acepto) return { ok: false };
   return servidorLocal.sync.ahora(true);
 });
 ipcMain.handle('srv-sync-quitar', async (e) => {

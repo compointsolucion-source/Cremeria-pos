@@ -200,7 +200,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
     const aqui = await resumenLocal(bd.url);
     if (aqui.productos || aqui.ventas || aqui.clientes) return;
     const err = new Error(`Tu sistema en la nube ya tiene información (${enNube.productos} productos y ${enNube.ventas} ventas) y esta computadora todavía está vacía. ` +
-      'Si se conecta así, la nube quedaría vacía. Primero usa «Traer mi información de la nube a esta computadora».');
+      'Si se conecta así, la nube quedaría vacía. Primero usa el botón «Bajar de la nube» para traer esa información a esta computadora.');
     err.http = 409;
     throw err;
   }
@@ -227,17 +227,20 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
       delete process.env.CLOUDINARY_CLOUD_NAME; delete process.env.CLOUDINARY_API_KEY; delete process.env.CLOUDINARY_API_SECRET;
     },
     nube: nubeActual,
+    // Cuánta información hay en esta computadora (para mostrarla en las confirmaciones).
+    resumenLocal: () => resumenLocal(bd.url),
     // Guarda la conexión con la nube y arranca la copia completa inicial.
     // Lo normal: dirección + usuario y contraseña del dueño de la nube (la nube crea la clave sola).
     // También acepta una clave escrita a mano (la variable SYNC_KEY de Render) o conserva la guardada.
-    async guardarSync({ texto, clave, usuario, password }) {
-      const api = await resolverApi(texto);
+    // Si ya se abrió sesión con la nube (para mostrar los números en la confirmación), se reutiliza: no se vuelve a pedir la contraseña.
+    async guardarSync({ texto, clave, usuario, password, sesion }) {
+      const api = sesion ? sesion.api : await resolverApi(texto);
       const previa = cfg.sync || {};
       let claveFinal = String(clave || '').trim();
       let reemplazo = false;
       let token = null;
-      if (!claveFinal && (String(usuario || '').trim() || password)) {
-        ({ token } = await iniciarSesionDueno(api, usuario, password));
+      if (!claveFinal && (sesion || String(usuario || '').trim() || password)) {
+        token = sesion ? sesion.token : (await iniciarSesionDueno(api, usuario, password)).token;
         // Seguro: si la nube ya tiene información y esta computadora está vacía, conectar vaciaría la nube.
         await protegerNube(api, { token });
         ({ clave: claveFinal, reemplazo } = await vincularConToken(api, token));

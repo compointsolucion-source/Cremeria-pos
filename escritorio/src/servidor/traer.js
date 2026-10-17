@@ -34,7 +34,9 @@ async function abrirSesionNube({ texto, usuario, password }) {
     estructura = await leerNube(api, '/sync/exportar/estructura', { token });
   } catch (e) {
     if (e.http === 404) {
-      throw errorNube('Tu sistema en la nube todavía no tiene la actualización para bajar la información. Pídele a Compoint que lo actualice e intenta de nuevo.', 404);
+      const sinAct = errorNube('Tu sistema en la nube todavía no tiene la actualización para bajar la información. Pídele a Compoint que lo actualice e intenta de nuevo.', 404);
+      sinAct.sinActualizar = true; // para distinguirlo de una dirección equivocada (también da 404)
+      throw sinAct;
     }
     throw e;
   }

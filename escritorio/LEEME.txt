@@ -118,7 +118,15 @@ MODO SERVIDOR (trabajar sin internet)
 - Panel del servidor: Ctrl+Alt+S o clic derecho en el icono junto al reloj.
 
 SINCRONIZAR CON LA NUBE (sin entrar a Render)
-- Panel del servidor -> "Sincronizar con la nube" -> "Conectar o cambiar la nube".
+- Panel del servidor -> "Sincronizar con la nube". Paso 1: se escribe la
+  direccion, usuario y contrasena del dueno. Paso 2: se elige UNO de dos botones:
+    SUBIR a la nube   = la nube queda igual que esta computadora.
+    BAJAR de la nube  = esta computadora queda igual que la nube.
+  Cada uno muestra primero cuanta informacion se reemplaza (la de aqui y la de
+  la nube) y pregunta DOS veces "Esta seguro?" antes de tocar nada; el boton
+  marcado por omision siempre es Cancelar. "Copiar todo de nuevo" tambien
+  pregunta dos veces. El panel muestra arriba la "Version del programa": si no
+  aparece, el instalador es anterior (la version actual es 1.1.0).
 - Se escribe la direccion del sistema en la nube y el USUARIO Y CONTRASENA DEL
   DUENO (los mismos con los que se entra a ese sistema). Se usan una sola vez:
   la nube crea sola una clave, guarda solo su "hash" (tabla sync_vinculo) y se
@@ -141,9 +149,11 @@ TRAER LA INFORMACION DE LA NUBE A LA COMPUTADORA (cliente que ya usa el sistema 
   nube" -> direccion + usuario y contrasena del DUENO -> "Conectar y revisar"
   (muestra cuantos productos, ventas, clientes y usuarios hay) -> "Traer mi
   informacion". Despues el dueno entra con los mismos usuario y contrasena.
-- Si el equipo ya era servidor: Panel del servidor -> "Traer mi informacion de
-  la nube a esta computadora". REEMPLAZA lo que haya (antes guarda un
-  respaldo) y reinicia el programa.
+- Si el equipo ya era servidor: Panel del servidor -> "Sincronizar con la
+  nube" -> direccion, usuario y contrasena del dueno -> boton "BAJAR de la
+  nube". REEMPLAZA lo que haya (antes guarda un respaldo) y reinicia el
+  programa. Si la nube esta vacia y la computadora tiene datos, se DETIENE
+  (bajar asi la dejaria vacia) y se sugiere SUBIR.
 - Se baja por pedazos y se escribe en una sola operacion: si falla (se va el
   internet, la nube esta dormida) no se guarda nada. En una computadora nueva la
   base queda vacia para volver a intentar; en una que ya tenia datos queda igual.
@@ -155,7 +165,7 @@ TRAER LA INFORMACION DE LA NUBE A LA COMPUTADORA (cliente que ya usa el sistema 
   termina de desplegar). Si no, el programa avisa que falta actualizarlo.
 - Seguro: al conectar la sincronizacion desde el panel, si la nube ya tiene
   informacion y esta computadora esta vacia, se DETIENE (conectar asi vaciaria
-  la nube) y se indica usar "Traer mi informacion de la nube".
+  la nube) y se indica usar "BAJAR de la nube".
 
 LICENCIA QUE SE TOMA DE LA NUBE (modo servidor)
 - Al traer la informacion, o al conectar la sincronizacion con el usuario

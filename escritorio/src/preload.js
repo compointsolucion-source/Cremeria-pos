@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('compointDesktop', {
 contextBridge.exposeInMainWorld('compointServidor', {
   altaGuardar: (d) => ipcRenderer.invoke('srv-alta-guardar', d),
   nubeRevisar: (d) => ipcRenderer.invoke('srv-nube-revisar', d),
-  traerNube: () => ipcRenderer.invoke('srv-traer-nube'),
+  traerNube: (d) => ipcRenderer.invoke('srv-traer-nube', d),
   licenciaRevisar: () => ipcRenderer.invoke('srv-licencia-revisar'),
   altaCancelar: () => ipcRenderer.invoke('srv-alta-cancelar'),
   estado: () => ipcRenderer.invoke('srv-estado'),
