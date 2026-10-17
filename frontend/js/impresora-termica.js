@@ -537,6 +537,8 @@ const ESCPOS_CENTRAR = escposComando([0x1B, 0x61, 1]);
 const ESCPOS_IZQUIERDA = escposComando([0x1B, 0x61, 0]);
 const ESCPOS_FUENTE_A = escposComando([0x1B, 0x4D, 0]);
 const ESCPOS_FUENTE_B = escposComando([0x1B, 0x4D, 1]);
+const ESCPOS_INVERSO_ON = escposComando([0x1D, 0x42, 1]);  // letras blancas sobre fondo negro
+const ESCPOS_INVERSO_OFF = escposComando([0x1D, 0x42, 0]);
 
 // Cuántos caracteres caben por renglón según papel y tamaño de letra.
 function columnasTicket(ancho, letra, paraDialogo) {
@@ -916,6 +918,78 @@ function formatearTicket(datosTicket) {
   return [...formatearEncabezadoTicket(datosTicket), ...formatearCuerpoTicket(datosTicket), '='.repeat(cols), ...leyendaCompoint().map(centrarL), ''];
 }
 
+// ---------------------------------------------------------------------------
+// Ticket de un PEDIDO que ya quedó listo en Mostrador. Además de lo normal lleva los datos del
+// cliente en letra grande (los arma js/mostrador-pedidos.js en "datosTicket.pedido"):
+//   { titulo, subtitulo, entrega:{etiqueta,valor}, datos:[{etiqueta,lineas,grande}],
+//     cobro:{titulo,monto,detalle}, notas, pie:[...] }
+// "arriba" va después del folio y la fecha; "abajo" después del total. Solo texto sencillo
+// (sin emojis ni símbolos raros, la impresora no los dibuja).
+// ---------------------------------------------------------------------------
+function bloquePedidoEscPos(d, parte, { linea, envolver }) {
+  const p = d.pedido, out = [];
+  if (!p) return out;
+  const cn = columnasTicket(d.ancho_ticket, 'normal', false);
+  const w2 = Math.floor(cn / 2);
+  const negrita = ESCPOS_NEGRITA_ON, sinNegrita = ESCPOS_NEGRITA_OFF;
+  const grande = (t) => { out.push(escposTamano(2, 2), negrita); envolver(t, w2).forEach(r => out.push(linea(r))); out.push(sinNegrita, escposTamano(1, 1)); };
+  const alto = (t) => { out.push(escposTamano(1, 2), negrita); envolver(t, cn).forEach(r => out.push(linea(r))); out.push(sinNegrita, escposTamano(1, 1)); };
+  const etiqueta = (t) => out.push(negrita, linea(t), sinNegrita);
+  const raya = (c) => out.push(linea(c.repeat(cn)));
+  const centrarEn = (t, w) => { const f = Math.max(0, w - t.length); const i = Math.floor(f / 2); return ' '.repeat(i) + t + ' '.repeat(f - i); };
+
+  out.push(ESCPOS_FUENTE_A);
+  if (parte === 'arriba') {
+    out.push(ESCPOS_CENTRAR);
+    if (p.titulo) grande(p.titulo);
+    if (p.subtitulo) grande(p.subtitulo);
+    if (p.entrega) { raya('='); envolver(p.entrega.etiqueta, cn).forEach(r => out.push(negrita, linea(r), sinNegrita)); grande(p.entrega.valor); raya('='); }
+    out.push(ESCPOS_IZQUIERDA);
+    (p.datos || []).forEach(dt => { etiqueta(dt.etiqueta); (dt.lineas || []).forEach(l => (dt.grande ? grande(l) : alto(l))); });
+    raya('-');
+    etiqueta('PRODUCTOS');
+  } else {
+    out.push(ESCPOS_IZQUIERDA);
+    if (p.cobro) {
+      // Recuadro negro de lado a lado: se rellena cada renglón con espacios porque lo invertido solo pinta donde hay letras.
+      out.push(ESCPOS_INVERSO_ON, negrita);
+      envolver(p.cobro.titulo, cn).forEach(r => out.push(linea(centrarEn(r, cn))));
+      if (p.cobro.monto) { out.push(escposTamano(2, 2)); envolver('$' + p.cobro.monto, w2).forEach(r => out.push(linea(centrarEn(r, w2)))); out.push(escposTamano(1, 1)); }
+      if (p.cobro.detalle) envolver(p.cobro.detalle, cn).forEach(r => out.push(linea(centrarEn(r, cn))));
+      out.push(sinNegrita, ESCPOS_INVERSO_OFF);
+    }
+    if (p.notas) { etiqueta('NOTAS DEL PEDIDO'); alto(p.notas); }
+    raya('-');
+    (p.pie || []).forEach(t => { out.push(ESCPOS_CENTRAR); envolver(t, cn).forEach(r => out.push(linea(r))); });
+    out.push(ESCPOS_IZQUIERDA);
+  }
+  return out;
+}
+
+// Lo mismo, para el ticket que se imprime con el diálogo del sistema (HTML).
+function bloquePedidoHtml(d, parte, esc) {
+  const p = d.pedido;
+  if (!p) return '';
+  const lineasHtml = (ls, clase) => (ls || []).map(l => `<div class="${clase}">${esc(l)}</div>`).join('');
+  if (parte === 'arriba') {
+    let h = '';
+    if (p.titulo) h += `<div class="pd-t">${esc(p.titulo)}</div>`;
+    if (p.subtitulo) h += `<div class="pd-t">${esc(p.subtitulo)}</div>`;
+    if (p.entrega) h += `<div class="pd-caja"><div class="e">${esc(p.entrega.etiqueta)}</div><div class="v">${esc(p.entrega.valor)}</div></div>`;
+    (p.datos || []).forEach(dt => { h += `<div class="pd-et">${esc(dt.etiqueta)}</div>${lineasHtml(dt.lineas, dt.grande ? 'pd-g' : 'pd-m')}`; });
+    h += `<div class="pd-raya"></div><div class="pd-et" style="margin-top:0">PRODUCTOS</div>`;
+    return h;
+  }
+  let h = '';
+  if (p.cobro) {
+    h += `<div class="pd-caja pd-cobro"><div class="e">${esc(p.cobro.titulo)}</div>${p.cobro.monto ? `<div class="v">$${esc(p.cobro.monto)}</div>` : ''}${p.cobro.detalle ? `<div class="e">${esc(p.cobro.detalle)}</div>` : ''}</div>`;
+  }
+  if (p.notas) h += `<div class="pd-et">NOTAS DEL PEDIDO</div><div class="pd-m">${esc(p.notas)}</div>`;
+  h += '<div class="pd-raya"></div>';
+  h += (p.pie || []).map(t => `<div class="c">${esc(t)}</div>`).join('');
+  return h;
+}
+
 // Imprime un ticket completo (logo, nombre, datos, código del folio, productos,
 // total, QR de promoción) con todo el diseño elegido en Configuración. Lanza
 // error si no hay impresora conectada — quien llama debe mostrar el banner de
@@ -991,9 +1065,16 @@ async function imprimirTicketBLE(datosTicket) {
   const separador = '-'.repeat(columnas);
   partes.push(ESCPOS_IZQUIERDA, linea(separador), linea(`Folio: ${d.folio}`), linea(`Fecha: ${d.fecha}`), linea(separador));
 
+  // ---- Pedido listo: título, hora de entrega y datos del cliente en letra grande ----
+  if (d.pedido) {
+    partes.push(...bloquePedidoEscPos(d, 'arriba', { linea, envolver }));
+    partes.push(d.tamanoLetra === 'pequena' ? ESCPOS_FUENTE_B : ESCPOS_FUENTE_A);
+  }
+
   // ---- Código del folio (QR y/o barras) para que Caja lo escanee ----
+  // (en el ticket de un pedido el código de barras va al final, ver más abajo)
   try {
-    const tipoCodigo = d.tipoCodigoEscaneo || 'ninguno';
+    const tipoCodigo = d.codigoAlFinal ? 'ninguno' : (d.tipoCodigoEscaneo || 'ninguno');
     const anchoPx = d.ancho_ticket === '58mm' ? 240 : 350;
     const partesCodigo = [];
     if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
@@ -1033,6 +1114,17 @@ async function imprimirTicketBLE(datosTicket) {
     }
   });
   partes.push(escposTamano(1, 1), ESCPOS_FUENTE_A);
+
+  // ---- Pedido listo: cobro, notas y, al final, el código de barras del folio (Caja lo escanea) ----
+  if (d.pedido) partes.push(...bloquePedidoEscPos(d, 'abajo', { linea, envolver }));
+  if (d.codigoAlFinal && d.folio && typeof JsBarcode !== 'undefined') {
+    try {
+      const anchoBarrasPx = d.ancho_ticket === '58mm' ? 240 : 350;
+      partes.push(ESCPOS_CENTRAR, canvasAComandosRaster(generarCanvasBarras(d.folio, anchoBarrasPx)), salto, ESCPOS_IZQUIERDA);
+    } catch (err) {
+      console.error('No se pudo generar el código de barras, se imprime solo el folio en texto:', err.message);
+    }
+  }
 
   // ---- QR de promoción (ej. descuentos, redes sociales, catálogo) ----
   if (d.qrPromo && d.qrPromo.contenido && typeof QRCode !== 'undefined') {
@@ -1114,6 +1206,16 @@ async function construirHtmlTicket(datosTicket) {
     .tk .nombre { font-weight: ${d.negocioNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.nombreTamano === 'grande' ? 1.9 : 1)).toFixed(1)}px; line-height: 1.15; margin: 2px 0; }
     .tk .total { display: flex; justify-content: space-between; font-weight: ${d.totalNegritas ? 700 : 400}; font-size: ${(fuentePx * (d.totalTamano === 'grande' ? 1.6 : 1)).toFixed(1)}px; margin: 2px 0; }
     .tk img { display: block; margin: 4px auto; max-width: 100%; }
+    /* Ticket de un pedido listo: datos del cliente grandes y en negritas */
+    .tk .pd-t { text-align: center; font-weight: 900; font-size: ${(fuentePx * 1.9).toFixed(1)}px; line-height: 1.1; margin: 2px 0; word-break: break-word; }
+    .tk .pd-caja { border: 3px solid #000; text-align: center; padding: 4px 5px; margin: 6px 0; }
+    .tk .pd-caja .e { font-weight: 800; word-break: break-word; }
+    .tk .pd-caja .v { font-weight: 900; font-size: ${(fuentePx * 1.9).toFixed(1)}px; line-height: 1.1; word-break: break-word; }
+    .tk .pd-cobro { border-width: 5px; border-style: double; }
+    .tk .pd-et { font-weight: 800; font-size: ${(fuentePx * 0.85).toFixed(1)}px; letter-spacing: .06em; margin-top: 6px; }
+    .tk .pd-g { font-weight: 900; font-size: ${(fuentePx * 1.45).toFixed(1)}px; line-height: 1.15; word-break: break-word; }
+    .tk .pd-m { font-weight: 800; font-size: ${(fuentePx * 1.15).toFixed(1)}px; line-height: 1.2; word-break: break-word; }
+    .tk .pd-raya { border-top: 2px dashed #000; margin: 6px 0; }
     .tk { position: relative; overflow: hidden; }
     .tk .marca-prueba { position: absolute; left: -20%; right: -20%; top: 38%; text-align: center; transform: rotate(-20deg); font-family: Arial, sans-serif; font-weight: 900; font-size: ${(fuentePx * 2.1).toFixed(1)}px; letter-spacing: 2px; color: rgba(0,0,0,.14); pointer-events: none; white-space: nowrap; }
   `;
@@ -1136,9 +1238,12 @@ async function construirHtmlTicket(datosTicket) {
   const sep = '-'.repeat(columnas);
   partes.push(`<div class="l">${sep}\nFolio: ${esc(d.folio)}\nFecha: ${esc(d.fecha)}\n${sep}</div>`);
 
-  // Código del folio (QR y/o barras)
+  // Pedido listo: título, hora de entrega y datos del cliente en letra grande
+  if (d.pedido) partes.push(bloquePedidoHtml(d, 'arriba', esc));
+
+  // Código del folio (QR y/o barras). En el ticket de un pedido el de barras va al final.
   try {
-    const tipoCodigo = d.tipoCodigoEscaneo || 'ninguno';
+    const tipoCodigo = d.codigoAlFinal ? 'ninguno' : (d.tipoCodigoEscaneo || 'ninguno');
     if ((tipoCodigo === 'qr' || tipoCodigo === 'ambos') && typeof QRCode !== 'undefined') {
       partes.push(`<img src="${(await generarCanvasQR(d.folio, 240)).toDataURL()}" style="width:55%;">`);
     }
@@ -1162,6 +1267,16 @@ async function construirHtmlTicket(datosTicket) {
     }
   });
   vaciar();
+
+  // Pedido listo: cobro, notas y, al final, el código de barras del folio
+  if (d.pedido) partes.push(bloquePedidoHtml(d, 'abajo', esc));
+  if (d.codigoAlFinal && d.folio && typeof JsBarcode !== 'undefined') {
+    try {
+      partes.push(`<img src="${generarCanvasBarras(d.folio, 350).toDataURL()}">`);
+    } catch (err) {
+      console.error('No se pudo generar el código de barras:', err.message);
+    }
+  }
 
   // QR de promoción
   if (d.qrPromo && d.qrPromo.contenido && typeof QRCode !== 'undefined') {

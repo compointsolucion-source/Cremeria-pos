@@ -34,7 +34,7 @@
   const estadoNuevo = () => ({
     tipo: 'domicilio', cliente: null, modoCliente: 'buscar', q: '', resultados: null, nuevoNombre: '', telefono: '', guardarCliente: true,
     dirSel: 'nueva', dir: dirVacia(), dirBase: null, zonaId: null, envioForzado: null,
-    cuando: 'ya', fecha: '', hora: '', repartidorId: '', pago: 'al_recibir', pagaCon: '', notas: '', imprimir: true,
+    cuando: 'ya', fecha: '', hora: '', repartidorId: '', pago: 'al_recibir', pagaCon: '', notas: '',
     enviando: false, exito: null
   });
   function dirVacia() { return { alias: '', calle: '', colonia: '', cp: '', ciudad: '', referencias: '', ubicacion: '', latitud: null, longitud: null, ubicacion_enlace: null }; }
@@ -564,7 +564,7 @@
     if (!el || !S) return;
     const prog = S.cuando === 'programar';
     el.innerHTML = `
-      <label class="pd-imprimir"><input type="checkbox" ${S.imprimir ? 'checked' : ''} onchange="PedidoDom.set('imprimir', this.checked)"> Imprimir el ticket</label>
+      <span class="pd-imprimir" style="color:var(--muted,#7A7D83); cursor:default">🖨 El ticket se imprime en Mostrador cuando el pedido esté listo</span>
       <span class="pd-pie-total">Total <span id="pdPieTotal">${dinero(totalPedido())}</span></span>
       <button type="button" class="btn btn-secondary" id="pdBtnGuardar" onclick="PedidoDom.enviar(false)" ${S.enviando ? 'disabled' : ''}>📝 Guardar sin enviar</button>
       <button type="button" class="btn btn-primary" id="pdBtnEnviar" onclick="PedidoDom.enviar(true)" ${S.enviando ? 'disabled' : ''}>${prog ? '📅 Programar pedido' : '✓ Enviar pedido a preparar'}</button>`;
@@ -637,13 +637,10 @@
     try {
       const p = await apiFetch('/pedidos', { method: 'POST', body: JSON.stringify(construirCuerpo(enviarAhora)) });
       S.exito = p;
-      let impreso = false;
-      if (S.imprimir && typeof imprimirTicket === 'function') {
-        try { await imprimirTicket(ticketParaImprimir(p)); impreso = true; } catch (e) { /* imprimirTicket ya avisa el problema */ }
-      }
+      // Ya no se imprime aquí: el ticket sale cuando Mostrador termina de preparar el pedido (js/mostrador-pedidos.js).
       carrito = [];
       if (typeof renderCarrito === 'function') renderCarrito();
-      mostrarExito(p, impreso);
+      mostrarExito(p);
     } catch (err) {
       const sinInternet = typeof esErrorDeConexion === 'function' && esErrorDeConexion(err);
       mostrarError(sinInternet ? 'Sin internet: los pedidos necesitan conexión. Para vender ahorita usa el modo Mostrador.' : (err.message || 'No se pudo crear el pedido'));
@@ -652,14 +649,7 @@
     }
   };
 
-  function ticketParaImprimir(p) {
-    const pie = p.tipo === 'recoger'
-      ? `Pedido ${p.etiqueta} para recoger. Presenta este ticket en caja.`
-      : p.pago_modo === 'al_recibir' ? `Pedido ${p.etiqueta} a domicilio. Se paga al recibir.` : `Pedido ${p.etiqueta} a domicilio.`;
-    return { folio: p.folio, total: p.total_neto !== null && p.total_neto !== undefined ? p.total_neto : p.ticket_total, items: p.items || [], pie_pagina: pie };
-  }
-
-  function mostrarExito(p, impreso) {
+  function mostrarExito(p) {
     $('pdCuerpo').style.display = 'none';
     $('pdPie').style.display = 'none';
     const ex = $('pdExito');
@@ -668,24 +658,18 @@
     let linea;
     if (p.estado === 'programado' && !lleno(p.preparar_desde)) linea = 'Quedó guardado sin enviar. Cuando esté listo para preparar, inícialo desde el tablero.';
     else if (p.estado === 'programado') linea = `Programado para ${fechaBonita(String(p.programado_para).slice(0, 10))} a las ${horaBonita(String(p.programado_para).slice(11, 16))}. Se avisa en el tablero a las ${horaBonita(String(p.preparar_desde).slice(11, 16))} para prepararlo.`;
-    else linea = 'Ya está en el tablero, preparándose.';
+    else linea = 'Ya le apareció a Mostrador para prepararlo. El ticket se imprime cuando esté listo.';
     const tel = p.telefono || '';
     const msg = `Hola ${p.nombre_contacto || ''}, recibimos tu pedido ${p.etiqueta} por ${dinero(total)}. ` + (p.estado === 'programado' && lleno(p.programado_para) ? `Lo ${p.tipo === 'recoger' ? 'tendremos listo' : 'entregaremos'} ${fechaBonita(String(p.programado_para).slice(0, 10))} a las ${horaBonita(String(p.programado_para).slice(11, 16))}. ` : 'Ya lo estamos preparando. ') + '¡Gracias!';
     const wa = UBICACION.urlWhatsApp(tel, msg);
     ex.innerHTML = `<div class="pd-exito"><div class="grande">✅</div><h3>Pedido ${esc(p.etiqueta)} creado</h3>
       <p><b>${esc(p.nombre_contacto || '')}</b> · ${dinero(total)} · ticket ${esc(p.folio)}</p><p>${esc(linea)}</p>
-      ${impreso ? '<p>🖨 Ticket enviado a la impresora.</p>' : ''}
       <div class="acciones">
         ${wa ? `<a class="btn btn-secondary" href="${esc(wa)}" target="_blank" rel="noopener">💬 Confirmar por WhatsApp</a>` : ''}
-        ${!impreso ? '<button type="button" class="btn btn-secondary" onclick="PedidoDom.reimprimir()">🖨 Imprimir ticket</button>' : ''}
         <a class="btn btn-secondary" href="pedidos.html">📋 Ver el tablero</a>
         <button type="button" class="btn btn-primary" onclick="PedidoDom.cerrar()">＋ Hacer otro pedido</button>
       </div></div>`;
   }
-
-  PD.reimprimir = async function () {
-    if (S && S.exito && typeof imprimirTicket === 'function') await imprimirTicket(ticketParaImprimir(S.exito));
-  };
 
   PD._estado = () => S;
   window.PedidoDom = PD;

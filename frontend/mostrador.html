@@ -200,9 +200,14 @@
       <button type="button" data-modo="domicilio">🛵 A domicilio</button>
       <button type="button" data-modo="recoger">🏪 Para recoger</button>
     </div>
+    <button type="button" class="mp-btn" id="btnPedidosPrep" title="Pedidos que se enviaron a preparar">📦 Pedidos por preparar <b class="mp-n" style="display:none">0</b></button>
     <a class="btn btn-secondary" href="admin/dashboard.html">🏠 Inicio</a>
     <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
+
+  <!-- Aviso de pedido nuevo por preparar y lista (los llena js/mostrador-pedidos.js) -->
+  <div class="mp-aviso" id="avisoPedidos" style="display:none"></div>
+  <div class="mp-drawer" id="drawerPedidos"></div>
 
   <div style="background:#F4F5F6; padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #DDD;">
     <button class="btn btn-secondary" onclick="generarFicha()">🎫 Generar Ficha</button>
@@ -339,6 +344,8 @@
 <script src="js/ubicacion.js"></script>
 <script src="js/mostrador.js"></script>
 <script src="js/pedido-domicilio.js"></script>
+<script src="js/vendor/socket.io.min.js"></script>
+<script src="js/mostrador-pedidos.js"></script>
 <script src="js/registrar-sw.js"></script>
 <script src="js/sidebar-nav.js"></script>
 </body>

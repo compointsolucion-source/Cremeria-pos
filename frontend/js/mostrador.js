@@ -752,7 +752,7 @@ async function imprimirTicket(ticket) {
     fecha: new Date().toLocaleString(),
     items: ticket.items.map(i => ({
       nombre_producto: i.nombre_producto,
-      detalle: GRANEL.detalle(i),
+      detalle: i.detalle !== undefined ? i.detalle : GRANEL.detalle(i),
       subtotal: parseFloat(i.subtotal).toFixed(2)
     })),
     total: parseFloat(ticket.total).toFixed(2),
@@ -765,6 +765,13 @@ async function imprimirTicket(ticket) {
     // El logo y el QR de promoción solo salen aquí si se activaron en Configuración.
     ...estiloTicketDesdeConfig(config, false)
   };
+  // Ticket de un pedido que ya quedó listo (js/mostrador-pedidos.js): lleva los datos del cliente en letra
+  // grande y, al final, el código de BARRAS del folio para que Caja lo escanee.
+  if (ticket.pedido) {
+    datosTicket.pedido = ticket.pedido;
+    datosTicket.codigoAlFinal = true;
+    datosTicket.tipoCodigoEscaneo = 'barras';
+  }
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
   if (modoImpresion === 'sistema') {

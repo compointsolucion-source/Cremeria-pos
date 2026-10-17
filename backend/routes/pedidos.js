@@ -54,6 +54,7 @@ const SQL_PEDIDO = `
     (t.total - COALESCE(t.descuento_monto, 0) - COALESCE(dd.descuento_items, 0)) AS total_neto,
     COALESCE(dd.n_items, 0) AS n_items,
     u.nombre AS repartidor_nombre, u.telefono AS repartidor_telefono,
+    ua.nombre AS aceptado_por_nombre,
     c.tipo AS cliente_tipo, c.usa_mayoreo AS cliente_mayoreo,
     z.nombre AS zona_nombre,
     CASE WHEN p.estado IN ('programado', 'preparando', 'listo', 'en_camino')
@@ -70,6 +71,7 @@ const SQL_PEDIDO = `
       FROM ticket_detalle d WHERE d.ticket_id = p.ticket_id
   ) dd ON true
   LEFT JOIN usuarios u ON u.id = p.repartidor_id
+  LEFT JOIN usuarios ua ON ua.id = p.aceptado_por
   LEFT JOIN clientes c ON c.id = p.cliente_id
   LEFT JOIN zonas_envio z ON z.id = p.zona_id
 `;
@@ -361,7 +363,8 @@ async function transicionar(req, id, nuevo, datos = {}, opciones = {}) {
       if (nuevo === 'en_camino' && !ped.repartidor_id) throw new ErrorHttp(400, 'Primero asigna un repartidor');
 
       if (nuevo === 'preparando') {
-        await conexion.query("UPDATE pedidos SET estado = 'preparando', salio_en = NULL, llego_en = NULL WHERE id = $1", [id]);
+        // Al reabrir la preparación, Mostrador lo vuelve a ver como NUEVO (hay que volver a aceptarlo).
+        await conexion.query("UPDATE pedidos SET estado = 'preparando', salio_en = NULL, llego_en = NULL, aceptado_en = NULL, aceptado_por = NULL WHERE id = $1", [id]);
       } else if (nuevo === 'listo') {
         await conexion.query("UPDATE pedidos SET estado = 'listo', listo_en = COALESCE(listo_en, NOW()), salio_en = NULL, llego_en = NULL WHERE id = $1", [id]);
       } else if (nuevo === 'en_camino') {
@@ -1265,6 +1268,23 @@ router.post('/:id/estado', requierePermiso('VENTAS_CREAR'), rutaAsync('Error al 
   if (!U.ESTADOS.includes(nuevo) || nuevo === 'programado') return res.status(400).json({ error: 'Estado inválido' });
   if (nuevo === 'cancelado' && !tienePermiso(req.usuario, 'VENTAS_CANCELAR')) return res.status(403).json({ error: 'No tienes permiso para cancelar pedidos' });
   res.json(await transicionar(req, req.params.id, nuevo, { motivo: req.body.motivo, metodo_cobro: req.body.metodo_cobro }));
+}));
+
+// Mostrador acepta un pedido que está por preparar: queda marcado quién lo toma y a qué hora.
+// Si ya lo aceptó alguien, no se pisa (cualquiera puede abrirlo y terminarlo, pero se conserva quién lo tomó primero).
+router.post('/:id/aceptar', requierePermiso('VENTAS_CREAR'), rutaAsync('Error al aceptar el pedido', async (req, res) => {
+  const r = await pool.query(
+    `UPDATE pedidos SET aceptado_en = COALESCE(aceptado_en, NOW()), aceptado_por = COALESCE(aceptado_por, $3)
+      WHERE id = $1 AND sucursal_id = $2 AND estado = 'preparando' RETURNING id`, [req.params.id, req.sucursalId, req.usuario.id]);
+  if (!r.rows.length) {
+    const hay = await pool.query('SELECT estado FROM pedidos WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
+    if (!hay.rows.length) return res.status(404).json({ error: 'Pedido no encontrado' });
+    return res.status(409).json({ error: `Este pedido está "${hay.rows[0].estado}" y ya no se puede aceptar para preparar` });
+  }
+  await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'pedido_aceptado', modulo: 'pedidos', referencia_id: Number(req.params.id) });
+  const completo = await cargarPedido(pool, req.params.id, req.sucursalId);
+  emitir(req.app.get('io'), req.sucursalId, 'pedido_actualizado', { id: completo.id, estado: completo.estado, repartidor_id: completo.repartidor_id, aceptado: true });
+  res.json(completo);
 }));
 
 router.post('/:id/asignar', requierePermiso('VENTAS_CREAR'), rutaAsync('Error al asignar el repartidor', async (req, res) => {

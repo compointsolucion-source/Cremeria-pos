@@ -414,7 +414,7 @@ const PT = (function () {
           ${lleno(p.ubicacion_enlace) ? `<a class="btn btn-secondary" target="_blank" rel="noopener" href="${esc(p.ubicacion_enlace)}">📍 Ubicación del cliente</a>` : ''}</div></div>` : '';
     const repartidor = p.tipo === 'domicilio' ? `<div class="pt-dato"><span>Repartidor</span><span>${p.repartidor_id ? esc(p.repartidor_nombre) : 'Sin asignar'}</span></div>` : '';
     const lineas = (p.items || []).map((i) => `<li><span>${esc(i.nombre_producto)}<br><small style="color:var(--muted)">${i.es_envio ? (p.zona_nombre ? 'Zona: ' + esc(p.zona_nombre) : 'Costo de envío') : esc(typeof GRANEL !== 'undefined' ? GRANEL.detalle(i, '×') : i.cantidad)}</small></span><b>${dinero(i.subtotal)}</b></li>`).join('');
-    const hist = [['Pedido creado', horaLocal(p.creado_en)], ['Listo', horaLocal(p.listo_en)], ['Salió', horaLocal(p.salio_en)], ['Llegó', horaLocal(p.llego_en)], ['Entregado', horaLocal(p.entregado_en)], ['Aviso al cliente', horaLocal(p.aviso_camino_en)]]
+    const hist = [['Pedido creado', horaLocal(p.creado_en)], ['Aceptado en Mostrador' + (p.aceptado_por_nombre ? ' por ' + esc(primerNombre(p.aceptado_por_nombre)) : ''), horaLocal(p.aceptado_en)], ['Listo', horaLocal(p.listo_en)], ['Salió', horaLocal(p.salio_en)], ['Llegó', horaLocal(p.llego_en)], ['Entregado', horaLocal(p.entregado_en)], ['Aviso al cliente', horaLocal(p.aviso_camino_en)]]
       .filter((x) => x[1]).map((x) => `<div><b>${x[0]}:</b> ${x[1]}</div>`).join('');
     const evid = (p.evidencias || []).map((e) => `<button type="button" class="btn btn-secondary" onclick="PT.verEvidencia(${p.id}, ${e.id})">${e.tipo === 'foto' ? '📷 Ver foto de entrega' : '✍ Ver firma'}</button>`).join('');
     const acc = accionPrincipal(p);

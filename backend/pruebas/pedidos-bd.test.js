@@ -833,3 +833,63 @@ test('los pedidos de otra sucursal no se ven ni se tocan', async () => {
   assert.equal((await api('g2', 'PUT', `/api/pedidos/zonas/${zona1}`, { nombre: 'Hack', costo: 1 })).status, 404);
   assert.equal((await api('g2', 'POST', '/api/pedidos', { tipo: 'domicilio', nombre_contacto: 'Z', direccion: direccion(), zona_id: zona1, items: [queso()] })).status, 400); // la zona es de otra sucursal
 });
+
+// ---------------------------------------------------------------- Mostrador: aceptar el pedido que se envió a preparar
+test('Mostrador: un pedido nuevo sale sin aceptar; al aceptarlo queda quién lo tomó y no se pisa', async () => {
+  const p = (await api('cajera', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Acepta Uno', telefono: '3311110000', pago_modo: 'pagado', items: [queso(0.5), crema(2)] })).json;
+  assert.equal(p.estado, 'preparando');
+  assert.equal(p.aceptado_en, null);
+  assert.equal(p.aceptado_por_nombre, null);
+  // la lista que usa Mostrador (preparando + listos) lo trae, sin aceptar
+  const lista = await api('mostrador', 'GET', '/api/pedidos?estado=preparando,listo&limit=200');
+  const enLista = lista.json.find((x) => x.id === p.id);
+  assert.ok(enLista && !enLista.aceptado_en);
+
+  const a = await api('mostrador', 'POST', `/api/pedidos/${p.id}/aceptar`, {});
+  assert.equal(a.status, 200, JSON.stringify(a.json));
+  assert.equal(a.json.estado, 'preparando');
+  assert.ok(a.json.aceptado_en);
+  assert.equal(a.json.aceptado_por_nombre, 'Mostrador');
+  assert.equal(a.json.items.filter((i) => !i.es_envio).length, 2); // trae los productos para la ventana de preparar
+
+  // otra persona lo acepta después: se conserva quién lo tomó primero
+  const b = await api('cajera', 'POST', `/api/pedidos/${p.id}/aceptar`, {});
+  assert.equal(b.status, 200);
+  assert.equal(b.json.aceptado_por_nombre, 'Mostrador');
+  assert.equal(b.json.aceptado_en, a.json.aceptado_en);
+
+  const bit = await pool.query("SELECT 1 FROM bitacora WHERE accion = 'pedido_aceptado' AND referencia_id = $1", [p.id]);
+  assert.ok(bit.rows.length >= 1);
+
+  // listo desde Mostrador; ya no se puede "aceptar"
+  assert.equal((await api('mostrador', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'listo' })).json.estado, 'listo');
+  const tarde = await api('mostrador', 'POST', `/api/pedidos/${p.id}/aceptar`, {});
+  assert.equal(tarde.status, 409);
+  assert.match(tarde.json.error, /listo/);
+
+  // si se reabre la preparación, vuelve a salir como NUEVO (hay que volver a aceptarlo)
+  const re = await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'preparando' });
+  assert.equal(re.json.estado, 'preparando');
+  assert.equal(re.json.aceptado_en, null);
+  assert.equal(re.json.aceptado_por_nombre, null);
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+});
+
+test('Mostrador: aceptar pide permiso, no existe en otra sucursal y no sirve para un pedido cancelado', async () => {
+  const p = (await api('mostrador', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Acepta Dos', telefono: '3322220000', pago_modo: 'pagado', items: [crema(1)] })).json;
+  assert.equal((await api('luis', 'POST', `/api/pedidos/${p.id}/aceptar`, {})).status, 403);          // el repartidor no
+  assert.equal((await api('mostrador', 'POST', '/api/pedidos/99999/aceptar', {})).status, 404);
+  if (T.g2) assert.equal((await api('g2', 'POST', `/api/pedidos/${p.id}/aceptar`, {})).status, 404);   // otra sucursal
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+  assert.equal((await api('mostrador', 'POST', `/api/pedidos/${p.id}/aceptar`, {})).status, 409);
+});
+
+test('Mostrador: un pedido programado entra a la lista de preparar cuando llega su hora', async () => {
+  const dentroDe = await enMinutos(5); // se prepara 30 min antes: ya toca prepararlo
+  const p = (await api('mostrador', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Programado Hoy', telefono: '3344440000', pago_modo: 'pagado', programado_para: dentroDe, items: [crema(1)] })).json;
+  assert.equal(p.estado, 'preparando');
+  const lista = await api('mostrador', 'GET', '/api/pedidos?estado=preparando,listo&limit=200');
+  const x = lista.json.find((q) => q.id === p.id);
+  assert.ok(x && !x.aceptado_en && x.programado_para === dentroDe);
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+});
