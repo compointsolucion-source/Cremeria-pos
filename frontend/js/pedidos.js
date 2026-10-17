@@ -97,8 +97,11 @@ const PT = (function () {
   function tagPago(p) {
     if (p.pago_modo === 'credito') return ['credito', 'A crédito'];
     if (p.ticket_estado === 'pagado') return ['pagado', 'Pagado'];
-    if (p.tipo === 'domicilio' && p.pago_modo === 'al_recibir') return ['cobrar', p.estado === 'entregado' ? 'Por liquidar' : 'Cobrar'];
-    return ['cobrar', 'Cobrar en caja'];
+    if (p.estado_cobro === 'pagado') return ['pagado', 'Ya pagó todo'];            // pagó por adelantado: solo falta registrarlo en Caja
+    const resta = p.anticipo > 0 ? ` ${dinero(p.resta)}` : '';                      // con anticipo se ve cuánto FALTA
+    const conAnticipo = p.anticipo > 0 ? ' (anticipo)' : '';
+    if (p.tipo === 'domicilio' && p.pago_modo === 'al_recibir') return ['cobrar', p.estado === 'entregado' ? 'Por liquidar' : `Cobrar${resta}${conAnticipo}`];
+    return ['cobrar', p.anticipo > 0 ? `Caja:${resta}${conAnticipo}` : 'Cobrar en caja'];
   }
 
   function textoEntrega(p) {
@@ -300,7 +303,7 @@ const PT = (function () {
   async function pedirMetodoCobro(p) {
     return new Promise((resolve) => {
       const m = abrirModal({ titulo: `¿Cómo pagó ${esc(p.nombre_contacto)}?`, ancho: 420, arriba: true,
-        cuerpo: `<p style="margin:0 0 12px">Total a cobrar: <b>${dinero(p.total_neto)}</b>${p.paga_con ? ` · pagó con ${dinero(p.paga_con)} (cambio ${dinero(p.cambio)})` : ''}</p>
+        cuerpo: `<p style="margin:0 0 12px">${p.anticipo > 0 ? `Total ${dinero(p.total_neto)} − anticipo ${dinero(p.anticipo)} = a cobrar` : 'Total a cobrar'}: <b>${dinero(p.resta)}</b>${p.paga_con ? ` · pagó con ${dinero(p.paga_con)} (cambio ${dinero(p.cambio)})` : ''}</p>
           <div style="display:grid; gap:8px;">
             <button type="button" class="btn btn-primary" data-m="efectivo">💵 Efectivo</button>
             <button type="button" class="btn btn-secondary" data-m="transferencia">🏦 Transferencia</button>
@@ -387,7 +390,10 @@ const PT = (function () {
     const items = (p.items || []).filter((i) => !i.es_envio).map((i) => `• ${typeof GRANEL !== 'undefined' ? GRANEL.formatoCantidad(i.cantidad) : i.cantidad}${i.tipo_venta === 'peso' ? ' kg' : ''} ${i.nombre_producto}`).join('\n');
     const url = UBICACION.urlWaze(p);
     return `🛵 Pedido ${p.etiqueta}\nCliente: ${p.nombre_contacto}${p.telefono ? ' · ' + p.telefono : ''}\nDirección: ${UBICACION.textoDireccion(p)}${p.referencias ? '\nRef.: ' + p.referencias : ''}\nWaze: ${url}\n${p.programado_para ? 'Hora: ' + hora12(p.programado_para) + '\n' : ''}${items ? 'Lleva:\n' + items + '\n' : ''}`
-      + (p.por_cobrar ? `💵 COBRAR: ${dinero(p.total_neto)}${p.paga_con ? ` (paga con ${dinero(p.paga_con)}, cambio ${dinero(p.cambio)})` : ''}` : '✔ No cobrar: ya está pagado') + (p.notas ? `\nNotas: ${p.notas}` : '');
+      + (p.por_cobrar ? `💵 COBRAR: ${dinero(p.resta)}${p.anticipo > 0 ? ` (total ${dinero(p.total_neto)}, ya dejó ${dinero(p.anticipo)} de anticipo)` : ''}${p.paga_con ? ` (paga con ${dinero(p.paga_con)}, cambio ${dinero(p.cambio)})` : ''}`
+        : p.estado_cobro === 'pagado' ? '✔ No cobrar: ya está pagado'
+        : p.estado_cobro === 'credito' ? '✔ No cobrar: va a crédito del cliente'
+        : '✔ No cobrar: se cobra en Caja') + (p.notas ? `\nNotas: ${p.notas}` : '');
   }
 
   // ------------------------------------------------------------------ detalle del pedido
@@ -418,8 +424,10 @@ const PT = (function () {
       .filter((x) => x[1]).map((x) => `<div><b>${x[0]}:</b> ${x[1]}</div>`).join('');
     const evid = (p.evidencias || []).map((e) => `<button type="button" class="btn btn-secondary" onclick="PT.verEvidencia(${p.id}, ${e.id})">${e.tipo === 'foto' ? '📷 Ver foto de entrega' : '✍ Ver firma'}</button>`).join('');
     const acc = accionPrincipal(p);
-    const cobro = p.tipo === 'domicilio' && p.pago_modo === 'al_recibir'
-      ? `${p.paga_con ? `<div class="pt-dato"><span>Paga con</span><span>${dinero(p.paga_con)} (cambio ${dinero(p.cambio)})</span></div>` : ''}${p.metodo_cobro ? `<div class="pt-dato"><span>Cobró</span><span>${esc(p.metodo_cobro)} ${dinero(p.monto_cobrado)}</span></div>` : ''}` : '';
+    const filasAnticipo = p.anticipo > 0
+      ? `<div class="pt-dato"><span>${p.resta > 0 ? 'Anticipo' : 'Pagó por adelantado'}</span><span>${dinero(p.anticipo)} (${esc(p.anticipo_metodo || 'efectivo')})</span></div>${p.resta > 0 ? `<div class="pt-dato"><span>Resta por cobrar</span><span><b>${dinero(p.resta)}</b></span></div>` : ''}` : '';
+    const cobro = filasAnticipo + (p.tipo === 'domicilio' && p.pago_modo === 'al_recibir'
+      ? `${p.paga_con ? `<div class="pt-dato"><span>Paga con</span><span>${dinero(p.paga_con)} (cambio ${dinero(p.cambio)})</span></div>` : ''}${p.metodo_cobro ? `<div class="pt-dato"><span>Cobró</span><span>${esc(p.metodo_cobro)} ${dinero(p.monto_cobrado)}</span></div>` : ''}` : '');
     m.html(`<div class="pt-dos"><div>
         <div class="pt-bloque"><h4>Cliente</h4><div style="font-weight:800; font-size:17px">${esc(p.nombre_contacto)}${p.cliente_tipo === 'tienda' ? ' <span class="pd-tag azul">Tienda</span>' : ''}</div>
           <div class="pt-sub">${esc(p.telefono || 'Sin teléfono')}</div>${tel}</div>
@@ -437,7 +445,7 @@ const PT = (function () {
         <div class="pt-bloque"><h4>Pedido · ticket ${esc(p.folio)}</h4><ul class="pt-linea">${lineas}</ul>
           <div class="pt-dato" style="border-top:2px solid var(--text); margin-top:6px; padding-top:8px; font-size:19px"><span style="color:var(--text); font-weight:800">Total</span><span>${dinero(p.total_neto)}</span></div></div>
         <div class="pt-bloque"><h4>Cobro</h4>
-          <div class="pt-dato"><span>Forma</span><span>${p.pago_modo === 'al_recibir' ? (p.tipo === 'recoger' ? 'Paga al recoger (en Caja)' : 'Paga al recibir') : p.pago_modo === 'credito' ? 'A crédito del cliente' : 'Se cobra en Caja'}</span></div>
+          <div class="pt-dato"><span>Forma</span><span>${p.estado_cobro === 'pagado' && p.ticket_estado !== 'pagado' ? 'Ya pagó todo por adelantado' : p.pago_modo === 'al_recibir' ? (p.tipo === 'recoger' ? 'Paga al recoger (en Caja)' : 'Paga al recibir') : p.pago_modo === 'credito' ? 'A crédito del cliente' : 'Se cobra en Caja'}</span></div>
           <div class="pt-dato"><span>Ticket</span><span>${esc(p.ticket_estado)}</span></div>${cobro}</div>
         ${hist ? `<div class="pt-bloque"><h4>Historial</h4><div class="pt-hist">${hist}</div></div>` : ''}
         ${evid ? `<div class="pt-bloque"><h4>Comprobantes de entrega</h4><div class="pt-botonera">${evid}</div></div>` : ''}
@@ -482,6 +490,7 @@ const PT = (function () {
     if (!E.zonas) { const z = await apiFetch('/pedidos/zonas').catch(() => ({ zonas: [] })); E.zonas = z.zonas || []; }
     const dom = p.tipo === 'domicilio';
     const puedeCobro = p.ticket_estado === 'pendiente';
+    const adelantoActual = p.anticipo > 0 ? (p.resta > 0 ? 'anticipo' : 'todo') : 'ninguno';
     const campo = (k, etq, v, tipo) => `<div><label class="pd-etq" for="ed_${k}">${etq}</label><input type="${tipo || 'text'}" id="ed_${k}" value="${esc(v)}"></div>`;
     const prog = p.programado_para || '';
     m.titulo(`Editar ${esc(p.etiqueta)}`);
@@ -498,6 +507,13 @@ const PT = (function () {
           <option value="pagado" ${p.pago_modo === 'pagado' ? 'selected' : ''}>Se cobra en Caja</option>
           <option value="credito" ${p.pago_modo === 'credito' ? 'selected' : ''}>A crédito del cliente</option></select></div>
           ${dom ? campo('pagaCon', '¿Con cuánto paga?', p.paga_con === null || p.paga_con === undefined ? '' : p.paga_con, 'number') : ''}</div>` : ''}
+      ${puedeCobro && p.pago_modo !== 'credito' ? `<div class="pd-fila f3" style="margin-top:6px"><div><label class="pd-etq" for="ed_adelanto">¿Ya pagó algo?</label><select id="ed_adelanto">
+          <option value="ninguno" ${adelantoActual === 'ninguno' ? 'selected' : ''}>No ha pagado nada</option>
+          <option value="anticipo" ${adelantoActual === 'anticipo' ? 'selected' : ''}>Dio anticipo</option>
+          <option value="todo" ${adelantoActual === 'todo' ? 'selected' : ''}>Ya pagó todo</option></select></div>
+          ${campo('anticipo', 'Anticipo ($)', p.anticipo > 0 && adelantoActual === 'anticipo' ? p.anticipo : '', 'number')}
+          <div><label class="pd-etq" for="ed_antmetodo">Lo pagó con</label><select id="ed_antmetodo">${['efectivo', 'transferencia', 'tarjeta'].map((k) => `<option value="${k}" ${(p.anticipo_metodo || 'efectivo') === k ? 'selected' : ''}>${k.charAt(0).toUpperCase() + k.slice(1)}</option>`).join('')}</select></div></div>
+        <div class="pd-nota">Total ${dinero(p.total_neto)}${p.anticipo > 0 ? ` · ya tiene ${dinero(p.anticipo)} · falta ${dinero(p.resta)}` : ''}. «Ya pagó todo» deja el pedido sin nada por cobrar.</div>` : ''}
       ${puedeCobro ? `<label class="pd-etq" style="margin-top:8px">Productos del pedido</label><div id="ed_prods"></div>
         <label class="pd-etq" for="ed_buscar">＋ Agregar otro producto</label><input type="search" id="ed_buscar" placeholder="Escribe el nombre del producto…" autocomplete="off"><div id="ed_res"></div>
         <div class="pd-nota">Al guardar, el envío y el total del ticket se calculan otra vez${p.cliente_mayoreo ? ' (a este cliente se le cobra precio de mayoreo en lo que agregues)' : ''}.</div>`
@@ -596,6 +612,16 @@ const PT = (function () {
         if (nuevos.length) cuerpo.agregar = nuevos.map((i) => ({ tipo: 'producto', producto_id: i.producto_id, nombre_producto: i.nombre, cantidad: Number(i.cantidad), precio_unitario: i.precio }));
       }
       if (puedeCobro && v('pago') !== p.pago_modo) cuerpo.pago_modo = v('pago');
+      if (puedeCobro && v('adelanto') !== undefined) {
+        const adel = v('adelanto'), metodoAnt = v('antmetodo') || 'efectivo';
+        if (adel === 'anticipo') {
+          const a = Number(v('anticipo'));
+          if (!(a > 0)) { err.textContent = 'Escribe cuánto dejó de anticipo (o elige «No ha pagado nada»)'; err.classList.add('visible'); return; }
+          if (a !== p.anticipo || metodoAnt !== (p.anticipo_metodo || 'efectivo') || adelantoActual !== 'anticipo') { cuerpo.anticipo = a; cuerpo.anticipo_metodo = metodoAnt; }
+        } else if (adel === 'todo') {
+          if (adelantoActual !== 'todo' || metodoAnt !== (p.anticipo_metodo || 'efectivo') || cuerpo.lineas || cuerpo.agregar || cuerpo.zona_id !== undefined) { cuerpo.ya_pago_todo = true; cuerpo.anticipo_metodo = metodoAnt; }
+        } else if (p.anticipo > 0) cuerpo.anticipo = 0;
+      }
       if (v('fecha') && v('hora') && `${v('fecha')}T${v('hora')}` !== prog) cuerpo.programado_para = `${v('fecha')}T${v('hora')}`;
       if (!Object.keys(cuerpo).length) { pintarDetalle(m, p); return; }
       try {

@@ -97,7 +97,7 @@ async function cargarBandeja() {
       // Si el ticket viene de un pedido (para recoger o a domicilio), se marca para que el cajero lo distinga.
       const quien = String(t.pedido_contacto || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const marcaPedido = t.pedido_id
-        ? `<br><small style="display:inline-block; margin-top:2px; padding:1px 7px; border-radius:8px; font-weight:700; background:rgba(21,101,192,.16);">${t.pedido_tipo === 'recoger' ? '🏪 Recoge' : '🛵 Domicilio'}${quien ? ' · ' + quien : ''}</small>`
+        ? `<br><small style="display:inline-block; margin-top:2px; padding:1px 7px; border-radius:8px; font-weight:700; background:rgba(21,101,192,.16);">${t.pedido_tipo === 'recoger' ? '🏪 Recoge' : '🛵 Domicilio'}${quien ? ' · ' + quien : ''}${Number(t.pedido_anticipo) > 0 ? (Number(t.pedido_anticipo) >= Number(t.total) ? ' · YA PAGÓ' : ' · Anticipo $' + Number(t.pedido_anticipo).toFixed(2)) : ''}</small>`
         : '';
 
       const div = document.createElement('div');
@@ -139,6 +139,17 @@ function totalNetoActual() {
   return parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0) - descuentoItems;
 }
 
+// Si el ticket es de un pedido con anticipo: qué decirle al cajero (el ticket se cobra por el TOTAL; el anticipo ya cuenta).
+function htmlAvisoAnticipo(t, totalNeto) {
+  const a = Number(t && t.pedido_anticipo) || 0;
+  if (!(a > 0)) return '';
+  const m = ['efectivo', 'transferencia', 'tarjeta'].includes(t.pedido_anticipo_metodo) ? t.pedido_anticipo_metodo : 'efectivo';
+  const resta = Math.max(0, Math.round((totalNeto - a) * 100) / 100);
+  if (resta <= 0) return `✅ <b>Ya pagó todo por adelantado</b> ($${a.toFixed(2)} con ${m}). No le cobres dinero: solo registra el cobro con ese método para cerrar el ticket.`;
+  return `💰 <b>Anticipo recibido: $${a.toFixed(2)}</b> (${m}). El cliente paga ahora <b>$${resta.toFixed(2)}</b>. Cobra el ticket por el total: el anticipo ya cuenta`
+    + (m === 'efectivo' ? ' (si lo dejó en efectivo, ya está en tu caja).' : `; como lo dejó por ${m}, usa «Mixto»: efectivo $${resta.toFixed(2)} + ${m} $${a.toFixed(2)}.`);
+}
+
 function renderPanelCobro() {
   const t = ticketActual;
   const panel = document.getElementById('panelCobro');
@@ -177,6 +188,7 @@ function renderPanelCobro() {
     </div>
     ${itemsHtml}
     ${filasDescuento}
+    ${htmlAvisoAnticipo(t, totalNetoActual()) ? `<div style="background:rgba(95,174,70,.12); border:1px solid var(--primary,#5FAE46); border-radius:10px; padding:9px 12px; margin:10px 0 0; font-size:14px; line-height:1.4;">${htmlAvisoAnticipo(t, totalNetoActual())}</div>` : ''}
     <div class="total-box" style="font-size:28px; font-weight:800; color:var(--primary,#5FAE46); text-align:right; margin:12px 0;">Total: $${totalNetoActual().toFixed(2)}</div>
 
     <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="abrirDescuento()">🏷️ Aplicar descuento</button>

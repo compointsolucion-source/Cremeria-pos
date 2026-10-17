@@ -275,7 +275,7 @@ const PTX = (function () {
         wa.href = UBICACION.urlWhatsApp(sel.telefono, texto) || '#';
       }
       m.el.querySelector('#rt_imp').onclick = () => imprimirContenido(`<h2>Ruta ${esc(U.fechaLarga(fecha))}${sel ? ' · ' + esc(sel.nombre) : ''}</h2>`
-        + lista.map((p, n) => `<p><b>${n + 1}. ${p.programado_para ? hora12(p.programado_para) : 'Pronto'} — ${esc(p.nombre_contacto)}</b> ${esc(p.telefono || '')}<br>${esc(UBICACION.textoDireccion(p))}${p.referencias ? '<br><i>' + esc(p.referencias) + '</i>' : ''}<br>${p.por_cobrar ? 'COBRAR ' + dinero(p.total_neto) : 'Ya pagado'}</p>`).join(''));
+        + lista.map((p, n) => `<p><b>${n + 1}. ${p.programado_para ? hora12(p.programado_para) : 'Pronto'} — ${esc(p.nombre_contacto)}</b> ${esc(p.telefono || '')}<br>${esc(UBICACION.textoDireccion(p))}${p.referencias ? '<br><i>' + esc(p.referencias) + '</i>' : ''}<br>${p.por_cobrar ? 'COBRAR ' + dinero(p.resta !== undefined && p.resta !== null ? p.resta : p.total_neto) + (p.anticipo > 0 ? ' (anticipo ' + dinero(p.anticipo) + ')' : '') : p.estado_cobro === 'pagado' ? 'Ya pagado' : p.estado_cobro === 'credito' ? 'A crédito' : 'Se cobra en Caja'}</p>`).join(''));
     }
     cargar();
   }

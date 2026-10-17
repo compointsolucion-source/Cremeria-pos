@@ -224,7 +224,7 @@ router.get('/pendientes', verificarToken, async (req, res) => {
       // toca preparar, no estorban en la bandeja de Caja: salen cuando les corresponde.
       result = await pool.query(
         `SELECT t.*, p.id AS pedido_id, p.tipo AS pedido_tipo, p.estado AS pedido_estado, p.pago_modo AS pedido_pago_modo,
-                p.nombre_contacto AS pedido_contacto
+                p.nombre_contacto AS pedido_contacto, p.anticipo AS pedido_anticipo, p.anticipo_metodo AS pedido_anticipo_metodo
            FROM tickets t LEFT JOIN pedidos p ON p.ticket_id = t.id
           WHERE t.sucursal_id = $1 AND t.estado = 'pendiente'
             AND (p.id IS NULL OR (p.estado NOT IN ('programado', 'cancelado') AND NOT (p.tipo = 'domicilio' AND p.pago_modo = 'al_recibir')))
@@ -275,7 +275,20 @@ router.get('/folio/:folio', verificarToken, async (req, res) => {
         WHERE d.ticket_id = $1 ORDER BY d.id`,
       [ticket.id]
     );
-    res.json({ ...ticket, items: detalleResult.rows });
+    // Si es el ticket de un pedido (a domicilio / para recoger), Caja ve quién es y si dejó anticipo.
+    let pedido = {};
+    try {
+      const pr = await pool.query(
+        `SELECT id, tipo, estado, pago_modo, nombre_contacto, anticipo, anticipo_metodo FROM pedidos WHERE ticket_id = $1`, [ticket.id]);
+      if (pr.rows.length) {
+        const x = pr.rows[0];
+        pedido = { pedido_id: x.id, pedido_tipo: x.tipo, pedido_estado: x.estado, pedido_pago_modo: x.pago_modo, pedido_contacto: x.nombre_contacto,
+          pedido_anticipo: x.anticipo, pedido_anticipo_metodo: x.anticipo_metodo };
+      }
+    } catch (e) {
+      if (e.code !== '42P01' && e.code !== '42703') throw e; // sin tabla/columnas de pedidos todavía: el ticket de siempre
+    }
+    res.json({ ...ticket, ...pedido, items: detalleResult.rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al buscar el ticket' });

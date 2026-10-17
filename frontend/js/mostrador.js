@@ -16,6 +16,8 @@ let granelCampo = 'cantidad';
 let granelTexto = '';
 let granelFresco = false;
 let cantidadUnidad = 1;
+let unidadFresca = false; // piezas: si el siguiente número tecleado reemplaza a la cantidad (igual que "granelFresco")
+let ultimaTeclaModal = 0;
 let scannerActivo = false;
 let html5QrCode;
 
@@ -382,6 +384,7 @@ function confirmarPeso() {
 function abrirModalUnidad(producto) {
   productoSeleccionado = producto;
   cantidadUnidad = 1;
+  unidadFresca = true;
   document.getElementById('modalUnidadNombre').textContent = producto.nombre;
   actualizarDisplayUnidad();
   document.getElementById('modalUnidad').classList.add('abierto');
@@ -389,6 +392,7 @@ function abrirModalUnidad(producto) {
 
 function cambiarCantidadUnidad(delta) {
   cantidadUnidad = Math.max(1, cantidadUnidad + delta);
+  unidadFresca = true; // el siguiente número que se teclee reemplaza a este
   actualizarDisplayUnidad();
 }
 
@@ -753,6 +757,7 @@ async function imprimirTicket(ticket) {
     items: ticket.items.map(i => ({
       nombre_producto: i.nombre_producto,
       detalle: i.detalle !== undefined ? i.detalle : GRANEL.detalle(i),
+      cantidad_texto: i.cantidad_texto, // pedidos: "1.500 kg" (se usa cuando no se imprime el precio de cada producto)
       subtotal: parseFloat(i.subtotal).toFixed(2)
     })),
     total: parseFloat(ticket.total).toFixed(2),
@@ -767,10 +772,15 @@ async function imprimirTicket(ticket) {
   };
   // Ticket de un pedido que ya quedó listo (js/mostrador-pedidos.js): lleva los datos del cliente en letra
   // grande y, al final, el código de BARRAS del folio para que Caja lo escanee.
+  // Lo que el dueño eligió en Configuración → Ticket de domicilio (letra, qué se imprime, espacios) viene en ticket.ajustes.
   if (ticket.pedido) {
-    datosTicket.pedido = ticket.pedido;
-    datosTicket.codigoAlFinal = true;
-    datosTicket.tipoCodigoEscaneo = 'barras';
+    if (typeof MostradorPedidos !== 'undefined' && MostradorPedidos.aplicarAjustesPedido) {
+      MostradorPedidos.aplicarAjustesPedido(datosTicket, ticket);
+    } else {
+      datosTicket.pedido = ticket.pedido;
+      datosTicket.codigoAlFinal = true;
+      datosTicket.tipoCodigoEscaneo = 'barras';
+    }
   }
 
   const modoImpresion = localStorage.getItem('modo_impresion') || 'directo';
@@ -796,6 +806,42 @@ setTimeout(actualizarBannerImpresora, 500);
 // Atajos de teclado: F1 buscar (ahora sí existe el buscador), F2 escanear,
 // F3 nueva venta (vaciar carrito), F4 generar ticket, ESC cerrar modal abierto.
 // DELETE sigue sin aplicar: no hay un ítem "seleccionado" en el carrito.
+// Teclado de la computadora dentro de las ventanas de cantidad (kilos o piezas): antes solo se podía
+// con los botones de la pantalla. Devuelve true si la tecla se usó aquí.
+//   Kilos:  0-9 y . o ,  escriben · Retroceso borra · Supr limpia · Tab (o ←/→) cambia Cantidad/Importe · Enter agrega
+//   Piezas: 0-9 escriben la cantidad · + / − (o ↑/↓) suben y bajan · Retroceso borra · Enter agrega
+function teclaEnVentanaDeCantidad(e, esPeso) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  const a = GRANEL.accionTecla(e.key);
+  if (!a) return false;
+  // Un lector de código de barras "teclea" muy rápido: esos números no son para la cantidad.
+  const ahora = Date.now();
+  const muyRapido = ahora - ultimaTeclaModal < 30;
+  ultimaTeclaModal = ahora;
+  if (muyRapido && ['digito', 'punto', 'confirmar'].includes(a.accion)) return false;
+
+  if (esPeso) {
+    if (!['digito', 'punto', 'borrar', 'limpiar', 'cambiar', 'confirmar'].includes(a.accion)) return false;
+    e.preventDefault(); // también evita que Enter o Tab "pulsen" un botón que haya quedado enfocado
+    if (a.accion === 'digito') teclear(a.valor);
+    else if (a.accion === 'punto') teclear('.');
+    else if (a.accion === 'borrar') borrarUltimo();
+    else if (a.accion === 'limpiar') { granelTexto = ''; granelFresco = false; actualizarDisplayPeso(); }
+    else if (a.accion === 'cambiar') granelActivar(granelCampo === 'cantidad' ? 'importe' : 'cantidad');
+    else confirmarPeso();
+    return true;
+  }
+
+  if (!['digito', 'borrar', 'mas', 'menos', 'confirmar'].includes(a.accion)) return false;
+  e.preventDefault();
+  if (a.accion === 'digito') { cantidadUnidad = GRANEL.cantidadUnidadTecleada(cantidadUnidad, a.valor, unidadFresca); unidadFresca = false; actualizarDisplayUnidad(); }
+  else if (a.accion === 'borrar') { cantidadUnidad = Math.max(1, Math.floor(cantidadUnidad / 10)); unidadFresca = false; actualizarDisplayUnidad(); }
+  else if (a.accion === 'mas') cambiarCantidadUnidad(1);
+  else if (a.accion === 'menos') cambiarCantidadUnidad(-1);
+  else confirmarUnidad();
+  return true;
+}
+
 document.addEventListener('keydown', async (e) => {
   const enCampoDeTexto = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
 
@@ -805,6 +851,9 @@ document.addEventListener('keydown', async (e) => {
     document.getElementById('buscadorProductos').blur();
     return;
   }
+  const ventanaPeso = document.getElementById('modalPeso').classList.contains('abierto');
+  const ventanaUnidad = document.getElementById('modalUnidad').classList.contains('abierto');
+  if ((ventanaPeso || ventanaUnidad) && teclaEnVentanaDeCantidad(e, ventanaPeso)) return;
   if (e.key === 'F1') { e.preventDefault(); document.getElementById('buscadorProductos').focus(); return; }
   if (enCampoDeTexto) return; // no interferir con lo que el usuario esté escribiendo
 

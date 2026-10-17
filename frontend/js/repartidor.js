@@ -112,8 +112,14 @@ const REP = (function () {
     return [...E.datos.pendientes, ...E.datos.disponibles, ...E.datos.hechos_hoy].find((p) => p.id === Number(id)) || null;
   }
   // por_cobrar es un sí/no (true cuando el cliente paga al recibir y el ticket sigue sin cobrarse); el monto es el total del pedido.
-  const montoCobrar = (p) => Number(p.total_neto) || 0;
-  const esCobro = (p) => p.pago_modo === 'al_recibir' && p.por_cobrar !== false;
+  // Lo que el repartidor cobra en la puerta es la RESTA (el total menos el anticipo que el cliente ya dejó).
+  const montoCobrar = (p) => (p.resta !== undefined && p.resta !== null ? Number(p.resta) : Number(p.total_neto)) || 0;
+  const esCobro = (p) => p.pago_modo === 'al_recibir' && p.por_cobrar !== false && p.estado_cobro !== 'pagado';
+  // Aviso cuando NO cobra: «ya está pagado» solo si de verdad ya se pagó; si se cobra en Caja lo dice tal cual.
+  const sinCobro = (p) => p.estado_cobro === 'credito' || p.pago_modo === 'credito'
+    ? { clase: 'cred', c1: 'A crédito del cliente', c3: 'Queda en su cuenta de la tienda' }
+    : p.estado_cobro === 'pagado' ? { clase: 'ok', c1: 'Ya está pagado', c3: 'Solo entrégalo' }
+    : { clase: 'ok', c1: 'No cobres nada', c3: 'Se cobra en Caja' };
   const fueCobrado = (p) => p.monto_cobrado !== null && p.monto_cobrado !== undefined && p.monto_cobrado !== '';
   const tieneDireccion = (p) => lleno(p.calle) || (U && U.tieneCoordenadas(p));
   const telefonoOk = (p) => lleno(p.telefono) && U && U.telefonoInternacional(p.telefono);
@@ -121,6 +127,7 @@ const REP = (function () {
   function badgeCobro(p) {
     if (esCobro(p)) return `<span class="rp-badge rp-b-cobrar">COBRAR ${dinero(montoCobrar(p))}</span>`;
     if (p.pago_modo === 'credito') return '<span class="rp-badge rp-b-credito">A CRÉDITO</span>';
+    if (p.estado_cobro === 'en_caja') return '<span class="rp-badge rp-b-pagado">SE COBRA EN CAJA</span>';
     return '<span class="rp-badge rp-b-pagado">PAGADO</span>';
   }
   const horaTxt = (p) => (p.programado_para ? hora12(p.programado_para) : 'Lo antes posible');
@@ -276,11 +283,10 @@ const REP = (function () {
         const paga = Number(p.paga_con) || 0;
         const cambio = paga > monto ? (Number(p.cambio) > 0 ? Number(p.cambio) : Math.round((paga - monto) * 100) / 100) : 0;
         h += `<div class="rp-cobrar"><div class="c1">Cobra al entregar</div><div class="c2">${dinero(monto)}</div>
-          <div class="c3">${paga > monto ? `Paga con ${dinero(paga)} · lleva cambio de <b>${dinero(cambio)}</b>` : paga ? 'Paga exacto' : 'No se anotó con cuánto paga'}</div></div>`;
-      } else if (p.pago_modo === 'credito') {
-        h += '<div class="rp-cobrar cred"><div class="c1">A crédito del cliente</div><div class="c2">No cobres nada</div><div class="c3">Queda en su cuenta de la tienda</div></div>';
+          <div class="c3">${Number(p.anticipo) > 0 ? `Total ${dinero(p.total_neto)} · ya dejó <b>${dinero(p.anticipo)}</b> de anticipo<br>` : ''}${paga > monto ? `Paga con ${dinero(paga)} · lleva cambio de <b>${dinero(cambio)}</b>` : paga ? 'Paga exacto' : 'No se anotó con cuánto paga'}</div></div>`;
       } else {
-        h += '<div class="rp-cobrar ok"><div class="c1">Ya está pagado</div><div class="c2">No cobres nada</div><div class="c3">Solo entrégalo</div></div>';
+        const sc = sinCobro(p);
+        h += `<div class="rp-cobrar ${sc.clase}"><div class="c1">${sc.c1}</div><div class="c2">${sc.c1 === 'No cobres nada' ? 'Solo entrégalo' : 'No cobres nada'}</div><div class="c3">${sc.c3}</div></div>`;
       }
     }
 
@@ -455,7 +461,7 @@ const REP = (function () {
           <button type="button" class="rp-metodo on" data-m="efectivo"><span>💵</span>Efectivo</button>
           <button type="button" class="rp-metodo" data-m="transferencia"><span>🏦</span>Transferencia</button>
           <button type="button" class="rp-metodo" data-m="tarjeta"><span>💳</span>Tarjeta</button>
-        </div>` : `<div class="rp-cobrar ${p.pago_modo === 'credito' ? 'cred' : 'ok'}" style="margin-top:0"><div class="c1">${p.pago_modo === 'credito' ? 'A crédito del cliente' : 'Ya está pagado'}</div><div class="c2">No cobres nada</div></div>`}
+        </div>` : (() => { const sc = sinCobro(p); return `<div class="rp-cobrar ${sc.clase}" style="margin-top:0"><div class="c1">${sc.c1}</div><div class="c2">No cobres nada</div>${sc.c1 === 'No cobres nada' ? `<div class="c3">${sc.c3}</div>` : ''}</div>`; })()}
       <div class="rp-prueba">
         <div class="tit"><span>📷 Foto de la entrega ${cfg.foto_obligatoria ? '<span class="rp-oblig">obligatoria</span>' : '<small style="color:var(--muted);font-weight:600">(opcional)</small>'}</span>
           <button type="button" class="rp-chico" id="rpFotoBtn">Tomar foto</button></div>

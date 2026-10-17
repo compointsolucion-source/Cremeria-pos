@@ -35,6 +35,7 @@
     tipo: 'domicilio', cliente: null, modoCliente: 'buscar', q: '', resultados: null, nuevoNombre: '', telefono: '', guardarCliente: true,
     dirSel: 'nueva', dir: dirVacia(), dirBase: null, zonaId: null, envioForzado: null,
     cuando: 'ya', fecha: '', hora: '', repartidorId: '', pago: 'al_recibir', pagaCon: '', notas: '',
+    adelanto: 'ninguno', anticipoMonto: '', anticipoMetodo: 'efectivo',   // ¿ya pagó algo? ninguno | anticipo | todo
     enviando: false, exito: null
   });
   function dirVacia() { return { alias: '', calle: '', colonia: '', cp: '', ciudad: '', referencias: '', ubicacion: '', latitud: null, longitud: null, ubicacion_enlace: null }; }
@@ -79,6 +80,10 @@
     return { costo: gratis ? 0 : z.costo, gratis, falta: min > 0 && !gratis ? r2(min - sub) : 0, minimo: min, zona: z };
   }
   const totalPedido = () => r2(subtotalCarrito() + calcEnvio().costo);
+  // Anticipo: lo que el cliente ya dejó. "Ya pagó todo" = anticipo igual al total. Lo que se cobra después es la resta.
+  const anticipoPedido = () => (!S ? 0 : S.adelanto === 'todo' ? totalPedido() : S.adelanto === 'anticipo' ? Math.max(0, r2(Number(S.anticipoMonto) || 0)) : 0);
+  const restaPedido = () => Math.max(0, r2(totalPedido() - anticipoPedido()));
+  const NOMBRE_METODO = { efectivo: 'efectivo', transferencia: 'transferencia', tarjeta: 'tarjeta' };
 
   // ------------------------------------------------------------------ selector de modo (barra del Mostrador)
   PD.setModo = function (m) {
@@ -510,6 +515,11 @@
       h += `<div class="pd-sum"><span>🛵 Envío${e.zona ? ' · ' + esc(e.zona.nombre) : ''}${e.gratis ? ' <span class="pd-tag ok">Gratis</span>' : ''}${e.manual ? ' <span class="pd-tag aviso">A mano</span>' : ''}</span><span>${dinero(e.costo)}</span></div>`;
     }
     h += `<div class="pd-total"><span>Total</span><span>${dinero(totalPedido())}</span></div>`;
+    const ant = anticipoPedido();
+    if (ant > 0) {
+      h += `<div class="pd-sum" style="margin-top:4px"><span>💰 ${S.adelanto === 'todo' ? 'Ya pagó' : 'Anticipo'} (${NOMBRE_METODO[S.anticipoMetodo] || 'efectivo'})</span><span>−${dinero(ant)}</span></div>
+        <div class="pd-sum" style="font-weight:800"><span>${restaPedido() > 0 ? 'Resta por cobrar' : 'Por cobrar'}</span><span>${dinero(restaPedido())}</span></div>`;
+    }
     el.innerHTML = h;
     const pt = $('pdPieTotal'); if (pt) pt.textContent = dinero(totalPedido());
   }
@@ -535,28 +545,70 @@
     if (!el || !S) return;
     const dom = S.tipo === 'domicilio';
     const sinCliente = !S.cliente;
+    const todo = S.adelanto === 'todo';
+    const resta = restaPedido();
     const op = (id, titulo, sub, extra, bloq) => `<div class="pd-pago ${S.pago === id ? 'sel' : ''} ${bloq ? 'bloq' : ''}" ${bloq ? '' : `onclick="PedidoDom.pago('${id}')"`}><span class="punto"></span><div style="flex:1;min-width:0"><b>${titulo}</b><small>${sub}</small>${S.pago === id && extra ? extra : ''}</div></div>`;
-    let h = '<h3>💵 ¿Cómo paga?</h3>';
-    if (dom) {
-      const cambio = Number(S.pagaCon) > 0 ? Math.max(0, r2(Number(S.pagaCon) - totalPedido())) : null;
-      h += op('al_recibir', 'Paga al recibir', 'El repartidor cobra (efectivo, transferencia o tarjeta) y entrega el dinero en caja.',
-        `<div class="pd-pagacon" onclick="event.stopPropagation()"><label for="pdPagaCon">¿Con cuánto paga?</label><input type="number" id="pdPagaCon" inputmode="decimal" min="0" step="any" placeholder="${totalPedido().toFixed(2)}" value="${esc(S.pagaCon)}" oninput="PedidoDom.pagaCon(this.value)"> <span id="pdCambio">${cambio !== null ? 'cambio: ' + dinero(cambio) : ''}</span></div>`);
-      h += op('pagado', 'Se cobra en Caja', 'Ya pagó (tarjeta o transferencia) o paga en el local. El repartidor no cobra nada.');
-    } else {
-      h += op('pagado', 'Paga al recoger (en Caja)', 'El pedido aparece en la bandeja de Caja para cobrarlo.');
+    const ad = (id, titulo, sub, extra) => `<div class="pd-pago ${S.adelanto === id ? 'sel' : ''}" onclick="PedidoDom.adelanto('${id}')"><span class="punto"></span><div style="flex:1;min-width:0"><b>${titulo}</b><small>${sub}</small>${S.adelanto === id && extra ? extra : ''}</div></div>`;
+    const metodos = `<div class="pd-metodos" onclick="event.stopPropagation()" role="group" aria-label="¿Con qué lo pagó?">${[['efectivo', '💵 Efectivo'], ['transferencia', '🏦 Transferencia'], ['tarjeta', '💳 Tarjeta']].map(([k, t]) => `<button type="button" class="pd-metodo ${S.anticipoMetodo === k ? 'on' : ''}" onclick="PedidoDom.anticipoMetodo('${k}')">${t}</button>`).join('')}</div>`;
+
+    // 1) ¿Ya pagó algo? (anticipo o pago completo). A crédito no aplica.
+    let h = '';
+    if (S.pago !== 'credito') {
+      h += '<h3>💰 ¿Ya pagó algo?</h3>';
+      h += ad('ninguno', 'No ha pagado nada', 'Se cobra todo al entregar o al recoger.');
+      h += ad('anticipo', 'Dio anticipo', 'Anota cuánto dejó. Al entregar o recoger solo se cobra lo que falta.',
+        `<div class="pd-pagacon" onclick="event.stopPropagation()"><label for="pdAnticipo">Dejó $</label><input type="number" id="pdAnticipo" inputmode="decimal" min="0" step="any" placeholder="0.00" value="${esc(S.anticipoMonto)}" oninput="PedidoDom.anticipoMonto(this.value)"> <span id="pdResta">${restaTexto()}</span></div>${metodos}`);
+      h += ad('todo', 'Ya pagó todo', 'Ya pagó el total por adelantado: en el ticket sale «YA PAGADO» y nadie le cobra nada más.', metodos);
     }
-    h += op('credito', 'A crédito del cliente', sinCliente ? 'Primero elige un cliente guardado.' : `Se suma a su cuenta${S.cliente.saldo_actual ? ' (debe ' + dinero(S.cliente.saldo_actual) + ')' : ''}.`, '', sinCliente);
-    const avisoCredito = textoAvisoCredito();
-    if (avisoCredito) h += `<div class="pd-aviso-credito" role="alert">${avisoCredito}</div>`;
+
+    // 2) ¿Cómo paga el resto?
+    h += `<h3${h ? ' style="margin-top:16px"' : ''}>💵 ${S.adelanto === 'anticipo' ? '¿Cómo paga lo que falta?' : '¿Cómo paga?'}</h3>`;
+    if (todo) {
+      h += `<div class="pd-pagado-aviso">✅ <b>Ya pagó todo</b> (${NOMBRE_METODO[S.anticipoMetodo] || 'efectivo'}). No hay nada que cobrar${dom ? ' al entregar' : ' al recoger'}. Caja solo registra el pago.</div>`;
+    } else {
+      if (dom) {
+        const cambio = Number(S.pagaCon) > 0 ? Math.max(0, r2(Number(S.pagaCon) - resta)) : null;
+        h += op('al_recibir', 'Paga al recibir', 'El repartidor cobra (efectivo, transferencia o tarjeta) y entrega el dinero en caja.',
+          `<div class="pd-pagacon" onclick="event.stopPropagation()"><label for="pdPagaCon">¿Con cuánto paga?</label><input type="number" id="pdPagaCon" inputmode="decimal" min="0" step="any" placeholder="${resta.toFixed(2)}" value="${esc(S.pagaCon)}" oninput="PedidoDom.pagaCon(this.value)"> <span id="pdCambio">${cambio !== null ? 'cambio: ' + dinero(cambio) : ''}</span></div>`);
+        h += op('pagado', 'Se cobra en Caja', 'Se cobra en Caja, no con el repartidor. Si ya pagó, usa «Ya pagó todo» o «Dio anticipo» arriba.');
+      } else {
+        h += op('pagado', 'Paga al recoger (en Caja)', 'El pedido aparece en la bandeja de Caja para cobrarlo.');
+      }
+      h += op('credito', 'A crédito del cliente', sinCliente ? 'Primero elige un cliente guardado.' : `Se suma a su cuenta${S.cliente.saldo_actual ? ' (debe ' + dinero(S.cliente.saldo_actual) + ')' : ''}.`, '', sinCliente);
+      const avisoCredito = textoAvisoCredito();
+      if (avisoCredito) h += `<div class="pd-aviso-credito" role="alert">${avisoCredito}</div>`;
+    }
     h += `<label class="pd-etq" for="pdNotas">Notas del pedido (opcional)</label><input type="text" id="pdNotas" maxlength="300" placeholder="Ej. Sin sal, tocar el timbre…" value="${esc(S.notas)}" oninput="PedidoDom.set('notas', this.value)">`;
     el.innerHTML = h;
   }
 
-  PD.pago = function (m) { S.pago = m; renderCobro(); };
+  function restaTexto() {
+    const a = anticipoPedido();
+    return a > 0 ? `resta por cobrar: <b>${dinero(restaPedido())}</b>` : '';
+  }
+
+  // Cambiar entre "no ha pagado / anticipo / ya pagó todo".
+  PD.adelanto = function (id) {
+    if (!S || S.adelanto === id) return;
+    S.adelanto = id;
+    if (id !== 'ninguno' && S.pago === 'credito') S.pago = S.tipo === 'domicilio' ? 'al_recibir' : 'pagado';   // a crédito no hay anticipo
+    renderResumen(); renderCobro();
+    if (id === 'anticipo') { const f = $('pdAnticipo'); if (f) f.focus(); }
+  };
+  PD.anticipoMonto = function (v) {
+    S.anticipoMonto = v;
+    const r = $('pdResta'); if (r) r.innerHTML = restaTexto();
+    const c = $('pdCambio');
+    if (c) { const n = Number(S.pagaCon); c.textContent = n > 0 ? 'cambio: ' + dinero(Math.max(0, r2(n - restaPedido()))) : ''; }
+    renderResumen();
+  };
+  PD.anticipoMetodo = function (m) { S.anticipoMetodo = m; renderResumen(); renderCobro(); };
+
+  PD.pago = function (m) { S.pago = m; if (m === 'credito') S.adelanto = 'ninguno'; renderResumen(); renderCobro(); };
   PD.pagaCon = function (v) {
     S.pagaCon = v;
     const c = $('pdCambio');
-    if (c) { const n = Number(v); c.textContent = n > 0 ? 'cambio: ' + dinero(Math.max(0, r2(n - totalPedido()))) : ''; }
+    if (c) { const n = Number(v); c.textContent = n > 0 ? 'cambio: ' + dinero(Math.max(0, r2(n - restaPedido()))) : ''; }
   };
 
   function renderBotones() {
@@ -594,6 +646,12 @@
       if (prog.getTime() < Date.now() - 60000) return 'Esa hora ya pasó. Elige una hora que todavía no llega.';
     }
     if (S.pagaCon !== '' && !(Number(S.pagaCon) >= 0)) return 'Revisa con cuánto paga el cliente.';
+    if (S.adelanto === 'anticipo') {
+      const a = r2(Number(S.anticipoMonto));
+      if (!(a > 0)) return 'Escribe cuánto dejó de anticipo (o elige «No ha pagado nada»).';
+      if (a > totalPedido()) return `El anticipo (${dinero(a)}) no puede ser mayor que el total del pedido (${dinero(totalPedido())}).`;
+      if (a === totalPedido()) return 'El anticipo es igual al total: elige «Ya pagó todo».';
+    }
     return '';
   }
 
@@ -622,8 +680,10 @@
       if (S.zonaId) cuerpo.zona_id = S.zonaId;
       if (S.envioForzado !== null && S.envioForzado !== undefined) cuerpo.costo_envio = S.envioForzado;
       if (lleno(S.repartidorId)) cuerpo.repartidor_id = Number(S.repartidorId);
-      if (S.pago === 'al_recibir' && lleno(S.pagaCon)) cuerpo.paga_con = Number(S.pagaCon);
+      if (S.pago === 'al_recibir' && S.adelanto !== 'todo' && lleno(S.pagaCon)) cuerpo.paga_con = Number(S.pagaCon);
     }
+    if (S.adelanto === 'anticipo') { cuerpo.anticipo = r2(Number(S.anticipoMonto)); cuerpo.anticipo_metodo = S.anticipoMetodo; }
+    else if (S.adelanto === 'todo') { cuerpo.ya_pago_todo = true; cuerpo.anticipo_metodo = S.anticipoMetodo; }
     if (S.cuando === 'programar') cuerpo.programado_para = `${S.fecha}T${S.hora}`;
     return cuerpo;
   }
@@ -663,7 +723,9 @@
     const msg = `Hola ${p.nombre_contacto || ''}, recibimos tu pedido ${p.etiqueta} por ${dinero(total)}. ` + (p.estado === 'programado' && lleno(p.programado_para) ? `Lo ${p.tipo === 'recoger' ? 'tendremos listo' : 'entregaremos'} ${fechaBonita(String(p.programado_para).slice(0, 10))} a las ${horaBonita(String(p.programado_para).slice(11, 16))}. ` : 'Ya lo estamos preparando. ') + '¡Gracias!';
     const wa = UBICACION.urlWhatsApp(tel, msg);
     ex.innerHTML = `<div class="pd-exito"><div class="grande">✅</div><h3>Pedido ${esc(p.etiqueta)} creado</h3>
-      <p><b>${esc(p.nombre_contacto || '')}</b> · ${dinero(total)} · ticket ${esc(p.folio)}</p><p>${esc(linea)}</p>
+      <p><b>${esc(p.nombre_contacto || '')}</b> · ${dinero(total)} · ticket ${esc(p.folio)}</p>
+      ${Number(p.anticipo) > 0 ? `<p>💰 ${Number(p.resta) > 0 ? `Dejó anticipo de <b>${dinero(p.anticipo)}</b> (${esc(p.anticipo_metodo || 'efectivo')}) · falta cobrar <b>${dinero(p.resta)}</b>` : `<b>Ya pagó todo</b> (${esc(p.anticipo_metodo || 'efectivo')}) · no hay nada que cobrar`}</p>` : ''}
+      <p>${esc(linea)}</p>
       <div class="acciones">
         ${wa ? `<a class="btn btn-secondary" href="${esc(wa)}" target="_blank" rel="noopener">💬 Confirmar por WhatsApp</a>` : ''}
         <a class="btn btn-secondary" href="pedidos.html">📋 Ver el tablero</a>

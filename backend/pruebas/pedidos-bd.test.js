@@ -893,3 +893,178 @@ test('Mostrador: un pedido programado entra a la lista de preparar cuando llega 
   assert.ok(x && !x.aceptado_en && x.programado_para === dentroDe);
   await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
 });
+
+// ---------------------------------------------------------------- anticipo / ya pagó todo
+const nuevoPedido = async (extra = {}) => api('mostrador', 'POST', '/api/pedidos', {
+  tipo: 'domicilio', nombre_contacto: 'Cliente Anticipo', telefono: '3355556666', direccion: direccion({ calle: 'Calle Anticipo 9' }), zona_id: zona1,
+  pago_modo: 'al_recibir', items: [queso(1)], ...extra });   // queso 190 + envío 25 = 215
+const entregarComo = async (quien, p, metodo) => {
+  await api('mostrador', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'listo' });
+  await api(quien, 'POST', `/api/pedidos/repartidor/${p.id}/salir`);
+  return api(quien, 'POST', `/api/pedidos/repartidor/${p.id}/entregar`, { metodo_cobro: metodo });
+};
+
+test('anticipo: a domicilio con anticipo — el repartidor cobra solo lo que resta y la liquidación cuadra con el ticket', async () => {
+  const r = await nuevoPedido({ paga_con: 300, anticipo: 100, anticipo_metodo: 'efectivo', repartidor_id: U.luis });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const p = r.json;
+  assert.equal(p.total_neto, 215);
+  assert.equal(p.anticipo, 100);
+  assert.equal(p.anticipo_metodo, 'efectivo');
+  assert.equal(p.resta, 115);
+  assert.equal(p.estado_cobro, 'al_recibir');
+  assert.equal(p.por_cobrar, true);
+  assert.equal(p.cambio, 300 - 115);                       // el cambio se calcula contra lo que RESTA
+  assert.ok(!(await api('cajera', 'GET', '/api/tickets/pendientes')).json.find((t) => t.id === p.ticket_id), 'lo cobra el repartidor: no sale en Caja');
+
+  const antes = (await api('luis', 'GET', '/api/pedidos/repartidor/mi-corte')).json;
+  const e = await entregarComo('luis', p, 'efectivo');
+  assert.equal(e.status, 200, JSON.stringify(e.json));
+  assert.equal(e.json.monto_cobrado, 115);                 // en la puerta cobró la resta
+  const corte = (await api('luis', 'GET', '/api/pedidos/repartidor/mi-corte')).json;
+  assert.equal(Math.round((corte.resumen.efectivo - antes.resumen.efectivo) * 100) / 100, 115);
+  const fila = corte.pedidos.find((x) => x.id === p.id);
+  assert.equal(fila.resta, 115);
+  assert.equal(fila.anticipo, 100);
+
+  const liq = await api('cajera', 'POST', '/api/pedidos/liquidar', { repartidor_id: U.luis, turno_id: turnoId, efectivo_entregado: 115, pedido_ids: [p.id] });
+  assert.equal(liq.status, 200, JSON.stringify(liq.json));
+  assert.equal(liq.json.liquidacion.esperado_efectivo, 115);   // el repartidor entrega solo lo que cobró
+  assert.equal(liq.json.liquidacion.diferencia, 0);
+  const tk = (await pool.query('SELECT * FROM tickets WHERE id = $1', [p.ticket_id])).rows[0];
+  assert.equal(tk.estado, 'pagado');
+  assert.equal(tk.metodo_pago, 'efectivo');
+  assert.equal(parseFloat(tk.monto_efectivo), 215);        // el ticket se cobra por el TOTAL: resta + anticipo en efectivo
+  assert.equal(parseFloat(tk.monto_tarjeta), 0);
+});
+
+test('anticipo por transferencia + resta en efectivo: el ticket queda mixto (efectivo = resta, transferencia = anticipo)', async () => {
+  const p = (await nuevoPedido({ anticipo: 80, anticipo_metodo: 'transferencia', repartidor_id: U.luis })).json;
+  assert.equal(p.resta, 135);
+  const e = await entregarComo('luis', p, 'efectivo');
+  assert.equal(e.json.monto_cobrado, 135);
+  const liq = await api('cajera', 'POST', '/api/pedidos/liquidar', { repartidor_id: U.luis, turno_id: turnoId, efectivo_entregado: 135, pedido_ids: [p.id] });
+  assert.equal(liq.status, 200, JSON.stringify(liq.json));
+  assert.equal(liq.json.liquidacion.esperado_efectivo, 135);
+  const tk = (await pool.query('SELECT * FROM tickets WHERE id = $1', [p.ticket_id])).rows[0];
+  assert.equal(tk.metodo_pago, 'mixto');
+  assert.equal(parseFloat(tk.monto_efectivo), 135);
+  assert.equal(parseFloat(tk.monto_tarjeta), 80);
+  assert.equal(parseFloat(tk.monto_efectivo) + parseFloat(tk.monto_tarjeta), 215);
+});
+
+test('ya pagó todo: nada que cobrar, pasa a "se cobra en Caja" como pagado por adelantado y Caja ve el anticipo', async () => {
+  const r = await nuevoPedido({ ya_pago_todo: true, anticipo_metodo: 'transferencia', paga_con: 500 });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const p = r.json;
+  assert.equal(p.anticipo, 215);
+  assert.equal(p.resta, 0);
+  assert.equal(p.pago_modo, 'pagado');                      // el repartidor no cobra nada
+  assert.equal(p.paga_con, null);
+  assert.equal(p.estado_cobro, 'pagado');
+  assert.equal(p.por_cobrar, false);
+  const caja = (await api('cajera', 'GET', '/api/tickets/pendientes')).json.find((t) => t.id === p.ticket_id);
+  assert.ok(caja, 'sale en Caja para registrar el pago');
+  assert.equal(parseFloat(caja.pedido_anticipo), 215);
+  assert.equal(caja.pedido_anticipo_metodo, 'transferencia');
+  const porFolio = await api('cajera', 'GET', `/api/tickets/folio/${p.folio}`);
+  assert.equal(porFolio.status, 200);
+  assert.equal(parseFloat(porFolio.json.pedido_anticipo), 215);
+  assert.equal(porFolio.json.pedido_tipo, 'domicilio');
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+});
+
+test('"se cobra en Caja" SIN anticipo NO es "ya pagado" (el error del ticket «YA PAGADO» en pedidos para recoger)', async () => {
+  const r = await api('mostrador', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Recoge Sin Pagar', telefono: '3300007777', pago_modo: 'pagado', items: [queso(1)] });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.estado_cobro, 'en_caja');
+  assert.equal(r.json.anticipo, 0);
+  assert.equal(r.json.resta, 190);
+  assert.equal(r.json.por_cobrar, false);
+  const domicilio = (await nuevoPedido({ pago_modo: 'pagado', telefono: '3300007778' })).json;
+  assert.equal(domicilio.estado_cobro, 'en_caja');
+  await api('dueno', 'POST', `/api/pedidos/${r.json.id}/estado`, { estado: 'cancelado' });
+  await api('dueno', 'POST', `/api/pedidos/${domicilio.id}/estado`, { estado: 'cancelado' });
+});
+
+test('pedido para recoger con anticipo: resta por cobrar en Caja y Caja ve el anticipo', async () => {
+  const r = await api('mostrador', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Recoge Con Anticipo', telefono: '3300007799', pago_modo: 'pagado', anticipo: 50, items: [queso(1)] });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.anticipo_metodo, 'efectivo');         // sin método: efectivo
+  assert.equal(r.json.resta, 140);
+  assert.equal(r.json.estado_cobro, 'en_caja');
+  const caja = (await api('cajera', 'GET', '/api/tickets/pendientes')).json.find((t) => t.id === r.json.ticket_id);
+  assert.equal(parseFloat(caja.pedido_anticipo), 50);
+  await api('dueno', 'POST', `/api/pedidos/${r.json.id}/estado`, { estado: 'cancelado' });
+});
+
+test('anticipo: validaciones (mayor al total, negativo, método raro, a crédito) y que 0 es "sin anticipo"', async () => {
+  const mal = async (extra, texto) => { const r = await nuevoPedido({ telefono: '3300006666', ...extra }); assert.equal(r.status, 400, JSON.stringify(r.json)); assert.match(r.json.error, texto); };
+  await mal({ anticipo: 500 }, /no puede ser mayor/);
+  await mal({ anticipo: -5 }, /anticipo no es válido/);
+  await mal({ anticipo: 'abc' }, /anticipo no es válido/);
+  await mal({ anticipo: 50, anticipo_metodo: 'cripto' }, /efectivo, transferencia o tarjeta/);
+  await mal({ anticipo: 50, pago_modo: 'credito', cliente_id: clienteMaria }, /crédito no lleva anticipo/);
+  const cero = await nuevoPedido({ anticipo: 0, telefono: '3300006667' });
+  assert.equal(cero.status, 200);
+  assert.equal(cero.json.anticipo, 0);
+  assert.equal(cero.json.anticipo_metodo, null);
+  assert.equal(cero.json.resta, 215);
+  const igual = await nuevoPedido({ anticipo: 215, anticipo_metodo: 'tarjeta', telefono: '3300006668' });   // anticipo = total: es "ya pagó todo"
+  assert.equal(igual.json.pago_modo, 'pagado');
+  assert.equal(igual.json.estado_cobro, 'pagado');
+  await api('dueno', 'POST', `/api/pedidos/${cero.json.id}/estado`, { estado: 'cancelado' });
+  await api('dueno', 'POST', `/api/pedidos/${igual.json.id}/estado`, { estado: 'cancelado' });
+});
+
+test('anticipo: editar un pedido — poner, cambiar y quitar; no puede pasarse del nuevo total; a crédito se rechaza', async () => {
+  const p = (await nuevoPedido({ telefono: '3300005555', items: [queso(2)] })).json;   // 380 + 25 = 405
+  assert.equal(p.total_neto, 405);
+  let r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { anticipo: 200, anticipo_metodo: 'tarjeta' });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.anticipo, 200);
+  assert.equal(r.json.resta, 205);
+  assert.equal(r.json.anticipo_metodo, 'tarjeta');
+  // bajar productos de modo que el total (190 + 25 = 215) siga cubriendo el anticipo: sí; si no lo cubre: error claro
+  const item = r.json.items.find((i) => !i.es_envio);
+  r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { lineas: [{ id: item.id, cantidad: 1 }] });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.total_neto, 215);
+  assert.equal(r.json.resta, 15);
+  r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { anticipo: 300 });
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /no puede ser mayor/);
+  r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { pago_modo: 'credito' });   // sin cliente guardado o con anticipo: no
+  assert.equal(r.status, 400);
+  // "ya pagó todo" desde la edición: el anticipo se iguala al total y el repartidor ya no cobra
+  r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { ya_pago_todo: true, anticipo_metodo: 'efectivo' });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.anticipo, 215);
+  assert.equal(r.json.resta, 0);
+  assert.equal(r.json.pago_modo, 'pagado');
+  assert.equal(r.json.estado_cobro, 'pagado');
+  // quitarlo
+  r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { anticipo: 0 });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.anticipo, 0);
+  assert.equal(r.json.anticipo_metodo, null);
+  assert.equal(r.json.estado_cobro, 'en_caja');
+  assert.equal(r.json.resta, 215);
+  // si el ticket ya se cobró en Caja, el anticipo no se toca
+  const pagado = await api('cajera', 'POST', `/api/tickets/${p.ticket_id}/pagar`, { metodo_pago: 'efectivo', monto_efectivo: 215, turno_id: turnoId, efectivo_recibido: 215 });
+  assert.equal(pagado.status, 200, JSON.stringify(pagado.json));
+  r = await api('mostrador', 'PUT', `/api/pedidos/${p.id}`, { anticipo: 10 });
+  assert.equal(r.status, 409);
+});
+
+test('tablero: "por cobrar" del resumen descuenta el anticipo', async () => {
+  const ant = (await api('dueno', 'GET', '/api/pedidos/resumen')).json.por_cobrar;
+  const p = (await nuevoPedido({ telefono: '3300004444', anticipo: 100, repartidor_id: U.pedro })).json;
+  await api('mostrador', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'listo' });
+  await api('pedro', 'POST', `/api/pedidos/repartidor/${p.id}/salir`);
+  const durante = (await api('dueno', 'GET', '/api/pedidos/resumen')).json.por_cobrar;
+  assert.equal(Math.round((durante - ant) * 100) / 100, 115);
+  const reps = (await api('dueno', 'GET', '/api/pedidos/repartidores')).json.find((x) => x.id === U.pedro);
+  assert.ok(reps.trae_por_cobrar >= 115);
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+});

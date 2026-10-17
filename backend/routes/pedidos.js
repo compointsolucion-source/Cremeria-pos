@@ -88,8 +88,19 @@ function formato(r) {
   for (const k of ['costo_envio', 'total_neto', 'ticket_total', 'monto_cobrado', 'paga_con', 'latitud', 'longitud']) o[k] = aNumero(r[k]);
   o.n_items = Number(r.n_items || 0);
   o.retraso_min = Number(r.retraso_min || 0);
-  o.por_cobrar = r.tipo === 'domicilio' && r.pago_modo === 'al_recibir' && r.ticket_estado === 'pendiente' && r.estado !== 'cancelado';
-  o.cambio = o.paga_con !== null && o.total_neto !== null ? Math.max(0, r2(o.paga_con - o.total_neto)) : null;
+  // Anticipo: lo que el cliente ya dejó. "resta" es lo que todavía hay que cobrar (en la puerta o en Caja).
+  o.anticipo = r2(Number(r.anticipo) || 0);
+  o.anticipo_metodo = o.anticipo > 0 ? (r.anticipo_metodo || 'efectivo') : null;
+  o.resta = o.total_neto !== null ? Math.max(0, r2(o.total_neto - o.anticipo)) : null;
+  // estado_cobro = lo que de verdad pasa con el dinero (así ninguna pantalla dice "ya pagado" por error):
+  //   pagado     el ticket ya se cobró en Caja, o el cliente pagó TODO por adelantado
+  //   credito    se carga a la cuenta del cliente
+  //   al_recibir el repartidor cobra la resta en la puerta
+  //   en_caja    se cobra en Caja (antes de salir o al recoger)
+  const cubierto = r.ticket_estado === 'pagado' || (o.total_neto !== null && o.total_neto > 0 && o.anticipo >= o.total_neto);
+  o.estado_cobro = cubierto ? 'pagado' : r.pago_modo === 'credito' ? 'credito' : (r.tipo === 'domicilio' && r.pago_modo === 'al_recibir') ? 'al_recibir' : 'en_caja';
+  o.por_cobrar = o.estado_cobro === 'al_recibir' && r.ticket_estado === 'pendiente' && r.estado !== 'cancelado';
+  o.cambio = o.paga_con !== null && o.resta !== null ? Math.max(0, r2(o.paga_con - o.resta)) : null;
   return o;
 }
 
@@ -208,6 +219,29 @@ async function insertarRenglones(db, ticketId, items, subtotales) {
   }
 }
 
+// ------------------------------------------------------------------ anticipo
+// "d" trae anticipo / anticipo_metodo / ya_pago_todo (lo que mandó la pantalla). Devuelve lo que se guarda.
+// Si el cliente ya pagó TODO, el repartidor no tiene nada que cobrar: el pedido pasa a "se cobra en Caja".
+function validarAnticipo(d, total, pagoModoActual) {
+  const pagoModo = pagoModoActual || d.pago_modo;
+  let anticipo = 0;
+  if (d.ya_pago_todo === true) anticipo = r2(total);
+  else if (d.anticipo !== undefined && d.anticipo !== null && d.anticipo !== '') {
+    anticipo = Number(d.anticipo);
+    if (!Number.isFinite(anticipo) || anticipo < 0) throw new ErrorHttp(400, 'El anticipo no es válido');
+    anticipo = r2(anticipo);
+  }
+  if (anticipo > 0 && pagoModo === 'credito') throw new ErrorHttp(400, 'Un pedido a crédito no lleva anticipo: quita el anticipo o cambia la forma de pago');
+  if (anticipo > total + 0.001) throw new ErrorHttp(400, `El anticipo ($${anticipo.toFixed(2)}) no puede ser mayor que el total del pedido ($${total.toFixed(2)})`);
+  let metodo = null;
+  if (anticipo > 0) {
+    metodo = d.anticipo_metodo === undefined || d.anticipo_metodo === null || d.anticipo_metodo === '' ? 'efectivo' : d.anticipo_metodo;
+    if (!METODOS_COBRO.includes(metodo)) throw new ErrorHttp(400, 'Elige con qué dejó el anticipo: efectivo, transferencia o tarjeta');
+  }
+  const pagoFinal = anticipo > 0 && total > 0 && anticipo >= total && pagoModo === 'al_recibir' ? 'pagado' : pagoModo;
+  return { anticipo, anticipo_metodo: metodo, pago_modo: pagoFinal };
+}
+
 // ------------------------------------------------------------------ crear un pedido (ticket + pedido)
 // "d" ya viene validado y con el cliente/dirección resueltos. Se llama dentro de una transacción.
 async function crearPedidoCore(db, d) {
@@ -222,6 +256,9 @@ async function crearPedidoCore(db, d) {
     zonaNombre = calc.zona ? calc.zona.nombre : null;
   }
   const total = r2(subtotal + costoEnvio);
+
+  // Anticipo: 0 = nada, igual al total = ya pagó todo. Nunca más que el total, y a crédito no lleva anticipo.
+  const an = validarAnticipo(d, total);
 
   const folio = await folioUnico(db, d.sucursalId);
   const tk = (await db.query(
@@ -247,7 +284,7 @@ async function crearPedidoCore(db, d) {
     `INSERT INTO pedidos (sucursal_id, ticket_id, cliente_id, direccion_id, tipo, estado,
         nombre_contacto, telefono, calle, colonia, cp, ciudad, referencias, latitud, longitud, ubicacion_enlace, zona_id,
         costo_envio, pago_modo, paga_con, programado_para, fecha_entrega, preparar_desde,
-        creado_por, repartidor_id, notas, origen, pedido_fijo_id)
+        creado_por, repartidor_id, notas, origen, pedido_fijo_id, anticipo, anticipo_metodo)
      VALUES ($1,$2,$3,$4,$5,
         CASE WHEN $22::boolean = false THEN 'programado'
              WHEN $21::text IS NOT NULL AND ($21::text::timestamp - make_interval(mins => $23::int)) > ${AHORA_LOCAL} THEN 'programado'
@@ -256,13 +293,13 @@ async function crearPedidoCore(db, d) {
         $17,$18,$19,$21::text::timestamp,
         COALESCE($21::text::timestamp::date, (${AHORA_LOCAL})::date),
         CASE WHEN $22::boolean = false OR $21::text IS NULL THEN NULL ELSE $21::text::timestamp - make_interval(mins => $23::int) END,
-        $20,$24,$25,$26,$27)
+        $20,$24,$25,$26,$27,$28,$29)
      RETURNING id, estado`,
     [d.sucursalId, tk.id, d.cliente ? d.cliente.id : null, d.direccion_id || null, d.tipo,
      d.nombre_contacto, d.telefono, dir.calle || null, dir.colonia || null, dir.cp || null, dir.ciudad || null, dir.referencias || null,
      dir.latitud === undefined ? null : dir.latitud, dir.longitud === undefined ? null : dir.longitud, dir.ubicacion_enlace || null, d.zona_id || null,
-     costoEnvio, d.pago_modo, d.paga_con, d.usuarioId, d.programado_para, d.enviar !== false, minPrep,
-     d.repartidor_id || null, d.notas, d.origen || 'manual', d.pedido_fijo_id || null]
+     costoEnvio, an.pago_modo, an.pago_modo === d.pago_modo ? d.paga_con : null, d.usuarioId, d.programado_para, d.enviar !== false, minPrep,
+     d.repartidor_id || null, d.notas, d.origen || 'manual', d.pedido_fijo_id || null, an.anticipo, an.anticipo_metodo]
   )).rows[0];
 
   return { pedido_id: p.id, estado: p.estado, ticket_id: tk.id, folio, total, costo_envio: costoEnvio, zona_nombre: zonaNombre };
@@ -379,7 +416,7 @@ async function transicionar(req, id, nuevo, datos = {}, opciones = {}) {
           if (!ped.repartidor_id) throw new ErrorHttp(400, 'Asigna un repartidor para registrar el cobro de este pedido');
           metodo = datos.metodo_cobro || 'efectivo';
           if (!METODOS_COBRO.includes(metodo)) throw new ErrorHttp(400, 'Forma de cobro inválida');
-          monto = ped.total_neto;
+          monto = ped.resta;   // en la puerta se cobra lo que RESTA (total menos el anticipo)
         }
         if (opciones.evidencias) await guardarEvidencias(conexion, req, id, opciones.evidencias);
         await conexion.query(
@@ -516,7 +553,7 @@ router.get('/repartidores', rutaAsync('Error al obtener los repartidores', async
     const mios = rows.filter((p) => p.repartidor_id === u.id);
     const enCamino = mios.filter((p) => p.estado === 'en_camino');
     const aEntregar = mios.filter((p) => p.estado === 'entregado' && p.pago_modo === 'al_recibir' && p.ticket_estado === 'pendiente');
-    const suma = (a) => r2(a.reduce((s, p) => s + (p.total_neto || 0), 0));
+    const suma = (a) => r2(a.reduce((s, p) => s + (p.resta || 0), 0));   // lo que el repartidor cobra: total menos anticipo
     return {
       ...u,
       en_camino: enCamino.length,
@@ -584,7 +621,7 @@ router.get('/resumen', rutaAsync('Error al obtener el resumen', async (req, res)
      SELECT
        COUNT(*) FILTER (WHERE fecha_entrega = $2::date AND estado <> 'cancelado')::int AS pedidos_dia,
        COUNT(*) FILTER (WHERE estado = 'en_camino')::int AS en_camino,
-       COALESCE(SUM(total_neto) FILTER (WHERE tipo = 'domicilio' AND pago_modo = 'al_recibir' AND ticket_estado = 'pendiente' AND estado IN ('en_camino', 'entregado')), 0) AS por_cobrar,
+       COALESCE(SUM(GREATEST(total_neto - anticipo, 0)) FILTER (WHERE tipo = 'domicilio' AND pago_modo = 'al_recibir' AND ticket_estado = 'pendiente' AND estado IN ('en_camino', 'entregado')), 0) AS por_cobrar,
        COUNT(*) FILTER (WHERE retraso_min > 0)::int AS con_retraso,
        COALESCE(SUM(total_neto) FILTER (WHERE estado = 'entregado' AND ${localDe('entregado_en')}::date = $2::date), 0) AS entregado_hoy,
        COUNT(*) FILTER (WHERE estado = 'programado' AND fecha_entrega > $2::date)::int AS futuros
@@ -656,6 +693,7 @@ function resumenParaRepartidor(p) {
     latitud: p.latitud, longitud: p.longitud, ubicacion_enlace: p.ubicacion_enlace,
     programado_para: p.programado_para, retraso_min: p.retraso_min, notas: p.notas,
     pago_modo: p.pago_modo, por_cobrar: p.por_cobrar, total_neto: p.total_neto, paga_con: p.paga_con, cambio: p.cambio,
+    anticipo: p.anticipo, anticipo_metodo: p.anticipo_metodo, resta: p.resta, estado_cobro: p.estado_cobro,
     metodo_cobro: p.metodo_cobro, monto_cobrado: p.monto_cobrado, repartidor_id: p.repartidor_id,
     salio_en: p.salio_en, llego_en: p.llego_en, entregado_en: p.entregado_en, motivo_no_entrega: p.motivo_no_entrega, n_items: p.n_items
   };
@@ -742,7 +780,7 @@ async function armarLiquidacion(sucursalId, repartidorId) {
     let tipo;
     if (p.pago_modo === 'al_recibir') {
       if (p.ticket_estado !== 'pendiente') { tipo = 'ya_cobrado_en_caja'; sumas.ya_cobrados_en_caja += p.total_neto; }
-      else { tipo = p.metodo_cobro || 'efectivo'; sumas[tipo] += p.total_neto; if (tipo === 'efectivo') sumas.n_efectivo += 1; }
+      else { tipo = p.metodo_cobro || 'efectivo'; sumas[tipo] += p.resta; if (tipo === 'efectivo') sumas.n_efectivo += 1; }   // lo que el repartidor cobró: la resta
     } else if (p.pago_modo === 'credito') { tipo = 'credito'; sumas.credito += p.total_neto; }
     else { tipo = 'pagado_antes'; sumas.pagados_antes += p.total_neto; }
     return { ...resumenParaRepartidor(p), cobro: tipo };
@@ -792,15 +830,22 @@ router.post('/liquidar', requierePermiso('CAJA_MOVIMIENTO'), async (req, res) =>
       if (p.pago_modo !== 'al_recibir' || p.ticket_estado !== 'pendiente') continue;
       const metodo = p.metodo_cobro || 'efectivo';
       const neto = p.total_neto;
-      const monto = { efectivo: metodo === 'efectivo' ? neto : 0, tarjeta: metodo !== 'efectivo' ? neto : 0 };
+      const resta = p.resta;                 // lo que el repartidor cobró en la puerta
+      // El ticket se cobra por el TOTAL: la resta (como la pagó el cliente al repartidor) + el anticipo (con lo que lo dejó).
+      // El anticipo en efectivo ya está en la caja desde que se recibió; por eso cuenta como efectivo del ticket.
+      const efectivo = r2((metodo === 'efectivo' ? resta : 0) + (p.anticipo_metodo === 'efectivo' ? p.anticipo : 0));
+      const monto = { efectivo, tarjeta: r2(neto - efectivo) };
+      const metodoPago = p.anticipo > 0 && monto.efectivo > 0 && monto.tarjeta > 0 ? 'mixto'
+        : monto.efectivo > 0 ? 'efectivo'
+        : (metodo !== 'efectivo' ? metodo : p.anticipo_metodo);
       const upd = await conexion.query(
         `UPDATE tickets SET estado = 'pagado', cajero_usuario_id = $1, metodo_pago = $2, monto_efectivo = $3, monto_tarjeta = $4,
                 turno_id = $5, fecha_pago = NOW(), efectivo_recibido = $6
           WHERE id = $7 AND estado = 'pendiente' RETURNING id`,
-        [req.usuario.id, metodo, monto.efectivo, monto.tarjeta, turnoId, metodo === 'efectivo' ? neto : null, p.ticket_id]);
+        [req.usuario.id, metodoPago, monto.efectivo, monto.tarjeta, turnoId, monto.efectivo > 0 ? monto.efectivo : null, p.ticket_id]);
       if (!upd.rows.length) continue;
       todosAgotados.push(...(await descontarInventarioVenta(conexion, p.ticket_id, req.usuario.id)));
-      tot[metodo] = r2(tot[metodo] + neto);
+      tot[metodo] = r2(tot[metodo] + resta);
       cobrados.push(p.ticket_id);
     }
     const esperado = r2(tot.efectivo);
@@ -1090,6 +1135,7 @@ router.post('/', requierePermiso('VENTAS_CREAR'), async (req, res) => {
     const c = await crearPedidoCore(conexion, {
       sucursalId: req.sucursalId, usuarioId: req.usuario.id, items: b.items, tipo, cliente, nombre_contacto: nombre, telefono,
       direccion, direccion_id: direccionId, zona_id: zonaId, costo_envio_forzado: forzado, pago_modo: pagoModo, paga_con: pagaCon,
+      anticipo: b.anticipo, anticipo_metodo: b.anticipo_metodo, ya_pago_todo: b.ya_pago_todo === true,
       programado_para: fh.valor, enviar: b.enviar !== false, repartidor_id: repartidorId, notas: textoOnull(b.notas, 300), origen: 'manual'
     });
     await registrarBitacora(conexion, {
@@ -1233,6 +1279,22 @@ router.put('/:id', requierePermiso('VENTAS_CREAR'), async (req, res) => {
       await conexion.query(`UPDATE pedidos SET ${campos.join(', ')} WHERE id = $${vals.length}`, vals);
     }
     if (recalcular) await recalcularEnvio(conexion, req.sucursalId, ped.id, forzado);
+
+    // Anticipo / "ya pagó todo": se valida contra el total YA recalculado (si bajan productos, el anticipo no puede pasarse).
+    const tocaAnticipo = b.anticipo !== undefined || b.anticipo_metodo !== undefined || b.ya_pago_todo === true;
+    if (tocaAnticipo && ped.ticket_estado !== 'pendiente') throw new ErrorHttp(409, 'El ticket de este pedido ya fue cobrado: no se puede cambiar el anticipo');
+    const act = formato((await conexion.query(`${SQL_PEDIDO} WHERE p.id = $1`, [ped.id])).rows[0]);
+    const an = validarAnticipo({
+      anticipo: b.ya_pago_todo === true || b.anticipo !== undefined ? b.anticipo : act.anticipo,
+      anticipo_metodo: b.anticipo_metodo !== undefined ? b.anticipo_metodo : act.anticipo_metodo,
+      ya_pago_todo: b.ya_pago_todo === true
+    }, act.total_neto, act.pago_modo);
+    if (an.anticipo !== act.anticipo || an.anticipo_metodo !== act.anticipo_metodo || an.pago_modo !== act.pago_modo) {
+      await conexion.query(
+        `UPDATE pedidos SET anticipo = $1, anticipo_metodo = $2, pago_modo = $3::varchar,
+                paga_con = CASE WHEN $3::varchar = 'al_recibir' THEN paga_con ELSE NULL END WHERE id = $4`,
+        [an.anticipo, an.anticipo_metodo, an.pago_modo, ped.id]);
+    }
     await registrarBitacora(conexion, { usuario_id: req.usuario.id, accion: 'editar_pedido', modulo: 'pedidos', referencia_id: ped.id, valor_nuevo: { campos: Object.keys(b) } });
     await conexion.query('COMMIT');
     const completo = await cargarPedido(pool, ped.id, req.sucursalId);

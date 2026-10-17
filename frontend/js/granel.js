@@ -100,7 +100,32 @@
     return `${it.cantidad} ${x} $${it.precio_unitario}`;
   }
 
-  const API = { r2, r3, tolerancia, importeCoherente, subtotal, escalones, precioPorVolumen, porCantidad, porImporte, renglon, formatoCantidad, detalle };
+  // Teclado de la computadora en las ventanas de "cuánto lleva": qué hace cada tecla.
+  // Devuelve null si la tecla no tiene nada que ver (así no se estorba al resto de la pantalla).
+  function accionTecla(tecla) {
+    if (typeof tecla !== 'string') return null;
+    if (/^[0-9]$/.test(tecla)) return { accion: 'digito', valor: tecla };
+    if (tecla === '.' || tecla === ',' || tecla === 'Decimal') return { accion: 'punto' };
+    switch (tecla) {
+      case 'Backspace': return { accion: 'borrar' };
+      case 'Delete': case 'Clear': return { accion: 'limpiar' };
+      case 'Enter': return { accion: 'confirmar' };
+      case 'Tab': case 'ArrowLeft': case 'ArrowRight': return { accion: 'cambiar' };
+      case '+': case 'ArrowUp': return { accion: 'mas' };
+      case '-': case 'ArrowDown': return { accion: 'menos' };
+      default: return null;
+    }
+  }
+
+  // Piezas: lo que queda al teclear un número. Si "fresco" (acaba de abrir o de usar +/−) el
+  // número reemplaza al que había; si no, se va escribiendo a la derecha. Máximo 4 cifras; el 0 no cuenta.
+  function cantidadUnidadTecleada(actual, digito, fresco) {
+    const texto = ((fresco ? '' : String(actual)) + digito).replace(/^0+/, '');
+    if (texto === '' || texto.length > 4) return actual;
+    return Number(texto);
+  }
+
+  const API = { r2, r3, tolerancia, importeCoherente, subtotal, escalones, precioPorVolumen, porCantidad, porImporte, renglon, formatoCantidad, detalle, accionTecla, cantidadUnidadTecleada };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else raiz.GRANEL = API;
 })(typeof window !== 'undefined' ? window : this);

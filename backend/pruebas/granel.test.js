@@ -127,3 +127,27 @@ conPantalla('pantalla: texto del renglón en ticket y carrito', () => {
   assert.equal(GRANEL.detalle({ tipo: 'producto', cantidad: 3, precio_unitario: '12.00' }), '3 x $12.00'); // sin tipo_venta: como siempre
   assert.equal(GRANEL.detalle({ tipo: 'kit', cantidad: 1, precio_unitario: 99 }), 'Kit');
 });
+
+conPantalla('teclado de la computadora: qué hace cada tecla en la ventana de peso/piezas', () => {
+  assert.deepEqual(GRANEL.accionTecla('7'), { accion: 'digito', valor: '7' });
+  assert.deepEqual(GRANEL.accionTecla('0'), { accion: 'digito', valor: '0' });
+  for (const t of ['.', ',', 'Decimal']) assert.deepEqual(GRANEL.accionTecla(t), { accion: 'punto' });
+  assert.deepEqual(GRANEL.accionTecla('Backspace'), { accion: 'borrar' });
+  assert.deepEqual(GRANEL.accionTecla('Delete'), { accion: 'limpiar' });
+  assert.deepEqual(GRANEL.accionTecla('Enter'), { accion: 'confirmar' });
+  for (const t of ['Tab', 'ArrowLeft', 'ArrowRight']) assert.deepEqual(GRANEL.accionTecla(t), { accion: 'cambiar' });
+  assert.deepEqual(GRANEL.accionTecla('+'), { accion: 'mas' });
+  assert.deepEqual(GRANEL.accionTecla('-'), { accion: 'menos' });
+  assert.equal(GRANEL.accionTecla('a'), null);             // las demás teclas no se estorban
+  assert.equal(GRANEL.accionTecla('F5'), null);
+  assert.equal(GRANEL.accionTecla(undefined), null);
+});
+
+conPantalla('teclado de la computadora: piezas tecleadas (la primera tecla reemplaza, luego se suma, máximo 4 dígitos)', () => {
+  assert.equal(GRANEL.cantidadUnidadTecleada(1, '5', true), 5);        // ventana recién abierta: reemplaza el 1
+  assert.equal(GRANEL.cantidadUnidadTecleada(5, '2', false), 52);
+  assert.equal(GRANEL.cantidadUnidadTecleada(52, '3', false), 523);
+  assert.equal(GRANEL.cantidadUnidadTecleada(9999, '1', false), 9999); // no pasa de 4 dígitos
+  assert.equal(GRANEL.cantidadUnidadTecleada(1, '0', true), 1);        // un 0 solo no deja la cantidad en cero
+  assert.equal(GRANEL.cantidadUnidadTecleada(5, '0', false), 50);
+});

@@ -95,6 +95,24 @@
   .chip-btn { border: 1px solid var(--border); background: var(--surface, #fff); color: var(--text); border-radius: 20px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .chip-btn:hover { border-color: var(--primary); }
 
+  /* ---- Ticket de domicilio: plantillas con su largo de papel ---- */
+  .plantillas-g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .plant { border: 2px solid var(--border); border-radius: 12px; background: var(--surface, #fff); padding: 11px 12px; text-align: left; cursor: pointer; font-family: inherit; color: var(--text); display: grid; gap: 5px; align-content: start; }
+  .plant:hover { border-color: var(--primary); }
+  .plant.activo { border-color: var(--primary); background: rgba(95,174,70,0.09); background: color-mix(in srgb, var(--primary) 9%, var(--surface, #fff)); }
+  .plant b { font-size: 14.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .plant .cm { font-size: 19px; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+  .plant .barra { height: 8px; border-radius: 6px; background: rgba(128,128,128,0.18); overflow: hidden; }
+  .plant .barra i { display: block; height: 100%; background: var(--primary); border-radius: 6px; }
+  .plant small { font-size: 12px; color: var(--muted, #7A7D83); }
+  .plant .ah { color: #2E7D32; font-weight: 800; }
+  .recomendada { font-size: 10.5px; font-weight: 800; background: #2E7D32; color: #fff; border-radius: 10px; padding: 2px 7px; }
+  .dato-papel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; background: rgba(128,128,128,0.07); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+  .dato-papel a { color: var(--primary); font-weight: 700; text-decoration: none; margin-left: auto; }
+  .ahorro-vp { text-align: center; font-size: 13px; background: rgba(95,174,70,0.12); border-radius: 10px; padding: 8px 10px; }
+  .ahorro-vp b { font-size: 17px; }
+  @media (max-width: 600px) { .plantillas-g { grid-template-columns: minmax(0, 1fr); } }
+
   .opcion-tarjeta { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; cursor: pointer; font-size: 13.5px; font-weight: 700; background: var(--surface, #fff); }
   .opcion-tarjeta small { display: block; font-weight: 400; color: var(--muted, #7A7D83); font-size: 11.5px; }
 
@@ -219,6 +237,9 @@
       </button>
       <button type="button" class="menu-item" data-sec="impresion" onclick="abrirSeccion('impresion')">
         <span class="menu-ico">🖨️</span><span class="menu-txt"><b>Impresión</b><small id="resImpresion">—</small></span><span class="menu-chev">›</span>
+      </button>
+      <button type="button" class="menu-item" data-sec="domicilio" onclick="abrirSeccion('domicilio')">
+        <span class="menu-ico">🛵</span><span class="menu-txt"><b>Ticket de domicilio</b><small id="resDomicilio">—</small></span><span class="menu-chev">›</span>
       </button>
       <button type="button" class="menu-item" data-sec="bascula" onclick="abrirSeccion('bascula')">
         <span class="menu-ico">⚖️</span><span class="menu-txt"><b>Báscula y etiquetas</b><small id="resBascula">—</small></span><span class="menu-chev">›</span>
@@ -443,6 +464,67 @@
             <button class="btn btn-primary btn-principal" onclick="guardarImpresionDispositivo()">💾 Guardar<span class="solo-pc">&nbsp;en este equipo</span></button>
             <button class="btn btn-secondary" onclick="probarImpresion()">🖨️ Probar<span class="solo-pc">&nbsp;impresión</span></button>
             <button class="btn btn-secondary" onclick="restablecerDisenoDispositivo()" title="Volver a lo predeterminado" aria-label="Volver a lo predeterminado">↺<span class="solo-pc">&nbsp;Restablecer</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TICKET DE DOMICILIO (papel y letra del ticket de un pedido) ============ -->
+      <section class="sec" id="sec-domicilio">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>🛵 Ticket de domicilio</h2><p>Cómo se imprime el ticket de un pedido cuando queda listo. Aquí puedes gastar menos papel.</p></div></div>
+          <span class="insignia equipo">📍 Solo este equipo</span>
+        </div>
+        <div class="sec-cuerpo">
+
+          <div class="tarjeta">
+            <h3>1 · Elige una plantilla</h3>
+            <div class="plantillas-g" id="domPlantillas"></div>
+            <div class="dato-papel">📄 <span>Papel de este equipo: <b id="domPapel">80 mm</b></span><a href="#" onclick="abrirSeccion('impresion'); return false;">Cambiar en Impresión ›</a></div>
+            <p class="nota">Elige una y abajo puedes ajustar cada cosa. El largo es aproximado, con un pedido de 3 productos y el envío.</p>
+          </div>
+
+          <div class="tarjeta">
+            <h3>2 · Letra</h3>
+            <div class="rejilla">
+              <label class="campo"><span>Datos del cliente</span>
+                <select id="domCliente"><option value="grande">Grande</option><option value="mediana">Mediana</option><option value="normal">Normal</option></select></label>
+              <label class="campo"><span>Hora de entrega</span>
+                <select id="domEntrega"><option value="recuadro">Con recuadro</option><option value="grande">Solo grande</option><option value="normal">Normal</option></select></label>
+              <label class="campo"><span>Letra de productos</span>
+                <select id="domLetraProductos"><option value="auto">Como en Impresión</option><option value="pequena">Pequeña</option><option value="normal">Normal</option><option value="grande">Grande</option></select></label>
+              <label class="campo"><span>Total</span>
+                <select id="domTotal"><option value="auto">Como en Impresión</option><option value="grande">Grande</option><option value="normal">Normal</option></select></label>
+            </div>
+          </div>
+
+          <div class="tarjeta">
+            <h3>3 · Qué se imprime</h3>
+            <div class="rejilla ancha">
+              <label class="opcion-tarjeta"><span>Dirección y teléfono del negocio<small>si lo apagas sale solo el nombre</small></span><input type="checkbox" class="interruptor" id="domNegocioCompleto"></label>
+              <label class="opcion-tarjeta"><span>Folio y fecha en un renglón<small>ahorra 1 renglón</small></span><input type="checkbox" class="interruptor" id="domFolioUna"></label>
+              <label class="opcion-tarjeta"><span>Rayas y rótulos de adorno<small>“CLIENTE”, “PRODUCTOS”, líneas de guiones</small></span><input type="checkbox" class="interruptor" id="domAdornos"></label>
+              <label class="opcion-tarjeta"><span>Precio de cada producto<small>“1.500 kg x $180.00”; si lo apagas queda la cantidad</small></span><input type="checkbox" class="interruptor" id="domPrecioUnit"></label>
+              <label class="opcion-tarjeta"><span>Producto y precio en un renglón<small>ahorra 1 renglón por producto</small></span><input type="checkbox" class="interruptor" id="domProductoUna"></label>
+              <label class="opcion-tarjeta"><span>Zona del pedido<small>la colonia ya sale en la dirección</small></span><input type="checkbox" class="interruptor" id="domZona"></label>
+              <label class="opcion-tarjeta"><span>Cobro en recuadro negro grande<small>si no, sale en una línea</small></span><input type="checkbox" class="interruptor" id="domCobroRecuadro"></label>
+              <label class="campo"><span>Código de barras (para Caja)</span>
+                <select id="domBarras"><option value="normal">Normal</option><option value="chico">Chico</option></select></label>
+            </div>
+            <details class="avanzado" id="domEspacios">
+              <summary>↕ Espacio en blanco (líneas arriba / abajo)</summary>
+              <div class="dentro">
+                <div class="fila-lineas"><span style="flex:1;">Arriba</span><input type="number" id="domLineasArriba" min="0" max="10" placeholder="igual"></div>
+                <div class="fila-lineas"><span style="flex:1;">Abajo</span><input type="number" id="domLineasAbajo" min="0" max="10" placeholder="igual"></div>
+                <p class="nota">Si lo dejas vacío usa lo de «Ticket de Mostrador» en Impresión. Deja al menos 1 abajo para que la cortadora no corte el texto de Compoint.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="barra-guardar">
+            <button class="btn btn-primary btn-principal" onclick="guardarDomicilio()">💾 Guardar<span class="solo-pc">&nbsp;en este equipo</span></button>
+            <button class="btn btn-secondary" onclick="probarDomicilio()">🖨️ Probar<span class="solo-pc">&nbsp;ticket</span></button>
+            <button class="btn btn-secondary" onclick="restablecerDomicilio()" title="Volver a lo de siempre" aria-label="Volver a lo de siempre">↺<span class="solo-pc">&nbsp;Restablecer</span></button>
           </div>
         </div>
       </section>
@@ -778,10 +860,11 @@
      <aside class="vp" id="panelVistaPrevia">
        <button type="button" class="vp-cab" onclick="toggleVistaPrevia()"><span>👁️ Así se verá el ticket</span><span class="vp-flecha">▾</span></button>
        <div class="vp-cuerpo">
-         <div class="segmentado" data-para="vistaTicketTipo">
+         <div class="segmentado" data-para="vistaTicketTipo" id="vistaTicketTipoSeg">
            <button type="button" data-valor="final">Ticket final</button>
            <button type="button" data-valor="mostrador">De Mostrador</button>
          </div>
+         <div class="ahorro-vp" id="ahorroVp" style="display:none;"></div>
          <select id="vistaTicketTipo" class="sel-oculto" onchange="refrescarVistaPreviaTicket()">
            <option value="final">Ticket final (ya pagado)</option>
            <option value="mostrador">Ticket de Mostrador</option>
@@ -819,6 +902,8 @@
 <script src="../js/ui-components.js"></script>
 <script src="../js/imagen-utils.js"></script>
 <script src="../js/impresora-termica.js"></script>
+<script src="../js/granel.js"></script>
+<script src="../js/mostrador-pedidos.js"></script>
 <script src="../js/bascula.js"></script>
 <script>
 requiereLogin();
@@ -1506,6 +1591,11 @@ function refrescarVistaPreviaTicket() {
   temporizadorVistaPrevia = setTimeout(async () => {
     const hoja = document.getElementById('hojaTicket');
     if (!hoja || typeof construirHtmlTicket !== 'function') return;
+    // En «Ticket de domicilio» la vista previa es la de un pedido (y no hay "final / mostrador")
+    const enDomicilio = seccionActual === 'domicilio';
+    const seg = document.getElementById('vistaTicketTipoSeg'); if (seg) seg.style.display = enDomicilio ? 'none' : '';
+    const avp = document.getElementById('ahorroVp'); if (avp) avp.style.display = enDomicilio ? '' : 'none';
+    if (enDomicilio) { await refrescarDomicilio(); return; }
     try {
       const esFinal = document.getElementById('vistaTicketTipo').value === 'final';
       const datos = {
@@ -1524,8 +1614,129 @@ function refrescarVistaPreviaTicket() {
   }, 150);
 }
 
-document.addEventListener('input', (e) => { if (e.target.closest('#sec-impresion, #sec-contenido')) refrescarVistaPreviaTicket(); });
-document.addEventListener('change', (e) => { if (e.target.closest('#sec-impresion, #sec-contenido')) refrescarVistaPreviaTicket(); });
+document.addEventListener('input', (e) => { if (e.target.closest('#sec-impresion, #sec-contenido, #sec-domicilio')) refrescarVistaPreviaTicket(); });
+document.addEventListener('change', (e) => { if (e.target.closest('#sec-impresion, #sec-contenido, #sec-domicilio')) refrescarVistaPreviaTicket(); });
+
+// ============ Ticket de domicilio (solo este equipo) ============
+// Las opciones se guardan en este equipo (localStorage) y las usa Mostrador al imprimir un pedido listo.
+// El largo en cm sale de armar de verdad el ticket (el mismo que se manda a la impresora) y medirlo.
+function leerFormularioDomicilio() {
+  const v = (id) => document.getElementById(id).value;
+  const c = (id) => document.getElementById(id).checked;
+  return MostradorPedidos.normalizarOpciones({
+    cliente: v('domCliente'), entrega: v('domEntrega'), letraProductos: v('domLetraProductos'), total: v('domTotal'),
+    negocioCompleto: c('domNegocioCompleto'), folioUnaLinea: c('domFolioUna'), adornos: c('domAdornos'),
+    precioUnitario: c('domPrecioUnit'), productoUnaLinea: c('domProductoUna'), zona: c('domZona'),
+    cobro: c('domCobroRecuadro') ? 'recuadro' : 'linea', barras: v('domBarras'),
+    lineasArriba: v('domLineasArriba'), lineasAbajo: v('domLineasAbajo')
+  });
+}
+
+function pintarFormularioDomicilio(o) {
+  const set = (id, x) => { document.getElementById(id).value = x; };
+  const chk = (id, x) => { document.getElementById(id).checked = !!x; };
+  set('domCliente', o.cliente); set('domEntrega', o.entrega); set('domLetraProductos', o.letraProductos); set('domTotal', o.total);
+  chk('domNegocioCompleto', o.negocioCompleto); chk('domFolioUna', o.folioUnaLinea); chk('domAdornos', o.adornos);
+  chk('domPrecioUnit', o.precioUnitario); chk('domProductoUna', o.productoUnaLinea); chk('domZona', o.zona);
+  chk('domCobroRecuadro', o.cobro === 'recuadro'); set('domBarras', o.barras);
+  set('domLineasArriba', o.lineasArriba === null || o.lineasArriba === undefined ? '' : o.lineasArriba);
+  set('domLineasAbajo', o.lineasAbajo === null || o.lineasAbajo === undefined ? '' : o.lineasAbajo);
+}
+
+// Un pedido de ejemplo armado igual que lo arma Mostrador al dar «Pedido listo».
+function datosTicketPedidoEjemplo(opciones) {
+  const MP = MostradorPedidos;
+  const ticket = MP.armarTicketPedido(MP.pedidoEjemplo(), { quien: 'Mostrador', opciones });
+  const n = (id, d) => { const x = parseInt(document.getElementById(id).value, 10); return Number.isFinite(x) ? x : d; };
+  const base = {
+    ancho_ticket: document.getElementById('anchoTicketDispositivo').value,
+    folio: ticket.folio,
+    fecha: new Date().toLocaleString(),
+    items: ticket.items.map(i => ({
+      nombre_producto: i.nombre_producto,
+      detalle: i.detalle !== undefined ? i.detalle : GRANEL.detalle(i),
+      cantidad_texto: i.cantidad_texto,
+      subtotal: parseFloat(i.subtotal).toFixed(2)
+    })),
+    total: parseFloat(ticket.total).toFixed(2),
+    piePagina: ticket.pie_pagina,
+    lineasSuperiores: n('lineasSuperioresMostrador', 0),
+    lineasInferiores: n('lineasInferioresMostrador', 3),
+    incluirPrecioUnitario: document.getElementById('incluirPrecioUnitario').checked,
+    descripcionCompleta: document.getElementById('descripcionCompleta').checked,
+    productosNegritas: document.getElementById('productosNegritas').checked,
+    ...estiloDesdeFormulario(false)
+  };
+  return MP.aplicarAjustesPedido(base, ticket);
+}
+
+async function refrescarDomicilio() {
+  const MP = MostradorPedidos;
+  const o = leerFormularioDomicilio();
+  const hoja = document.getElementById('hojaTicket');
+  document.getElementById('domPapel').textContent = document.getElementById('anchoTicketDispositivo').value.replace('mm', ' mm');
+  try {
+    const largo = async (op) => estimarLargoTicketCm(await construirBytesTicketBLE(datosTicketPedidoEjemplo(op)));
+    const cm = {};
+    for (const k of Object.keys(MP.PLANTILLAS)) cm[k] = await largo(MP.PLANTILLAS[k]);
+    const actual = await largo(o);
+    const antes = cm.como_ahora;
+    const ahorroDe = (x) => Math.max(0, Math.round((1 - x / antes) * 100));
+
+    document.getElementById('domPlantillas').innerHTML = Object.keys(MP.PLANTILLAS).map(k => {
+      const ah = ahorroDe(cm[k]);
+      return `<button type="button" class="plant ${o.plantilla === k ? 'activo' : ''}" onclick="aplicarPlantillaDomicilio('${k}')">
+        <b>${MP.NOMBRES_PLANTILLA[k]}${k === 'ahorro' ? ' <span class="recomendada">RECOMENDADA</span>' : ''}</b>
+        <span class="cm">≈ ${cm[k].toFixed(1)} cm</span>
+        <span class="barra"><i style="width:${Math.min(100, Math.round(cm[k] / antes * 100))}%"></i></span>
+        <small>${ah > 0 ? `<span class="ah">ahorras ${ah} %</span> de papel` : 'lo que imprime hoy'}</small></button>`;
+    }).join('');
+
+    const ah = ahorroDe(actual);
+    document.getElementById('ahorroVp').innerHTML = ah > 0
+      ? `Largo: <b>≈ ${actual.toFixed(1)} cm</b> &nbsp;(antes ${antes.toFixed(1)} cm) · <b style="color:#2E7D32">ahorras ${ah} %</b>`
+      : `Largo: <b>≈ ${actual.toFixed(1)} cm</b>`;
+
+    const datos = datosTicketPedidoEjemplo(o);
+    const { css, html } = await construirHtmlTicket(datos);
+    hoja.style.width = (datos.ancho_ticket === '58mm' ? 204 : 287) + 'px';
+    hoja.innerHTML = `<style>${css}</style>${html}`;
+  } catch (err) {
+    console.error('No se pudo armar la vista previa del ticket de domicilio:', err);
+  }
+}
+
+function aplicarPlantillaDomicilio(nombre) {
+  const p = MostradorPedidos.PLANTILLAS[nombre];
+  if (!p) return;
+  pintarFormularioDomicilio(p);
+  refrescarVistaPreviaTicket();
+  mostrarToast(`Plantilla «${MostradorPedidos.NOMBRES_PLANTILLA[nombre]}» — revisa la vista previa y pulsa "Guardar en este equipo"`, 'info');
+}
+
+function guardarDomicilio() {
+  MostradorPedidos.guardarOpcionesDomicilio(leerFormularioDomicilio());
+  actualizarResumenes();
+  refrescarVistaPreviaTicket();
+  mostrarToast('Ticket de domicilio guardado en este equipo', 'exito');
+}
+
+function restablecerDomicilio() {
+  MostradorPedidos.borrarOpcionesDomicilio();
+  pintarFormularioDomicilio(MostradorPedidos.PLANTILLAS.como_ahora);
+  actualizarResumenes();
+  refrescarVistaPreviaTicket();
+  mostrarToast('El ticket de domicilio vuelve a salir como siempre', 'info');
+}
+
+async function probarDomicilio() {
+  try { await imprimirSegunModo(datosTicketPedidoEjemplo(leerFormularioDomicilio())); }
+  catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+function cargarDomicilioUI() {
+  pintarFormularioDomicilio(MostradorPedidos.leerOpcionesDomicilio() || MostradorPedidos.PLANTILLAS.como_ahora);
+}
 
 function quitarLogoTicket() {
   logoBase64 = '';
@@ -1683,8 +1894,8 @@ function guardarImpresorasWindows() {
 // ============ Menú de secciones ============
 // PC: menú a la izquierda y la sección elegida a la derecha.
 // Celular: lista de secciones; al tocar una se abre a pantalla completa.
-const SECCIONES = ['dispositivo', 'impresion', 'bascula', 'contenido', 'pagos', 'anuncios', 'zona'];
-const SECCIONES_CON_VISTA_PREVIA = ['impresion', 'contenido'];
+const SECCIONES = ['dispositivo', 'impresion', 'domicilio', 'bascula', 'contenido', 'pagos', 'anuncios', 'zona'];
+const SECCIONES_CON_VISTA_PREVIA = ['impresion', 'contenido', 'domicilio'];
 const mqAngosto = window.matchMedia('(max-width: 1000px)');
 let seccionActual = null;
 let empujadoAlHistorial = false;
@@ -1712,6 +1923,7 @@ function mostrarSeccion(id) {
   document.querySelectorAll('.sec').forEach(s => s.classList.toggle('activa', s.id === 'sec-' + id));
   document.querySelectorAll('.menu-item[data-sec]').forEach(b => b.classList.toggle('activo', b.dataset.sec === id));
   document.getElementById('configMain').classList.toggle('con-preview', SECCIONES_CON_VISTA_PREVIA.includes(id));
+  if (SECCIONES_CON_VISTA_PREVIA.includes(id) && typeof refrescarVistaPreviaTicket === 'function') refrescarVistaPreviaTicket();
   const enSeccion = angosto && !!id;
   document.getElementById('configLayout').classList.toggle('vista-sec', enSeccion);
   // Con una sección abierta en celular se esconden los botones flotantes (tema/conexión)
@@ -1788,6 +2000,9 @@ function actualizarResumenes() {
   const modo = document.getElementById('modoImpresion').value === 'sistema' ? 'Windows/Mac' : 'Directo';
   poner('resImpresion', `${modo} · ${document.getElementById('anchoTicketDispositivo').value.replace('mm', ' mm')}`);
 
+  const guardadoDom = typeof MostradorPedidos !== 'undefined' ? MostradorPedidos.leerOpcionesDomicilio() : null;
+  poner('resDomicilio', !guardadoDom ? 'Como siempre' : (guardadoDom.plantilla === 'personal' ? 'Personalizado' : MostradorPedidos.NOMBRES_PLANTILLA[guardadoDom.plantilla]));
+
   poner('resBascula', (typeof basculaConectada === 'function' && basculaConectada()) ? 'Báscula conectada' : 'Báscula sin conectar');
   poner('resContenido', document.getElementById('nombreNegocio').value.trim() || 'Sin nombre de negocio');
 
@@ -1808,6 +2023,7 @@ mostrarSeccion(seccionDelHash());
 
 cargarModoImpresion();
 cargarImpresorasWindows();
+cargarDomicilioUI();
 cargarConfiguracion();
 cargarLayoutMostrador();
 cargarColorTema();

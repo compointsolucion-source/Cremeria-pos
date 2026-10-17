@@ -96,39 +96,155 @@
   const dinero2 = (n) => (Number(n) || 0).toFixed(2);
 
   // Recuadro de cobro del ticket (o null si no hay nada que decir).
+  // Qué dice el ticket sobre el dinero. "YA PAGADO" SOLO sale si de verdad ya se cobró en Caja o si lo anotaron
+  // (el cliente pagó todo por adelantado). "Se cobra en Caja" NO es "ya pagado": todavía hay que cobrarlo.
+  // Si hay anticipo, se cobra lo que RESTA y se muestra cuánto dejó y con qué.
   function textoCobro(p) {
     const total = p.total_neto !== null && p.total_neto !== undefined ? p.total_neto : p.ticket_total;
-    if (p.ticket_estado === 'pagado' || p.pago_modo === 'pagado') return { titulo: 'YA PAGADO', monto: null, detalle: 'No cobrar' };
+    const anticipo = Math.max(0, Number(p.anticipo) || 0);
+    const resta = Math.max(0, Math.round((Number(total) - anticipo) * 100) / 100);
+    const metodo = ['efectivo', 'transferencia', 'tarjeta'].includes(p.anticipo_metodo) ? ` (${p.anticipo_metodo})` : '';
+    if (p.ticket_estado === 'pagado') return { titulo: 'YA PAGADO', monto: null, detalle: 'No cobrar' };
     if (p.pago_modo === 'credito') return { titulo: 'A CREDITO DEL CLIENTE', monto: null, detalle: 'Se carga a su cuenta' };
-    if (p.tipo === 'domicilio') {
+    if (anticipo > 0 && resta <= 0) return { titulo: 'YA PAGADO', monto: null, detalle: `No cobrar - Pago $${dinero2(anticipo)}${metodo}` };
+    const antes = anticipo > 0 ? `Total $${dinero2(total)} - Anticipo $${dinero2(anticipo)}${metodo}` : '';
+    if (p.tipo === 'domicilio' && p.pago_modo === 'al_recibir') {
       const pagaCon = Number(p.paga_con);
-      const detalle = pagaCon > 0 ? `Paga con $${dinero2(pagaCon)} - Cambio $${dinero2(Math.max(0, pagaCon - Number(total)))}` : '';
-      return { titulo: 'COBRAR AL RECIBIR', monto: dinero2(total), detalle };
+      const paga = pagaCon > 0 ? `Paga con $${dinero2(pagaCon)} - Cambio $${dinero2(Math.max(0, pagaCon - resta))}` : '';
+      return { titulo: 'COBRAR AL RECIBIR', monto: dinero2(resta), detalle: [antes, paga].filter(Boolean).join(' - ') };
     }
-    return { titulo: 'COBRAR EN CAJA AL RECOGER', monto: dinero2(total), detalle: '' };
+    if (p.tipo === 'domicilio') return { titulo: 'COBRAR EN CAJA', monto: dinero2(resta), detalle: antes || 'El repartidor no cobra' };
+    return { titulo: 'COBRAR EN CAJA AL RECOGER', monto: dinero2(resta), detalle: antes };
+  }
+
+  // ------------------------------------------------------------------ opciones del ticket de domicilio (por equipo)
+  // Se eligen en Configuración → «Ticket de domicilio» y se guardan SOLO en el equipo que imprime
+  // (igual que «Papel y letra»). Si no hay nada guardado, el ticket sale exactamente como siempre.
+  const OPCIONES_CLAVE = 'ticket_domicilio_dispositivo';
+  const PLANTILLAS = {
+    como_ahora: { cliente: 'grande', entrega: 'recuadro', letraProductos: 'auto', total: 'auto', negocioCompleto: true, folioUnaLinea: false, adornos: true, precioUnitario: true, productoUnaLinea: false, zona: true, cobro: 'recuadro', barras: 'normal', lineasArriba: null, lineasAbajo: null },
+    ahorro: { cliente: 'mediana', entrega: 'grande', letraProductos: 'normal', total: 'grande', negocioCompleto: false, folioUnaLinea: true, adornos: false, precioUnitario: false, productoUnaLinea: true, zona: false, cobro: 'linea', barras: 'chico', lineasArriba: 0, lineasAbajo: 2 },
+    minimo: { cliente: 'normal', entrega: 'normal', letraProductos: 'pequena', total: 'normal', negocioCompleto: false, folioUnaLinea: true, adornos: false, precioUnitario: false, productoUnaLinea: true, zona: false, cobro: 'linea', barras: 'chico', lineasArriba: 0, lineasAbajo: 1 }
+  };
+  const NOMBRES_PLANTILLA = { como_ahora: 'Como ahora', ahorro: 'Ahorro de papel', minimo: 'Mínimo' };
+  const OPCIONES_ENUM = {
+    cliente: ['grande', 'mediana', 'normal'], entrega: ['recuadro', 'grande', 'normal'],
+    letraProductos: ['auto', 'pequena', 'normal', 'grande'], total: ['auto', 'grande', 'normal'],
+    cobro: ['recuadro', 'linea'], barras: ['normal', 'chico']
+  };
+  const OPCIONES_SI_NO = ['negocioCompleto', 'folioUnaLinea', 'adornos', 'precioUnitario', 'productoUnaLinea', 'zona'];
+
+  // Deja las opciones completas y válidas (lo que falte o venga raro se llena con «como ahora»).
+  // null = no hay opciones guardadas → todo sale como siempre.
+  function normalizarOpciones(o) {
+    if (!o || typeof o !== 'object') return null;
+    const base = PLANTILLAS.como_ahora, r = {};
+    Object.keys(OPCIONES_ENUM).forEach((k) => { r[k] = OPCIONES_ENUM[k].includes(o[k]) ? o[k] : base[k]; });
+    OPCIONES_SI_NO.forEach((k) => { r[k] = typeof o[k] === 'boolean' ? o[k] : base[k]; });
+    ['lineasArriba', 'lineasAbajo'].forEach((k) => {
+      const n = (o[k] === null || o[k] === undefined || o[k] === '') ? NaN : Number(o[k]);
+      r[k] = Number.isFinite(n) ? Math.min(10, Math.max(0, Math.round(n))) : null;
+    });
+    r.plantilla = plantillaDe(r);
+    return r;
+  }
+  // Cuál plantilla es (o 'personal' si es una mezcla).
+  function plantillaDe(o) {
+    const iguales = (a, b) => Object.keys(PLANTILLAS.como_ahora).every((k) => a[k] === b[k]);
+    const x = o || {};
+    return Object.keys(PLANTILLAS).find((n) => iguales(x, PLANTILLAS[n])) || 'personal';
+  }
+  const almacenLocal = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (e) { return null; } };
+  function leerOpcionesDomicilio(almacen) {
+    const a = almacen || almacenLocal();
+    if (!a) return null;
+    try { return normalizarOpciones(JSON.parse(a.getItem(OPCIONES_CLAVE) || 'null')); } catch (e) { return null; }
+  }
+  function guardarOpcionesDomicilio(o, almacen) {
+    const a = almacen || almacenLocal();
+    const n = normalizarOpciones(o);
+    if (a && n) a.setItem(OPCIONES_CLAVE, JSON.stringify(n));
+    return n;
+  }
+  function borrarOpcionesDomicilio(almacen) {
+    const a = almacen || almacenLocal();
+    if (a) a.removeItem(OPCIONES_CLAVE);
+  }
+
+  // Pedido inventado para la vista previa y la prueba de impresión de Configuración.
+  function pedidoEjemplo(ahora) {
+    const a = ahora || new Date();
+    const entrega = new Date(a.getTime() + 30 * 60000);
+    return {
+      id: 0, etiqueta: 'D-0192', folio: 'PRUEBA-001', tipo: 'domicilio', estado: 'listo', pago_modo: 'al_recibir',
+      nombre_contacto: 'Juan Pérez López', telefono: '33 1234 5678', calle: 'Av. Siempre Viva 123', colonia: 'Centro', cp: '44100', ciudad: 'Guadalajara',
+      referencias: 'Portón negro, esquina con Hidalgo', zona_nombre: 'Centro', notas: 'Queso en bolsas de medio kilo.',
+      programado_para: `${hoyISO(entrega)}T${pad(entrega.getHours())}:${pad(entrega.getMinutes())}`,
+      paga_con: 500, total_neto: 496, ticket_total: 496, ticket_estado: 'pendiente',
+      items: [
+        { id: 1, tipo: 'producto', tipo_venta: 'peso', nombre_producto: 'Queso Oaxaca', cantidad: 1.5, precio_unitario: 180, subtotal: 270 },
+        { id: 2, tipo: 'producto', tipo_venta: 'unidad', nombre_producto: 'Crema Lala 1 L', cantidad: 2, precio_unitario: 38, subtotal: 76 },
+        { id: 3, tipo: 'producto', tipo_venta: 'peso', nombre_producto: 'Jamón de pavo', cantidad: 0.8, precio_unitario: 150, subtotal: 120 },
+        { id: 4, tipo: 'producto', tipo_venta: null, nombre_producto: 'Envío a domicilio', cantidad: 1, precio_unitario: 30, subtotal: 30, es_envio: true }
+      ]
+    };
+  }
+
+  // Pasa lo que eligió el dueño (ticket.ajustes) a los datos que entiende la impresora.
+  // Lo usan Mostrador (al dar «Pedido listo») y la prueba de Configuración, para que salga igual.
+  function aplicarAjustesPedido(datos, ticket) {
+    if (!ticket || !ticket.pedido) return datos;
+    const aj = ticket.ajustes || {};
+    datos.pedido = ticket.pedido;
+    datos.codigoAlFinal = true;          // el código de barras del folio va al final, no arriba
+    datos.tipoCodigoEscaneo = 'barras';
+    if (aj.tamanoLetra) datos.tamanoLetra = aj.tamanoLetra;
+    if (aj.totalTamano) datos.totalTamano = aj.totalTamano;
+    if (aj.folioUnaLinea) datos.folioUnaLinea = true;
+    if (aj.productoUnaLinea) datos.productoUnaLinea = true;
+    if (aj.compacto) datos.ticketCompacto = true;
+    if (typeof aj.incluirPrecioUnitario === 'boolean') datos.incluirPrecioUnitario = aj.incluirPrecioUnitario;
+    if (aj.soloNombreNegocio) { datos.negocio = { nombre: (datos.negocio || {}).nombre }; datos.mensajeSuperior = ''; datos.nombreTamano = 'normal'; }
+    if (Number.isFinite(aj.lineasSuperiores)) datos.lineasSuperiores = aj.lineasSuperiores;
+    if (Number.isFinite(aj.lineasInferiores)) datos.lineasInferiores = aj.lineasInferiores;
+    return datos;
   }
 
   // El ticket que se imprime cuando el pedido queda LISTO (lo imprime imprimirTicket() de mostrador.js).
-  function armarTicketPedido(p, { ahora, quien } = {}) {
+  // "opciones" = lo elegido en Configuración → Ticket de domicilio (sin opciones sale como siempre).
+  function armarTicketPedido(p, { ahora, quien, opciones } = {}) {
+    const op = normalizarOpciones(opciones);
+    const fmt = op || PLANTILLAS.como_ahora;
     const hoy = ahora || new Date();
     const total = p.total_neto !== null && p.total_neto !== undefined ? p.total_neto : p.ticket_total;
     const ent = textoEntrega(p, hoy);
     const mayus = (t) => String(t || '').trim().toUpperCase();
+    const etq = (t) => (fmt.adornos ? t : '');   // los rótulos sueltos (CLIENTE, DIRECCION...) son parte del adorno
+    const noGrande = fmt.cliente === 'grande' ? {} : { tam: 'normal' };
 
-    const datos = [];
     const cliente = [];
     if (lleno(p.nombre_contacto)) cliente.push(mayus(p.nombre_contacto));
     if (lleno(p.telefono)) cliente.push('TEL: ' + String(p.telefono).trim());
-    if (cliente.length) datos.push({ etiqueta: 'CLIENTE', lineas: cliente, grande: true });
+    const dir = [];
     if (p.tipo === 'domicilio') {
-      const dir = [];
       if (lleno(p.calle)) dir.push(mayus(p.calle));
       if (lleno(p.colonia)) dir.push(mayus(p.colonia));
       const cpCiudad = [lleno(p.cp) ? 'CP ' + String(p.cp).trim() : '', p.ciudad].filter(lleno).join(' ');
       if (lleno(cpCiudad)) dir.push(mayus(cpCiudad));
-      if (dir.length) datos.push({ etiqueta: 'DIRECCION', lineas: dir, grande: true });
-      if (lleno(p.referencias)) datos.push({ etiqueta: 'REFERENCIAS', lineas: [String(p.referencias).trim()], grande: false });
-      if (lleno(p.zona_nombre)) datos.push({ etiqueta: 'ZONA', lineas: [String(p.zona_nombre).trim()], grande: false });
+    }
+
+    const datos = [];
+    if (fmt.cliente === 'grande') {
+      if (cliente.length) datos.push({ etiqueta: etq('CLIENTE'), lineas: cliente, grande: true });
+      if (dir.length) datos.push({ etiqueta: etq('DIRECCION'), lineas: dir, grande: true });
+    } else {
+      const tam = fmt.cliente === 'mediana' ? 'alto' : 'normal';
+      if (cliente.length) datos.push({ etiqueta: etq('CLIENTE'), lineas: [cliente.join('  ')], grande: false, tam });
+      if (dir.length) datos.push({ etiqueta: etq('DIRECCION'), lineas: [dir.join(', ')], grande: false, tam });
+    }
+    if (p.tipo === 'domicilio') {
+      if (lleno(p.referencias)) datos.push({ etiqueta: etq('REFERENCIAS'), lineas: [(fmt.adornos ? '' : 'Ref: ') + String(p.referencias).trim()], grande: false, ...noGrande });
+      if (fmt.zona && lleno(p.zona_nombre)) datos.push({ etiqueta: etq('ZONA'), lineas: [(fmt.adornos ? '' : 'Zona: ') + String(p.zona_nombre).trim()], grande: false, ...noGrande });
     }
 
     const listoEn = lleno(p.listo_en) && !isNaN(new Date(p.listo_en).getTime()) ? new Date(p.listo_en) : hoy;
@@ -142,11 +258,15 @@
       folio: p.folio,
       total,
       pie_pagina: pieCuerpo,
-      items: (p.items || []).map((i) => ({
-        nombre_producto: i.nombre_producto, tipo: i.tipo, tipo_venta: i.tipo_venta, cantidad: i.cantidad,
-        precio_unitario: i.precio_unitario, importe: i.importe, subtotal: i.subtotal,
-        ...(i.es_envio ? { detalle: '' } : {})
-      })),
+      items: (p.items || []).map((i) => {
+        const c = i.es_envio ? null : textoCantidad(i);
+        return {
+          nombre_producto: i.nombre_producto, tipo: i.tipo, tipo_venta: i.tipo_venta, cantidad: i.cantidad,
+          precio_unitario: i.precio_unitario, importe: i.importe, subtotal: i.subtotal,
+          // "1.500 kg", "2 pzas": se imprime cuando no se quiere el precio de cada producto
+          ...(i.es_envio ? { detalle: '' } : { cantidad_texto: `${c.num} ${c.unidad}` })
+        };
+      }),
       pedido: {
         titulo: `PEDIDO ${p.etiqueta}`,
         subtitulo: p.tipo === 'recoger' ? 'PARA RECOGER' : 'A DOMICILIO',
@@ -154,12 +274,31 @@
         datos,
         cobro,
         notas: lleno(p.notas) ? String(p.notas).trim() : '',
-        pie
-      }
+        pie,
+        // Cómo se dibuja (solo cuando hay opciones guardadas; sin esto la impresora usa lo de siempre)
+        ...(op ? { formato: { cliente: op.cliente, entrega: op.entrega, tituloUna: op.cliente !== 'grande', adornos: op.adornos, cobro: op.cobro, barras: op.barras } } : {})
+      },
+      ...(op ? {
+        ajustes: {
+          ...(op.letraProductos !== 'auto' ? { tamanoLetra: op.letraProductos } : {}),
+          ...(op.total !== 'auto' ? { totalTamano: op.total } : {}),
+          folioUnaLinea: op.folioUnaLinea,
+          productoUnaLinea: op.productoUnaLinea,
+          compacto: !op.adornos,
+          soloNombreNegocio: !op.negocioCompleto,
+          incluirPrecioUnitario: op.precioUnitario,
+          ...(op.lineasArriba !== null ? { lineasSuperiores: op.lineasArriba } : {}),
+          ...(op.lineasAbajo !== null ? { lineasInferiores: op.lineasAbajo } : {})
+        }
+      } : {})
     };
   }
 
-  const PURO = { diaTexto, hora24, minutosPara, duracion, minutosDesde, haceTexto, textoCantidad, textoEntrega, clasificar, textoCobro, armarTicketPedido, esc };
+  const PURO = {
+    diaTexto, hora24, minutosPara, duracion, minutosDesde, haceTexto, textoCantidad, textoEntrega, clasificar, textoCobro, armarTicketPedido, esc,
+    OPCIONES_CLAVE, PLANTILLAS, NOMBRES_PLANTILLA, normalizarOpciones, plantillaDe, leerOpcionesDomicilio, guardarOpcionesDomicilio, borrarOpcionesDomicilio,
+    pedidoEjemplo, aplicarAjustesPedido
+  };
   if (typeof module !== 'undefined' && module.exports) { module.exports = PURO; return; }
   raiz.MostradorPedidos = PURO;
   if (typeof document === 'undefined') return;
@@ -375,7 +514,7 @@
     if (typeof imprimirTicket !== 'function') { mostrarToast('Esta pantalla no tiene impresora configurada', 'error'); return; }
     let completo = p;
     if (!Array.isArray(p.items)) completo = await apiFetch(`/pedidos/${p.id}`);
-    await imprimirTicket(armarTicketPedido(completo, { quien: usuario && usuario.nombre }));
+    await imprimirTicket(armarTicketPedido(completo, { quien: usuario && usuario.nombre, opciones: leerOpcionesDomicilio() }));
   }
   async function reimprimir(id) {
     try { await imprimirPedido({ id }); } catch (err) { mostrarToast(err.message || 'No se pudo imprimir', 'error'); }
@@ -447,7 +586,9 @@
   }
 
   function iniciar() {
-    if (!usuario) return;
+    // Esta pantalla solo trabaja en Mostrador (donde está el botón de pedidos). En Configuración el archivo
+    // se carga únicamente por las funciones del ticket y no debe conectarse ni revisar pedidos.
+    if (!usuario || !$('btnPedidosPrep')) return;
     iniciarSocket();
     cargar();
     setInterval(cargar, 45000);

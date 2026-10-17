@@ -773,15 +773,17 @@ function generarCanvasQR(texto, tamanoPx) {
 // Genera un código de barras lineal (Code128) con el folio, usando la
 // librería JsBarcode (cargada por separado en la página) — para lectores
 // físicos básicos que solo leen códigos de barras, no QR.
-function generarCanvasBarras(texto, anchoTotalPx) {
+// "chico" (ticket de domicilio con ahorro de papel): barras más bajas y sin el número debajo
+// (el folio ya sale escrito en el ticket), para gastar menos papel.
+function generarCanvasBarras(texto, anchoTotalPx, chico) {
   const canvas = document.createElement('canvas');
   JsBarcode(canvas, texto, {
     format: 'CODE128',
     width: Math.max(1, Math.floor(anchoTotalPx / (texto.length * 11))),
-    height: 60,
-    displayValue: true,
+    height: chico ? 36 : 60,
+    displayValue: !chico,
     fontSize: 14,
-    margin: 4
+    margin: chico ? 2 : 4
   });
   return canvas;
 }
@@ -833,7 +835,11 @@ const TEXTO_VERSION_PRUEBA = '*** VERSIÓN DE PRUEBA ***';
 function ticketEsPrueba() { return typeof licenciaEsPrueba === 'function' && licenciaEsPrueba(); }
 function leyendaCompoint() { return ticketEsPrueba() ? [TEXTO_VERSION_PRUEBA, ...LEYENDA_COMPOINT_BASE] : LEYENDA_COMPOINT_BASE; }
 
-function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items, total, piePagina, textoLegal = '', incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null }) {
+// Opciones del ticket de domicilio (ver js/mostrador-pedidos.js):
+//   productoUnaLinea → "1.500 kg Queso Oaxaca ........ $270.00" en un solo renglón
+//   ticketCompacto   → sin los renglones en blanco de arriba y de abajo
+//   (sin precio unitario, los pedidos siguen mostrando la cantidad: item.cantidad_texto)
+function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items, total, piePagina, textoLegal = '', incluirPrecioUnitario = true, descripcionCompleta = true, cliente = null, montoRecibido = null, cambio = null, productoUnaLinea = false, ticketCompacto = false }) {
   const columnas = columnasForzadas || (ancho_ticket === '58mm' ? 32 : 48);
   const centrar = (texto) => {
     const espacios = Math.max(0, Math.floor((columnas - texto.length) / 2));
@@ -869,7 +875,7 @@ function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items
     return renglones;
   });
 
-  const lineas = [''];
+  const lineas = ticketCompacto ? [] : [''];
 
   if (cliente && cliente.nombre) {
     lineas.push(`Cliente: ${cliente.nombre}`);
@@ -878,6 +884,18 @@ function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items
   }
 
   items.forEach(item => {
+    const cant = item.cantidad_texto || '';
+    if (productoUnaLinea) {
+      // Cantidad + nombre a la izquierda e importe a la derecha, en un solo renglón (si cabe).
+      const izq = (cant ? cant + ' ' : '') + item.nombre_producto;
+      const monto = `$${item.subtotal}`;
+      const partes = descripcionCompleta ? envolverTexto(izq) : [izq.length > columnas ? izq.slice(0, columnas - 1) + '.' : izq];
+      const ultimo = partes[partes.length - 1];
+      partes.slice(0, -1).forEach(renglon => lineas.push(renglon));
+      if (ultimo.length + 1 + monto.length <= columnas) lineas.push(ultimo + ' '.repeat(columnas - ultimo.length - monto.length) + monto);
+      else { lineas.push(ultimo); lineas.push(filaMonto('  ', item.subtotal)); }
+      return;
+    }
     if (descripcionCompleta) {
       envolverTexto(item.nombre_producto).forEach(renglon => lineas.push(renglon));
     } else {
@@ -885,6 +903,8 @@ function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items
     }
     if (incluirPrecioUnitario && item.detalle) {
       lineas.push(filaMonto(`  ${item.detalle}`, item.subtotal));
+    } else if (cant) {
+      lineas.push(filaMonto(`  ${cant}`, item.subtotal)); // sin precio unitario, pero sin perder cuánto lleva
     } else {
       lineas.push(filaMonto('  ', item.subtotal));
     }
@@ -906,7 +926,7 @@ function formatearCuerpoTicket({ ancho_ticket, columnas: columnasForzadas, items
     lineas.push('');
     envolverTexto(textoLegal).forEach(r => lineas.push(centrar(r)));
   }
-  lineas.push('');
+  if (!ticketCompacto) lineas.push('');
   return lineas;
 }
 
@@ -937,29 +957,47 @@ function bloquePedidoEscPos(d, parte, { linea, envolver }) {
   const etiqueta = (t) => out.push(negrita, linea(t), sinNegrita);
   const raya = (c) => out.push(linea(c.repeat(cn)));
   const centrarEn = (t, w) => { const f = Math.max(0, w - t.length); const i = Math.floor(f / 2); return ' '.repeat(i) + t + ' '.repeat(f - i); };
+  const normal = (t) => { out.push(negrita); envolver(t, cn).forEach(r => out.push(linea(r))); out.push(sinNegrita); };
+  // Cómo se dibuja (Configuración → Ticket de domicilio). Sin "formato" sale como siempre.
+  const f = p.formato || {};
+  const adornos = f.adornos !== false;
 
   out.push(ESCPOS_FUENTE_A);
   if (parte === 'arriba') {
     out.push(ESCPOS_CENTRAR);
-    if (p.titulo) grande(p.titulo);
-    if (p.subtitulo) grande(p.subtitulo);
-    if (p.entrega) { raya('='); envolver(p.entrega.etiqueta, cn).forEach(r => out.push(negrita, linea(r), sinNegrita)); grande(p.entrega.valor); raya('='); }
+    if (f.tituloUna) { const t = [p.titulo, p.subtitulo].filter(Boolean).join(' - '); if (t) alto(t); }
+    else { if (p.titulo) grande(p.titulo); if (p.subtitulo) grande(p.subtitulo); }
+    if (p.entrega) {
+      if (!f.entrega || f.entrega === 'recuadro') { raya('='); envolver(p.entrega.etiqueta, cn).forEach(r => out.push(negrita, linea(r), sinNegrita)); grande(p.entrega.valor); raya('='); }
+      else { const t = `${p.entrega.etiqueta} ${p.entrega.valor}`.trim(); if (f.entrega === 'grande') grande(t); else normal(t); }
+    }
     out.push(ESCPOS_IZQUIERDA);
-    (p.datos || []).forEach(dt => { etiqueta(dt.etiqueta); (dt.lineas || []).forEach(l => (dt.grande ? grande(l) : alto(l))); });
+    (p.datos || []).forEach(dt => {
+      if (dt.etiqueta) etiqueta(dt.etiqueta);
+      const tam = dt.tam || (dt.grande ? 'grande' : 'alto');
+      (dt.lineas || []).forEach(l => (tam === 'grande' ? grande(l) : tam === 'alto' ? alto(l) : normal(l)));
+    });
     raya('-');
-    etiqueta('PRODUCTOS');
+    if (adornos) etiqueta('PRODUCTOS');
   } else {
     out.push(ESCPOS_IZQUIERDA);
     if (p.cobro) {
       // Recuadro negro de lado a lado: se rellena cada renglón con espacios porque lo invertido solo pinta donde hay letras.
       out.push(ESCPOS_INVERSO_ON, negrita);
-      envolver(p.cobro.titulo, cn).forEach(r => out.push(linea(centrarEn(r, cn))));
-      if (p.cobro.monto) { out.push(escposTamano(2, 2)); envolver('$' + p.cobro.monto, w2).forEach(r => out.push(linea(centrarEn(r, w2)))); out.push(escposTamano(1, 1)); }
+      if (f.cobro === 'linea') {
+        // Ahorro de papel: "COBRAR AL RECIBIR $496.00" en un renglón (y abajo con cuánto paga, si lo hay)
+        out.push(escposTamano(1, 2));
+        envolver(p.cobro.titulo + (p.cobro.monto ? ' $' + p.cobro.monto : ''), cn).forEach(r => out.push(linea(centrarEn(r, cn))));
+        out.push(escposTamano(1, 1));
+      } else {
+        envolver(p.cobro.titulo, cn).forEach(r => out.push(linea(centrarEn(r, cn))));
+        if (p.cobro.monto) { out.push(escposTamano(2, 2)); envolver('$' + p.cobro.monto, w2).forEach(r => out.push(linea(centrarEn(r, w2)))); out.push(escposTamano(1, 1)); }
+      }
       if (p.cobro.detalle) envolver(p.cobro.detalle, cn).forEach(r => out.push(linea(centrarEn(r, cn))));
       out.push(sinNegrita, ESCPOS_INVERSO_OFF);
     }
-    if (p.notas) { etiqueta('NOTAS DEL PEDIDO'); alto(p.notas); }
-    raya('-');
+    if (p.notas) { if (adornos) { etiqueta('NOTAS DEL PEDIDO'); alto(p.notas); } else normal('NOTA: ' + p.notas); }
+    if (adornos) raya('-');
     (p.pie || []).forEach(t => { out.push(ESCPOS_CENTRAR); envolver(t, cn).forEach(r => out.push(linea(r))); });
     out.push(ESCPOS_IZQUIERDA);
   }
@@ -971,21 +1009,37 @@ function bloquePedidoHtml(d, parte, esc) {
   const p = d.pedido;
   if (!p) return '';
   const lineasHtml = (ls, clase) => (ls || []).map(l => `<div class="${clase}">${esc(l)}</div>`).join('');
+  const f = p.formato || {};
+  const adornos = f.adornos !== false;
   if (parte === 'arriba') {
     let h = '';
-    if (p.titulo) h += `<div class="pd-t">${esc(p.titulo)}</div>`;
-    if (p.subtitulo) h += `<div class="pd-t">${esc(p.subtitulo)}</div>`;
-    if (p.entrega) h += `<div class="pd-caja"><div class="e">${esc(p.entrega.etiqueta)}</div><div class="v">${esc(p.entrega.valor)}</div></div>`;
-    (p.datos || []).forEach(dt => { h += `<div class="pd-et">${esc(dt.etiqueta)}</div>${lineasHtml(dt.lineas, dt.grande ? 'pd-g' : 'pd-m')}`; });
-    h += `<div class="pd-raya"></div><div class="pd-et" style="margin-top:0">PRODUCTOS</div>`;
+    if (f.tituloUna) { const t = [p.titulo, p.subtitulo].filter(Boolean).join(' - '); if (t) h += `<div class="pd-t una">${esc(t)}</div>`; }
+    else {
+      if (p.titulo) h += `<div class="pd-t">${esc(p.titulo)}</div>`;
+      if (p.subtitulo) h += `<div class="pd-t">${esc(p.subtitulo)}</div>`;
+    }
+    if (p.entrega) {
+      if (!f.entrega || f.entrega === 'recuadro') h += `<div class="pd-caja"><div class="e">${esc(p.entrega.etiqueta)}</div><div class="v">${esc(p.entrega.valor)}</div></div>`;
+      else h += `<div class="${f.entrega === 'grande' ? 'pd-t' : 'pd-n c'}">${esc(`${p.entrega.etiqueta} ${p.entrega.valor}`.trim())}</div>`;
+    }
+    (p.datos || []).forEach(dt => {
+      const clase = { grande: 'pd-g', alto: 'pd-m', normal: 'pd-n' }[dt.tam || (dt.grande ? 'grande' : 'alto')] || 'pd-m';
+      if (dt.etiqueta) h += `<div class="pd-et">${esc(dt.etiqueta)}</div>`;
+      h += lineasHtml(dt.lineas, clase);
+    });
+    h += `<div class="pd-raya"></div>${adornos ? '<div class="pd-et" style="margin-top:0">PRODUCTOS</div>' : ''}`;
     return h;
   }
   let h = '';
   if (p.cobro) {
-    h += `<div class="pd-caja pd-cobro"><div class="e">${esc(p.cobro.titulo)}</div>${p.cobro.monto ? `<div class="v">$${esc(p.cobro.monto)}</div>` : ''}${p.cobro.detalle ? `<div class="e">${esc(p.cobro.detalle)}</div>` : ''}</div>`;
+    if (f.cobro === 'linea') {
+      h += `<div class="pd-linea">${esc(p.cobro.titulo + (p.cobro.monto ? ' $' + p.cobro.monto : ''))}${p.cobro.detalle ? `<div class="d">${esc(p.cobro.detalle)}</div>` : ''}</div>`;
+    } else {
+      h += `<div class="pd-caja pd-cobro"><div class="e">${esc(p.cobro.titulo)}</div>${p.cobro.monto ? `<div class="v">$${esc(p.cobro.monto)}</div>` : ''}${p.cobro.detalle ? `<div class="e">${esc(p.cobro.detalle)}</div>` : ''}</div>`;
+    }
   }
-  if (p.notas) h += `<div class="pd-et">NOTAS DEL PEDIDO</div><div class="pd-m">${esc(p.notas)}</div>`;
-  h += '<div class="pd-raya"></div>';
+  if (p.notas) h += adornos ? `<div class="pd-et">NOTAS DEL PEDIDO</div><div class="pd-m">${esc(p.notas)}</div>` : `<div class="pd-n">${esc('NOTA: ' + p.notas)}</div>`;
+  if (adornos) h += '<div class="pd-raya"></div>';
   h += (p.pie || []).map(t => `<div class="c">${esc(t)}</div>`).join('');
   return h;
 }
@@ -1001,7 +1055,33 @@ async function imprimirTicketBLE(datosTicket) {
   if (!impresoraConectada()) {
     throw new Error('No hay impresora conectada. Toca "Conectar impresora" primero.');
   }
+  await enviarBytes(await construirBytesTicketBLE(datosTicket));
+}
 
+// Largo aproximado (en cm) de lo que imprime un ticket ya armado en bytes ESC/POS: cada renglón
+// avanza 30 puntos (más 24 por cada vez que la letra es más alta) y las imágenes avanzan su alto.
+// La impresora térmica trae 203 puntos por pulgada.
+function estimarLargoTicketCm(bytes) {
+  let puntos = 0, altoLetra = 1;
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    if (b === 0x1B && bytes[i + 1] === 0x40) { altoLetra = 1; i += 1; continue; }                          // reiniciar
+    if (b === 0x1D && bytes[i + 1] === 0x21) { altoLetra = (bytes[i + 2] & 0x0F) + 1; i += 2; continue; }  // tamaño de letra
+    if (b === 0x1D && bytes[i + 1] === 0x76 && bytes[i + 2] === 0x30) {                                   // imagen: m xL xH yL yH + datos
+      const ancho = bytes[i + 4] + bytes[i + 5] * 256, alto = bytes[i + 6] + bytes[i + 7] * 256;
+      puntos += alto; i += 7 + ancho * alto; continue;
+    }
+    if (b === 0x1D && bytes[i + 1] === 0x56) { i += 2; continue; }                                         // corte
+    if (b === 0x1D && bytes[i + 1] === 0x42) { i += 2; continue; }                                         // inverso
+    if (b === 0x1B && (bytes[i + 1] === 0x45 || bytes[i + 1] === 0x61 || bytes[i + 1] === 0x4D || bytes[i + 1] === 0x74)) { i += 2; continue; }
+    if (b === 0x0A) puntos += 30 + 24 * (altoLetra - 1);
+  }
+  return Math.round((puntos / 203) * 2.54 * 10) / 10;
+}
+
+// Arma TODO lo que se manda a la impresora (sin mandarlo). Lo usa imprimirTicketBLE y la vista previa
+// de Configuración (para decir cuánto papel gasta un ticket).
+async function construirBytesTicketBLE(datosTicket) {
   const d = completarDatosTicket(datosTicket);
   ticketModoAcentos = d.acentos;
   const ESC = 0x1B;
@@ -1063,7 +1143,10 @@ async function imprimirTicketBLE(datosTicket) {
 
   // ---- Folio y fecha (alineados a la izquierda) ----
   const separador = '-'.repeat(columnas);
-  partes.push(ESCPOS_IZQUIERDA, linea(separador), linea(`Folio: ${d.folio}`), linea(`Fecha: ${d.fecha}`), linea(separador));
+  partes.push(ESCPOS_IZQUIERDA, linea(separador));
+  if (d.folioUnaLinea) envolver(`Folio: ${d.folio}   ${d.fecha}`, columnas).forEach(r => partes.push(linea(r)));   // ahorro de papel: un renglón
+  else partes.push(linea(`Folio: ${d.folio}`), linea(`Fecha: ${d.fecha}`));
+  partes.push(linea(separador));
 
   // ---- Pedido listo: título, hora de entrega y datos del cliente en letra grande ----
   if (d.pedido) {
@@ -1120,7 +1203,8 @@ async function imprimirTicketBLE(datosTicket) {
   if (d.codigoAlFinal && d.folio && typeof JsBarcode !== 'undefined') {
     try {
       const anchoBarrasPx = d.ancho_ticket === '58mm' ? 240 : 350;
-      partes.push(ESCPOS_CENTRAR, canvasAComandosRaster(generarCanvasBarras(d.folio, anchoBarrasPx)), salto, ESCPOS_IZQUIERDA);
+      const chico = !!(d.pedido && d.pedido.formato && d.pedido.formato.barras === 'chico');
+      partes.push(ESCPOS_CENTRAR, canvasAComandosRaster(generarCanvasBarras(d.folio, anchoBarrasPx, chico)), salto, ESCPOS_IZQUIERDA);
     } catch (err) {
       console.error('No se pudo generar el código de barras, se imprime solo el folio en texto:', err.message);
     }
@@ -1168,7 +1252,7 @@ async function imprimirTicketBLE(datosTicket) {
     escposComando([0x1D, 0x56, 0x00]) // cortar papel (si la impresora lo soporta)
   );
 
-  await enviarBytes(bytesJuntos(partes));
+  return bytesJuntos(partes);
 }
 
 // Respaldo cuando no hay impresora BLE conectada o el navegador no la soporta:
@@ -1216,6 +1300,11 @@ async function construirHtmlTicket(datosTicket) {
     .tk .pd-g { font-weight: 900; font-size: ${(fuentePx * 1.45).toFixed(1)}px; line-height: 1.15; word-break: break-word; }
     .tk .pd-m { font-weight: 800; font-size: ${(fuentePx * 1.15).toFixed(1)}px; line-height: 1.2; word-break: break-word; }
     .tk .pd-raya { border-top: 2px dashed #000; margin: 6px 0; }
+    .tk .pd-t.una { font-size: ${(fuentePx * 1.3).toFixed(1)}px; }
+    .tk .pd-n { font-weight: 800; word-break: break-word; }
+    .tk .pd-linea { border: 2px solid #000; text-align: center; font-weight: 900; font-size: ${(fuentePx * 1.2).toFixed(1)}px; padding: 1px 3px; margin: 3px 0; word-break: break-word; }
+    .tk .pd-linea .d { font-size: ${fuentePx.toFixed(1)}px; font-weight: 800; }
+    .tk .l.w { white-space: pre-wrap; }
     .tk { position: relative; overflow: hidden; }
     .tk .marca-prueba { position: absolute; left: -20%; right: -20%; top: 38%; text-align: center; transform: rotate(-20deg); font-family: Arial, sans-serif; font-weight: 900; font-size: ${(fuentePx * 2.1).toFixed(1)}px; letter-spacing: 2px; color: rgba(0,0,0,.14); pointer-events: none; white-space: nowrap; }
   `;
@@ -1236,7 +1325,9 @@ async function construirHtmlTicket(datosTicket) {
   if (ticketEsPrueba()) partes.push(`<div class="c" style="font-weight:800;">${esc(TEXTO_VERSION_PRUEBA)}</div>`);
 
   const sep = '-'.repeat(columnas);
-  partes.push(`<div class="l">${sep}\nFolio: ${esc(d.folio)}\nFecha: ${esc(d.fecha)}\n${sep}</div>`);
+  partes.push(d.folioUnaLinea
+    ? `<div class="l w">${sep}\nFolio: ${esc(d.folio)}   ${esc(d.fecha)}\n${sep}</div>`
+    : `<div class="l">${sep}\nFolio: ${esc(d.folio)}\nFecha: ${esc(d.fecha)}\n${sep}</div>`);
 
   // Pedido listo: título, hora de entrega y datos del cliente en letra grande
   if (d.pedido) partes.push(bloquePedidoHtml(d, 'arriba', esc));
@@ -1272,7 +1363,8 @@ async function construirHtmlTicket(datosTicket) {
   if (d.pedido) partes.push(bloquePedidoHtml(d, 'abajo', esc));
   if (d.codigoAlFinal && d.folio && typeof JsBarcode !== 'undefined') {
     try {
-      partes.push(`<img src="${generarCanvasBarras(d.folio, 350).toDataURL()}">`);
+      const chico = !!(d.pedido && d.pedido.formato && d.pedido.formato.barras === 'chico');
+      partes.push(`<img src="${generarCanvasBarras(d.folio, 350, chico).toDataURL()}">`);
     } catch (err) {
       console.error('No se pudo generar el código de barras:', err.message);
     }

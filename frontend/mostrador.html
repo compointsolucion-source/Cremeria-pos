@@ -180,6 +180,8 @@
   }
   .granel-chip.on { background: #5FAE46; border-color: #5FAE46; color: #fff; }
   .modal-granel .teclado { margin-top: 8px; }
+  .ayuda-teclado { margin-top: 10px; text-align: center; font-size: 11.5px; line-height: 1.35; color: #7A7D83; }
+  @media (hover: none) { .ayuda-teclado { display: none; } } /* en celular/tablet sin teclado no estorba */
   .modal-granel .tecla { padding: 12px 0; }
   .stepper { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 14px 0; }
   .stepper button {
@@ -307,6 +309,7 @@
         <button class="tecla" onclick="teclear('0')">0</button>
         <button class="tecla" onclick="borrarUltimo()">⌫</button>
       </div>
+      <div class="ayuda-teclado">⌨ También con el teclado: números y punto · Tab cambia Cantidad/Importe · Enter agrega · Esc cancela</div>
       <div style="display:flex; gap:8px; margin-top:14px;">
         <button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modalPeso')">Cancelar</button>
         <button class="btn btn-primary" style="flex:1" onclick="confirmarPeso()">Agregar</button>
@@ -324,6 +327,7 @@
         <button onclick="cambiarCantidadUnidad(1)">+</button>
       </div>
       <div class="subtotal-preview" id="subtotalUnidadPreview">Subtotal: $0.00</div>
+      <div class="ayuda-teclado">⌨ También con el teclado: escribe la cantidad · + / − · Enter agrega · Esc cancela</div>
       <div style="display:flex; gap:8px; margin-top:14px;">
         <button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modalUnidad')">Cancelar</button>
         <button class="btn btn-primary" style="flex:1" onclick="confirmarUnidad()">Agregar</button>
