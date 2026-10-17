@@ -18,7 +18,7 @@ router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'),
   try {
     const result = await pool.query(
       `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador, telefono
-       FROM usuarios WHERE sucursal_id = $1 ORDER BY creado_en ASC`,
+       FROM usuarios WHERE sucursal_id = $1 AND eliminado_en IS NULL ORDER BY creado_en ASC`,
       [req.sucursalId]
     );
 
@@ -73,16 +73,31 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
   }
 });
 
-// Editar nombre/rol/activo/permisos de un empleado (dueño/gerente)
+// Editar nombre/usuario/rol/activo/permisos de un empleado (dueño/gerente)
 router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    const { nombre, rol, activo, permisos, nombre_mostrador, telefono } = req.body;
+    const { rol, activo, permisos, nombre_mostrador, telefono } = req.body;
     if (rol && !['gerente', 'cajero', 'mostrador', 'repartidor'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
 
+    // Nombre y usuario: si vienen, no pueden quedar vacíos. El usuario no lleva espacios.
+    let nombre;
+    if (req.body.nombre !== undefined) {
+      nombre = String(req.body.nombre || '').trim().slice(0, 100);
+      if (!nombre) return res.status(400).json({ error: 'El nombre no puede quedar vacío' });
+    }
+    let usuario;
+    if (req.body.usuario !== undefined) {
+      usuario = String(req.body.usuario || '').trim();
+      if (!usuario) return res.status(400).json({ error: 'El usuario no puede quedar vacío' });
+      if (/\s/.test(usuario)) return res.status(400).json({ error: 'El usuario no puede llevar espacios' });
+      if (usuario.length > 30) return res.status(400).json({ error: 'El usuario puede tener máximo 30 letras' });
+      if (usuario.includes('~')) return res.status(400).json({ error: 'El usuario no puede llevar el símbolo ~' });
+    }
+
     // Nunca permitir que se edite/desactive al usuario dueño desde aquí
-    const objetivo = await pool.query('SELECT rol, nombre, activo, permisos FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
+    const objetivo = await pool.query('SELECT rol, nombre, usuario, activo, permisos FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND eliminado_en IS NULL', [req.params.id, req.sucursalId]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede modificar al usuario dueño desde aquí' });
     const valorAnterior = objetivo.rows[0];
@@ -94,11 +109,12 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
         activo = COALESCE($3, activo),
         permisos = COALESCE(permisos, '{}'::jsonb) || COALESCE($4::jsonb, '{}'::jsonb),
         nombre_mostrador = CASE WHEN $7::boolean THEN $8 ELSE nombre_mostrador END,
-        telefono = CASE WHEN $9::boolean THEN $10 ELSE telefono END
+        telefono = CASE WHEN $9::boolean THEN $10 ELSE telefono END,
+        usuario = COALESCE($11, usuario)
        WHERE id = $5 AND sucursal_id = $6
        RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador, telefono`,
       [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.sucursalId, nombre_mostrador !== undefined, nombre_mostrador || null,
-       telefono !== undefined, telefono ? String(telefono).slice(0, 20) : null]
+       telefono !== undefined, telefono ? String(telefono).slice(0, 20) : null, usuario]
     );
 
     await registrarBitacora(pool, {
@@ -107,13 +123,56 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
       modulo: 'usuarios',
       referencia_id: parseInt(req.params.id),
       valor_anterior: valorAnterior,
-      valor_nuevo: { nombre: result.rows[0].nombre, rol: result.rows[0].rol, activo: result.rows[0].activo }
+      valor_nuevo: { nombre: result.rows[0].nombre, usuario: result.rows[0].usuario, rol: result.rows[0].rol, activo: result.rows[0].activo }
     });
 
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
+    if (err.code === '23505') return res.status(400).json({ error: 'Ese nombre de usuario ya está en uso' });
     res.status(500).json({ error: 'Error al actualizar el empleado' });
+  }
+});
+
+// Eliminar un empleado. NO se borra de la base: se archiva (deja de salir en Equipo, ya no puede entrar
+// y su usuario queda libre para otra persona), y sus ventas, turnos y movimientos se conservan tal cual.
+router.delete('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Empleado inválido' });
+    if (id === req.usuario.id) return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
+
+    const objetivo = await pool.query('SELECT id, nombre, usuario, rol FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND eliminado_en IS NULL', [id, req.sucursalId]);
+    if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
+    const emp = objetivo.rows[0];
+    if (emp.rol === 'dueno' || emp.rol === 'jefe_general') return res.status(403).json({ error: 'No se puede eliminar al usuario dueño' });
+    if (emp.rol === 'gerente' && req.usuario.rol === 'gerente') return res.status(403).json({ error: 'Solo el dueño puede eliminar a un gerente' });
+
+    // No dejar cosas a medias: un turno de caja abierto o entregas pendientes.
+    const turno = await pool.query("SELECT 1 FROM turnos WHERE usuario_id = $1 AND estado = 'abierto' LIMIT 1", [id]);
+    if (turno.rows.length) return res.status(409).json({ error: `${emp.nombre} tiene un turno de caja abierto. Ciérralo primero y luego elimínalo.` });
+    const entregas = await pool.query("SELECT 1 FROM pedidos WHERE repartidor_id = $1 AND estado IN ('programado', 'preparando', 'listo', 'en_camino') LIMIT 1", [id]);
+    if (entregas.rows.length) return res.status(409).json({ error: `${emp.nombre} tiene pedidos pendientes por entregar. Reasígnalos o termínalos primero.` });
+
+    await pool.query(
+      `UPDATE usuarios SET activo = false, eliminado_en = NOW(), nombre_mostrador = NULL,
+              usuario = LEFT(usuario, 30) || '~eliminado~' || id
+       WHERE id = $1 AND sucursal_id = $2`,
+      [id, req.sucursalId]
+    );
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'eliminar_empleado',
+      modulo: 'usuarios',
+      referencia_id: id,
+      valor_anterior: { nombre: emp.nombre, usuario: emp.usuario, rol: emp.rol }
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al eliminar el empleado' });
   }
 });
 
@@ -125,7 +184,7 @@ router.put('/:id/restablecer-password', verificarToken, requiereRol('jefe_genera
       return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
     }
 
-    const objetivo = await pool.query('SELECT rol FROM usuarios WHERE id = $1 AND sucursal_id = $2', [req.params.id, req.sucursalId]);
+    const objetivo = await pool.query('SELECT rol FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND eliminado_en IS NULL', [req.params.id, req.sucursalId]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede restablecer la contraseña del dueño desde aquí' });
 

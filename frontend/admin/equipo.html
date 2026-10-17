@@ -191,8 +191,8 @@ function pintarPanel() {
     return;
   }
   cab.textContent = '✏️ Editando empleado';
-  const perfil = `<div class="perfil"><div class="avatar grande" style="background:${colorDe(u.nombre)}">${escapar(iniciales(u.nombre))}</div>
-    <div><b>${escapar(u.nombre)}</b><small>@${escapar(u.usuario)} · usuario para entrar</small></div></div>`;
+  const perfil = `<div class="perfil"><div class="avatar grande" id="perfilAvatar" style="background:${colorDe(u.nombre)}">${escapar(iniciales(u.nombre))}</div>
+    <div><b id="perfilNombre">${escapar(u.nombre)}</b><small>@<span id="perfilUsuario">${escapar(u.usuario)}</span> · usuario para entrar</small></div></div>`;
   if (esDueno(u)) {
     pie.style.display = 'none';
     cuerpo.innerHTML = perfil + `<div class="solo-lectura"><span class="rol-tag rol-${escapar(u.rol)}" style="font-size:13px;">${escapar(rolNombres[u.rol])}</span>
@@ -211,7 +211,13 @@ function pintarPanel() {
       <div style="display:flex; gap:6px; margin-top:6px; align-items:center;"><input type="text" readonly value="${escapar(enlaceRepartidor)}" style="min-height:36px; font-size:13px;" onclick="this.select()">
         <button class="btn btn-secondary" style="min-height:36px; padding:4px 12px;" onclick="copiarEnlaceRepartidor()">Copiar</button></div>
       <div class="ayuda" style="margin-top:6px;">Necesita internet en su celular. Recomiéndale abrirla y elegir «Agregar a pantalla de inicio».</div></div>`;
-  cuerpo.innerHTML = perfil + `
+  const bloqueDatos = `
+    <div class="campo"><label for="datoNombre">Nombre</label>
+      <input type="text" id="datoNombre" value="${escapar(u.nombre)}" maxlength="100" autocomplete="off" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarDato(${u.id}, 'nombre', this)"></div>
+    <div class="campo"><label for="datoUsuario">Usuario para iniciar sesión</label>
+      <input type="text" id="datoUsuario" value="${escapar(u.usuario)}" maxlength="30" autocomplete="off" autocapitalize="none" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarDato(${u.id}, 'usuario', this)">
+      <div class="ayuda">Si lo cambias, esa persona debe entrar con el usuario nuevo (su contraseña sigue igual).</div></div>`;
+  cuerpo.innerHTML = perfil + bloqueDatos + `
     <div class="bloque blanco"><div class="interruptor-fila">
       <div><b>Cuenta activa</b><small>Si la apagas, ya no podrá entrar</small></div>
       <input type="checkbox" class="interruptor" id="chkActivo" ${u.activo ? 'checked' : ''} onchange="alternarActivo(${u.id}, this.checked)">
@@ -232,7 +238,8 @@ function pintarPanel() {
       </div>`;
     }).join('')}`}`;
   pie.style.display = '';
-  pie.innerHTML = `<button class="btn btn-secondary btn-grande" onclick="restablecerPassword(${u.id})">🔑 Restablecer contraseña</button>`;
+  pie.innerHTML = `<button class="btn btn-secondary btn-grande" onclick="restablecerPassword(${u.id})">🔑 Restablecer contraseña</button>
+    <button class="btn btn-secondary btn-grande btn-peligro" onclick="eliminarEmpleado(${u.id})">🗑️ Eliminar empleado</button>`;
 }
 
 function alternarGrupo(grupo) {
@@ -287,6 +294,47 @@ async function guardarTelefono(id, campo) {
   } catch (err) {
     mostrarToast(err.message, 'error');
     campo.value = (u && u.telefono) || '';
+  }
+}
+
+// Cambiar el nombre o el usuario con el que entra. Se guarda al salir del campo.
+async function guardarDato(id, campo, input) {
+  const u = buscar(id);
+  if (!u) return;
+  const nuevo = input.value.trim();
+  if (nuevo === u[campo]) { input.value = nuevo; return; }
+  const etiqueta = campo === 'nombre' ? 'nombre' : 'usuario';
+  if (!nuevo) { mostrarToast(`El ${etiqueta} no puede quedar vacío`, 'error'); input.value = u[campo]; return; }
+  if (campo === 'usuario' && /\s/.test(nuevo)) { mostrarToast('El usuario no puede llevar espacios', 'error'); input.value = u[campo]; return; }
+  if (campo === 'usuario' && !(await confirmarAccion(`¿Cambiar el usuario de ${u.nombre} a «${nuevo}»? Desde ahora tendrá que entrar con ese usuario.`))) { input.value = u[campo]; return; }
+  try {
+    const r = await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ [campo]: nuevo }) });
+    u[campo] = (r && r[campo]) || nuevo;
+    input.value = u[campo];
+    const pn = document.getElementById('perfilNombre'), pu = document.getElementById('perfilUsuario'), pa = document.getElementById('perfilAvatar');
+    if (pn) pn.textContent = u.nombre;
+    if (pu) pu.textContent = u.usuario;
+    if (pa) { pa.textContent = iniciales(u.nombre); pa.style.background = colorDe(u.nombre); }
+    mostrarToast(campo === 'nombre' ? 'Nombre guardado' : 'Usuario guardado', 'exito');
+    pintarLista();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    input.value = u[campo];
+  }
+}
+
+async function eliminarEmpleado(id) {
+  const u = buscar(id);
+  if (!u) return;
+  if (!(await confirmarAccion(`¿Eliminar a ${u.nombre}? Ya no podrá entrar y desaparecerá de Equipo. Sus ventas y su historial se conservan en los reportes.`))) return;
+  try {
+    await apiFetch(`/usuarios/${id}`, { method: 'DELETE' });
+    mostrarToast(`${u.nombre} eliminado`, 'exito');
+    modo = null; selId = null;
+    if (esAngosto.matches) cerrarHoja();
+    await cargarEquipo();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
   }
 }
 
