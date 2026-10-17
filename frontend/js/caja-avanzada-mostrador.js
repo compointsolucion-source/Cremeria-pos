@@ -253,13 +253,18 @@ function renderGridAv() {
 function vmAgregarProducto(id) {
   const p = catalogoAvanzada.find(x => x.id === id);
   if (!p) return;
-  // Por pieza: tocar el mismo producto otra vez suma 1 al renglón que ya existe (si no tiene descuento propio).
+  // Igual que en Mostrador: por pieza se abre la ventana de cantidad (Enter agrega 1); a granel, la de kilos.
+  agregarConDecisionDeTipo(p, { alConfirmar: vmAgregarPiezas });
+}
+
+// Por pieza: si el producto ya está en el ticket (y no tiene descuento propio), se suma a ese renglón.
+function vmAgregarPiezas(p, cantidad) {
   const pest = pestanas[pestanaActivaIndex];
-  if (p.tipo_venta !== 'peso' && !pest.ticketIdExistente) {
+  if (!pest.ticketIdExistente) {
     const existente = pest.carrito.find(it => it.tipo === 'producto' && it.producto_id === p.id && !it.descuento && it.precio_unitario === parseFloat(p.precio));
-    if (existente) { existente.cantidad = (parseFloat(existente.cantidad) || 0) + 1; renderTablaVentaAvanzada(); return; }
+    if (existente) { existente.cantidad = (parseFloat(existente.cantidad) || 0) + cantidad; renderTablaVentaAvanzada(); return; }
   }
-  agregarConDecisionDeTipo(p);
+  agregarProductoAvanzada(p, cantidad);
 }
 function vmAgregarKit(id) {
   const k = kitsAvanzada.find(x => x.id === id);
