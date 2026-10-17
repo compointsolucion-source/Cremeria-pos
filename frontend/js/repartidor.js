@@ -7,8 +7,10 @@ const REP = (function () {
   'use strict';
 
   const usuario = getUsuario() || {};
-  const ROLES_OK = ['repartidor', 'dueno', 'gerente', 'jefe_general'];
-  if (!ROLES_OK.includes(usuario.rol)) window.location.replace('login.html');
+  // Esta pantalla es solo para usuarios con rol «Repartidor». El dueño y el gerente asignan y corrigen entregas
+  // desde Pedidos; si llegan aquí, se les regresa a Pedidos (así nunca quedan registrados como repartidores).
+  if (['dueno', 'gerente', 'jefe_general'].includes(usuario.rol)) { window.location.replace('pedidos.html'); return {}; }
+  if (usuario.rol !== 'repartidor') window.location.replace('login.html');
 
   // ------------------------------------------------------------------ utilidades
   const esc = (t) => String(t === undefined || t === null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

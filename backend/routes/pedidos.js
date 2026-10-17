@@ -390,7 +390,14 @@ async function transicionar(req, id, nuevo, datos = {}, opciones = {}) {
     if (opciones.soloRepartidor && ped.repartidor_id !== req.usuario.id) throw new ErrorHttp(403, 'Este pedido no es tuyo');
 
     if (nuevo === 'cancelado') {
-      if (!['programado', 'preparando', 'listo', 'en_camino', 'no_entregado'].includes(actual)) rechazar('Este pedido ya no se puede cancelar');
+      const eraEntregado = actual === 'entregado';
+      if (!eraEntregado && !['programado', 'preparando', 'listo', 'en_camino', 'no_entregado'].includes(actual)) rechazar('Este pedido ya no se puede cancelar');
+      if (eraEntregado) {
+        // Corregir un error: solo dueño/gerente, con motivo, y mientras el repartidor no haya liquidado en Caja.
+        if (!ROLES_ADMIN.includes(req.usuario.rol)) throw new ErrorHttp(403, 'Solo el dueño o el gerente pueden cancelar un pedido ya entregado');
+        if (ped.liquidacion_id) rechazar('Este pedido ya se liquidó en Caja: para regresar el dinero haz una devolución desde Devoluciones');
+        if (!textoOnull(datos.motivo, 300)) throw new ErrorHttp(400, 'Escribe por qué cancelas un pedido ya entregado');
+      }
       if (ped.ticket_estado === 'pagado') rechazar('Este pedido ya está cobrado: para regresar el dinero haz una devolución desde Devoluciones');
       await conexion.query("UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente'", [ped.ticket_id]);
       await conexion.query("UPDATE pedidos SET estado = 'cancelado', motivo_cancelacion = $2 WHERE id = $1", [id, textoOnull(datos.motivo, 300)]);
@@ -683,7 +690,9 @@ router.put('/ruta/orden', requierePermiso('VENTAS_CREAR'), rutaAsync('Error al g
 }));
 
 // =================================================================== MÓDULO DEL REPARTIDOR
-const rolesReparto = requiereRol('repartidor', ...ROLES_ADMIN);
+// Solo los usuarios con rol «Repartidor» toman, llevan y entregan pedidos. El dueño y el gerente ASIGNAN el
+// repartidor (y corrigen entregas) desde la pantalla de Pedidos, pero no quedan registrados como repartidores.
+const rolesReparto = requiereRol('repartidor');
 
 function resumenParaRepartidor(p) {
   return {
@@ -1353,13 +1362,66 @@ router.post('/:id/asignar', requierePermiso('VENTAS_CREAR'), rutaAsync('Error al
   const ped = await cargarPedido(pool, req.params.id, req.sucursalId, { conItems: false });
   if (!ped) return res.status(404).json({ error: 'Pedido no encontrado' });
   if (ped.tipo !== 'domicilio') return res.status(400).json({ error: 'Un pedido para recoger no lleva repartidor' });
-  if (!['programado', 'preparando', 'listo', 'en_camino', 'no_entregado'].includes(ped.estado)) return res.status(409).json({ error: 'Este pedido ya no se puede reasignar' });
+  const corrigeEntregado = ped.estado === 'entregado';
+  if (corrigeEntregado) {
+    // Corregir quién entregó: solo dueño/gerente, siempre con un repartidor, y antes de que se liquide en Caja.
+    if (!ROLES_ADMIN.includes(req.usuario.rol)) return res.status(403).json({ error: 'Solo el dueño o el gerente pueden cambiar el repartidor de un pedido ya entregado' });
+    if (ped.liquidacion_id) return res.status(409).json({ error: 'Este pedido ya se liquidó en Caja: ya no se puede cambiar el repartidor' });
+  } else if (!['programado', 'preparando', 'listo', 'en_camino', 'no_entregado'].includes(ped.estado)) {
+    return res.status(409).json({ error: 'Este pedido ya no se puede reasignar' });
+  }
   const rid = await repartidorValido(pool, req.sucursalId, req.body.repartidor_id);
+  if (corrigeEntregado && !rid) return res.status(400).json({ error: 'Elige el repartidor que sí entregó este pedido' });
   await pool.query('UPDATE pedidos SET repartidor_id = $1 WHERE id = $2', [rid, ped.id]);
-  await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'asignar_repartidor', modulo: 'pedidos', referencia_id: ped.id, valor_nuevo: { repartidor_id: rid } });
+  await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'asignar_repartidor', modulo: 'pedidos', referencia_id: ped.id,
+    valor_anterior: { repartidor_id: ped.repartidor_id }, valor_nuevo: { repartidor_id: rid } });
   const completo = await cargarPedido(pool, ped.id, req.sucursalId);
   emitir(req.app.get('io'), req.sucursalId, 'pedido_actualizado', { id: ped.id, estado: completo.estado, repartidor_id: rid });
   res.json(completo);
+}));
+
+// «Deshacer entrega» (dueño/gerente): el pedido entregado por error regresa a «En camino» (o a «Listo» si no tiene
+// repartidor) y se borra el cobro que se había registrado, para volver a marcarlo bien. Solo antes de liquidar en Caja.
+router.post('/:id/deshacer-entrega', requiereRol(...ROLES_ADMIN), rutaAsync('Error al deshacer la entrega', async (req, res) => {
+  const io = req.app.get('io');
+  const conexion = await pool.connect();
+  try {
+    await conexion.query('BEGIN');
+    const fila = await conexion.query(`${SQL_PEDIDO} WHERE p.id = $1 AND p.sucursal_id = $2 FOR UPDATE OF p`, [req.params.id, req.sucursalId]);
+    if (!fila.rows.length) throw new ErrorHttp(404, 'Pedido no encontrado');
+    const ped = formato(fila.rows[0]);
+    if (ped.estado !== 'entregado') throw new ErrorHttp(409, 'Este pedido no está entregado');
+    if (ped.liquidacion_id) throw new ErrorHttp(409, 'Este pedido ya se liquidó en Caja: ya no se puede deshacer la entrega');
+    if (ped.ticket_estado === 'cancelado') throw new ErrorHttp(409, 'El ticket de este pedido está cancelado');
+    // Si el repartidor anotado ya no es un repartidor válido (por ejemplo, quedó a nombre del dueño), el pedido
+    // regresa a «Listo» sin repartidor, para que lo asignen bien o lo tome uno de verdad.
+    let rid = ped.repartidor_id;
+    if (rid) {
+      const valido = await conexion.query("SELECT 1 FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND rol = 'repartidor' AND activo = true", [rid, req.sucursalId]);
+      if (!valido.rows.length) rid = null;
+    }
+    const destino = ped.tipo === 'domicilio' && rid ? 'en_camino' : 'listo';
+    await conexion.query(
+      `UPDATE pedidos SET estado = $2::varchar, entregado_en = NULL, metodo_cobro = NULL, monto_cobrado = NULL, llego_en = NULL,
+              salio_en = CASE WHEN $2::varchar = 'en_camino' THEN COALESCE(salio_en, NOW()) ELSE NULL END,
+              listo_en = COALESCE(listo_en, NOW()),
+              repartidor_id = $3
+        WHERE id = $1`, [ped.id, destino, ped.tipo === 'domicilio' ? rid : null]);
+    await registrarBitacora(conexion, {
+      usuario_id: req.usuario.id, accion: 'pedido_deshacer_entrega', modulo: 'pedidos', referencia_id: ped.id,
+      valor_anterior: { estado: 'entregado', repartidor_id: ped.repartidor_id, metodo_cobro: ped.metodo_cobro, monto_cobrado: ped.monto_cobrado },
+      valor_nuevo: { estado: destino, repartidor_id: rid }
+    });
+    await conexion.query('COMMIT');
+    const completo = await cargarPedido(pool, ped.id, req.sucursalId);
+    emitir(io, req.sucursalId, 'pedido_actualizado', { id: ped.id, estado: destino, repartidor_id: completo.repartidor_id });
+    res.json(completo);
+  } catch (err) {
+    await conexion.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    conexion.release();
+  }
 }));
 
 // Se avisó al cliente por WhatsApp que su pedido va en camino (el aviso lo abre la pantalla con un enlace wa.me).

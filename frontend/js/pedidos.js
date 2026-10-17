@@ -317,9 +317,10 @@ const PT = (function () {
     if (!E.reps.length) { E.reps = await apiFetch('/pedidos/repartidores').catch(() => []); }
     return new Promise((resolve) => {
       if (!E.reps.length) { mostrarToast('Todavía no hay repartidores: crea uno en Equipo (rol Repartidor)', 'error'); resolve(null); return; }
-      const m = abrirModal({ titulo: `Asignar repartidor · ${esc(pedido.etiqueta)}`, ancho: 440, arriba: true,
+      const yaEntregado = pedido.estado === 'entregado';
+      const m = abrirModal({ titulo: `${yaEntregado ? 'Cambiar repartidor' : 'Asignar repartidor'} · ${esc(pedido.etiqueta)}`, ancho: 440, arriba: true,
         cuerpo: `<div style="display:grid; gap:8px;">${E.reps.map((r) => `<button type="button" class="btn ${pedido.repartidor_id === r.id ? 'btn-primary' : 'btn-secondary'}" style="justify-content:space-between" data-r="${r.id}"><span>${esc(r.nombre)}</span><small>${r.estado === 'en_ruta' ? 'en ruta (' + r.en_camino + ')' : 'libre'}</small></button>`).join('')}
-          <button type="button" class="btn btn-secondary" data-r="">Quitar repartidor (que lo tome el que esté libre)</button></div>` });
+          ${yaEntregado ? '<div class="pt-sub">Elige quién SÍ entregó este pedido.</div>' : '<button type="button" class="btn btn-secondary" data-r="">Quitar repartidor (que lo tome el que esté libre)</button>'}</div>` });
       m.cuerpo.querySelectorAll('button[data-r]').forEach((b) => { b.onclick = () => { m.alCerrar = null; m.cerrar(); resolve(b.dataset.r === '' ? 0 : Number(b.dataset.r)); }; });
       m.alCerrar = () => resolve(null);
     });
@@ -367,12 +368,29 @@ const PT = (function () {
     return r;
   }
 
-  async function cancelar(id) {
-    const ok = await confirmarAccion('¿Cancelar este pedido? El ticket también se cancela.');
+  async function cancelar(id, p) {
+    const entregado = !!p && p.estado === 'entregado';
+    const anticipo = p && p.anticipo > 0 ? ` Dejó un anticipo de ${dinero(p.anticipo)}: recuerda devolvérselo al cliente.` : '';
+    const ok = await confirmarAccion((entregado
+      ? '¿Cancelar este pedido que ya se entregó? El ticket también se cancela y el dinero que cobró el repartidor deja de contar.'
+      : '¿Cancelar este pedido? El ticket también se cancela.') + anticipo);
     if (!ok) return null;
-    const motivo = await solicitarTexto('¿Por qué se cancela? (opcional)');
+    const motivo = await solicitarTexto(entregado ? '¿Por qué se cancela? (obligatorio)' : '¿Por qué se cancela? (opcional)');
+    if (entregado && !(motivo || '').trim()) { mostrarToast('Escribe el motivo para poder cancelarlo', 'error'); return null; }
     const r = await avisoError(() => apiFetch(`/pedidos/${id}/estado`, { method: 'POST', body: JSON.stringify({ estado: 'cancelado', motivo: motivo || '' }) }));
     if (r) { mostrarToast('Pedido cancelado', 'exito'); recargar(); }
+    return r;
+  }
+
+  // Dueño/gerente: el pedido se marcó «Entregado» por error → regresa a «En camino» (o «Listo») sin cobro registrado.
+  async function deshacerEntrega(p) {
+    const repValido = (E.reps || []).some((r) => r.id === p.repartidor_id);   // un repartidor de verdad (no el dueño)
+    const destino = p.tipo === 'domicilio' && repValido ? 'En camino' : 'Listo';
+    const sinRep = p.tipo === 'domicilio' && p.repartidor_id && !repValido ? ' Como ese usuario no es repartidor, queda sin repartidor para que lo asignes bien.' : '';
+    const cobro = p.metodo_cobro ? ` Se borra el cobro que se había registrado (${p.metodo_cobro} ${dinero(p.monto_cobrado)}).` : '';
+    if (!(await confirmarAccion(`¿Deshacer la entrega de ${p.etiqueta}? El pedido regresa a «${destino}».${cobro}${sinRep}`))) return null;
+    const r = await avisoError(() => apiFetch(`/pedidos/${p.id}/deshacer-entrega`, { method: 'POST' }));
+    if (r) { mostrarToast('Entrega deshecha: el pedido regresó a «' + (ESTADO_TXT[r.estado] || r.estado) + '»', 'exito'); recargar(); }
     return r;
   }
 
@@ -424,6 +442,8 @@ const PT = (function () {
       .filter((x) => x[1]).map((x) => `<div><b>${x[0]}:</b> ${x[1]}</div>`).join('');
     const evid = (p.evidencias || []).map((e) => `<button type="button" class="btn btn-secondary" onclick="PT.verEvidencia(${p.id}, ${e.id})">${e.tipo === 'foto' ? '📷 Ver foto de entrega' : '✍ Ver firma'}</button>`).join('');
     const acc = accionPrincipal(p);
+    // Un pedido ya entregado lo corrige el dueño/gerente, mientras el repartidor no haya liquidado en Caja.
+    const corregible = esAdmin && p.estado === 'entregado' && !p.liquidacion_id;
     const filasAnticipo = p.anticipo > 0
       ? `<div class="pt-dato"><span>${p.resta > 0 ? 'Anticipo' : 'Pagó por adelantado'}</span><span>${dinero(p.anticipo)} (${esc(p.anticipo_metodo || 'efectivo')})</span></div>${p.resta > 0 ? `<div class="pt-dato"><span>Resta por cobrar</span><span><b>${dinero(p.resta)}</b></span></div>` : ''}` : '';
     const cobro = filasAnticipo + (p.tipo === 'domicilio' && p.pago_modo === 'al_recibir'
@@ -439,7 +459,9 @@ const PT = (function () {
           ${p.notas ? `<div class="pt-dato"><span>Notas</span><span>${esc(p.notas)}</span></div>` : ''}
           ${p.motivo_no_entrega ? `<div class="pt-dato"><span>No se entregó porque</span><span>${esc(p.motivo_no_entrega)}</span></div>` : ''}
           ${p.motivo_cancelacion ? `<div class="pt-dato"><span>Cancelado porque</span><span>${esc(p.motivo_cancelacion)}</span></div>` : ''}
-          ${p.tipo === 'domicilio' && editables.concat(['en_camino']).includes(p.estado) ? '<div class="pt-botonera"><button type="button" class="btn btn-secondary" id="dtAsignar">👤 Cambiar repartidor</button>' + (lleno(p.repartidor_telefono) ? '<a class="btn btn-secondary" id="dtWaRep" target="_blank" rel="noopener">📲 Mandarle el pedido por WhatsApp</a>' : '') + '</div>' : ''}
+          ${esAdmin && p.estado === 'entregado' && p.liquidacion_id ? '<div class="pt-sub">ℹ️ Ya se liquidó en Caja: para corregir el dinero usa Devoluciones.</div>' : ''}
+          ${corregible && p.ticket_estado === 'pagado' ? '<div class="pt-sub">ℹ️ El ticket ya está pagado en Caja: para cancelarlo y regresar el dinero usa Devoluciones.</div>' : ''}
+          ${p.tipo === 'domicilio' && (editables.concat(['en_camino']).includes(p.estado) || corregible) ? '<div class="pt-botonera"><button type="button" class="btn btn-secondary" id="dtAsignar">👤 Cambiar repartidor</button>' + (lleno(p.repartidor_telefono) ? '<a class="btn btn-secondary" id="dtWaRep" target="_blank" rel="noopener">📲 Mandarle el pedido por WhatsApp</a>' : '') + '</div>' : ''}
         </div>
       </div><div>
         <div class="pt-bloque"><h4>Pedido · ticket ${esc(p.folio)}</h4><ul class="pt-linea">${lineas}</ul>
@@ -454,7 +476,8 @@ const PT = (function () {
     const b = [];
     if (lleno(p.telefono) && ['programado', 'preparando', 'listo', 'en_camino'].includes(p.estado)) b.push('<button type="button" class="btn btn-secondary" id="dtAvisar">💬 Avisar al cliente</button>');
     if (editables.includes(p.estado)) b.push('<button type="button" class="btn btn-secondary" id="dtEditar">✏ Editar</button>');
-    if (['programado', 'preparando', 'listo', 'en_camino', 'no_entregado'].includes(p.estado) && p.ticket_estado !== 'pagado') b.push('<button type="button" class="btn btn-secondary" id="dtCancelar" style="color:var(--danger)">✕ Cancelar pedido</button>');
+    if (corregible && p.ticket_estado !== 'cancelado') b.push('<button type="button" class="btn btn-secondary" id="dtDeshacer">↩ Deshacer entrega</button>');
+    if ((['programado', 'preparando', 'listo', 'en_camino', 'no_entregado'].includes(p.estado) || corregible) && p.ticket_estado !== 'pagado') b.push('<button type="button" class="btn btn-secondary" id="dtCancelar" style="color:var(--danger)">✕ Cancelar pedido</button>');
     if (p.estado === 'en_camino') b.push('<button type="button" class="btn btn-secondary" id="dtNoEnt">No se entregó</button>');
     if (p.estado === 'programado') b.push('<button type="button" class="btn btn-secondary" id="dtListo">Ya está listo</button>');
     if (acc) b.push(`<button type="button" class="btn btn-primary" id="dtAccion">${acc.txt}</button>`);
@@ -465,7 +488,8 @@ const PT = (function () {
     dar('dtAccion', async () => { const r = await accion(p.id, acc.asignar ? 'asignar' : acc.est); if (r || acc.asignar) refrescarDetalle(); });
     dar('dtListo', async () => { if (await accion(p.id, 'listo')) refrescarDetalle(); });
     dar('dtNoEnt', async () => { if (await noEntregado(p.id)) refrescarDetalle(); });
-    dar('dtCancelar', async () => { if (await cancelar(p.id)) m.cerrar(); });
+    dar('dtCancelar', async () => { if (await cancelar(p.id, p)) m.cerrar(); });
+    dar('dtDeshacer', async () => { if (await deshacerEntrega(p)) refrescarDetalle(); });
     dar('dtAsignar', async () => { await asignar(p.id); refrescarDetalle(); });
     dar('dtEditar', () => pintarEdicion(m, p));
     dar('dtAvisar', async () => {
@@ -662,7 +686,7 @@ const PT = (function () {
   function verTodosEntregados() { E.verTodosEntregados = !E.verTodosEntregados; pintarHoy(); }
 
   function iniciar() {
-    if (esAdmin) { $('btnAjustesPedidos').style.display = ''; $('btnVistaRepartidor').style.display = ''; $('btnNuevoFijo').style.display = ''; $('btnGenerarFijos').style.display = ''; }
+    if (esAdmin) { $('btnAjustesPedidos').style.display = ''; $('btnNuevoFijo').style.display = ''; $('btnGenerarFijos').style.display = ''; }
     iniciarSocket();
     recargar();
     setInterval(() => { if (!document.hidden && !pila.length) recargar(); }, 60000);
@@ -671,7 +695,7 @@ const PT = (function () {
 
   const API_PT = {
     estado: E, u: { esc, dinero, hora12, horaLocal, fechaLarga, fechaBonita, sumarDias, abrirModal, avisoError, iniciales, primerNombre, norm, lleno, ESTADO_TXT, tagPago, esAdmin },
-    tab, recargar, filtrar, abrir, accion, noEntregado, cancelar, asignar, irADia, cambiarFechaAgenda, verEvidencia, verTodosEntregados, mensajeCliente, mensajeRepartidor, pedirMetodoCobro, iniciar
+    tab, recargar, filtrar, abrir, accion, noEntregado, cancelar, deshacerEntrega, asignar, irADia, cambiarFechaAgenda, verEvidencia, verTodosEntregados, mensajeCliente, mensajeRepartidor, pedirMetodoCobro, iniciar
   };
   return API_PT;
 })();

@@ -1068,3 +1068,124 @@ test('tablero: "por cobrar" del resumen descuenta el anticipo', async () => {
   assert.ok(reps.trae_por_cobrar >= 115);
   await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
 });
+
+// ---------------------------------------------------------------- solo reparte quien tiene rol Repartidor + corregir entregados
+test('solo el rol Repartidor reparte: dueño y gerente no pueden tomar ni entregar, y no se les puede asignar un pedido', async () => {
+  const hash = await bcrypt.hash('Clave-Prueba-1', 4);
+  const gid = (await pool.query("INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo) VALUES ($1,'Gerente','gerente_rep',$2,'gerente',true) RETURNING id", [sucursalId, hash])).rows[0].id;
+  T.gerente = jwt.sign({ id: gid, nombre: 'Gerente', usuario: 'gerente_rep', rol: 'gerente', sucursal_id: sucursalId, permisos: {} }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const p = (await nuevoPedido()).json;
+  await api('mostrador', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'listo' });
+  for (const quien of ['dueno', 'gerente']) {
+    assert.equal((await api(quien, 'POST', `/api/pedidos/repartidor/${p.id}/tomar`)).status, 403, quien + ' no toma pedidos');
+    assert.equal((await api(quien, 'GET', '/api/pedidos/repartidor/mis-pedidos')).status, 403, quien + ' no ve la pantalla del repartidor');
+    assert.equal((await api(quien, 'GET', '/api/pedidos/repartidor/mi-corte')).status, 403);
+  }
+  assert.equal((await api('dueno', 'GET', `/api/pedidos/${p.id}`)).json.repartidor_id, null, 'el pedido no quedó a nombre del dueño');
+  const raro = await api('dueno', 'POST', `/api/pedidos/${p.id}/asignar`, { repartidor_id: U.dueno });
+  assert.equal(raro.status, 400);
+  assert.match(raro.json.error, /no existe o está desactivado/);
+  assert.ok(!(await api('dueno', 'GET', '/api/pedidos/repartidores')).json.find((x) => x.id === U.dueno || x.id === gid), 'el dueño y el gerente no salen en la lista de repartidores');
+  // el repartidor de verdad sí toma y entrega
+  assert.equal((await api('pedro', 'POST', `/api/pedidos/repartidor/${p.id}/tomar`)).status, 200);
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+});
+
+test('corregir un entregado: cambiar de repartidor (solo dueño/gerente, siempre con repartidor, y antes de liquidar)', async () => {
+  const p = (await nuevoPedido({ repartidor_id: U.luis })).json;
+  const e = await entregarComo('luis', p, 'efectivo');
+  assert.equal(e.status, 200, JSON.stringify(e.json));
+  assert.equal(e.json.estado, 'entregado');
+  assert.equal((await api('cajera', 'POST', `/api/pedidos/${p.id}/asignar`, { repartidor_id: U.pedro })).status, 403, 'la cajera no corrige entregas');
+  assert.equal((await api('mostrador', 'POST', `/api/pedidos/${p.id}/asignar`, { repartidor_id: U.pedro })).status, 403);
+  const sin = await api('dueno', 'POST', `/api/pedidos/${p.id}/asignar`, { repartidor_id: null });
+  assert.equal(sin.status, 400, 'un entregado no puede quedarse sin repartidor');
+  const oka = await api('dueno', 'POST', `/api/pedidos/${p.id}/asignar`, { repartidor_id: U.pedro });
+  assert.equal(oka.status, 200, JSON.stringify(oka.json));
+  assert.equal(oka.json.repartidor_id, U.pedro);
+  assert.equal(oka.json.estado, 'entregado', 'sigue entregado, solo cambió quién');
+  assert.ok((await api('pedro', 'GET', '/api/pedidos/repartidor/mi-corte')).json.pedidos.find((x) => x.id === p.id), 'ahora está en el corte de Pedro');
+  assert.ok(!(await api('luis', 'GET', '/api/pedidos/repartidor/mi-corte')).json.pedidos.find((x) => x.id === p.id), 'y ya no en el de Luis');
+  const bit = await pool.query("SELECT valor_anterior, valor_nuevo FROM bitacora WHERE accion = 'asignar_repartidor' AND referencia_id = $1 ORDER BY id DESC LIMIT 1", [p.id]);
+  assert.equal(bit.rows[0].valor_anterior.repartidor_id, U.luis);
+  assert.equal(bit.rows[0].valor_nuevo.repartidor_id, U.pedro);
+  // ya liquidado en Caja: no se corrige nada
+  const liq = await api('cajera', 'POST', '/api/pedidos/liquidar', { repartidor_id: U.pedro, turno_id: turnoId, efectivo_entregado: 215, pedido_ids: [p.id] });
+  assert.equal(liq.status, 200, JSON.stringify(liq.json));
+  assert.equal((await api('dueno', 'POST', `/api/pedidos/${p.id}/asignar`, { repartidor_id: U.luis })).status, 409);
+  assert.equal((await api('dueno', 'POST', `/api/pedidos/${p.id}/deshacer-entrega`)).status, 409);
+  const c = await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado', motivo: 'prueba' });
+  assert.equal(c.status, 409);
+  assert.match(c.json.error, /liquid/i);
+});
+
+test('deshacer entrega: regresa a «en camino», borra el cobro y se puede volver a entregar', async () => {
+  const p = (await nuevoPedido({ repartidor_id: U.pedro })).json;
+  const e = await entregarComo('pedro', p, 'transferencia');
+  assert.equal(e.json.estado, 'entregado');
+  assert.equal(e.json.monto_cobrado, 215);
+  assert.equal((await api('mostrador', 'POST', `/api/pedidos/${p.id}/deshacer-entrega`)).status, 403);
+  assert.equal((await api('cajera', 'POST', `/api/pedidos/${p.id}/deshacer-entrega`)).status, 403);
+  const d = await api('dueno', 'POST', `/api/pedidos/${p.id}/deshacer-entrega`);
+  assert.equal(d.status, 200, JSON.stringify(d.json));
+  assert.equal(d.json.estado, 'en_camino');
+  assert.equal(d.json.repartidor_id, U.pedro, 'conserva su repartidor');
+  assert.equal(d.json.metodo_cobro, null);
+  assert.equal(d.json.monto_cobrado, null);
+  assert.equal(d.json.entregado_en, null);
+  assert.ok(!(await api('pedro', 'GET', '/api/pedidos/repartidor/mi-corte')).json.pedidos.find((x) => x.id === p.id), 'ya no cuenta como entregado en su corte');
+  assert.equal((await api('dueno', 'POST', `/api/pedidos/${p.id}/deshacer-entrega`)).status, 409, 'ya no está entregado');
+  const otra = await api('pedro', 'POST', `/api/pedidos/repartidor/${p.id}/entregar`, { metodo_cobro: 'efectivo' });
+  assert.equal(otra.status, 200, JSON.stringify(otra.json));
+  assert.equal(otra.json.metodo_cobro, 'efectivo');
+  const bit = await pool.query("SELECT valor_anterior FROM bitacora WHERE accion = 'pedido_deshacer_entrega' AND referencia_id = $1", [p.id]);
+  assert.equal(bit.rows.length, 1);
+  assert.equal(bit.rows[0].valor_anterior.metodo_cobro, 'transferencia');
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado', motivo: 'limpieza de prueba' });
+});
+
+test('deshacer entrega de un pedido para recoger lo regresa a «listo»', async () => {
+  const r = (await api('mostrador', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Recoge', telefono: '3300001010', pago_modo: 'al_recibir', items: [crema(1)] })).json;
+  await api('mostrador', 'POST', `/api/pedidos/${r.id}/estado`, { estado: 'listo' });
+  assert.equal((await api('mostrador', 'POST', `/api/pedidos/${r.id}/estado`, { estado: 'entregado' })).json.estado, 'entregado');
+  const d = await api('dueno', 'POST', `/api/pedidos/${r.id}/deshacer-entrega`);
+  assert.equal(d.status, 200, JSON.stringify(d.json));
+  assert.equal(d.json.estado, 'listo');
+  await api('dueno', 'POST', `/api/pedidos/${r.id}/estado`, { estado: 'cancelado' });
+});
+
+test('cancelar un pedido ya entregado: solo dueño/gerente, con motivo, antes de liquidar; sale de la liquidación', async () => {
+  const p = (await nuevoPedido({ repartidor_id: U.luis })).json;
+  assert.equal((await entregarComo('luis', p, 'efectivo')).json.estado, 'entregado');
+  assert.ok((await api('cajera', 'GET', `/api/pedidos/liquidacion/${U.luis}`)).json.pedidos.find((x) => x.id === p.id), 'antes de cancelar sí está por liquidar');
+  assert.equal((await api('cajera', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado', motivo: 'x' })).status, 403, 'la cajera no cancela entregados');
+  const sinMotivo = await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+  assert.equal(sinMotivo.status, 400);
+  assert.match(sinMotivo.json.error, /por qué/i);
+  const ok = await api('gerente', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado', motivo: 'Lo marcaron entregado por error' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.json));
+  assert.equal(ok.json.estado, 'cancelado');
+  assert.equal(ok.json.motivo_cancelacion, 'Lo marcaron entregado por error');
+  assert.equal((await pool.query('SELECT estado FROM tickets WHERE id = $1', [p.ticket_id])).rows[0].estado, 'cancelado');
+  assert.ok(!(await api('cajera', 'GET', `/api/pedidos/liquidacion/${U.luis}`)).json.pedidos.find((x) => x.id === p.id), 'ya no estorba en la liquidación');
+  // un entregado cuyo ticket ya está pagado en Caja se devuelve por Devoluciones
+  const q = (await api('mostrador', 'POST', '/api/pedidos', { tipo: 'recoger', nombre_contacto: 'Pagado', telefono: '3300002020', pago_modo: 'pagado', items: [crema(1)] })).json;
+  assert.equal((await api('cajera', 'POST', `/api/tickets/${q.ticket_id}/pagar`, { metodo_pago: 'efectivo', monto_efectivo: 12.5, efectivo_recibido: 20, turno_id: turnoId })).status, 200);
+  await api('mostrador', 'POST', `/api/pedidos/${q.id}/estado`, { estado: 'listo' });
+  await api('mostrador', 'POST', `/api/pedidos/${q.id}/estado`, { estado: 'entregado' });
+  const dev = await api('dueno', 'POST', `/api/pedidos/${q.id}/estado`, { estado: 'cancelado', motivo: 'prueba' });
+  assert.equal(dev.status, 409);
+  assert.match(dev.json.error, /devoluci/i);
+});
+
+test('deshacer entrega de un pedido que quedó a nombre del dueño: regresa a «listo» sin repartidor', async () => {
+  const p = (await nuevoPedido({ repartidor_id: U.luis })).json;
+  assert.equal((await entregarComo('luis', p, 'efectivo')).json.estado, 'entregado');
+  await pool.query('UPDATE pedidos SET repartidor_id = $1 WHERE id = $2', [U.dueno, p.id]);   // así quedaron los pedidos viejos
+  const d = await api('dueno', 'POST', `/api/pedidos/${p.id}/deshacer-entrega`);
+  assert.equal(d.status, 200, JSON.stringify(d.json));
+  assert.equal(d.json.estado, 'listo');
+  assert.equal(d.json.repartidor_id, null);
+  assert.equal((await api('pedro', 'POST', `/api/pedidos/repartidor/${p.id}/tomar`)).status, 200, 'un repartidor de verdad ya puede tomarlo');
+  await api('dueno', 'POST', `/api/pedidos/${p.id}/estado`, { estado: 'cancelado' });
+});
