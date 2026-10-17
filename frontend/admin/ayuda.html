@@ -263,7 +263,8 @@
               <ul>
                 <li>El <b>ticket del pedido</b> dice <b>YA PAGADO · No cobrar</b> solo si de verdad ya se cobró en Caja o si tú marcaste «Ya pagó todo». Si no, dice <b>COBRAR EN CAJA</b> (o <b>COBRAR AL RECIBIR</b>) con el monto, y si hay anticipo muestra el total, el anticipo y lo que falta.</li>
                 <li>El <b>repartidor</b> cobra solo lo que resta. Al liquidar, el sistema cobra el ticket completo: la resta que cobró el repartidor más el anticipo.</li>
-                <li>En <b>Caja</b> el ticket sale con un aviso verde: «Anticipo recibido…». <b>Cobra el ticket por el total</b>: el anticipo ya cuenta. Si lo dejó en efectivo, ese dinero ya debe estar en tu caja; si fue por transferencia o tarjeta, usa <b>Mixto</b> (efectivo lo que falta + transferencia/tarjeta el anticipo).</li>
+                <li>En <b>Caja</b> el ticket muestra el total desglosado: <b>Total − Anticipo = COBRAR AHORA</b>. El cambio y el botón «Exacto» ya se calculan sobre lo que falta; tú solo eliges cómo paga ahora y confirmas. El sistema registra solo el ticket completo (lo que falta + el anticipo). Si el anticipo fue en efectivo, ese dinero debe estar ya en tu caja.</li>
+                <li>Si «Ya pagó todo», Caja muestra «Cobrar ahora $0.00» y solo confirmas para cerrar el ticket. Un pedido con anticipo no se puede pasar a fiado.</li>
                 <li>A <b>crédito</b> no se puede poner anticipo, y el anticipo nunca puede ser mayor al total.</li>
               </ul>
             </div>

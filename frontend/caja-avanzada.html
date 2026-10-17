@@ -378,6 +378,7 @@
 <script src="js/offline-db.js"></script>
 <script src="js/ventas-offline.js"></script>
 <script src="js/granel.js"></script>
+<script src="js/anticipo-cobro.js"></script>
 <script>
 requiereLogin();
 
@@ -1429,16 +1430,10 @@ let metodoPagoCobrarAvanzada = 'efectivo';
 let clienteCobrarAvanzada = null;
 let configuracionCobrarAvanzada = null;
 
-// Si el ticket es de un pedido con anticipo: qué decirle al cajero (el ticket se cobra por el TOTAL; el anticipo ya cuenta).
-function htmlAvisoAnticipo(t, totalNeto) {
-  const a = Number(t && t.pedido_anticipo) || 0;
-  if (!(a > 0)) return '';
-  const m = ['efectivo', 'transferencia', 'tarjeta'].includes(t.pedido_anticipo_metodo) ? t.pedido_anticipo_metodo : 'efectivo';
-  const resta = Math.max(0, Math.round((totalNeto - a) * 100) / 100);
-  if (resta <= 0) return `✅ <b>Ya pagó todo por adelantado</b> ($${a.toFixed(2)} con ${m}). No le cobres dinero: solo registra el cobro con ese método para cerrar el ticket.`;
-  return `💰 <b>Anticipo recibido: $${a.toFixed(2)}</b> (${m}). El cliente paga ahora <b>$${resta.toFixed(2)}</b>. Cobra el ticket por el total: el anticipo ya cuenta`
-    + (m === 'efectivo' ? ' (si lo dejó en efectivo, ya está en tu caja).' : `; como lo dejó por ${m}, usa «Mixto»: efectivo $${resta.toFixed(2)} + ${m} $${a.toFixed(2)}.`);
-}
+// Pedido con anticipo: el total se muestra desglosado y el cobro (cambio, «Exacto», mixto) se calcula
+// sobre lo que FALTA. El reparto lo hace js/anticipo-cobro.js.
+function desgloseCobrarAv() { return AnticipoCobro.desglose(ticketParaCobrarAvanzada, totalNetoTicketAv(ticketParaCobrarAvanzada)); }
+function totalACobrarAhoraAv() { return AnticipoCobro.aCobrarAhora(desgloseCobrarAv()); }
 
 async function abrirModalCobrar(ticket) {
   ticketParaCobrarAvanzada = ticket;
@@ -1454,9 +1449,13 @@ async function abrirModalCobrar(ticket) {
   const avisoOff = document.getElementById('avisoOfflineCobro');
   if (avisoOff) avisoOff.style.display = ticket.offline ? 'block' : 'none';
 
-  document.getElementById('totalCobrarModal').textContent = `$${totalNetoTicketAv(ticket).toFixed(2)}`;
+  const dAntModal = desgloseCobrarAv();
+  const totalModal = document.getElementById('totalCobrarModal');
+  totalModal.textContent = `$${totalNetoTicketAv(ticket).toFixed(2)}`;
+  // Con anticipo: el cuadro desglosado (Total − Anticipo = Cobrar ahora) reemplaza al total grande.
+  totalModal.style.display = dAntModal.hay ? 'none' : '';
   const avisoAnt = document.getElementById('avisoAnticipoCobro');
-  if (avisoAnt) { const t = htmlAvisoAnticipo(ticket, totalNetoTicketAv(ticket)); avisoAnt.innerHTML = t; avisoAnt.style.display = t ? 'block' : 'none'; }
+  if (avisoAnt) { avisoAnt.innerHTML = AnticipoCobro.htmlDesglose(dAntModal); avisoAnt.style.cssText = dAntModal.hay ? 'display:block; margin:0 0 10px;' : 'display:none;'; }
   renderMetodosPagoModalCobrar();
   document.getElementById('modalCobrarAvanzada').style.display = 'flex';
 }
@@ -1479,8 +1478,16 @@ function renderMetodosPagoModalCobrar() {
     { id: 'cheque', label: '🖋️ Cheque', activo: !!config.cheque_habilitado },
     { id: 'vale_despensa', label: '🎟️ Vale', activo: !!config.vales_habilitado },
     { id: 'mixto', label: 'Mixto', activo: config.mixto_habilitado !== false },
-    { id: 'credito', label: '💳 Fiado', activo: config.credito_habilitado !== false && !(ticketParaCobrarAvanzada && ticketParaCobrarAvanzada.offline) }
+    // Con anticipo no se fía: el fiado se carga por el total del ticket (igual que al crear el pedido).
+    { id: 'credito', label: '💳 Fiado', activo: config.credito_habilitado !== false && !(ticketParaCobrarAvanzada && ticketParaCobrarAvanzada.offline) && !desgloseCobrarAv().hay }
   ];
+
+  // Ya pagó todo por adelantado: no hay nada que elegir ni que cobrar, solo confirmar.
+  if (desgloseCobrarAv().pagoTodo) {
+    document.getElementById('metodosPagoModalCobrar').innerHTML = '';
+    setMetodoCobrarAvanzada(desgloseCobrarAv().metodo);
+    return;
+  }
 
   document.getElementById('metodosPagoModalCobrar').innerHTML = metodos.filter(m => m.activo).map(m => `
     <button class="btn btn-secondary" id="btnCobrarAv${m.id}" onclick="setMetodoCobrarAvanzada('${m.id}')">${m.label}</button>
@@ -1495,11 +1502,13 @@ function setMetodoCobrarAvanzada(m) {
     btn.classList.toggle('activo', btn.id === 'btnCobrarAv' + m);
   });
 
-  const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
+  const total = totalACobrarAhoraAv(); // con anticipo: lo que falta
   const campos = document.getElementById('camposPagoModalCobrar');
   const config = configuracionCobrarAvanzada || {};
 
-  if (m === 'efectivo') {
+  if (desgloseCobrarAv().pagoTodo) {
+    campos.innerHTML = ''; // nada que cobrar: se cierra con el método del anticipo
+  } else if (m === 'efectivo') {
     campos.innerHTML = `
       <input type="text" inputmode="decimal" autocomplete="off" id="montoRecibidoCobrarAv" placeholder="Efectivo recibido" oninput="calcularCambioCobrarAvanzada()">
       <div id="cambioCobrarAvTexto" class="cambio-grande"></div>
@@ -1541,11 +1550,12 @@ function setMetodoCobrarAvanzada(m) {
   // vez sin tener que darle clic primero — igual al abrir el modal, como
   // al cambiar de método con el teclado.
   const tecladoEl = document.getElementById('tecladoCobro');
-  if (tecladoEl) tecladoEl.style.display = ['efectivo', 'mixto', 'dolares'].includes(m) ? 'grid' : 'none';
+  if (tecladoEl) tecladoEl.style.display = (!desgloseCobrarAv().pagoTodo && ['efectivo', 'mixto', 'dolares'].includes(m)) ? 'grid' : 'none';
   campoNumericoCobroAv = null;
-  if (m === 'efectivo') pintarCambioAv('cambioCobrarAvTexto', 0, 0, '');
-  if (m === 'mixto') calcularFaltanteMixtoAv();
-  if (m === 'dolares') pintarCambioAv('cambioDolaresCobrarAvTexto', 0, 0, ' USD');
+  const sinCobro = desgloseCobrarAv().pagoTodo;
+  if (m === 'efectivo' && !sinCobro) pintarCambioAv('cambioCobrarAvTexto', 0, 0, '');
+  if (m === 'mixto' && !sinCobro) calcularFaltanteMixtoAv();
+  if (m === 'dolares' && !sinCobro) pintarCambioAv('cambioDolaresCobrarAvTexto', 0, 0, ' USD');
   const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv' }[m];
   if (idCampoPrincipal) {
     setTimeout(() => {
@@ -1589,7 +1599,7 @@ function tecladoCobroAv(tecla) {
     const tarjetaMixto = document.getElementById('montoTarjetaCobrarAv');
     if (efectivoMixto && tarjetaMixto && campo === efectivoMixto) {
       if (!tarjetaMixto.value) {
-        const resto = totalNetoTicketAv(ticketParaCobrarAvanzada) - (parseFloat(efectivoMixto.value) || 0);
+        const resto = totalACobrarAhoraAv() - (parseFloat(efectivoMixto.value) || 0);
         if (resto > 0) tarjetaMixto.value = resto.toFixed(2);
         calcularFaltanteMixtoAv();
       }
@@ -1602,7 +1612,7 @@ function tecladoCobroAv(tecla) {
   if (!campo) return;
 
   if (tecla === 'exacto') {
-    const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
+    const total = totalACobrarAhoraAv(); // con anticipo: lo que falta, no el total
     if (campo.id === 'dolaresRecibidosCobrarAv') {
       const tc = parseFloat((configuracionCobrarAvanzada || {}).tipo_cambio_dolar || 0);
       campo.value = tc > 0 ? (total / tc).toFixed(2) : '';
@@ -1641,7 +1651,7 @@ function calcularFaltanteMixtoAv() {
   if (!el || !ticketParaCobrarAvanzada) return;
   const ef = parseFloat(document.getElementById('montoEfectivoCobrarAv').value || 0) || 0;
   const tj = parseFloat(document.getElementById('montoTarjetaCobrarAv').value || 0) || 0;
-  const dif = Math.round((totalNetoTicketAv(ticketParaCobrarAvanzada) - ef - tj) * 100) / 100; // >0 falta, <0 sobra
+  const dif = Math.round((totalACobrarAhoraAv() - ef - tj) * 100) / 100; // >0 falta, <0 sobra
   let clase, etiqueta, monto;
   if (Math.abs(dif) < 0.005) { clase = 'ok'; etiqueta = 'PAGO COMPLETO'; monto = 0; }
   else if (dif > 0) { clase = 'falta'; etiqueta = 'FALTA'; monto = dif; }
@@ -1652,14 +1662,14 @@ function calcularFaltanteMixtoAv() {
 
 function calcularCambioCobrarAvanzada() {
   const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
-  const cambio = recibido - totalNetoTicketAv(ticketParaCobrarAvanzada);
+  const cambio = recibido - totalACobrarAhoraAv();
   pintarCambioAv('cambioCobrarAvTexto', recibido, cambio, '');
 }
 
 function calcularCambioDolaresCobrarAvanzada() {
   const config = configuracionCobrarAvanzada || {};
   const tipoCambio = parseFloat(config.tipo_cambio_dolar || 0);
-  const totalDolares = tipoCambio > 0 ? (totalNetoTicketAv(ticketParaCobrarAvanzada) / tipoCambio) : 0;
+  const totalDolares = tipoCambio > 0 ? (totalACobrarAhoraAv() / tipoCambio) : 0;
   const recibido = parseFloat(document.getElementById('dolaresRecibidosCobrarAv').value || 0);
   const cambio = recibido - totalDolares;
   pintarCambioAv('cambioDolaresCobrarAvTexto', recibido, cambio, ' USD');
@@ -1717,11 +1727,15 @@ async function confirmarCobroAvanzada(sinTicket = false) {
     const turno = ticketParaCobrarAvanzada.offline ? turnoDesdeCacheOffline() : await asegurarTurnoAbierto();
     if (!turno) return;
 
-    const total = totalNetoTicketAv(ticketParaCobrarAvanzada);
+    const dAnt = desgloseCobrarAv();
+    // Con anticipo, el cliente paga ahora solo lo que falta; el reparto del ticket (total) lo hace AnticipoCobro.
+    const total = dAnt.hay ? dAnt.resta : totalNetoTicketAv(ticketParaCobrarAvanzada);
     let montoEfectivo = 0, montoTarjeta = 0, cliente_id = null;
     let recibidoEfectivoParaTicket = null, cambioParaTicket = null;
 
-    if (metodoPagoCobrarAvanzada === 'efectivo') {
+    if (dAnt.pagoTodo) {
+      // Ya pagó todo por adelantado: no hay nada que validar ni cobrar.
+    } else if (metodoPagoCobrarAvanzada === 'efectivo') {
       montoEfectivo = total;
       const config = configuracionCobrarAvanzada || {};
       const recibido = parseFloat(document.getElementById('montoRecibidoCobrarAv').value || 0);
@@ -1755,7 +1769,20 @@ async function confirmarCobroAvanzada(sinTicket = false) {
       cliente_id = clienteCobrarAvanzada.id;
     }
 
-    const datosPago = { metodo_pago: metodoPagoCobrarAvanzada, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket };
+    // Pedido con anticipo: el ticket se registra por el TOTAL (lo que falta + el anticipo).
+    let metodoParaGuardar = metodoPagoCobrarAvanzada;
+    if (dAnt.hay) {
+      const rp = AnticipoCobro.repartoCobro(
+        dAnt, metodoPagoCobrarAvanzada, { efectivo: montoEfectivo, tarjeta: montoTarjeta },
+        (configuracionCobrarAvanzada || {}).tarjeta_comision_porcentaje
+      );
+      metodoParaGuardar = rp.metodo_pago;
+      montoEfectivo = rp.monto_efectivo;
+      montoTarjeta = rp.monto_tarjeta;
+    }
+    // Lo que se imprime como "forma de pago" es lo que el cliente usó ahora (o el método del anticipo si ya pagó todo).
+    const metodoParaTicket = dAnt.pagoTodo ? dAnt.metodo : metodoPagoCobrarAvanzada;
+    const datosPago = { metodo_pago: metodoParaGuardar, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket };
     let resultadoPago;
     if (ticketParaCobrarAvanzada.offline) {
       if (metodoPagoCobrarAvanzada === 'credito') { mostrarToast('El fiado necesita internet', 'error'); return; }
@@ -1776,7 +1803,7 @@ async function confirmarCobroAvanzada(sinTicket = false) {
     }
 
     if (sinTicket) mostrarToast('Venta cobrada sin ticket', 'exito');
-    else await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoPagoCobrarAvanzada, recibidoEfectivoParaTicket, cambioParaTicket);
+    else await imprimirTicketCobradoAvanzada(ticketParaCobrarAvanzada, metodoParaTicket, recibidoEfectivoParaTicket, cambioParaTicket);
     actualizarPanelUltimaVenta();
 
     // Cerrar el ticket ya cobrado: quita esta pestaña (o la vacía si es la única)
@@ -1804,8 +1831,11 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
   const config = configuracionCobrarAvanzada || {};
   const comision = parseFloat(config.tarjeta_comision_porcentaje || 0);
   const aplicaComision = metodoPagoUsado === 'tarjeta' && comision > 0;
+  const dAntImp = AnticipoCobro.desglose(ticket, totalNetoTicketAv(ticket));
   const totalNetoImpresion = totalNetoTicketAv(ticket);
-  const montoComision = aplicaComision ? totalNetoImpresion * comision / 100 : 0;
+  // Con anticipo: se imprime el anticipo restado y el total que se cobró ahora.
+  const totalCobradoAhora = dAntImp.hay ? dAntImp.resta : totalNetoImpresion;
+  const montoComision = aplicaComision ? totalCobradoAhora * comision / 100 : 0;
 
   const itemsComprobante = ticket.items.map(i => ({
     nombre_producto: i.nombre_producto,
@@ -1815,6 +1845,9 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
   const descuentosImpresion = parseFloat(ticket.total) - totalNetoImpresion;
   if (descuentosImpresion > 0.004) {
     itemsComprobante.push({ nombre_producto: 'Descuentos', detalle: '', subtotal: (-descuentosImpresion).toFixed(2) });
+  }
+  if (dAntImp.hay) {
+    itemsComprobante.push({ nombre_producto: `Anticipo (${dAntImp.metodo})`, detalle: '', subtotal: (-dAntImp.anticipo).toFixed(2) });
   }
   if (aplicaComision) {
     itemsComprobante.push({ nombre_producto: `Comisión tarjeta (${comision}%)`, detalle: '', subtotal: montoComision.toFixed(2) });
@@ -1826,10 +1859,10 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
     folio: ticket.folio,
     fecha: new Date().toLocaleString(),
     items: itemsComprobante,
-    total: (totalNetoImpresion + montoComision).toFixed(2),
+    total: (totalCobradoAhora + montoComision).toFixed(2),
     montoRecibido,
     cambio,
-    piePagina: `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
+    piePagina: dAntImp.pagoTodo ? `PAGADO POR ADELANTADO (${dAntImp.metodo.toUpperCase()}) — ¡Gracias por su compra!` : `Pagado con ${metodoPagoUsado.toUpperCase()} — ¡Gracias por su compra!`,
     lineasSuperiores: config.lineas_superiores || 0,
     lineasInferiores: config.lineas_inferiores !== undefined ? config.lineas_inferiores : 3,
     incluirPrecioUnitario: config.incluir_precio_unitario !== false,
