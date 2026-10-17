@@ -282,7 +282,11 @@ async function apiFetch(endpoint, options = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || mensajesPorCodigo[response.status] || `Error del servidor (código ${response.status})`);
+    const error = new Error(data.error || mensajesPorCodigo[response.status] || `Error del servidor (código ${response.status})`);
+    // Algunas pantallas (formularios) necesitan saber QUÉ campo falló.
+    if (data.campos) error.campos = data.campos;
+    if (data.motivo) error.motivo = data.motivo;
+    throw error;
   }
   return data;
 }

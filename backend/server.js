@@ -126,6 +126,8 @@ migrar()
   .catch((e) => console.error(`[${new Date().toISOString()}] Arranque sin completar migraciones:`, e.message))
   .finally(() => server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
     console.log(`Servidor corriendo en puerto ${PORT}`);
+    // Solicitudes de licencia que no se pudieron mandar por falta de internet: se reintentan solas.
+    require('./utils/licenciaEnvio').iniciarReintentos(process.env.COMPOINT_ID_EQUIPO ? 'local' : 'nube');
   }));
 
 // Para el modo servidor local (la app de escritorio lo arranca y lo detiene).

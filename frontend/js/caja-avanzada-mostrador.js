@@ -23,7 +23,7 @@ function escaparAv(t) {
 
 // ---------- Descuentos y totales (compartidos con la vista Clásica y el cobro) ----------
 function subtotalItemAv(it) {
-  return (parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0);
+  return GRANEL.subtotal(it); // cantidad × precio, o el importe exacto si fue venta a granel por importe
 }
 
 // Descuento en pesos de un renglón: el que se capturó aquí (porcentaje o monto) o el que
@@ -150,8 +150,8 @@ function convertirPestanaEnTicketGuardadoAv(pest, ticket) {
   pest.descuento_monto_ticket = parseFloat(ticket.descuento_monto || 0);
   pest.carrito = (ticket.items || []).map(i => ({
     tipo: i.tipo, producto_id: i.producto_id, kit_id: i.kit_id, id: i.id, codigo_barras: '',
-    nombre_producto: i.nombre_producto, cantidad: parseFloat(i.cantidad), precio_unitario: parseFloat(i.precio_unitario),
-    descuento_monto: parseFloat(i.descuento_monto || 0), existencia_referencia: null
+    nombre_producto: i.nombre_producto, tipo_venta: i.tipo_venta, cantidad: parseFloat(i.cantidad), precio_unitario: parseFloat(i.precio_unitario),
+    importe: parseFloat(i.subtotal), descuento_monto: parseFloat(i.descuento_monto || 0), existencia_referencia: null
   }));
 }
 
@@ -283,7 +283,9 @@ function renderTicketAv() {
     const sub = subtotalItemAv(it);
     const desc = descuentoItemAv(it);
     const esKit = it.tipo === 'kit';
-    const detalle = esKit ? 'Kit' : `${formatoCantidadAv(it)} × $${(parseFloat(it.precio_unitario) || 0).toFixed(2)}`;
+    const detalle = esKit ? 'Kit' : (it.tipo_venta === 'peso'
+      ? GRANEL.detalle(it, '×')
+      : `${formatoCantidadAv(it)} × $${(parseFloat(it.precio_unitario) || 0).toFixed(2)}`);
     const lineaDesc = desc > 0
       ? `<small class="vm-desc">Descuento${it.descuento ? ' (' + escaparAv(it.descuento.motivo) + ')' : (it.descuento_motivo ? ' (' + escaparAv(it.descuento_motivo) + ')' : '')}: −$${desc.toFixed(2)}${it.descuento ? ` <a href="#" onclick="vmQuitarDescuentoItem(${idx}); return false;">quitar</a>` : ''}</small>`
       : '';
@@ -338,6 +340,7 @@ function vmCambiarCantidad(idx, delta) {
   const nueva = Math.round(((parseFloat(it.cantidad) || 0) + delta * paso) * 1000) / 1000;
   if (nueva <= 0) { vmQuitar(idx); return; }
   it.cantidad = nueva;
+  delete it.importe; // la cantidad cambió: ya no aplica el importe exacto capturado antes
   renderTablaVentaAvanzada();
 }
 
@@ -349,6 +352,7 @@ async function vmEditarCantidad(idx) {
   const n = parseFloat(txt);
   if (isNaN(n) || n <= 0) { mostrarToast('Cantidad inválida', 'error'); return; }
   it.cantidad = n;
+  delete it.importe;
   renderTablaVentaAvanzada();
 }
 

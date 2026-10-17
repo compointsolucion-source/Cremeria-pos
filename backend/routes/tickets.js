@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+const { r2, subtotalRenglon } = require('../utils/importeExacto');
 const bcrypt = require('bcryptjs');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
@@ -86,7 +87,9 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
 
     await cliente.query('BEGIN');
 
-    const total = items.reduce((sum, it) => sum + (it.cantidad * it.precio_unitario), 0);
+    // Cada renglón se redondea a centavos (y respeta el importe exacto si fue venta por importe).
+    const subtotales = items.map(subtotalRenglon);
+    const total = r2(subtotales.reduce((sum, s) => sum + s, 0));
     const folio = generarFolio(req.sucursalId);
 
     const ticketResult = await cliente.query(
@@ -97,8 +100,9 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     const ticket = ticketResult.rows[0];
 
     const itemsGuardados = [];
-    for (const item of items) {
-      const subtotal = item.cantidad * item.precio_unitario;
+    for (let n = 0; n < items.length; n++) {
+      const item = items[n];
+      const subtotal = subtotales[n];
       const tipo = item.tipo === 'kit' ? 'kit' : 'producto';
       const detalleResult = await cliente.query(
         `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
@@ -150,10 +154,9 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
     if (isNaN(fecha.getTime()) || fecha > ahora) fecha = ahora;
     if (ahora - fecha > 60 * 24 * 3600 * 1000) fecha = ahora;
 
-    const r2 = (n) => Math.round(n * 100) / 100;
     const lineas = items.map((it) => {
       const cantidad = Number(it.cantidad), precio = Number(it.precio_unitario);
-      const subtotal = r2(cantidad * precio);
+      const subtotal = subtotalRenglon(it); // respeta el importe exacto de una venta por importe
       const desc = Math.min(Math.max(r2(Number(it.descuento_monto) || 0), 0), subtotal);
       return { it, cantidad, precio, subtotal, desc, tipo: it.tipo === 'kit' ? 'kit' : 'producto' };
     });
@@ -234,20 +237,22 @@ router.post('/pendiente-offline', verificarToken, requierePermiso('VENTAS_CREAR'
     if (isNaN(fecha.getTime()) || fecha > ahora) fecha = ahora;
     if (ahora - fecha > 60 * 24 * 3600 * 1000) fecha = ahora;
 
-    const total = items.reduce((sum, it) => sum + Number(it.cantidad) * Number(it.precio_unitario), 0);
+    const subtotales = items.map(subtotalRenglon);
+    const total = r2(subtotales.reduce((sum, s) => sum + s, 0));
     await conexion.query('BEGIN');
     const ticket = (await conexion.query(
       `INSERT INTO tickets (folio, sucursal_id, mostrador_usuario_id, estado, total, fecha_creacion)
        VALUES ($1, $2, $3, 'pendiente', $4, $5::timestamptz) RETURNING *`,
       [folio, req.sucursalId, req.usuario.id, total, fecha.toISOString()]
     )).rows[0];
-    for (const item of items) {
+    for (let n = 0; n < items.length; n++) {
+      const item = items[n];
       const tipo = item.tipo === 'kit' ? 'kit' : 'producto';
       await conexion.query(
         `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [ticket.id, tipo, tipo === 'producto' ? (item.producto_id || null) : null, tipo === 'kit' ? (item.kit_id || null) : null,
-         String(item.nombre_producto).slice(0, 150), item.cantidad, item.precio_unitario, Number(item.cantidad) * Number(item.precio_unitario)]
+         String(item.nombre_producto).slice(0, 150), item.cantidad, item.precio_unitario, subtotales[n]]
       );
     }
     await conexion.query('COMMIT');
@@ -304,7 +309,7 @@ router.get('/folio/:folio', verificarToken, async (req, res) => {
     const ticket = ticketResult.rows[0];
     // Cada renglón trae la foto del producto o kit (si tiene) para mostrarla en Caja.
     const detalleResult = await pool.query(
-      `SELECT d.*, COALESCE(p.imagen_url, k.imagen_url) AS imagen_url
+      `SELECT d.*, COALESCE(p.imagen_url, k.imagen_url) AS imagen_url, p.tipo_venta AS tipo_venta
          FROM ticket_detalle d
          LEFT JOIN productos p ON p.id = d.producto_id
          LEFT JOIN kits k ON k.id = d.kit_id
@@ -329,7 +334,12 @@ router.get('/ultimo-pagado', verificarToken, async (req, res) => {
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'No se ha cobrado ningún ticket todavía' });
 
     const ticket = ticketResult.rows[0];
-    const detalleResult = await pool.query('SELECT * FROM ticket_detalle WHERE ticket_id = $1', [ticket.id]);
+    const detalleResult = await pool.query(
+      `SELECT d.*, p.tipo_venta AS tipo_venta
+         FROM ticket_detalle d LEFT JOIN productos p ON p.id = d.producto_id
+        WHERE d.ticket_id = $1 ORDER BY d.id`,
+      [ticket.id]
+    );
     res.json({ ...ticket, items: detalleResult.rows });
   } catch (err) {
     console.error(err);
@@ -391,7 +401,7 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
     const ticket = ticketResult.rows[0];
 
     const tipoNormalizado = tipo === 'kit' ? 'kit' : 'producto';
-    const subtotal = cantidad * precio_unitario;
+    const subtotal = subtotalRenglon({ cantidad, precio_unitario, importe: req.body.importe });
 
     const detalleResult = await cliente.query(
       `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
@@ -399,7 +409,7 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
       [ticket.id, tipoNormalizado, tipoNormalizado === 'producto' ? (producto_id || null) : null, tipoNormalizado === 'kit' ? (kit_id || null) : null, nombre_producto, cantidad, precio_unitario, subtotal]
     );
 
-    const nuevoTotal = parseFloat(ticket.total) + subtotal;
+    const nuevoTotal = r2(parseFloat(ticket.total) + subtotal);
     const ticketActualizado = await cliente.query(
       'UPDATE tickets SET total = $1 WHERE id = $2 RETURNING *',
       [nuevoTotal, ticket.id]

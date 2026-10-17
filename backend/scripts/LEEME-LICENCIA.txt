@@ -9,7 +9,7 @@ Hay tres tipos:
 Y dos planes: "local" (sin nube) y "nube" (con servicio en la nube).
 
 QUE VE EL CLIENTE
-  - Prueba: barra con los dias que le quedan (verde; naranja los ultimos 7)
+  - Prueba: barra con los dias que le quedan (amarilla; naranja los ultimos 7)
     y la leyenda "VERSION DE PRUEBA" en los tickets.
   - 7 dias antes de vencer: barra naranja con el aviso.
   - Despues de vencer: 5 DIAS DE GRACIA (la licencia de pago sigue vendiendo
@@ -43,6 +43,27 @@ CANDADO DEL RELOJ (solo servidor local)
   Si alguien atrasa la fecha de la computadora, el sistema se queda con la
   fecha mas reciente que ya vio (y con la de la ultima venta). Se avisa en
   Configuracion -> Licencia que la fecha esta atrasada.
+
+DATOS DEL NEGOCIO Y SOLICITUD DE LICENCIA (como llega un cliente nuevo a ti)
+  1. En la prueba, al entrar por primera vez sale "Bienvenido a tu prueba de 30
+     dias": el cliente captura el nombre de su negocio, su nombre y su WhatsApp
+     (y si quiere direccion y datos de factura). Se guardan SOLO en su sistema
+     (tabla datos_negocio) y, si acepta, llenan el encabezado de sus tickets.
+  2. Cuando decide contratar: Licencia -> Quiero contratar -> elige plan (sin
+     nube / con nube) y sucursales -> acepta el aviso de privacidad -> "Enviar
+     solicitud". Se arma un CODIGO DE SOLICITUD (CPT-REQ-...) con todo eso y el ID
+     del equipo, y se manda a solicitud.php (en tu hosting), que te lo manda por
+     correo a contacto@compoint.com.mx. Ver herramientas/solicitud-compoint/LEEME.txt
+  3. Sin internet: la solicitud se guarda (tabla licencia_solicitud) y se reintenta
+     sola cada 10 minutos hasta por 14 dias. El cliente tambien tiene el boton de
+     WhatsApp (mensaje listo), "Copiar solicitud" y "Guardar archivo".
+  4. Tu: pegas el CPT-REQ en el Activador Compoint (Nueva activacion), eliges
+     vigencia y plan, y le mandas el codigo CPT1-... (WhatsApp o correo).
+  Direccion del servicio: backend/utils/licenciaEnvio.js (URL_POR_DEFECTO).
+  Para pruebas se puede cambiar con la variable COMPOINT_SOLICITUD_URL.
+  Ver solicitudes de un cliente en la nube (Neon):
+    SELECT id, creada_en, tipo, plan, sucursales, estado, intentos, ultimo_error FROM licencia_solicitud ORDER BY id DESC;
+    SELECT negocio, nombre_dueno, whatsapp, email, ciudad FROM datos_negocio;
 
 CLIENTE EN LA NUBE (Neon): todo se puede ver/manejar en el SQL Editor de Neon:
 

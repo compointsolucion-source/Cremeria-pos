@@ -10,7 +10,11 @@ let categorias = [];
 let categoriaActiva = null; // null=todos, 'kits'=kits, número=categoría
 let carrito = [];
 let productoSeleccionado = null;
-let pesoActual = '';
+// Modal de granel: qué campo se está capturando ('cantidad' o 'importe'), lo tecleado en él, y si la
+// siguiente tecla debe reemplazarlo (después de un botón rápido, de la báscula o de cambiar de campo).
+let granelCampo = 'cantidad';
+let granelTexto = '';
+let granelFresco = false;
 let cantidadUnidad = 1;
 let scannerActivo = false;
 let html5QrCode;
@@ -207,7 +211,10 @@ let cancelarSuscripcionPesoModal = null;
 
 function abrirModalPeso(producto) {
   productoSeleccionado = producto;
-  pesoActual = '';
+  // Siempre abre capturando la CANTIDAD (como siempre); un botón "$100" o tocar "Importe" cambia al importe.
+  granelCampo = 'cantidad';
+  granelTexto = '';
+  granelFresco = false;
   document.getElementById('modalProductoNombre').textContent = producto.nombre;
   actualizarDisplayPeso();
   document.getElementById('modalPeso').classList.add('abierto');
@@ -240,43 +247,116 @@ function usarPesoBascula() {
     mostrarToast('Aún no hay una lectura de la báscula', 'error');
     return;
   }
-  pesoActual = peso.toFixed(3);
+  granelCampo = 'cantidad';
+  granelTexto = peso.toFixed(3);
+  granelFresco = true;
+  actualizarDisplayPeso();
+}
+
+// Cuenta del modal con lo que se lleva tecleado: null si todavía no hay nada, { error } si no se puede.
+function granelCalcular() {
+  const valor = parseFloat(granelTexto || '0');
+  if (!productoSeleccionado || !(valor > 0)) return null;
+  return granelCampo === 'importe'
+    ? GRANEL.porImporte(productoSeleccionado, valor)
+    : GRANEL.porCantidad(productoSeleccionado, valor);
+}
+
+// Pasa a capturar el otro campo; arranca con el valor que ya se había calculado (se puede corregir).
+function granelActivar(campo) {
+  if (campo === granelCampo) return;
+  const calc = granelCalcular();
+  granelCampo = campo;
+  granelTexto = (calc && !calc.error) ? String(campo === 'importe' ? calc.importe : calc.cantidad) : '';
+  granelFresco = true;
+  actualizarDisplayPeso();
+}
+
+// Botones rápidos: "$100" o "½ kg".
+function granelRapido(campo, valor) {
+  granelCampo = campo;
+  granelTexto = String(valor);
+  granelFresco = true;
   actualizarDisplayPeso();
 }
 
 function teclear(valor) {
-  if (valor === '.' && pesoActual.includes('.')) return;
-  if (pesoActual.length >= 6) return;
-  pesoActual += valor;
+  if (granelFresco) { granelTexto = ''; granelFresco = false; }
+  if (valor === '.') {
+    if (granelTexto.includes('.')) return;
+    if (!granelTexto) granelTexto = '0';
+  } else if (granelTexto === '0') {
+    granelTexto = '';
+  }
+  const maxDecimales = granelCampo === 'importe' ? 2 : 3;
+  const [entero, decimales] = (granelTexto + valor).split('.');
+  if (entero.length > 6 || (decimales !== undefined && decimales.length > maxDecimales)) return;
+  granelTexto += valor;
   actualizarDisplayPeso();
 }
 
 function borrarUltimo() {
-  pesoActual = pesoActual.slice(0, -1);
+  if (granelFresco) { granelTexto = ''; granelFresco = false; }
+  else granelTexto = granelTexto.slice(0, -1);
   actualizarDisplayPeso();
 }
 
 function actualizarDisplayPeso() {
-  const peso = parseFloat(pesoActual || '0');
-  document.getElementById('displayPeso').textContent = (pesoActual || '0');
-  const precioAplicado = precioEfectivo(productoSeleccionado, peso);
-  const subtotal = peso * precioAplicado;
-  const textoPromo = precioAplicado < parseFloat(productoSeleccionado.precio) ? ' 🏷️ Precio promocional aplicado' : '';
-  document.getElementById('subtotalPreview').textContent = `Subtotal: $${subtotal.toFixed(2)}${textoPromo}`;
+  const calc = granelCalcular();
+  const ok = !!(calc && !calc.error);
+  const campoCantidad = document.getElementById('granelCampoCantidad');
+  const campoImporte = document.getElementById('granelCampoImporte');
+  const porImporte = granelCampo === 'importe';
+
+  document.getElementById('displayPeso').textContent = porImporte ? (ok ? calc.cantidad.toFixed(3) : '0.000') : (granelTexto || '0');
+  document.getElementById('displayImporte').textContent = porImporte ? (granelTexto || '0') : (ok ? calc.importe.toFixed(2) : '0.00');
+  campoCantidad.classList.toggle('activo', !porImporte);
+  campoImporte.classList.toggle('activo', porImporte);
+  document.getElementById('granelSubCantidad').textContent = porImporte ? 'se calcula sola' : 'lo que estás capturando';
+  document.getElementById('granelSubImporte').textContent = porImporte ? 'el cliente pidió este importe' : 'se calcula solo';
+
+  const precioBase = parseFloat(productoSeleccionado.precio) || 0;
+  const precioMostrado = ok ? calc.precio_unitario : precioBase;
+  document.getElementById('granelPrecio').textContent = `Precio unitario = $${precioMostrado.toFixed(2)} / kg`;
+
+  const avisoPromo = document.getElementById('granelAvisoPromo');
+  const avisoExacto = document.getElementById('granelAvisoExacto');
+  const avisoError = document.getElementById('granelAvisoError');
+  [avisoPromo, avisoExacto, avisoError].forEach(a => { a.className = 'granel-aviso'; a.textContent = ''; });
+  if (calc && calc.error) {
+    avisoError.className = 'granel-aviso error';
+    avisoError.textContent = calc.error === 'sin_precio'
+      ? 'Este producto no tiene precio. Captura la cantidad.'
+      : 'Ese importe es menor a un gramo: sube el importe.';
+  } else if (ok) {
+    if (calc.promo) {
+      avisoPromo.className = 'granel-aviso promo';
+      avisoPromo.textContent = `🏷️ Precio por volumen aplicado: $${calc.precio_unitario.toFixed(2)} / kg`;
+    }
+    const porPrecio = GRANEL.r2(calc.cantidad * calc.precio_unitario);
+    if (calc.por_importe && Math.abs(porPrecio - calc.importe) >= 0.005) {
+      avisoExacto.className = 'granel-aviso exacto';
+      avisoExacto.textContent = `✔ Importe exacto: el ticket cobra $${calc.importe.toFixed(2)} aunque ${calc.cantidad.toFixed(3)} kg × $${calc.precio_unitario.toFixed(2)} sea $${porPrecio.toFixed(2)}.`;
+    }
+  }
+
+  const actual = parseFloat(granelTexto || '0');
+  document.querySelectorAll('#modalPeso .granel-chip').forEach(chip => {
+    chip.classList.toggle('on', chip.dataset.campo === granelCampo && actual > 0 && actual === parseFloat(chip.dataset.valor));
+  });
 }
 
 function confirmarPeso() {
-  const peso = parseFloat(pesoActual || '0');
-  if (peso <= 0) { mostrarToast('Ingresa un peso válido', 'error'); return; }
+  const calc = granelCalcular();
+  if (!calc) { mostrarToast('Ingresa un peso o un importe válido', 'error'); return; }
+  if (calc.error) {
+    mostrarToast(calc.error === 'sin_precio' ? 'Este producto no tiene precio: captura la cantidad' : 'El importe es muy pequeño', 'error');
+    return;
+  }
 
-  const precioUnitario = precioEfectivo(productoSeleccionado, peso);
-  carrito.push({
-    tipo: 'producto',
-    producto_id: productoSeleccionado.id,
-    nombre_producto: productoSeleccionado.nombre,
-    cantidad: peso,
-    precio_unitario: precioUnitario
-  });
+  const peso = calc.cantidad;
+  const precioUnitario = calc.precio_unitario;
+  carrito.push(GRANEL.renglon(productoSeleccionado, calc));
 
   renderCarrito();
   cerrarModal('modalPeso');
@@ -291,7 +371,7 @@ function confirmarPeso() {
       nombreProducto: productoSeleccionado.nombre,
       peso,
       precioUnitario,
-      subtotal: peso * precioUnitario,
+      subtotal: calc.importe,
       codigo: productoSeleccionado.codigo_barras || productoSeleccionado.id,
       ancho_etiqueta: configuracionNegocio.ancho_etiqueta || '50mm'
     }).catch(err => mostrarToast('No se pudo imprimir la etiqueta: ' + err.message, 'error'));
@@ -424,23 +504,25 @@ async function agregarProductoPesadoPorEtiqueta({ plu, valor, tipoDato }) {
     return;
   }
 
-  let peso, precioUnitario;
+  // La etiqueta de la báscula trae el PRECIO ya calculado: se cobra ese importe exacto
+  // (sin promociones por volumen, igual que antes) o, si trae el peso, se calcula el importe.
+  let calculo;
   if (tipoDato === 'precio') {
-    precioUnitario = parseFloat(producto.precio);
-    const subtotal = valor;
-    peso = precioUnitario > 0 ? subtotal / precioUnitario : 0;
+    calculo = GRANEL.porImporte(producto, valor, { promos: false });
+    if (!calculo || calculo.error) {
+      mostrarToast(`La etiqueta de "${producto.nombre}" no se pudo leer: revisa el precio del producto.`, 'error');
+      return;
+    }
   } else {
-    peso = valor;
-    precioUnitario = precioEfectivo(producto, peso);
+    calculo = GRANEL.porCantidad(producto, valor);
+    if (!calculo) {
+      mostrarToast('La etiqueta de la báscula trae un peso de cero.', 'error');
+      return;
+    }
   }
+  const peso = calculo.cantidad;
 
-  carrito.push({
-    tipo: 'producto',
-    producto_id: producto.id,
-    nombre_producto: producto.nombre,
-    cantidad: peso,
-    precio_unitario: precioUnitario
-  });
+  carrito.push(GRANEL.renglon(producto, calculo));
   renderCarrito();
   mostrarToast(`${producto.nombre}: ${peso.toFixed(3)} kg agregado desde la etiqueta de báscula`, 'exito');
 }
@@ -452,9 +534,9 @@ function renderCarrito() {
   let total = 0;
 
   carrito.forEach((item, idx) => {
-    const subtotal = item.cantidad * item.precio_unitario;
-    total += subtotal;
-    const detalle = item.tipo === 'kit' ? 'Kit' : `${item.cantidad} × $${item.precio_unitario}`;
+    const subtotal = GRANEL.subtotal(item);
+    total = GRANEL.r2(total + subtotal);
+    const detalle = GRANEL.detalle(item, '×');
     const div = document.createElement('div');
     div.className = 'carrito-item';
     div.innerHTML = `
@@ -598,6 +680,8 @@ async function generarTicket() {
       method: 'POST',
       body: JSON.stringify({ items: carrito })
     });
+    // El servidor devuelve los renglones en el mismo orden: se les pega si fueron a granel (para el ticket impreso).
+    ticket.items = (ticket.items || []).map((it, n) => ({ ...it, tipo_venta: (carrito[n] && carrito[n].tipo_venta) || it.tipo_venta }));
 
     await imprimirTicket(ticket);
     carrito = [];
@@ -620,11 +704,13 @@ async function generarTicketSinInternet() {
     producto_id: i.producto_id || null,
     kit_id: i.kit_id || null,
     nombre_producto: i.nombre_producto,
+    tipo_venta: i.tipo_venta,
     cantidad: i.cantidad,
-    precio_unitario: i.precio_unitario
+    precio_unitario: i.precio_unitario,
+    importe: i.importe
   }));
   const folio = generarFolioOffline();
-  const total = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+  const total = GRANEL.r2(items.reduce((s, i) => s + GRANEL.subtotal(i), 0));
   const fecha = new Date().toISOString();
   try {
     await guardarVentaOffline({ folio, fecha, items }, 'tickets');
@@ -634,7 +720,7 @@ async function generarTicketSinInternet() {
   }
   const ticket = {
     folio, total,
-    items: items.map(i => ({ ...i, subtotal: i.cantidad * i.precio_unitario }))
+    items: items.map(i => ({ ...i, subtotal: GRANEL.subtotal(i) }))
   };
   try { await imprimirTicket(ticket); } catch (e) { /* ya quedó guardado; se puede reimprimir */ }
   carrito = [];
@@ -664,7 +750,7 @@ async function imprimirTicket(ticket) {
     fecha: new Date().toLocaleString(),
     items: ticket.items.map(i => ({
       nombre_producto: i.nombre_producto,
-      detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+      detalle: GRANEL.detalle(i),
       subtotal: parseFloat(i.subtotal).toFixed(2)
     })),
     total: parseFloat(ticket.total).toFixed(2),

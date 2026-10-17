@@ -47,11 +47,24 @@
   .pasos { display: grid; gap: 10px; margin: 12px 0 14px; padding: 0; list-style: none; counter-reset: p; }
   .pasos li { counter-increment: p; position: relative; padding-left: 34px; font-size: 14px; line-height: 1.45; }
   .pasos li::before { content: counter(p); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; background: rgba(95,174,70,.2); color: var(--primary-dark, #4C9439); font-weight: 800; font-size: 12.5px; display: flex; align-items: center; justify-content: center; }
+  .planes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .plan-op { position: relative; display: block; border: 2px solid var(--border, #E4E6E9); border-radius: 12px; padding: 12px 12px 12px 40px; cursor: pointer; background: var(--surface, #fff); transition: border-color .15s, background .15s; }
+  .plan-op input { position: absolute; left: 13px; top: 15px; }
+  .plan-op > b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+  .plan-op > span { display: block; font-size: 12.5px; line-height: 1.4; color: var(--muted, #7A7D83); }
+  .plan-op > span b { color: var(--text, #1F2023); }
+  .plan-op:has(input:checked) { border-color: var(--primary, #5FAE46); background: rgba(95,174,70,.09); }
+  .plan-op.lic-malo { border-color: #C62828; }
+  .ct-estado { margin-bottom: 14px; }
+  .ct-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .ct-acciones .btn { flex: 1 1 150px; }
+  .ct-vacio-nota { margin-top: 10px; }
   .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
   .acciones .btn { flex: none; }
   .btn-wa { background: #25D366; color: #fff; border-color: #25D366; }
 
   @media (max-width: 900px) { .rejilla { grid-template-columns: minmax(0, 1fr); } .grande { font-size: 26px; } }
+  @media (max-width: 520px) { .planes { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -88,19 +101,56 @@
 
       <div>
         <div class="caja tarjeta" id="contratar">
-          <h3>Quiero contratar o renovar Compoint Punto</h3>
-          <p class="nota">Con tu ID de equipo, Compoint te prepara el código de activación en minutos. Funciona <b>sin nube</b> (trabaja sin internet) o <b>con nube</b> (además, copia y consulta desde cualquier lugar).</p>
-          <ol class="pasos">
-            <li>Mándanos el <b>ID de este equipo</b> por WhatsApp (el botón de abajo lo escribe por ti).</li>
-            <li>Compoint te confirma el plan y el pago, y te manda tu <b>código de activación</b>.</li>
+          <h3 id="ctTitulo">Quiero contratar Compoint Punto</h3>
+          <p class="nota" id="ctIntro"></p>
+
+          <div class="ct-estado" id="ctEstado"></div>
+
+          <div id="ctFormulario">
+            <div id="ctDatos"></div>
+
+            <div class="lic-grupo" style="margin-top:18px">Tu plan <i style="font-style:normal;color:#C62828">*</i></div>
+            <div class="planes" id="ctPlanes">
+              <label class="plan-op"><input type="radio" name="ctPlan" value="local"><b>Sin nube</b><span>Trabaja <b>sin internet</b>. Tu información vive en tu computadora, con respaldos.</span></label>
+              <label class="plan-op"><input type="radio" name="ctPlan" value="nube"><b>Con nube</b><span>Además, copia tu información en la nube para consultarla <b>desde cualquier lugar</b>.</span></label>
+            </div>
+            <div class="lic-error" id="ct_plan_e" hidden></div>
+
+            <div class="lic-rej" style="margin-top:12px">
+              <div class="lic-campo">
+                <label for="ct_sucursales">¿Cuántas sucursales?<i>*</i></label>
+                <input id="ct_sucursales" type="number" min="1" max="50" value="1" inputmode="numeric">
+                <div class="lic-error" id="ct_sucursales_e" hidden></div>
+              </div>
+            </div>
+            <div class="lic-campo" style="margin-top:12px">
+              <label for="ct_nota">¿Algo que quieras decirnos? <small>(opcional)</small></label>
+              <textarea id="ct_nota" maxlength="300" rows="2" placeholder="Ej. Necesito factura, tengo 2 básculas, quiero que me instalen…"></textarea>
+            </div>
+
+            <label class="lic-chk"><input type="checkbox" id="ct_ticket"> <span>Usar estos datos en el encabezado de mis tickets <small style="color:var(--muted,#7A7D83)">(solo donde esté vacío)</small></span></label>
+
+            <details class="lic-det" id="ctAviso">
+              <summary>🔒 Aviso de privacidad</summary>
+              <div id="ctAvisoTexto"></div>
+            </details>
+            <label class="lic-chk"><input type="checkbox" id="ct_acepto"> <span>Acepto el aviso de privacidad y quiero que Compoint reciba estos datos para atender mi solicitud.</span></label>
+            <div class="lic-error" id="ct_acepto_e" hidden></div>
+
+            <div class="acciones" style="margin-top:16px">
+              <button class="btn btn-primary" id="btnEnviar">Enviar solicitud a Compoint</button>
+              <button class="btn btn-secondary" id="btnGuardarDatos">Solo guardar mis datos</button>
+              <button class="btn btn-secondary" id="btnCancelarEdicion" hidden>Cancelar</button>
+            </div>
+            <p class="nota ct-vacio-nota">Tus datos se quedan en tu sistema hasta que presiones «Enviar solicitud». Compoint te contacta por WhatsApp o correo para confirmar plan y pago.</p>
+          </div>
+
+          <ol class="pasos" id="ctPasos" style="margin-top:16px">
+            <li>Compoint revisa tu solicitud y te confirma el plan y el pago.</li>
+            <li>Te manda tu <b>código de activación</b> (por WhatsApp o correo).</li>
             <li>Lo pegas en <b>«¿Ya tienes tu código?»</b> y listo. No necesitas internet para activarlo.</li>
           </ol>
-          <div class="acciones">
-            <a class="btn btn-wa" id="btnWa" href="https://wa.me/523325907090" target="_blank" rel="noopener">WhatsApp</a>
-            <button class="btn btn-secondary" id="btnCopiarId">Copiar mi ID de equipo</button>
-            <a class="btn btn-secondary" href="mailto:contacto@compoint.com.mx" id="btnCorreo">Correo</a>
-          </div>
-          <p class="nota" style="margin-top:12px">WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx</p>
+          <p class="nota" style="margin-top:6px">WhatsApp 33 25 90 70 90 · Tel. 33 15 97 04 12 · contacto@compoint.com.mx</p>
         </div>
 
         <div class="aviso azul separa" style="margin-top:14px">
@@ -114,6 +164,7 @@
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
+<script src="../js/licencia-datos.js"></script>
 <script>
 requiereLogin();
 
@@ -190,12 +241,6 @@ function pintarEstado(l) {
   if (l.codigo_invalido === 'equipo') av.push('<div class="aviso rojo separa">🔒 <b>El código guardado es de otra computadora.</b> Si cambiaste de equipo o reinstalaste, manda a Compoint el ID de este equipo para recibir uno nuevo.</div>');
   else if (l.codigo_invalido) av.push('<div class="aviso rojo separa">🔒 <b>El código guardado ya no se puede comprobar.</b> Pide uno nuevo a Compoint.</div>');
   document.getElementById('avisos').innerHTML = av.join('');
-
-  // WhatsApp con el ID escrito
-  const quien = l.cliente ? ` de ${l.cliente}` : '';
-  const texto = `Hola, quiero ${l.control && l.tipo !== 'demo' ? 'renovar' : 'contratar'} Compoint Punto${quien}.\nID de equipo: ${l.id_equipo}`;
-  document.getElementById('btnWa').href = 'https://wa.me/523325907090?text=' + encodeURIComponent(texto);
-  document.getElementById('btnCorreo').href = 'mailto:contacto@compoint.com.mx?subject=' + encodeURIComponent('Compoint Punto — ID de equipo ' + l.id_equipo) + '&body=' + encodeURIComponent(texto);
 }
 
 async function copiarId() {
@@ -212,6 +257,7 @@ async function cargar() {
     document.getElementById('grande').textContent = 'No se pudo consultar';
     document.getElementById('notaBarra').textContent = err.message;
   }
+  iniciarContratar();
 }
 
 async function activar() {
@@ -239,8 +285,199 @@ async function activar() {
   }
 }
 
+// ====================== Quiero contratar o renovar ======================
+let solicitud = null;     // la última solicitud (la que ya se armó o envió)
+let enEdicion = false;    // true cuando se está corrigiendo/rehaciendo
+let consultaId = 0;       // para que una consulta nueva cancele la anterior
+
+const esRenovacion = () => !!(lic && lic.control && lic.tipo !== 'demo');
+const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const textoPlanCorto = (p) => (p === 'local' ? 'Sin nube' : 'Con nube');
+
+function pintarTituloContratar() {
+  document.getElementById('ctTitulo').textContent = esRenovacion() ? 'Quiero renovar mi licencia' : 'Quiero contratar Compoint Punto';
+  document.getElementById('ctIntro').innerHTML = esRenovacion()
+    ? 'Manda tu solicitud y Compoint te prepara el código de renovación. Si algún dato cambió, corrígelo aquí.'
+    : 'Deja los datos de tu negocio y elige tu plan. Compoint recibe tu solicitud, te confirma el pago y te manda tu código de activación <b>sin que tengas que capturar nada más</b>.';
+}
+
+async function iniciarContratar() {
+  LicDatos.estilos();
+  const raiz = document.getElementById('contratar');
+  document.getElementById('ctDatos').innerHTML = LicDatos.formularioHTML('ct_');
+  document.getElementById('ctAvisoTexto').innerHTML = LicDatos.avisoHTML();
+  pintarTituloContratar();
+  try {
+    const info = await apiFetch('/licencia/datos');
+    LicDatos.poner(raiz, 'ct_', info.datos, info.sugerencias);
+    document.getElementById('ct_sucursales').value = info.datos.sucursales || (info.sugerencias && info.sugerencias.sucursales) || 1;
+  } catch (e) { /* queda en blanco */ }
+  if (esRenovacion() && lic.plan) {
+    const r = raiz.querySelector(`input[name=ctPlan][value=${lic.plan}]`);
+    if (r) r.checked = true;
+  }
+  try { solicitud = (await apiFetch('/licencia/solicitud')).solicitud; } catch (e) { solicitud = null; }
+  pintarSolicitud();
+  if (solicitud && solicitud.estado === 'pendiente' && !solicitud.intentos) esperarEnvio();
+  if (location.hash === '#contratar') raiz.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function accionesSolicitudHTML(s) {
+  const wa = s.estado === 'enviada' ? 'WhatsApp (más rápido)' : 'Mandar por WhatsApp';
+  return `<div class="ct-acciones">
+      <a class="btn btn-wa" href="${esc(s.whatsapp_url)}" target="_blank" rel="noopener">💬 ${wa}</a>
+      <button class="btn btn-secondary" onclick="copiarSolicitud()">📋 Copiar solicitud</button>
+      <button class="btn btn-secondary" onclick="guardarArchivo()">💾 Guardar archivo</button>
+      ${s.estado === 'pendiente' || s.estado === 'vencida' || s.estado === 'rechazada' ? '<button class="btn btn-secondary" id="btnReintentar" onclick="reintentarEnvio()">🔄 Reintentar envío</button>' : ''}
+      <button class="btn btn-secondary" onclick="editarSolicitud()">✏️ Cambiar mis datos o plan</button>
+    </div>
+    <div id="ctCopiaManual" hidden></div>`;
+}
+
+function estadoSolicitudHTML(s) {
+  const cuando = LicDatos.fechaCorta(s.enviada_en || s.creada_en);
+  let aviso;
+  if (s.estado === 'enviada') {
+    aviso = `<div class="aviso verde">✅ <b>Solicitud enviada a Compoint</b> (${esc(cuando)}). Te contactaremos por WhatsApp o correo para confirmar tu plan y el pago.</div>`;
+  } else if (s.estado === 'pendiente' && !s.intentos) {
+    aviso = '<div class="aviso azul">⏳ <b>Enviando tu solicitud…</b></div>';
+  } else if (s.estado === 'pendiente') {
+    aviso = `<div class="aviso amarillo">📡 <b>Tu solicitud está lista, pero todavía no llegó por correo.</b> ${esc(s.error || '')} Se enviará sola en cuanto haya internet. Para ir más rápido, mándala por WhatsApp (botón verde).</div>`;
+  } else if (s.estado === 'rechazada') {
+    aviso = `<div class="aviso rojo">⚠️ <b>No se pudo enviar el correo.</b> ${esc(s.error || '')} Mándala por WhatsApp (botón verde).</div>`;
+  } else {
+    aviso = '<div class="aviso amarillo">⌛ <b>Pasaron varios días sin poder enviarla.</b> Mándala por WhatsApp (botón verde) o haz una solicitud nueva.</div>';
+  }
+  const detalle = `${s.tipo === 'renovar' ? 'Renovación' : 'Contratación'} · ${textoPlanCorto(s.plan)} · ${plural(s.sucursales, 'sucursal', 'sucursales')}`;
+  return `${aviso}<p class="nota" style="margin:8px 0 0">${esc(detalle)}</p>${accionesSolicitudHTML(s)}`;
+}
+
+function pintarSolicitud() {
+  const est = document.getElementById('ctEstado');
+  const form = document.getElementById('ctFormulario');
+  const tieneSolicitud = !!solicitud && !enEdicion;
+  est.innerHTML = tieneSolicitud ? estadoSolicitudHTML(solicitud) : '';
+  est.hidden = !tieneSolicitud;
+  form.hidden = tieneSolicitud;
+  document.getElementById('btnCancelarEdicion').hidden = !(solicitud && enEdicion);
+  document.getElementById('ctIntro').hidden = tieneSolicitud;
+}
+
+// Mientras el servidor intenta mandar el correo, revisa cómo va (máximo ~15 segundos).
+async function esperarEnvio() {
+  const mia = ++consultaId;
+  for (let i = 0; i < 10; i++) {
+    await dormir(1500);
+    if (mia !== consultaId) return;
+    try { solicitud = (await apiFetch('/licencia/solicitud')).solicitud; } catch (e) { return; }
+    if (!enEdicion) pintarSolicitud();
+    if (!solicitud || solicitud.estado !== 'pendiente' || solicitud.intentos >= 1) return;
+  }
+}
+
+function editarSolicitud() { enEdicion = true; pintarSolicitud(); document.getElementById('contratar').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+document.getElementById('btnCancelarEdicion').onclick = () => { enEdicion = false; pintarSolicitud(); };
+
+async function copiarSolicitud() {
+  if (!solicitud) return;
+  if (await LicDatos.copiar(solicitud.texto_completo)) { mostrarToast('Solicitud copiada. Pégala en WhatsApp o en un correo.', 'exito'); return; }
+  const caja = document.getElementById('ctCopiaManual');
+  caja.hidden = false;
+  caja.innerHTML = '<p class="nota" style="margin:10px 0 4px">No pude copiar solo. Selecciona todo el texto de abajo y cópialo (Ctrl+C):</p><textarea class="pegar" readonly style="min-height:150px"></textarea>';
+  const t = caja.querySelector('textarea'); t.value = solicitud.texto_completo; t.focus(); t.select();
+}
+
+function guardarArchivo() {
+  if (!solicitud) return;
+  const neg = (solicitud.texto_completo.match(/Negocio: (.+)/) || [])[1];
+  LicDatos.descargar(LicDatos.nombreArchivo(neg), solicitud.texto_completo);
+  mostrarToast('Archivo guardado. Mándalo a Compoint por WhatsApp o correo.', 'exito');
+}
+
+async function reintentarEnvio() {
+  const b = document.getElementById('btnReintentar');
+  if (b) { b.disabled = true; b.textContent = 'Enviando…'; }
+  try {
+    const r = await apiFetch('/licencia/solicitud/reintentar', { method: 'POST', body: '{}' });
+    solicitud = r.solicitud;
+    pintarSolicitud();
+    if (solicitud && solicitud.estado === 'enviada') mostrarToast('¡Solicitud enviada a Compoint!', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error', 5000);
+    pintarSolicitud();
+  }
+}
+
+function leerFormularioContratar() {
+  const raiz = document.getElementById('contratar');
+  const datos = LicDatos.leer(raiz, 'ct_');
+  const plan = (raiz.querySelector('input[name=ctPlan]:checked') || {}).value || '';
+  const sucursales = parseInt(document.getElementById('ct_sucursales').value, 10);
+  return { raiz, datos, plan, sucursales, nota: document.getElementById('ct_nota').value.trim(), acepto: document.getElementById('ct_acepto').checked, ticket: document.getElementById('ct_ticket').checked };
+}
+
+async function enviarSolicitud() {
+  const f = leerFormularioContratar();
+  const errores = LicDatos.faltantes(f.datos);
+  document.querySelectorAll('.plan-op').forEach((e) => e.classList.remove('lic-malo'));
+  const extra = {};
+  if (!f.plan) extra.plan = 'Elige si quieres el plan sin nube o con nube.';
+  if (!Number.isInteger(f.sucursales) || f.sucursales < 1 || f.sucursales > 50) extra.sucursales = 'Escribe un número de 1 a 50.';
+  if (!f.acepto) extra.acepto = 'Marca esta casilla para poder enviar tus datos.';
+  const todos = { ...errores, ...extra };
+  if (Object.keys(todos).length) {
+    LicDatos.marcarErrores(f.raiz, 'ct_', todos);
+    if (todos.plan) {
+      document.querySelectorAll('.plan-op').forEach((e) => e.classList.add('lic-malo'));
+      if (!Object.keys(errores).length) document.getElementById('ctPlanes').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    return;
+  }
+  LicDatos.limpiarErrores(f.raiz);
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true; btn.textContent = 'Preparando…';
+  try {
+    const r = await apiFetch('/licencia/solicitud', {
+      method: 'POST',
+      body: JSON.stringify({ plan: f.plan, sucursales: f.sucursales, nota: f.nota, datos: f.datos, acepto_privacidad: true, aplicar_ticket: f.ticket })
+    });
+    solicitud = r.solicitud;
+    enEdicion = false;
+    pintarSolicitud();
+    document.getElementById('contratar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    esperarEnvio();
+  } catch (err) {
+    if (err.campos) LicDatos.marcarErrores(f.raiz, 'ct_', err.campos);
+    else mostrarToast(err.message, 'error', 6000);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enviar solicitud a Compoint';
+  }
+}
+
+async function soloGuardarDatos() {
+  const f = leerFormularioContratar();
+  const errores = LicDatos.faltantes(f.datos);
+  if (errores.negocio) { LicDatos.marcarErrores(f.raiz, 'ct_', { negocio: errores.negocio }); return; }
+  LicDatos.limpiarErrores(f.raiz);
+  const btn = document.getElementById('btnGuardarDatos');
+  btn.disabled = true;
+  try {
+    const r = await apiFetch('/licencia/datos', { method: 'PUT', body: JSON.stringify({ datos: { ...f.datos, sucursales: f.sucursales }, aplicar_ticket: f.ticket }) });
+    mostrarToast(r.ticket_aplicado && r.ticket_aplicado.length ? 'Datos guardados y puestos en tus tickets.' : 'Datos guardados en tu sistema.', 'exito');
+  } catch (err) {
+    if (err.campos) LicDatos.marcarErrores(f.raiz, 'ct_', err.campos);
+    else mostrarToast(err.message, 'error', 5000);
+  } finally { btn.disabled = false; }
+}
+
+document.getElementById('btnEnviar').onclick = enviarSolicitud;
+document.getElementById('btnGuardarDatos').onclick = soloGuardarDatos;
+document.getElementById('ctPlanes').addEventListener('change', () => {
+  document.querySelectorAll('.plan-op').forEach((e) => e.classList.remove('lic-malo'));
+  const m = document.getElementById('ct_plan_e'); m.hidden = true;
+});
+
 document.getElementById('btnActivar').onclick = activar;
-document.getElementById('btnCopiarId').onclick = copiarId;
 if (!puedeActivar) {
   document.getElementById('codigo').disabled = true;
   document.getElementById('btnActivar').disabled = true;

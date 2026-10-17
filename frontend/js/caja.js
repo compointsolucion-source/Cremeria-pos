@@ -135,7 +135,7 @@ function renderPanelCobro() {
   const t = ticketActual;
   const panel = document.getElementById('panelCobro');
   let itemsHtml = t.items.map(i => {
-    const detalle = i.tipo === 'kit' ? 'Kit (fijo)' : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`;
+    const detalle = i.tipo === 'kit' ? 'Kit (fijo)' : (i.tipo_venta === 'peso' ? GRANEL.detalle(i, '×') : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`);
     const puedeEditar = i.tipo !== 'kit';
     const tieneDescuentoItem = parseFloat(i.descuento_monto || 0) > 0;
     const lineaDescuentoItem = tieneDescuentoItem
@@ -607,7 +607,7 @@ async function imprimirCopiaTicketCaja(ticket, pie) {
     items: [
       ...ticket.items.map(i => ({
         nombre_producto: i.nombre_producto,
-        detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+        detalle: GRANEL.detalle(i),
         subtotal: parseFloat(i.subtotal).toFixed(2)
       })),
       ...((parseFloat(ticket.total) - neto) > 0.004
@@ -672,7 +672,7 @@ async function verTicketHistorialCaja(fila) {
     document.getElementById('detalleHistorialCaja').innerHTML = `
       <h4>Folio: ${t.folio}</h4>
       <p style="font-size:13px; color:#666;">Estado: ${t.estado} — Método: ${t.metodo_pago || '—'}</p>
-      ${t.items.map(i => `<div class="detalle-item"><span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}</small></span></span><span>$${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}
+      ${t.items.map(i => `<div class="detalle-item"><span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${i.tipo_venta === 'peso' ? GRANEL.detalle(i, '×') : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`}</small></span></span><span>$${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}
       <p style="text-align:right; font-weight:700; margin:10px 0;">Total: $${totalNetoDeTicket(t).toFixed(2)}</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="imprimirCopiaHistorialCaja()">🖨️ Imprimir copia</button>
@@ -795,7 +795,7 @@ async function imprimirComprobante(ticket, metodoPagoUsado, montoRecibido = null
 
   const itemsComprobante = ticket.items.map(i => ({
     nombre_producto: i.nombre_producto,
-    detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+    detalle: GRANEL.detalle(i),
     subtotal: parseFloat(i.subtotal).toFixed(2)
   }));
   if (aplicaComision) {
@@ -926,25 +926,20 @@ async function agregarProductoPesadoPorEtiquetaCaja({ plu, valor, tipoDato }) {
     return;
   }
 
-  let peso, precioUnitario;
-  if (tipoDato === 'precio') {
-    precioUnitario = parseFloat(producto.precio);
-    peso = precioUnitario > 0 ? valor / precioUnitario : 0;
-  } else {
-    peso = valor;
-    precioUnitario = parseFloat(producto.precio);
+  // La etiqueta con PRECIO se cobra por ese importe exacto (sin centavos de diferencia por redondeo).
+  const calculo = tipoDato === 'precio'
+    ? GRANEL.porImporte(producto, valor, { promos: false })
+    : GRANEL.porCantidad(producto, valor, { promos: false });
+  if (!calculo || calculo.error) {
+    mostrarToast(`La etiqueta de "${producto.nombre}" no se pudo leer: revisa el precio del producto.`, 'error');
+    return;
   }
+  const peso = calculo.cantidad;
 
   try {
     await apiFetch(`/tickets/${ticketActual.id}/agregar-item`, {
       method: 'POST',
-      body: JSON.stringify({
-        tipo: 'producto',
-        producto_id: producto.id,
-        nombre_producto: producto.nombre,
-        cantidad: peso,
-        precio_unitario: precioUnitario
-      })
+      body: JSON.stringify(GRANEL.renglon(producto, calculo))
     });
     await cargarTicket(ticketActual.folio);
     mostrarToast(`${producto.nombre}: ${peso.toFixed(3)} kg agregado desde la etiqueta de báscula`, 'exito');

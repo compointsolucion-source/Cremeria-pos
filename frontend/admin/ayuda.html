@@ -166,6 +166,31 @@
           </details>
         </section>
 
+        <!-- ============ Ventas y pedidos ============ -->
+        <section class="caja recorta tema" data-tema="ventas">
+          <h3 class="tema-tit">🛒 Ventas y pedidos</h3>
+          <p class="intro">Vender a granel por importe o por cantidad, y (próximamente aquí) pedidos a domicilio y programados.</p>
+
+          <details class="guia" data-item data-claves="granel importe cantidad peso kilo kilos gramos dame pesos de queso costo precio unitario botones rapidos importe exacto centavos 99.94 mostrador caja avanzada">
+            <summary>Vender a granel por importe («dame $100 de queso») o por cantidad</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>En <b>Mostrador</b> o <b>Caja Avanzada</b> toca el producto a granel (el de kilo). Se abre la ventana con dos cuadros: <b>Cantidad (kg)</b> e <b>Importe ($)</b>.</li>
+                <li>Captura <b>uno</b> de los dos y el otro se calcula solo. El cuadro verde con la rayita es el que estás capturando; toca el otro cuadro para cambiar.</li>
+                <li>Atajos: los botones <b>«Por importe»</b> ($20, $50, $100, $200, $500) y <b>«Por cantidad»</b> (¼, ½, ¾, 1 y 2 kg) llenan el cuadro con un toque. Después de un botón, la primera tecla que pulses <b>reemplaza</b> el valor.</li>
+                <li>Pulsa <b>Agregar</b> (o <b>Aceptar</b> en Caja Avanzada).</li>
+              </ol>
+              <ul>
+                <li><b>Importe exacto:</b> si el cliente pide <b>$100</b> de un queso de $190 el kilo, salen 0.526 kg. Pesado a mano serían $99.94, pero el ticket <b>cobra los $100.00 completos</b>, sin centavos de diferencia. En el ticket aparece <i>«0.526 kg x $190.00/kg»</i>.</li>
+                <li><b>Precio por volumen:</b> en Mostrador, si con el importe o la cantidad alcanzas un precio por volumen del producto, se aplica solo y la ventana lo avisa en amarillo.</li>
+                <li><b>Báscula:</b> si hay báscula conectada, <b>«Usar este peso»</b> pone el peso en el cuadro de cantidad.</li>
+                <li><b>Devoluciones:</b> si devuelves un producto vendido por importe, se regresa la parte proporcional de lo cobrado; devolver todo regresa exactamente los $100.00.</li>
+                <li>Si cambias la cantidad o el precio de un renglón ya capturado (por ejemplo con mayoreo), el importe exacto deja de aplicar y se cobra cantidad × precio.</li>
+              </ul>
+            </div>
+          </details>
+        </section>
+
         <!-- ============ Equipos y servidor ============ -->
         <section class="caja recorta tema" data-tema="equipos">
           <h3 class="tema-tit">🖥️ Equipos y servidor</h3>
@@ -240,7 +265,36 @@
                 <li>Todo lo que captures en la prueba <b>se conserva</b> cuando contrates: no se pierde ni se vuelve a capturar nada.</li>
                 <li>Al terminar los 30 días pasa a <b>solo consulta</b>: puedes entrar, ver reportes, exportar y respaldar tu información, pero no registrar ventas ni cambios. Al activar tu código vuelve todo al instante.</li>
               </ul>
-              <p>Para contratar, entra a <b>Licencia</b> (menú Administración), copia el <b>ID de tu equipo</b> y mándalo por WhatsApp (el botón lo escribe por ti).</p>
+              <p>Para contratar, entra a <b>Licencia</b> (menú Administración) y llena <b>«Quiero contratar»</b> (ver la guía de abajo).</p>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="datos negocio bienvenida registro nombre direccion telefono whatsapp ticket encabezado rfc factura privacidad">
+            <summary>Los datos de mi negocio (ventana de bienvenida)</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>La primera vez que entras a tu prueba aparece <b>«¡Bienvenido a tu prueba de 30 días!»</b>. Escribe el nombre de tu negocio, tu nombre y tu WhatsApp (lo demás es opcional).</li>
+                <li>Si dejas marcada la casilla del ticket, tus tickets <b>salen con el nombre, dirección y teléfono de tu negocio</b> (solo se llenan los datos que estaban vacíos; nunca se pisa lo que ya pusiste).</li>
+                <li>Pulsa <b>Guardar y empezar</b>. Si no tienes tiempo, <b>«Más tarde»</b>: te lo volvemos a preguntar en un par de días.</li>
+              </ol>
+              <div class="aviso azul">🔒 Esos datos se guardan <b>solo en tu sistema</b>. Compoint no recibe nada hasta que tú decidas contratar y pulses «Enviar solicitud». Puedes corregirlos cuando quieras en <b>Licencia</b>.</div>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="contratar comprar renovar solicitud enviar whatsapp correo copiar archivo plan sin nube con nube sucursales sin internet pendiente reintentar">
+            <summary>Quiero contratar o renovar: mandar mi solicitud a Compoint</summary>
+            <div class="cuerpo">
+              <ol>
+                <li>Entra a <b>Licencia</b> → <b>«Quiero contratar»</b>. Revisa tus datos (ya vienen llenos si los capturaste en la bienvenida).</li>
+                <li>Elige tu <b>plan</b>: <b>sin nube</b> (trabaja sin internet) o <b>con nube</b> (además se copia en la nube y lo consultas desde cualquier lugar), y cuántas <b>sucursales</b> necesitas.</li>
+                <li>Marca que aceptas el aviso de privacidad y pulsa <b>«Enviar solicitud a Compoint»</b>. Le llega un correo a Compoint con tus datos y el ID de tu equipo.</li>
+                <li>Compoint te confirma el plan y el pago y te manda tu <b>código de activación</b>. Lo pegas en <b>«¿Ya tienes tu código?»</b> y listo.</li>
+              </ol>
+              <ul>
+                <li><b>Si no hay internet:</b> la solicitud queda lista y se envía sola cuando vuelva. Mientras tanto usa el botón verde de <b>WhatsApp</b> (ya lleva todo escrito), <b>Copiar solicitud</b> o <b>Guardar archivo</b> y mándalo como prefieras.</li>
+                <li>Si algo cambió, pulsa <b>«Cambiar mis datos o plan»</b> y vuelve a enviar: la solicitud nueva reemplaza a la anterior.</li>
+                <li>También funciona estando en <b>solo consulta</b>.</li>
+              </ul>
             </div>
           </details>
 
@@ -364,6 +418,7 @@ const esEscritorio = !!(window.compointDesktop && window.compointDesktop.esEscri
 const TEMAS = [
   { id: 'todo', icono: '📚', nombre: 'Todo' },
   { id: 'impresoras', icono: '🖨️', nombre: 'Impresoras' },
+  { id: 'ventas', icono: '🛒', nombre: 'Ventas y pedidos' },
   { id: 'equipos', icono: '🖥️', nombre: 'Equipos y servidor' },
   { id: 'licencia', icono: '🛡️', nombre: 'Licencia' },
   { id: 'sininternet', icono: '📶', nombre: 'Sin internet' },

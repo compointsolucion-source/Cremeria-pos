@@ -75,6 +75,13 @@
   .teclado-cobro .tc-exacto { grid-column: 1 / span 1; font-size: 14px; background: #E3F2FD; color: #0D47A1; }
   .teclado-peso { width: 100%; flex-basis: auto; }
   .teclado-peso button { padding: 12px 0; font-size: 24px; }
+  /* Granel: botones rápidos y avisos del modal de peso */
+  .peso-rapidos { display: flex; align-items: center; gap: 5px; margin: 6px 0; flex-wrap: wrap; justify-content: center; }
+  .peso-rapidos .q { font-size: 11.5px; font-weight: 700; color: #5b6270; min-width: 64px; text-align: right; }
+  .peso-chip { border: 1px solid #D9DDE2; background: #fff; color: #2E4A72; border-radius: 999px; padding: 5px 9px; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+  .peso-chip.on { background: #5FAE46; border-color: #5FAE46; color: #fff; }
+  .peso-aviso-exacto { display: none; background: #E8F5E9; color: #2E6B1F; border-radius: 8px; padding: 6px 10px; margin: 6px 0; font-size: 13px; text-align: left; }
+  .peso-aviso-exacto.visible { display: block; }
   .teclado-cobro .tc-enter { grid-column: 2 / span 2; background: #5FAE46; color: white; font-size: 22px; }
   @media (max-width: 700px) {
     .cobro-cols { flex-direction: column; }
@@ -244,7 +251,24 @@
           <input type="text" inputmode="none" autocomplete="off" id="importePesoAvanzada" style="font-size:24px; font-weight:700; text-align:center;" oninput="limpiarNumeroPesoAv(this); calcularDesdeImporteAvanzada()" onfocus="campoPesoAv=this">
         </div>
       </div>
-      <p style="font-size:18px; font-weight:700; margin:12px 0;">Precio Unitario = $<span id="precioUnitarioPesoAvanzada"></span></p>
+      <p style="font-size:18px; font-weight:700; margin:12px 0 6px;">Precio Unitario = $<span id="precioUnitarioPesoAvanzada"></span></p>
+      <div class="peso-aviso-exacto" id="avisoExactoPesoAv"></div>
+      <div class="peso-rapidos">
+        <span class="q">Por importe</span>
+        <button type="button" class="peso-chip" data-campo="importe" data-valor="20" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('importe', 20)">$20</button>
+        <button type="button" class="peso-chip" data-campo="importe" data-valor="50" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('importe', 50)">$50</button>
+        <button type="button" class="peso-chip" data-campo="importe" data-valor="100" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('importe', 100)">$100</button>
+        <button type="button" class="peso-chip" data-campo="importe" data-valor="200" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('importe', 200)">$200</button>
+        <button type="button" class="peso-chip" data-campo="importe" data-valor="500" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('importe', 500)">$500</button>
+      </div>
+      <div class="peso-rapidos">
+        <span class="q">Por cantidad</span>
+        <button type="button" class="peso-chip" data-campo="cantidad" data-valor="0.25" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('cantidad', 0.25)">¼ kg</button>
+        <button type="button" class="peso-chip" data-campo="cantidad" data-valor="0.5" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('cantidad', 0.5)">½ kg</button>
+        <button type="button" class="peso-chip" data-campo="cantidad" data-valor="0.75" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('cantidad', 0.75)">¾ kg</button>
+        <button type="button" class="peso-chip" data-campo="cantidad" data-valor="1" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('cantidad', 1)">1 kg</button>
+        <button type="button" class="peso-chip" data-campo="cantidad" data-valor="2" onmousedown="event.preventDefault()" onclick="rapidoPesoAv('cantidad', 2)">2 kg</button>
+      </div>
       <div class="teclado-cobro teclado-peso" id="tecladoPeso">
         <button type="button" onmousedown="event.preventDefault()" onclick="tecladoPesoAv('7')">7</button>
         <button type="button" onmousedown="event.preventDefault()" onclick="tecladoPesoAv('8')">8</button>
@@ -352,6 +376,7 @@
 <script src="js/turno-caja.js"></script>
 <script src="js/offline-db.js"></script>
 <script src="js/ventas-offline.js"></script>
+<script src="js/granel.js"></script>
 <script>
 requiereLogin();
 
@@ -558,6 +583,9 @@ function abrirModalPesoAvanzada(producto) {
   document.getElementById('precioUnitarioPesoAvanzada').textContent = parseFloat(producto.precio).toFixed(2);
   document.getElementById('cantidadPesoAvanzada').value = '';
   document.getElementById('importePesoAvanzada').value = '';
+  fuentePesoAv = 'cantidad';
+  reemplazarPesoAv = false;
+  actualizarAvisosPesoAv();
   campoPesoAv = document.getElementById('cantidadPesoAvanzada');
   ultimoCampoTecladoPesoAv = campoPesoAv;
   document.getElementById('modalPesoAvanzada').style.display = 'flex';
@@ -570,6 +598,10 @@ function abrirModalPesoAvanzada(producto) {
 // Teclado en pantalla del modal de peso: escribe en el último campo tocado (Cantidad por defecto).
 let campoPesoAv = null;
 let ultimoCampoTecladoPesoAv = null;
+// Qué campo capturó el cajero ('cantidad' o 'importe'): de ahí sale el renglón (cantidad, o importe EXACTO).
+let fuentePesoAv = 'cantidad';
+// true = la siguiente tecla del teclado en pantalla reemplaza el campo (después de un botón rápido).
+let reemplazarPesoAv = false;
 function limpiarNumeroPesoAv(el) {
   let v = el.value.replace(/[^0-9.]/g, '');
   const i = v.indexOf('.');
@@ -580,7 +612,8 @@ function tecladoPesoAv(tecla) {
   if (tecla === 'enter') { confirmarPesoAvanzada(); return; }
   const campo = campoPesoAv && document.getElementById('modalPesoAvanzada').contains(campoPesoAv) ? campoPesoAv : document.getElementById('cantidadPesoAvanzada');
   // Al pasar de Cantidad a Importe (o al revés), el campo nuevo se limpia para escribir desde cero.
-  if (campo !== ultimoCampoTecladoPesoAv) { campo.value = ''; ultimoCampoTecladoPesoAv = campo; }
+  if (campo !== ultimoCampoTecladoPesoAv || reemplazarPesoAv) { campo.value = ''; ultimoCampoTecladoPesoAv = campo; }
+  reemplazarPesoAv = false;
   if (tecla === 'borrar') campo.value = campo.value.slice(0, -1);
   else if (tecla === '.') { if (!campo.value.includes('.')) campo.value = (campo.value || '0') + '.'; }
   else campo.value += tecla;
@@ -596,22 +629,73 @@ function cerrarModalPesoAvanzada() {
   document.getElementById('campoCodigoProducto').focus();
 }
 
+// Caja Avanzada nunca ha aplicado precios por volumen: el precio es el del producto (promos: false).
 function calcularDesdeCantidadAvanzada() {
+  fuentePesoAv = 'cantidad';
   const cantidad = parseFloat(document.getElementById('cantidadPesoAvanzada').value || 0);
-  const precio = parseFloat(productoPesoActualAvanzada.precio);
-  document.getElementById('importePesoAvanzada').value = (cantidad * precio).toFixed(2);
+  const calc = GRANEL.porCantidad(productoPesoActualAvanzada, cantidad, { promos: false });
+  document.getElementById('importePesoAvanzada').value = calc ? calc.importe.toFixed(2) : '0.00';
+  actualizarAvisosPesoAv();
 }
 
 function calcularDesdeImporteAvanzada() {
+  fuentePesoAv = 'importe';
   const importe = parseFloat(document.getElementById('importePesoAvanzada').value || 0);
-  const precio = parseFloat(productoPesoActualAvanzada.precio);
-  if (precio > 0) document.getElementById('cantidadPesoAvanzada').value = (importe / precio).toFixed(3);
+  const calc = importe > 0 ? GRANEL.porImporte(productoPesoActualAvanzada, importe, { promos: false }) : null;
+  if (calc && !calc.error) document.getElementById('cantidadPesoAvanzada').value = calc.cantidad.toFixed(3);
+  else if (!(importe > 0)) document.getElementById('cantidadPesoAvanzada').value = '0.000';
+  actualizarAvisosPesoAv();
+}
+
+// Botones rápidos ($100, ½ kg…): ponen el valor en su campo y lo calculan como si se hubiera tecleado.
+function rapidoPesoAv(campo, valor) {
+  const input = document.getElementById(campo === 'importe' ? 'importePesoAvanzada' : 'cantidadPesoAvanzada');
+  input.value = String(valor);
+  campoPesoAv = input;
+  ultimoCampoTecladoPesoAv = input;
+  reemplazarPesoAv = true;
+  input.focus();
+  input.select();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Aviso de "Importe exacto" y botón rápido resaltado.
+function actualizarAvisosPesoAv() {
+  const aviso = document.getElementById('avisoExactoPesoAv');
+  if (!aviso) return;
+  const p = productoPesoActualAvanzada;
+  const importe = parseFloat(document.getElementById('importePesoAvanzada').value || 0);
+  const cantidad = parseFloat(document.getElementById('cantidadPesoAvanzada').value || 0);
+  aviso.classList.remove('visible');
+  aviso.textContent = '';
+  if (p && fuentePesoAv === 'importe' && importe > 0 && cantidad > 0) {
+    const porPrecio = GRANEL.r2(cantidad * parseFloat(p.precio));
+    if (Math.abs(porPrecio - importe) >= 0.005) {
+      aviso.classList.add('visible');
+      aviso.textContent = `✔ Importe exacto: el ticket cobra $${importe.toFixed(2)} aunque ${cantidad.toFixed(3)} kg × $${parseFloat(p.precio).toFixed(2)} sea $${porPrecio.toFixed(2)}.`;
+    }
+  }
+  const valorActivo = fuentePesoAv === 'importe' ? importe : cantidad;
+  document.querySelectorAll('#modalPesoAvanzada .peso-chip').forEach(chip => {
+    chip.classList.toggle('on', chip.dataset.campo === fuentePesoAv && valorActivo > 0 && valorActivo === parseFloat(chip.dataset.valor));
+  });
 }
 
 function confirmarPesoAvanzada() {
+  const p = productoPesoActualAvanzada;
   const cantidad = parseFloat(document.getElementById('cantidadPesoAvanzada').value || 0);
+  const importe = parseFloat(document.getElementById('importePesoAvanzada').value || 0);
   if (cantidad <= 0) { mostrarToast('Ingresa una cantidad válida', 'error'); return; }
-  agregarProductoAvanzada(productoPesoActualAvanzada, cantidad);
+  // Si el cajero capturó el IMPORTE ("dame $100 de queso"), el ticket cobra ese importe exacto.
+  if (fuentePesoAv === 'importe' && importe > 0) {
+    const calc = GRANEL.porImporte(p, importe, { promos: false });
+    if (calc && !calc.error) {
+      agregarProductoAvanzada(p, calc.cantidad, { importe: calc.importe });
+      cerrarModalPesoAvanzada();
+      return;
+    }
+  }
+  agregarProductoAvanzada(p, cantidad);
   cerrarModalPesoAvanzada();
 }
 
@@ -716,8 +800,10 @@ async function cargarTicketMostradorEnPestana(folio) {
         kit_id: i.kit_id,
         codigo_barras: '',
         nombre_producto: i.nombre_producto,
+        tipo_venta: i.tipo_venta,
         cantidad: parseFloat(i.cantidad),
         precio_unitario: parseFloat(i.precio_unitario),
+        importe: parseFloat(i.subtotal), // el importe que ya guardó el ticket (puede ser un importe exacto)
         existencia_referencia: null
       })),
       clienteAsignado: null,
@@ -739,16 +825,19 @@ async function cargarTicketMostradorEnPestana(folio) {
   }
 }
 
-async function agregarProductoAvanzada(producto, cantidad) {
+// extra.importe = venta a granel POR IMPORTE: ese importe se cobra exacto (ver js/granel.js).
+async function agregarProductoAvanzada(producto, cantidad, extra) {
   const nuevoItem = {
     tipo: 'producto',
     producto_id: producto.id,
     codigo_barras: producto.codigo_barras || '',
     nombre_producto: producto.nombre,
+    tipo_venta: producto.tipo_venta,
     cantidad: cantidad,
     precio_unitario: parseFloat(producto.precio),
     existencia_referencia: producto.existencia_actual !== undefined ? producto.existencia_actual : null
   };
+  if (extra && extra.importe > 0) nuevoItem.importe = extra.importe;
 
   const pestanaActual = pestanas[pestanaActivaIndex];
   if (pestanaActual.ticketIdExistente) {
@@ -809,7 +898,7 @@ function renderTablaVentaAvanzada() {
   let total = 0;
 
   tbody.innerHTML = carritoActivo().map((item, idx) => {
-    const importe = item.cantidad * item.precio_unitario;
+    const importe = GRANEL.subtotal(item);
     total += importe;
     const existenciaTexto = item.existencia_referencia !== null ? parseFloat(item.existencia_referencia).toFixed(2) : (item.tipo === 'kit' ? 'Kit' : '—');
     return `
@@ -923,6 +1012,7 @@ function aplicarMayoreoAvanzada() {
 
   const usandoMayoreo = item.precio_unitario === parseFloat(producto.precio_mayoreo);
   item.precio_unitario = usandoMayoreo ? parseFloat(producto.precio) : parseFloat(producto.precio_mayoreo);
+  delete item.importe; // con otro precio, el importe exacto de una venta por importe ya no aplica
   renderTablaVentaAvanzada();
   mostrarToast(usandoMayoreo ? 'Precio normal aplicado' : 'Precio de mayoreo aplicado', 'exito');
 }
@@ -1036,7 +1126,7 @@ async function reimprimirUltimoTicketAvanzada() {
       items: [
         ...ticket.items.map(i => ({
           nombre_producto: i.nombre_producto,
-          detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+          detalle: GRANEL.detalle(i),
           subtotal: parseFloat(i.subtotal).toFixed(2)
         })),
         ...((parseFloat(ticket.total) - totalNetoTicketAv(ticket)) > 0.004
@@ -1210,7 +1300,7 @@ async function imprimirCopiaHistorial() {
     fecha: new Date(ticketSeleccionadoHistorial.fecha_pago || ticketSeleccionadoHistorial.fecha_creacion).toLocaleString(),
     items: ticketSeleccionadoHistorial.items.map(i => ({
       nombre_producto: i.nombre_producto,
-      detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+      detalle: GRANEL.detalle(i),
       subtotal: parseFloat(i.subtotal).toFixed(2)
     })),
     total: parseFloat(ticketSeleccionadoHistorial.total).toFixed(2),
@@ -1257,7 +1347,8 @@ function construirTicketOfflineAv(pest) {
     descuento_motivo: pest.descuentoTicket ? pest.descuentoTicket.motivo : null,
     items: pest.carrito.map(it => ({
       id: null, tipo: it.tipo === 'kit' ? 'kit' : 'producto', producto_id: it.producto_id || null, kit_id: it.kit_id || null,
-      nombre_producto: it.nombre_producto, cantidad: it.cantidad, precio_unitario: it.precio_unitario,
+      nombre_producto: it.nombre_producto, tipo_venta: it.tipo_venta, cantidad: it.cantidad, precio_unitario: it.precio_unitario,
+      importe: it.importe,
       subtotal: r2(subtotalItemAv(it)), descuento_monto: r2(descuentoItemAv(it)),
       descuento_motivo: it.descuento ? it.descuento.motivo : null
     }))
@@ -1273,7 +1364,7 @@ async function registrarVentaOfflineAv(ticket, pago) {
     descuento_monto: ticket.descuento_monto, descuento_motivo: ticket.descuento_motivo,
     items: ticket.items.map(i => ({
       tipo: i.tipo, producto_id: i.producto_id, kit_id: i.kit_id, nombre_producto: i.nombre_producto,
-      cantidad: i.cantidad, precio_unitario: i.precio_unitario, descuento_monto: i.descuento_monto, descuento_motivo: i.descuento_motivo
+      cantidad: i.cantidad, precio_unitario: i.precio_unitario, importe: i.importe, descuento_monto: i.descuento_monto, descuento_motivo: i.descuento_motivo
     }))
   });
   pintarAvisoVentasOffline();
@@ -1704,7 +1795,7 @@ async function imprimirTicketCobradoAvanzada(ticket, metodoPagoUsado, montoRecib
 
   const itemsComprobante = ticket.items.map(i => ({
     nombre_producto: i.nombre_producto,
-    detalle: i.tipo === 'kit' ? 'Kit' : `${i.cantidad} x $${i.precio_unitario}`,
+    detalle: GRANEL.detalle(i),
     subtotal: parseFloat(i.subtotal).toFixed(2)
   }));
   const descuentosImpresion = parseFloat(ticket.total) - totalNetoImpresion;

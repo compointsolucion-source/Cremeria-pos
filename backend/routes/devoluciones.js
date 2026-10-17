@@ -91,7 +91,15 @@ router.post('/', verificarToken, requierePermiso('VENTAS_DEVOLVER'), async (req,
         return res.status(400).json({ error: `Cantidad inválida para "${detalle.nombre_producto}" (disponible para devolver: ${cantidadDisponible})` });
       }
 
-      const montoDevuelto = cantidadDevolver * parseFloat(detalle.precio_unitario);
+      // Lo normal: cantidad × precio. Si el renglón se vendió POR IMPORTE ("dame $100 de queso"), su
+      // subtotal es el importe exacto y no cantidad × precio: se devuelve la parte proporcional del
+      // subtotal, para que devolver todo regrese exactamente lo que se cobró.
+      const montoPorPrecio = cantidadDevolver * parseFloat(detalle.precio_unitario);
+      const subtotalRenglon = parseFloat(detalle.subtotal);
+      const esPorImporte = cantidadOriginal > 0 && Math.abs(subtotalRenglon - cantidadOriginal * parseFloat(detalle.precio_unitario)) > 0.005;
+      const montoDevuelto = esPorImporte
+        ? Math.round((subtotalRenglon * cantidadDevolver / cantidadOriginal) * 100) / 100
+        : montoPorPrecio;
       montoTotal += montoDevuelto;
 
       await conexion.query(

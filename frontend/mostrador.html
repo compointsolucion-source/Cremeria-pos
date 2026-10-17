@@ -147,6 +147,39 @@
   }
   .tecla:active { background: #DDD; }
   .subtotal-preview { text-align: center; color: #555; margin-top: 8px; }
+
+  /* Modal de granel: Cantidad ⇄ Importe (se captura cualquiera de los dos y el otro se calcula solo) */
+  .modal-granel { width: 420px; max-width: 94vw; max-height: 96vh; overflow-y: auto; padding: 16px 20px 18px; }
+  .modal-granel h3 { margin: 2px 0 12px; font-size: 22px; color: #2E4A72; }
+  .granel-campos { display: grid; grid-template-columns: 1fr 26px 1fr; align-items: end; gap: 4px; }
+  .granel-campo { cursor: pointer; }
+  .granel-campo label { display: block; text-align: center; font-size: 13px; font-weight: 700; color: #4a4e56; margin-bottom: 5px; cursor: pointer; }
+  .granel-val {
+    height: 58px; display: flex; align-items: center; justify-content: center; border-radius: 10px;
+    border: 2px solid #D9DDE2; background: #F4F5F6; color: #2E4A72; font-size: 32px; font-weight: 700;
+    overflow: hidden; white-space: nowrap;
+  }
+  .granel-campo.activo .granel-val { border-color: #5FAE46; background: #fff; box-shadow: 0 0 0 4px rgba(95,174,70,.18); }
+  .granel-campo.activo .granel-val::after { content: ''; width: 3px; height: 32px; margin-left: 3px; background: #5FAE46; animation: granelCursor 1s steps(1) infinite; }
+  @keyframes granelCursor { 50% { opacity: 0; } }
+  .granel-campo:not(.activo) .granel-val { color: #7a8190; }
+  .granel-sub { text-align: center; font-size: 12px; margin-top: 4px; font-weight: 600; color: #8a8f98; min-height: 15px; }
+  .granel-campo.activo .granel-sub { color: #3F8A2E; font-weight: 700; }
+  .granel-swap { text-align: center; color: #8a8f98; font-size: 20px; padding-bottom: 22px; }
+  .granel-precio { text-align: center; font-size: 19px; font-weight: 700; color: #2E4A72; margin: 8px 0 4px; }
+  .granel-aviso { font-size: 13px; border-radius: 8px; padding: 6px 10px; margin: 5px 0; display: none; }
+  .granel-aviso.promo { display: block; background: #FFF8E1; color: #8a6100; }
+  .granel-aviso.exacto { display: block; background: #E8F5E9; color: #2E6B1F; }
+  .granel-aviso.error { display: block; background: #FDECEA; color: #B3261E; font-weight: 700; }
+  .granel-rapidos { display: flex; align-items: center; gap: 5px; margin: 6px 0; flex-wrap: wrap; }
+  .granel-rapidos .q { width: 66px; font-size: 11.5px; font-weight: 700; color: #5b6270; }
+  .granel-chip {
+    border: 1px solid #D9DDE2; background: #fff; color: #2E4A72; border-radius: 999px;
+    padding: 6px 9px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+  }
+  .granel-chip.on { background: #5FAE46; border-color: #5FAE46; color: #fff; }
+  .modal-granel .teclado { margin-top: 8px; }
+  .modal-granel .tecla { padding: 12px 0; }
   .stepper { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 14px 0; }
   .stepper button {
     width: 54px; height: 54px; border-radius: 50%; border: none; background: #5FAE46;
@@ -210,14 +243,45 @@
 
   <!-- Modal para capturar peso (productos a granel) -->
   <div class="modal-overlay" id="modalPeso">
-    <div class="modal-caja">
+    <div class="modal-caja modal-granel">
       <h3 id="modalProductoNombre">Producto</h3>
-      <div id="basculaEnVivo" style="display:none; background:#F4F5F6; border-radius:10px; padding:8px 12px; margin-bottom:10px; text-align:center; font-size:14px;">
+      <div class="granel-campos">
+        <div class="granel-campo" id="granelCampoCantidad" onclick="granelActivar('cantidad')">
+          <label>Cantidad (kg)</label>
+          <div class="granel-val" id="displayPeso">0</div>
+          <div class="granel-sub" id="granelSubCantidad"></div>
+        </div>
+        <div class="granel-swap">⇄</div>
+        <div class="granel-campo activo" id="granelCampoImporte" onclick="granelActivar('importe')">
+          <label>Importe ($)</label>
+          <div class="granel-val" id="displayImporte">0.00</div>
+          <div class="granel-sub" id="granelSubImporte"></div>
+        </div>
+      </div>
+      <div class="granel-precio" id="granelPrecio">Precio unitario = $0.00 / kg</div>
+      <div class="granel-aviso" id="granelAvisoPromo"></div>
+      <div class="granel-aviso" id="granelAvisoExacto"></div>
+      <div class="granel-aviso" id="granelAvisoError"></div>
+      <div class="granel-rapidos">
+        <span class="q">Por importe</span>
+        <button type="button" class="granel-chip" data-campo="importe" data-valor="20" onclick="granelRapido('importe', 20)">$20</button>
+        <button type="button" class="granel-chip" data-campo="importe" data-valor="50" onclick="granelRapido('importe', 50)">$50</button>
+        <button type="button" class="granel-chip" data-campo="importe" data-valor="100" onclick="granelRapido('importe', 100)">$100</button>
+        <button type="button" class="granel-chip" data-campo="importe" data-valor="200" onclick="granelRapido('importe', 200)">$200</button>
+        <button type="button" class="granel-chip" data-campo="importe" data-valor="500" onclick="granelRapido('importe', 500)">$500</button>
+      </div>
+      <div class="granel-rapidos">
+        <span class="q">Por cantidad</span>
+        <button type="button" class="granel-chip" data-campo="cantidad" data-valor="0.25" onclick="granelRapido('cantidad', 0.25)">¼ kg</button>
+        <button type="button" class="granel-chip" data-campo="cantidad" data-valor="0.5" onclick="granelRapido('cantidad', 0.5)">½ kg</button>
+        <button type="button" class="granel-chip" data-campo="cantidad" data-valor="0.75" onclick="granelRapido('cantidad', 0.75)">¾ kg</button>
+        <button type="button" class="granel-chip" data-campo="cantidad" data-valor="1" onclick="granelRapido('cantidad', 1)">1 kg</button>
+        <button type="button" class="granel-chip" data-campo="cantidad" data-valor="2" onclick="granelRapido('cantidad', 2)">2 kg</button>
+      </div>
+      <div id="basculaEnVivo" style="display:none; background:#F4F5F6; border-radius:10px; padding:8px 12px; margin:8px 0; text-align:center; font-size:14px;">
         ⚖️ Báscula: <b id="basculaPesoLive">0.000</b> kg
         <button class="btn btn-secondary" style="margin-left:8px; padding:4px 10px; font-size:13px;" onclick="usarPesoBascula()">Usar este peso</button>
       </div>
-      <div class="display-valor" id="displayPeso">0.000</div>
-      <div class="subtotal-preview" id="subtotalPreview">Subtotal: $0.00</div>
       <div class="teclado">
         <button class="tecla" onclick="teclear('1')">1</button>
         <button class="tecla" onclick="teclear('2')">2</button>
@@ -265,6 +329,7 @@
 <script src="js/bascula.js"></script>
 <script src="js/offline-db.js"></script>
 <script src="js/ventas-offline.js"></script>
+<script src="js/granel.js"></script>
 <script src="js/mostrador.js"></script>
 <script src="js/registrar-sw.js"></script>
 <script src="js/sidebar-nav.js"></script>

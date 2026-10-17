@@ -151,6 +151,7 @@
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
+<script src="../js/licencia-datos.js"></script>
 <script>
 requiereLogin();
 
@@ -342,6 +343,8 @@ function pintarActividad() {
 
 pintarSaludo();
 cargarDashboard();
+// En la prueba de 30 días, pide los datos del negocio (una ventana de bienvenida; se puede dejar para después).
+setTimeout(() => LicDatos.revisarBienvenida(), 900);
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>

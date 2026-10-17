@@ -1,0 +1,95 @@
+SOLICITUD.PHP - RECIBE LAS SOLICITUDES DE LICENCIA Y TE LAS MANDA POR CORREO
+============================================================================
+Cuando un cliente pulsa "Enviar solicitud a Compoint" (en Licencia -> Quiero
+contratar), su sistema manda los datos a esta pagina, y esta pagina te manda un
+correo a contacto@compoint.com.mx con: el negocio, el contacto, el plan, las
+sucursales, el ID del equipo y el CODIGO DE SOLICITUD (el que pegaras en el
+Activador Compoint para hacer su codigo de activacion).
+
+Si el cliente no tiene internet, su sistema la guarda y la reintenta solo
+(cada 10 minutos, hasta por 14 dias). Si le llega dos veces la misma, el correo
+se manda UNA sola vez.
+
+SOLO SE SUBE UNA VEZ, a tu hosting (cPanel de compoint.com.mx). Los clientes no
+necesitan configurar nada.
+
+
+PASO A PASO (10 minutos)
+------------------------
+1. Entra a tu cPanel (el de compoint.com.mx) y abre "Administrador de archivos".
+
+2. Abre la carpeta  public_html  y crea una carpeta nueva llamada:  punto
+   (boton "+ Carpeta").
+
+3. Entra a la carpeta  punto  y pulsa "Cargar". Sube el archivo  solicitud.php
+   (el que viene en esta misma carpeta).
+
+4. Prueba que quedo: abre en tu navegador
+
+       https://www.compoint.com.mx/punto/solicitud.php
+
+   Debe aparecer exactamente algo como:
+
+       {"ok":true,"servicio":"solicitud-licencia-compoint","version":1}
+
+   - Si te manda a otra direccion (por ejemplo sin "www"), copia la direccion
+     final y avisame: el sistema debe usar esa misma.
+   - Si aparece un error 404: la carpeta o el archivo no estan donde debe ser.
+   - Si aparece un error 500: avisame que version de PHP tiene tu hosting
+     (cPanel -> "Seleccionar version de PHP"; funciona con PHP 7.4 o mayor).
+
+5. Crea el correo que usara como "remitente": en cPanel -> "Cuentas de correo"
+   -> Crear -> no-responder@compoint.com.mx  (cualquier clave, no se usa).
+   Es para que tus correos no caigan en spam. (Si prefieres otro remitente,
+   cambialo en solicitud.php, arriba, en la linea CORREO_ORIGEN.)
+
+6. En cPanel abre "Entregabilidad de correo" (Email Deliverability). Si junto a
+   compoint.com.mx dice "Reparar" o "Problemas", pulsalo y acepta. Asi los
+   correos salen firmados y llegan a tu bandeja.
+
+7. Haz una prueba real: en un sistema en modo prueba (o el tuyo), entra a
+   Licencia -> Quiero contratar, llena los datos, elige plan y pulsa "Enviar
+   solicitud". En 1 minuto debe llegarte el correo a contacto@compoint.com.mx
+   (revisa tambien SPAM la primera vez y marcalo como "No es spam").
+
+
+COMO SE VE EL CORREO
+--------------------
+Asunto:  Solicitud de licencia: <negocio> (con nube, 2 suc.)
+Responder: si el cliente dejo su correo, "Responder" le contesta a el.
+Al final trae la linea  CPT-REQ-...  : ese es el CODIGO DE SOLICITUD. Copialo
+completo (puede venir partido en varias lineas; el Activador lo entiende).
+
+
+COPIAS DE SEGURIDAD
+-------------------
+La pagina crea sola la carpeta  punto/solicitudes-datos  y guarda ahi una copia
+de cada solicitud (archivos .json). Esa carpeta se protege sola (nadie de
+internet puede abrirla). Sirve si alguna vez un correo se pierde: ahi estan
+todas. No la borres. Si quieres revisarla: cPanel -> Administrador de archivos.
+
+
+PROTECCIONES QUE YA TRAE
+------------------------
+- Solo acepta solicitudes bien formadas (con su codigo de control); lo demas se rechaza.
+- Maximo 10 solicitudes por hora desde la misma IP y 300 por dia en total.
+- Un campo "trampa" para robots (si lo llenan, se ignora en silencio).
+- Limpia todos los datos y no deja meter encabezados falsos en el correo.
+- No es una puerta a nada de tu sistema: solo recibe texto y manda un correo.
+
+
+SI CAMBIAS DE DIRECCION
+-----------------------
+La direccion que usan los sistemas esta en  backend/utils/licenciaEnvio.js  (la
+constante URL_POR_DEFECTO). Si algun dia mueves la pagina, se cambia ahi y se
+publica una version nueva. Los sistemas que no la alcancen seguiran guardando
+sus solicitudes y siempre pueden usar el boton de WhatsApp.
+
+
+PROBLEMAS FRECUENTES
+--------------------
+- "Se envia pero no me llega": revisa SPAM; revisa el paso 6; revisa que el
+  correo no-responder@compoint.com.mx exista (paso 5).
+- El sistema del cliente dice "todavia no llego por correo": es normal si el
+  cliente esta sin internet o si todavia no subiste esta pagina. Se reintenta solo.
+  Mientras tanto el boton verde de WhatsApp le manda todo a tu numero.
