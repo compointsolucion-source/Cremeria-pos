@@ -24,6 +24,36 @@ function mensajeErrorCamara(err) {
   return 'No se pudo activar la cámara: ' + (err && err.message ? err.message : err);
 }
 
+// ---- Menú «⋯ Más» (lista desplegable de botones secundarios) ----
+// Uso: <div class="menu-mas"><button onclick="alternarMenuMas(this)">⋯ Más</button>
+//        <div class="menu-mas-lista">…botones .menu-mas-item…</div></div>
+function cerrarMenusMas() {
+  document.querySelectorAll('.menu-mas.abierto').forEach((m) => {
+    m.classList.remove('abierto');
+    const b = m.querySelector('button[aria-expanded]');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+function alternarMenuMas(boton) {
+  const menu = boton.closest('.menu-mas');
+  const estabaAbierto = menu.classList.contains('abierto');
+  cerrarMenusMas();
+  if (estabaAbierto) return;
+  const lista = menu.querySelector('.menu-mas-lista');
+  lista.style.left = ''; lista.style.right = '';
+  menu.classList.add('abierto');
+  boton.setAttribute('aria-expanded', 'true');
+  // Si la lista se sale de la pantalla (pasa en celular, donde el botón queda a la izquierda), se acomoda.
+  let r = lista.getBoundingClientRect();
+  if (r.left < 8) {
+    lista.style.right = 'auto'; lista.style.left = '0';
+    r = lista.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) lista.style.left = (window.innerWidth - 8 - r.right) + 'px';
+  }
+}
+document.addEventListener('click', (e) => { if (!e.target.closest('.menu-mas')) cerrarMenusMas(); }, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarMenusMas(); });
+
 function asegurarContenedorToast() {
   let cont = document.getElementById('toastContainer');
   if (!cont) {

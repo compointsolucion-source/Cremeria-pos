@@ -15,7 +15,8 @@
   .contenido { max-width: 1400px; margin: 16px auto; padding: 0 14px 90px; }
 
   /* ---- Dos columnas: catálogo y formulario ---- */
-  .columnas { display: grid; grid-template-columns: 1fr 420px; gap: 14px; align-items: start; }
+  .columnas { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px; align-items: start; }
+  .columnas > * { min-width: 0; }
   .caja { background: var(--surface, #fff); border-radius: 12px; box-shadow: var(--shadow); }
   .barra { padding: 10px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .barra + .barra { padding-top: 0; }
@@ -25,7 +26,7 @@
   .barra select { width: auto; max-width: 260px; }
   .chip { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border, #E4E6E9); font-size: 13px; font-weight: 600; color: var(--muted, #7A7D83); background: var(--surface, #fff); cursor: pointer; white-space: nowrap; }
   .chip i { font-style: normal; font-weight: 500; margin-left: 3px; }
-  .chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+  .chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 
   .tabla-scroll { max-height: calc(100vh - 270px); min-height: 300px; overflow: auto; border-top: 1px solid var(--border, #E4E6E9); }
   .tabla-prod { width: 100%; border-collapse: collapse; }
@@ -62,7 +63,7 @@
   .tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .campo-con-camara { position: relative; }
   .campo-con-camara input { padding-right: 44px !important; display: block; }
-  .btn-mini-camara { position: absolute; top: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; justify-content: center; width: 32px; background: var(--primary, #5FAE46); color: white; border: none; border-radius: 7px; font-size: 15px; cursor: pointer; }
+  .btn-mini-camara { position: absolute; top: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; justify-content: center; width: 32px; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); border: none; border-radius: 7px; font-size: 15px; cursor: pointer; }
   #scannerCodigoBarras { width: 100%; max-width: 320px; margin: 4px 0; }
   .buscando-externo { font-size: 12px; color: var(--muted, #7A7D83); min-height: 0; }
   .buscando-externo:empty { display: none; }
@@ -114,7 +115,7 @@
     .fondo-hoja { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 80; }
     .fondo-hoja.abierto { display: block; }
     .cerrar-hoja { display: inline-flex; }
-    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
+    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
     .btn-nuevo-escritorio { display: none !important; }
     #btnCancelarEdicion { display: none !important; }
   }
@@ -127,8 +128,6 @@
       </button>
       <h1>🖼️ Productos</h1></div>
     <button class="btn btn-primary btn-nuevo-escritorio" onclick="nuevoProducto()">＋ Nuevo producto</button>
-    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">

@@ -34,7 +34,7 @@
 .chip { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border, #E4E6E9); font-size: 13px; font-weight: 600; color: var(--muted, #7A7D83); background: var(--surface, #fff); white-space: nowrap; cursor: pointer; font-family: inherit; line-height: 1.2; }
 .chip i { font-style: normal; font-weight: 500; margin-left: 4px; opacity: .8; }
 .chip:hover { border-color: var(--primary, #5FAE46); }
-.chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+.chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 .chips.desliza { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .chips.desliza::-webkit-scrollbar { display: none; }
 
@@ -44,7 +44,7 @@
 .pestanas button { background: none; border: none; padding: 12px 16px; font-weight: 700; color: var(--muted, #7A7D83); border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; white-space: nowrap; font-size: 14px; font-family: inherit; }
 .pestanas button.activa { color: var(--primary-dark, #4C9439); border-bottom-color: var(--primary, #5FAE46); }
 .pestanas button i { font-style: normal; background: rgba(128,128,128,.16); border-radius: 10px; padding: 1px 8px; font-size: 12px; margin-left: 6px; }
-.pestanas button.activa i { background: var(--primary, #5FAE46); color: #fff; }
+.pestanas button.activa i { background: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 .pestanas.suelta { border-radius: 12px; margin-bottom: 12px; box-shadow: var(--shadow); }
 
 /* ---- Filas de lista ---- */
@@ -75,7 +75,7 @@
 .mini { border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 8px; min-width: 32px; height: 32px; font-weight: 800; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; font-family: inherit; }
 .mini:hover { filter: brightness(.95); }
 .mini:disabled { opacity: .35; cursor: default; }
-.mini.agregar { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+.mini.agregar { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 .cuadro { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 17px; flex: none; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 14px; flex: none; }
 .avatar.grande { width: 54px; height: 54px; font-size: 19px; }
@@ -151,7 +151,7 @@
   .fondo-hoja.abierto { display: block; }
   .cerrar-hoja { display: inline-flex; }
   .solo-movil { display: initial; }
-  .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer; }
+  .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer; }
   .solo-pc { display: none !important; }
   /* Pantallas con barra fija abajo: se esconden los botones flotantes globales para no taparla */
   body.barra-fija .boton-tema-flotante, body.barra-fija #indicadorConexion { display: none !important; }

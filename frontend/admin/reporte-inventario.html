@@ -31,7 +31,7 @@
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { padding: 7px 12px; border-radius: 20px; border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); font-size: 13px; font-weight: 600; color: var(--muted, #7A7D83); cursor: pointer; }
   .chip i { font-style: normal; font-weight: 500; opacity: 0.85; margin-left: 4px; }
-  .chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: #fff; }
+  .chip.activo { background: var(--primary, #5FAE46); border-color: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
   .chip.amarillo.activo { background: #F9A825; border-color: #F9A825; color: #222; }
   .chip.rojo.activo { background: #E53935; border-color: #E53935; color: #fff; }
   .espaciador { flex: 1; }
@@ -103,6 +103,13 @@
     .tabla-reporte-inv th { position: static; }
     body { background: white; }
   }
+  /* Modo oscuro: las etiquetas de estado usan letras más claras para que se lean */
+  [data-tema="oscuro"] .estado.agotado { color: #FF8A80; }
+  [data-tema="oscuro"] .estado.bajo { color: #FFC857; }
+  [data-tema="oscuro"] .estado.orden { color: #8BD97A; }
+  [data-tema="oscuro"] .mini.merma { color: #FF8A80; }
+  [data-tema="oscuro"] .etiqueta-tipo.unidad { color: #7DB8F5; }
+  [data-tema="oscuro"] .etiqueta-tipo.peso { color: #FFC857; }
 </style>
 </head>
 <body>
@@ -111,8 +118,6 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📋 Reporte de Inventario</h1></div>
-    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
@@ -309,7 +314,7 @@ function renderFilasReporte(lista) {
   if (esMovil.matches) {
     document.getElementById('tarjetasReporteInventario').innerHTML = lista.map(p => {
       const e = parseFloat(p.existencia);
-      const color = p._estado === 'agotado' ? '#E53935' : p._estado === 'bajo' ? '#F9A825' : 'var(--primary,#5FAE46)';
+      const color = p._estado === 'agotado' ? '#E53935' : p._estado === 'bajo' ? 'var(--ambar-texto,#8A5A00)' : 'var(--primary,#5FAE46)';
       const rotulo = { agotado: 'Agotado', bajo: 'Bajo', orden: 'En orden' }[p._estado];
       return `
         <div class="tarjeta-prod ${seleccionados.has(p.id) ? 'marcada' : ''}">
@@ -345,7 +350,7 @@ function renderFilasReporte(lista) {
           <td class="numero">${p.precio_costo ? dinero(p.precio_costo) : 'N/D'}</td>
           <td class="numero"><b>${dinero(p.precio)}</b></td>
           <td class="numero">${m == null ? '—' : `<span class="margen ${claseMargen}">${m.toFixed(0)}%</span>`}</td>
-          <td class="numero"><div class="existencia-celda"><b style="color:${p._estado === 'orden' ? 'inherit' : color}">${e.toFixed(2)}</b>${base > 0 ? `<div class="medidor"><i style="width:${pct}%; background:${color}"></i></div>` : '<div class="medidor" style="visibility:hidden"></div>'}</div></td>
+          <td class="numero"><div class="existencia-celda"><b style="color:${p._estado === 'orden' ? 'inherit' : p._estado === 'bajo' ? 'var(--ambar-texto,#8A5A00)' : color}">${e.toFixed(2)}</b>${base > 0 ? `<div class="medidor"><i style="width:${pct}%; background:${color}"></i></div>` : '<div class="medidor" style="visibility:hidden"></div>'}</div></td>
           <td><span class="estado ${p._estado}">${rotulo}</span></td>
           <td class="numero">${min.toFixed(2)}</td>
           <td class="numero">${max.toFixed(2)}</td>

@@ -71,6 +71,7 @@
   .total-grande { background: rgba(95,174,70,0.14); border-radius: 12px; padding: 14px; text-align: center; }
   .total-grande .peq { font-size: 12px; color: var(--muted, #7A7D83); letter-spacing: 0.04em; }
   .total-grande .cifra { font-size: 34px; font-weight: 800; letter-spacing: -1px; color: #2E7D32; }
+  [data-tema="oscuro"] .total-grande .cifra, [data-tema="oscuro"] .barra-fija .cifra { color: #8BD97A; }
   .lista-efectos { background: rgba(128,128,128,0.08); border: 1px solid var(--border, #E4E6E9); border-radius: 11px; padding: 11px; display: grid; gap: 7px; font-size: 13.5px; }
   .lista-efectos h5 { font-size: 12px; color: var(--muted, #7A7D83); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
   .lista-efectos .ok { color: var(--primary, #5FAE46); font-weight: 800; margin-right: 8px; }
@@ -145,7 +146,7 @@
     .fondo-hoja { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 80; }
     .fondo-hoja.abierto { display: block; }
     .cerrar-hoja { display: inline-flex; }
-    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: #fff; border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
+    .boton-flotante { display: block; position: fixed; right: 74px; bottom: 16px; z-index: 70; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); border: none; border-radius: 28px; padding: 13px 18px; font-weight: 800; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
     .compra-detalle { padding-left: 14px; }
   }
 </style>
@@ -156,8 +157,6 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>🚚 Compras y Proveedores</h1></div>
-    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">

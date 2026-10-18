@@ -30,12 +30,14 @@
     document.documentElement.setAttribute('data-tema', esOscuro ? 'oscuro' : 'claro');
   }
 
+  const ICONOS_TEMA = { claro: '☀️', oscuro: '🌙', sistema: '🖥️' };
+
   function actualizarBotonTema() {
+    const texto = `Tema: ${obtenerTemaPreferido()} (toca para cambiar)`;
     const boton = document.getElementById('botonTema');
-    if (!boton) return;
-    const iconos = { claro: '☀️', oscuro: '🌙', sistema: '🖥️' };
-    boton.textContent = iconos[obtenerTemaPreferido()];
-    boton.title = `Tema: ${obtenerTemaPreferido()} (toca para cambiar)`;
+    if (boton) { boton.textContent = ICONOS_TEMA[obtenerTemaPreferido()]; boton.title = texto; }
+    // El menú lateral trae su propio botón de tema (en computadora reemplaza al círculo flotante).
+    document.querySelectorAll('.sg-tema').forEach((b) => { b.textContent = ICONOS_TEMA[obtenerTemaPreferido()]; b.title = texto; });
   }
 
   function alternarTema() {
@@ -45,6 +47,10 @@
     aplicarTema(siguiente);
     actualizarBotonTema();
   }
+
+  window.alternarTemaGlobal = function () { alternarTema(); };
+  window.iconoTemaGlobal = function () { return ICONOS_TEMA[obtenerTemaPreferido()]; };
+  window.textoTemaGlobal = function () { return `Tema: ${obtenerTemaPreferido()} (toca para cambiar)`; };
 
   function inyectarBotonTema() {
     if (document.getElementById('botonTema')) return;

@@ -58,7 +58,7 @@
   .cuerpo code { background: rgba(128,128,128,.18); padding: 1px 6px; border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; }
   .cuerpo a { color: var(--primary-dark, #4C9439); }
   .cuerpo a:hover { text-decoration: underline; }
-  .cuerpo a.boton-descarga { display: inline-flex; align-items: center; gap: 8px; background: var(--primary, #5FAE46); color: #fff; padding: 11px 18px; border-radius: 10px; font-weight: 800; text-decoration: none; }
+  .cuerpo a.boton-descarga { display: inline-flex; align-items: center; gap: 8px; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); padding: 11px 18px; border-radius: 10px; font-weight: 800; text-decoration: none; }
   .cuerpo a.boton-descarga:hover { text-decoration: none; filter: brightness(.95); }
 
   /* ---- Mi servicio con Compoint (solo clientes con licencia) ---- */
@@ -68,7 +68,7 @@
   .servicio-dato small { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #7A7D83); margin-bottom: 3px; }
   .servicio-dato b { display: block; font-size: 16px; overflow-wrap: anywhere; }
   .servicio-dato .sub { display: block; font-size: 12.5px; color: var(--muted, #7A7D83); margin-top: 2px; }
-  .pastilla { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 800; background: rgba(95,174,70,.2); color: var(--primary-dark, #4C9439); }
+  .pastilla { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 800; background: rgba(95,174,70,.2); color: var(--ok-texto, #2E7D32); }
   .pastilla.ambar { background: rgba(249,168,37,.25); color: #8a5a00; }
   .pastilla.rojo { background: rgba(198,40,40,.16); color: #b71c1c; }
   .servicio-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -111,8 +111,6 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>❓ Ayuda y soporte</h1></div>
-    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido angosto">
@@ -444,6 +442,58 @@
                 <li>Se abre WhatsApp con el mensaje preparado; tú solo lo envías. El sistema anota que ya avisaste.</li>
               </ol>
               <div class="aviso azul">Los mensajes salen de tu propio WhatsApp. No hace falta contratar nada extra.</div>
+            </div>
+          </details>
+        </section>
+
+        <!-- ============ Apariencia y menú ============ -->
+        <section class="caja recorta tema" data-tema="apariencia">
+          <h3 class="tema-tit">🎨 Apariencia y menú</h3>
+          <p class="intro">Cómo moverte por el sistema y cómo cambiar los colores. Todo se queda guardado en esta computadora o celular.</p>
+
+          <details class="guia" data-item data-claves="menu lateral grupos compacto angosto iconos flecha abrir cerrar secciones botones limpio barra izquierda">
+            <summary>Menú de la izquierda: grupos y modo compacto</summary>
+            <div class="cuerpo">
+              <ul>
+                <li>Los botones están ordenados en <b>grupos</b> (Ventas, Catálogo e Inventario, Clientes, Reportes y Administración). Toca el nombre del grupo para abrirlo o cerrarlo; el sistema recuerda cuáles dejaste abiertos.</li>
+                <li>La flechita <b>‹</b> junto al logo de Compoint (arriba del menú) lo deja angosto, solo con iconos, para que la pantalla tenga más espacio. En modo compacto, toca un icono y se abre la lista de ese grupo.</li>
+                <li>En el celular el menú se abre con el botón <b>☰</b> de arriba y se cierra al tocar afuera.</li>
+                <li>Abajo del menú ves tu nombre, tu rol, el botón del tema (☀️ 🌙 🖥️) y <b>Salir</b>. <b>Inicio</b> es el primer botón de arriba.</li>
+                <li>El puntito de color sobre tu foto indica la conexión: <b>verde</b> bien, <b>amarillo</b> lenta, <b>rojo</b> sin internet.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="menu rol permisos cajero ver no aparece falta boton opcion acceso inicio reportes gerente">
+            <summary>El menú muestra solo lo que tu rol puede usar</summary>
+            <div class="cuerpo">
+              <ul>
+                <li>Cada persona ve únicamente los botones que le corresponden. Un <b>cajero</b> ve Mostrador, Caja y Pedidos; el <b>dueño</b> y el <b>gerente</b> ven todo.</li>
+                <li><b>Inicio</b> solo aparece si tu usuario tiene permiso de ver reportes.</li>
+                <li>Si a alguien le falta un botón que necesita, el dueño lo activa en <b>Equipo</b>, en los <b>Permisos</b> de esa persona.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="tema temas colores cremeria carniceria pizarra menta verde azul morado naranja alto contraste claro oscuro cambiar apariencia configuracion">
+            <summary>Cambiar el tema y los colores</summary>
+            <div class="cuerpo">
+              <ul>
+                <li>Entra a <b>Configuración → Dispositivo y color</b>. Hay colores sencillos (Verde, Azul, Morado, Naranja, Alto contraste) y <b>temas completos</b> que cambian también el fondo y las tarjetas: <b>Cremería</b>, <b>Carnicería</b>, <b>Pizarra</b> y <b>Menta</b>.</li>
+                <li>Todos funcionan en modo <b>claro</b> y <b>oscuro</b>. El botón ☀️ 🌙 🖥️ (abajo del menú de la izquierda; en celular, el círculo de la esquina) alterna entre claro, oscuro y automático (según tu equipo).</li>
+                <li>Cada computadora o celular puede tener su propio tema; no afecta a los demás.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="guia" data-item data-claves="mas tres puntos menu superior barra arriba pedidos opciones hoja produccion ruta repartidores liquidaciones zonas ajustes">
+            <summary>El botón «⋯ Más» de la barra de arriba</summary>
+            <div class="cuerpo">
+              <ul>
+                <li>Para que la barra de arriba se vea limpia, las opciones que se usan menos están dentro de <b>⋯ Más</b> (por ejemplo, en Pedidos: Ruta de hoy, Hoja de producción, Repartidores, Liquidaciones y Zonas y ajustes).</li>
+                <li>Toca <b>⋯ Más</b>, elige la opción y el menú se cierra solo. También se cierra al tocar afuera o con la tecla <b>Esc</b>.</li>
+                <li>Los botones de <b>Inicio</b> y <b>Salir</b> ya no están arriba: están en el menú de la izquierda.</li>
+              </ul>
             </div>
           </details>
         </section>

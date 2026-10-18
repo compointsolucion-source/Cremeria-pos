@@ -126,6 +126,7 @@
   .colores { display: flex; gap: 10px; flex-wrap: wrap; }
   .color-op { display: flex; align-items: center; gap: 8px; border: 2px solid var(--border); background: var(--surface, #fff); color: var(--text); border-radius: 11px; padding: 9px 14px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
   .color-op i { width: 18px; height: 18px; border-radius: 50%; display: block; background: var(--c); border: 1px solid rgba(128,128,128,0.55); }
+  .color-op[style*="--c2"] i { background: linear-gradient(135deg, var(--c) 50%, var(--c2) 50%); }
   .color-op.activo { border-color: var(--c); box-shadow: 0 0 0 1px var(--c); }
   .color-op.activo::after { content: "✓"; font-weight: 800; }
 
@@ -222,8 +223,6 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>⚙️ Configuración</h1></div>
-    <a class="btn btn-secondary" href="dashboard.html">🏠 Inicio</a>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
@@ -289,12 +288,23 @@
           </div>
           <div class="tarjeta ancho-total">
             <h3>Color</h3>
+            <p class="nota" style="margin:2px 0 10px">Solo cambia el color principal de botones y avisos.</p>
             <div class="colores">
               <button type="button" class="color-op" style="--c:#5FAE46" onclick="establecerColorTema('verde'); marcarColorTemaActivo('verde')" data-color-boton="verde"><i></i>Verde</button>
               <button type="button" class="color-op" style="--c:#1565C0" onclick="establecerColorTema('azul'); marcarColorTemaActivo('azul')" data-color-boton="azul"><i></i>Azul</button>
               <button type="button" class="color-op" style="--c:#6A1B9A" onclick="establecerColorTema('morado'); marcarColorTemaActivo('morado')" data-color-boton="morado"><i></i>Morado</button>
               <button type="button" class="color-op" style="--c:#E65100" onclick="establecerColorTema('naranja'); marcarColorTemaActivo('naranja')" data-color-boton="naranja"><i></i>Naranja</button>
               <button type="button" class="color-op" style="--c:#000000" onclick="establecerColorTema('alto-contraste'); marcarColorTemaActivo('alto-contraste')" data-color-boton="alto-contraste"><i></i>Alto contraste</button>
+            </div>
+          </div>
+          <div class="tarjeta ancho-total">
+            <h3>Temas completos</h3>
+            <p class="nota" style="margin:2px 0 10px">Cambian todo el aspecto del sistema: fondos, tarjetas, barra de arriba y menú. Combinan con el modo claro/oscuro (botón ☀️🌙🖥️ abajo del menú de la izquierda; en celular, el círculo de la esquina).</p>
+            <div class="colores">
+              <button type="button" class="color-op" style="--c:#A86508; --c2:#FAF4E8" onclick="establecerColorTema('cremeria'); marcarColorTemaActivo('cremeria')" data-color-boton="cremeria"><i></i>Cremería</button>
+              <button type="button" class="color-op" style="--c:#A4232F; --c2:#F7F2F1" onclick="establecerColorTema('carniceria'); marcarColorTemaActivo('carniceria')" data-color-boton="carniceria"><i></i>Carnicería</button>
+              <button type="button" class="color-op" style="--c:#12A594; --c2:#0E131B" onclick="establecerColorTema('pizarra'); marcarColorTemaActivo('pizarra')" data-color-boton="pizarra"><i></i>Pizarra</button>
+              <button type="button" class="color-op" style="--c:#23805F; --c2:#F1F6F4" onclick="establecerColorTema('menta'); marcarColorTemaActivo('menta')" data-color-boton="menta"><i></i>Menta</button>
             </div>
           </div>
         </div>
@@ -1990,7 +2000,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ---- Resumen corto debajo de cada opción del menú ----
-const NOMBRES_COLOR_TEMA = { verde: 'Verde', azul: 'Azul', morado: 'Morado', naranja: 'Naranja', 'alto-contraste': 'Alto contraste' };
+const NOMBRES_COLOR_TEMA = { verde: 'Verde', azul: 'Azul', morado: 'Morado', naranja: 'Naranja', 'alto-contraste': 'Alto contraste', cremeria: 'Cremería', carniceria: 'Carnicería', pizarra: 'Pizarra', menta: 'Menta' };
 function actualizarResumenes() {
   const poner = (id, texto) => { const el = document.getElementById(id); if (el) el.textContent = texto; };
   const nombre = (document.getElementById('nombreMostrador').value || '').trim() || 'Sin nombre';

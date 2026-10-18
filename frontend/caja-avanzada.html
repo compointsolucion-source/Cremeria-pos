@@ -15,10 +15,10 @@
 <script src="js/vendor/qrcode.min.js"></script>
 <script src="js/vendor/JsBarcode.all.min.js"></script>
 <style>
-  body { background: #F4F5F6; }
+  body { background: var(--background, #F4F5F6); }
   .contenido-avanzada { max-width: 1200px; margin: 12px auto; padding: 0 12px; }
   .barra-superior-avanzada {
-    background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px;
+    background: var(--surface, white); border-radius: 12px; padding: 12px; margin-bottom: 10px;
     box-shadow: var(--shadow); display: flex; gap: 10px; align-items: center;
   }
   .barra-superior-avanzada input { flex: 1; font-size: 16px; }
@@ -39,24 +39,24 @@
   .tabla-venta td.numero { text-align: right; }
   .tabla-venta tbody tr:hover { background: #FAFAFA; }
   .fila-seleccionada { background: #E3F2FD !important; }
-  .zona-total { background: white; border-radius: 12px; padding: 16px; margin-top: 10px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; }
+  .zona-total { background: var(--surface, white); border-radius: 12px; padding: 16px; margin-top: 10px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; }
   .zona-total .total-grande { font-size: 40px; font-weight: 800; color: var(--primary, #5FAE46); }
-  .contador-articulos { font-size: 13px; color: #666; margin-top: 6px; }
+  .contador-articulos { font-size: 13px; color: var(--muted, #666); margin-top: 6px; }
   .zona-inferior-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  #metodosPagoModalCobrar button.activo { background: var(--primary, #5FAE46); color: white; }
-  .resultado-cliente { background: #F4F5F6; border-radius: 8px; padding: 8px 12px; margin-top: 4px; cursor: pointer; font-size: 13px; }
+  #metodosPagoModalCobrar button.activo { background: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
+  .resultado-cliente { background: var(--background, #F4F5F6); border-radius: 8px; padding: 8px 12px; margin-top: 4px; cursor: pointer; font-size: 13px; }
   .resultado-cliente:hover { background: #E8F5E9; }
 
   .pestana-ticket {
-    background: white; border: 2px solid #DDD; border-radius: 10px 10px 0 0;
-    padding: 8px 14px; cursor: pointer; font-size: 13px; font-weight: 600; color: #666;
+    background: var(--surface, white); border: 2px solid var(--border, #DDD); border-radius: 10px 10px 0 0;
+    padding: 8px 14px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted, #666);
     display: flex; align-items: center; gap: 6px;
   }
-  .pestana-ticket.activa { border-color: var(--primary, #5FAE46); color: var(--primary, #5FAE46); background: #E8F5E9; }
-  .pestana-ticket .contador-pestana { background: #DDD; border-radius: 10px; padding: 1px 7px; font-size: 11px; }
+  .pestana-ticket.activa { border-color: var(--primary, #5FAE46); color: var(--primary-dark, #5FAE46); background: #E8F5E9; background: color-mix(in srgb, var(--primary, #5FAE46) 14%, var(--surface, #fff)); }
+  .pestana-ticket .contador-pestana { background: rgba(128,128,128,0.25); border-radius: 10px; padding: 1px 7px; font-size: 11px; }
   .pestana-ticket .cerrar-pestana { border: none; background: transparent; color: #999; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; cursor: pointer; border-radius: 50%; width: 18px; height: 18px; }
   .pestana-ticket .cerrar-pestana:hover { background: #C62828; color: white; }
-  .pestana-ticket.activa .contador-pestana { background: var(--primary, #5FAE46); color: white; }
+  .pestana-ticket.activa .contador-pestana { background: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 
   /* ---- Teclado numérico del cobro ---- */
   #totalCobrarModal { font-size: 40px; font-weight: 800; color: var(--primary, #5FAE46); }
@@ -97,7 +97,7 @@
   /* ---- Selector de vista ---- */
   .selector-vista { display: flex; background: rgba(255,255,255,0.14); border-radius: 12px; padding: 4px; gap: 4px; margin-left: auto; margin-right: 10px; }
   .selector-vista button { border: none; background: transparent; color: #DDD; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
-  .selector-vista button.activa { background: var(--primary, #5FAE46); color: white; }
+  .selector-vista button.activa { background: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 
   /* ---- Vista Caja Mostrador ---- */
   #vistaMostrador { display: none; }
@@ -116,7 +116,7 @@
   .vm-card:active { transform: scale(0.96); background: #E8F5E9; }
   .vm-card img, .vm-sinfoto { width: 100%; height: 88px; object-fit: cover; background: #EEF3EA; display: flex; align-items: center; justify-content: center; font-size: 38px; }
   .vm-nombre { padding: 8px 6px 2px; font-size: 13px; font-weight: 600; }
-  .vm-precio { padding: 0 6px 8px; font-size: 12px; color: #555; }
+  .vm-precio { padding: 0 6px 8px; font-size: 12px; color: var(--muted, #555); }
   .vm-badge { position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; color: white; z-index: 1; }
   .vm-b-peso { background: #1565C0; } .vm-b-uni { background: #6A1B9A; } .vm-b-kit { background: #F9A825; }
   .vm-ticket { background: white; border-radius: 14px; padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
@@ -127,7 +127,7 @@
   .vm-fila { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid #EEE; font-size: 13px; cursor: pointer; }
   .vm-fila.sel { background: #E3F2FD; }
   .vm-fila-t { flex: 1; min-width: 0; }
-  .vm-fila-t span { color: #666; }
+  .vm-fila-t span { color: var(--muted, #666); }
   .vm-desc { display: block; color: #C62828; font-size: 12px; }
   .vm-desc a, .vm-t-desc a { color: #C62828; margin-left: 4px; }
   .vm-fila-b { display: flex; gap: 4px; align-items: center; }
@@ -162,8 +162,6 @@
       <button type="button" id="selVistaClasica" class="activa" onclick="cambiarVistaCaja('clasica')" title="Tabla de productos y teclas rápidas">⌨️ Clásica</button>
       <button type="button" id="selVistaMostrador" onclick="cambiarVistaCaja('mostrador')" title="Productos con fotos y ticket con descuentos, como en Mostrador">🛒 Caja Mostrador</button>
     </div>
-    <a class="btn btn-secondary" href="admin/dashboard.html">🏠 Inicio</a>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido-avanzada" id="vistaClasica">
@@ -217,7 +215,7 @@
 
     <div class="card" id="panelUltimaVenta" style="margin-top:10px; display:none; font-size:13px;">
       <b style="font-size:13px;">📋 Última venta</b>
-      <div id="contenidoUltimaVenta" style="margin-top:6px; color:#555;"></div>
+      <div id="contenidoUltimaVenta" style="margin-top:6px; color:var(--muted, #555);"></div>
     </div>
 
     <div class="zona-total">

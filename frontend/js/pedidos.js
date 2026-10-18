@@ -688,7 +688,14 @@ const PT = (function () {
   function iniciar() {
     if (esAdmin) { $('btnAjustesPedidos').style.display = ''; $('btnNuevoFijo').style.display = ''; $('btnGenerarFijos').style.display = ''; }
     iniciarSocket();
-    recargar();
+    recargar().then(() => {
+      // Desde el Inicio: pedidos.html?liquidar=ID abre directo la liquidación de ese repartidor.
+      const idLiq = Number(new URLSearchParams(window.location.search).get('liquidar'));
+      if (!idLiq) return;
+      const abrirLiquidacion = () => { history.replaceState(null, '', window.location.pathname); PTX.liquidar(idLiq); };
+      if (typeof PTX !== 'undefined') abrirLiquidacion();
+      else window.addEventListener('load', abrirLiquidacion);
+    });
     setInterval(() => { if (!document.hidden && !pila.length) recargar(); }, 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescarSuave(); });
   }

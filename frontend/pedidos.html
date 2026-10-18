@@ -22,7 +22,17 @@
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <a class="btn btn-primary" href="mostrador.html?modo=domicilio">＋ Pedido a domicilio</a>
       <a class="btn btn-secondary" href="mostrador.html?modo=recoger">🏪 Para recoger</a>
-      <a class="btn btn-secondary" href="admin/dashboard.html">🏠 Inicio</a>
+      <div class="menu-mas">
+        <button type="button" class="btn btn-secondary" onclick="alternarMenuMas(this)" aria-haspopup="true" aria-expanded="false" title="Ruta, producción, repartidores y más">⋯ Más</button>
+        <div class="menu-mas-lista" role="menu">
+          <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); PTX.abrirRuta(PT.estado.hoy)"><span class="em">🗺</span>Ruta de hoy</button>
+          <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); PTX.abrirProduccion(PT.estado.hoy)"><span class="em">📋</span>Hoja de producción</button>
+          <hr>
+          <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); PTX.abrirReporte()"><span class="em">📊</span>Repartidores</button>
+          <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); PTX.abrirLiquidaciones()"><span class="em">💵</span>Liquidaciones</button>
+          <button type="button" class="menu-mas-item" role="menuitem" id="btnAjustesPedidos" style="display:none" onclick="cerrarMenusMas(); PTX.abrirAjustes()"><span class="em">⚙</span>Zonas y ajustes</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -33,9 +43,6 @@
       <button class="pt-tab" data-tab="semana" onclick="PT.tab('semana')">Esta semana</button>
       <button class="pt-tab" data-tab="fijos" onclick="PT.tab('fijos')">🔁 Pedidos fijos</button>
       <span class="pt-espacio"></span>
-      <button class="btn btn-secondary" onclick="PTX.abrirReporte()">📊 Repartidores</button>
-      <button class="btn btn-secondary" onclick="PTX.abrirLiquidaciones()">💵 Liquidaciones</button>
-      <button class="btn btn-secondary" id="btnAjustesPedidos" style="display:none" onclick="PTX.abrirAjustes()">⚙ Zonas y ajustes</button>
       <span class="pt-vivo" id="indicadorVivo">se actualiza solo, en vivo</span>
     </div>
 
@@ -44,9 +51,6 @@
       <div class="pt-herramientas">
         <input type="search" id="filtroTexto" placeholder="🔍 Buscar cliente, colonia o número…" oninput="PT.filtrar()">
         <select id="filtroTipo" onchange="PT.filtrar()"><option value="todos">Domicilio y recoger</option><option value="domicilio">Solo a domicilio</option><option value="recoger">Solo para recoger</option></select>
-        <span class="pt-espacio"></span>
-        <button class="btn btn-secondary" onclick="PTX.abrirRuta(PT.estado.hoy)">🗺 Ruta de hoy</button>
-        <button class="btn btn-secondary" onclick="PTX.abrirProduccion(PT.estado.hoy)">📋 Hoja de producción</button>
       </div>
       <div class="pt-kpis" id="kpis"></div>
       <div class="pt-tablero" id="tablero"></div>

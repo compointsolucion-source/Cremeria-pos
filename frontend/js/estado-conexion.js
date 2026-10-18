@@ -17,6 +17,9 @@
     if (!indicador) return;
     const iconos = { ok: '🟢', lento: '🟡', sin_conexion: '🔴', verificando: '🟡' };
     indicador.textContent = iconos[estado] || '🟡';
+    // El menú lateral muestra el estado como un puntito en el avatar (en vez de
+    // un círculo flotante). Mientras "verifica" se deja el último color para que no parpadee.
+    if (estado !== 'verificando') document.documentElement.setAttribute('data-conexion', estado);
   }
 
   async function verificarSalud() {

@@ -13,6 +13,16 @@
   --radius: 12px;
   --radius-sm: 9px;
   --shadow: 0 1px 3px rgba(16,24,40,0.06);
+  /* Piezas que cambian con cada tema (claro, oscuro y cada color) */
+  --on-primary: #FFFFFF;          /* color del texto sobre botones/etiquetas de color */
+  --ok-texto: #2E7D32;            /* texto verde de «pagado/activa» (no cambia con el tema de color) */
+  --ambar-texto: #8A5A00;         /* texto ámbar de «stock bajo» */
+  --topbar-fondo: #1F2023;        /* barra de arriba de cada pantalla */
+  --topbar-texto: #FFFFFF;
+  --campo-fondo: #FFFFFF;         /* fondo de cuadros de texto, listas y fechas */
+  --tabla-cab: #FAFAFB;           /* encabezado de tablas */
+  --fila-hover: #FAFAFB;          /* fila de tabla al pasar el cursor */
+  --fila-borde: #F2F3F5;
 }
 
 * { box-sizing: border-box; }
@@ -26,8 +36,8 @@ body {
 h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
 
 .top-bar {
-  background: var(--text);
-  color: white;
+  background: var(--topbar-fondo);
+  color: var(--topbar-texto);
   padding: 14px 22px;
   display: flex;
   justify-content: space-between;
@@ -52,8 +62,8 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
   box-sizing: border-box;
   transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
 }
-.btn-primary { background: var(--primary); color: white; }
-.btn-secondary { background: white; color: var(--text); border-color: var(--border); }
+.btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
 .btn-danger { background: var(--danger); color: white; }
 .btn:hover { filter: brightness(0.97); }
 .btn:active { filter: brightness(0.92); }
@@ -75,12 +85,13 @@ input:not([type="checkbox"]):not([type="radio"]), select, textarea {
   width: 100%;
   font-family: inherit;
   color: var(--text);
-  background: white;
+  background: var(--campo-fondo);
 }
 input:focus:not([type="checkbox"]):not([type="radio"]), select:focus, textarea:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(46,125,50,0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 /* Checkboxes y radios no deben heredar el tamaño/ancho de los campos de
@@ -148,14 +159,16 @@ input[type="checkbox"].interruptor:disabled { opacity: 0.55; cursor: not-allowed
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 10px 12px; font-size: 13.5px; }
 thead th {
-  background: #FAFAFB; color: var(--muted); font-weight: 600; font-size: 11.5px;
+  background: var(--tabla-cab); color: var(--muted); font-weight: 600; font-size: 11.5px;
   text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--border);
 }
-tbody tr { border-bottom: 1px solid #F2F3F5; }
+tbody tr { border-bottom: 1px solid var(--fila-borde); }
 tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: #FAFAFB; }
+tbody tr:hover { background: var(--fila-hover); }
 
 [data-tema="oscuro"] {
+  --ok-texto: #8BD97A;
+  --ambar-texto: #FFC857;
   --primary: #74C95A;
   --primary-dark: #5FAE46;
   --secondary: #3A3B3E;
@@ -164,31 +177,43 @@ tbody tr:hover { background: #FAFAFB; }
   --text: #F0F0F0;
   --muted: #A0A3A8;
   --border: #45474A;
+  --on-primary: #0F2A08;
+  --topbar-fondo: #101114;
+  --topbar-texto: #F0F0F0;
+  --campo-fondo: #222326;
+  --tabla-cab: #232426;
+  --fila-hover: #313235;
+  --fila-borde: #36373A;
 }
 [data-tema="oscuro"] body { background: var(--background); color: var(--text); }
 [data-tema="oscuro"] .card { background: var(--surface); }
 [data-tema="oscuro"] .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+/* Los campos usan --campo-fondo (ver arriba); aquí solo se asegura el color de letra y el borde. */
 [data-tema="oscuro"] input, [data-tema="oscuro"] select, [data-tema="oscuro"] textarea {
-  background: var(--surface); color: var(--text); border-color: var(--border);
+  color: var(--text); border-color: var(--border);
 }
 [data-tema="oscuro"] table, [data-tema="oscuro"] th, [data-tema="oscuro"] td { background: var(--surface); color: var(--text); border-color: var(--border); }
-[data-tema="oscuro"] thead th { background: #232426; }
-[data-tema="oscuro"] tbody tr:hover { background: #313235; }
+[data-tema="oscuro"] thead th { background: var(--tabla-cab); }
+[data-tema="oscuro"] tbody tr:hover { background: var(--fila-hover); }
 
-/* ===== 5 temas de color — independientes de claro/oscuro, se pueden
+/* ===== Temas de color — independientes de claro/oscuro, se pueden
    combinar (ej. "Azul" + oscuro). "Verde" es el color de toda la vida del
-   sistema y es el que ya se ve si no se elige nada distinto. ===== */
+   sistema y es el que ya se ve si no se elige nada distinto.
+   Los 5 primeros solo cambian el color principal; los 4 de abajo (Cremería,
+   Carnicería, Pizarra y Menta) son TEMAS COMPLETOS: cambian también fondos,
+   tarjetas, letras, barra de arriba y menú lateral, cada uno con su versión
+   clara y su versión oscura. ===== */
 [data-color-tema="verde"] { --primary: #5FAE46; --primary-dark: #4C9439; }
-[data-tema="oscuro"][data-color-tema="verde"] { --primary: #74C95A; --primary-dark: #5FAE46; }
+[data-tema="oscuro"][data-color-tema="verde"] { --primary: #74C95A; --primary-dark: #5FAE46; --on-primary: #0F2A08; }
 
 [data-color-tema="azul"] { --primary: #1565C0; --primary-dark: #0D47A1; }
-[data-tema="oscuro"][data-color-tema="azul"] { --primary: #42A5F5; --primary-dark: #1E88E5; }
+[data-tema="oscuro"][data-color-tema="azul"] { --primary: #42A5F5; --primary-dark: #1E88E5; --on-primary: #06192B; }
 
 [data-color-tema="morado"] { --primary: #6A1B9A; --primary-dark: #4A148C; }
-[data-tema="oscuro"][data-color-tema="morado"] { --primary: #AB47BC; --primary-dark: #8E24AA; }
+[data-tema="oscuro"][data-color-tema="morado"] { --primary: #AB47BC; --primary-dark: #8E24AA; --on-primary: #FFFFFF; }
 
 [data-color-tema="naranja"] { --primary: #E65100; --primary-dark: #BF360C; }
-[data-tema="oscuro"][data-color-tema="naranja"] { --primary: #FFA726; --primary-dark: #FB8C00; }
+[data-tema="oscuro"][data-color-tema="naranja"] { --primary: #FFA726; --primary-dark: #FB8C00; --on-primary: #2B1500; }
 
 /* Alto contraste: pensado para legibilidad, no solo un color distinto —
    negro/blanco puro y bordes más marcados en toda la interfaz. */
@@ -198,7 +223,79 @@ tbody tr:hover { background: #FAFAFB; }
 [data-color-tema="alto-contraste"] select,
 [data-color-tema="alto-contraste"] textarea,
 [data-color-tema="alto-contraste"] .btn { border-width: 2px; }
-[data-tema="oscuro"][data-color-tema="alto-contraste"] { --primary: #FFFFFF; --primary-dark: #FFFFFF; --border: #FFFFFF; }
+[data-tema="oscuro"][data-color-tema="alto-contraste"] { --primary: #FFFFFF; --primary-dark: #FFFFFF; --border: #FFFFFF; --on-primary: #000000; }
+
+/* ---------- CREMERÍA: crema cálido con ámbar ---------- */
+html[data-color-tema="cremeria"] {
+  --primary: #A86508; --primary-dark: #8A5206;
+  --background: #FAF4E8; --surface: #FFFDF8; --text: #33281B; --muted: #84735B; --border: #E9DDC6; --secondary: #E9DDC6;
+  --on-primary: #FFFFFF; --topbar-fondo: #33281B; --topbar-texto: #FFFFFF;
+  --campo-fondo: #FFFFFF; --tabla-cab: #F6EEDC; --fila-hover: #FBF3E1; --fila-borde: #F0E6D0;
+  --sidebar-fondo: #FFF9EC; --sidebar-texto: #5A4A33; --sidebar-texto-tenue: #A39278; --sidebar-borde: #EFE3CB;
+  --sidebar-hover: #F7EBD2; --sidebar-activo-fondo: #FBE9C6; --sidebar-activo-texto: #8A5206; --sidebar-activo-borde: #A86508;
+}
+html[data-tema="oscuro"][data-color-tema="cremeria"] {
+  --primary: #E9A94A; --primary-dark: #D08E2D;
+  --background: #1C1710; --surface: #27201A; --text: #F4ECDD; --muted: #B3A48A; --border: #43382B; --secondary: #43382B;
+  --on-primary: #2A1A00; --topbar-fondo: #120F0A; --topbar-texto: #F4ECDD;
+  --campo-fondo: #1F1A14; --tabla-cab: #211B15; --fila-hover: #30281F; --fila-borde: #352C21;
+  --sidebar-fondo: #15110C; --sidebar-texto: #D8CCB6; --sidebar-texto-tenue: #8A7B63; --sidebar-borde: #2B2319;
+  --sidebar-hover: #1F1913; --sidebar-activo-fondo: #2E2312; --sidebar-activo-texto: #F0B95C; --sidebar-activo-borde: #E9A94A;
+}
+
+/* ---------- CARNICERÍA: blanco limpio con rojo vino ---------- */
+html[data-color-tema="carniceria"] {
+  --primary: #A4232F; --primary-dark: #82171F;
+  --background: #F7F2F1; --surface: #FFFFFF; --text: #2A1A1B; --muted: #85706F; --border: #E9DBDA; --secondary: #E9DBDA;
+  --on-primary: #FFFFFF; --topbar-fondo: #2A1A1B; --topbar-texto: #FFFFFF;
+  --campo-fondo: #FFFFFF; --tabla-cab: #F9F2F1; --fila-hover: #FBF3F2; --fila-borde: #F1E6E5;
+  --sidebar-fondo: #FFFFFF; --sidebar-texto: #4F3A3B; --sidebar-texto-tenue: #A58E8D; --sidebar-borde: #EFE3E2;
+  --sidebar-hover: #F8EFEE; --sidebar-activo-fondo: #F9E3E4; --sidebar-activo-texto: #A4232F; --sidebar-activo-borde: #A4232F;
+}
+html[data-tema="oscuro"][data-color-tema="carniceria"] {
+  --primary: #E5606C; --primary-dark: #CC4651;
+  --background: #1D1415; --surface: #291D1E; --text: #F5EBEB; --muted: #B79C9D; --border: #473233; --secondary: #473233;
+  --on-primary: #2A0A0E; --topbar-fondo: #130C0D; --topbar-texto: #F5EBEB;
+  --campo-fondo: #211718; --tabla-cab: #231819; --fila-hover: #332526; --fila-borde: #382829;
+  --sidebar-fondo: #150E0F; --sidebar-texto: #DCC9CA; --sidebar-texto-tenue: #8F7576; --sidebar-borde: #2C1D1E;
+  --sidebar-hover: #211617; --sidebar-activo-fondo: #301A1D; --sidebar-activo-texto: #F28A94; --sidebar-activo-borde: #E5606C;
+}
+
+/* ---------- PIZARRA: gris azulado con verde azulado ---------- */
+html[data-color-tema="pizarra"] {
+  --primary: #0E8678; --primary-dark: #0A6A5F;
+  --background: #EEF1F5; --surface: #FFFFFF; --text: #172033; --muted: #66728A; --border: #D9DFE8; --secondary: #D9DFE8;
+  --on-primary: #FFFFFF; --topbar-fondo: #172033; --topbar-texto: #FFFFFF;
+  --campo-fondo: #FFFFFF; --tabla-cab: #F3F5F9; --fila-hover: #F3F6FA; --fila-borde: #E8ECF2;
+  --sidebar-fondo: #FFFFFF; --sidebar-texto: #3B4658; --sidebar-texto-tenue: #8E99AB; --sidebar-borde: #E3E8EF;
+  --sidebar-hover: #F2F5F9; --sidebar-activo-fondo: #DFF3F0; --sidebar-activo-texto: #0A6A5F; --sidebar-activo-borde: #0E8678;
+}
+html[data-tema="oscuro"][data-color-tema="pizarra"] {
+  --primary: #12A594; --primary-dark: #0E8678;
+  --background: #0E131B; --surface: #161D29; --text: #E7ECF4; --muted: #8D98AB; --border: #263043; --secondary: #263043;
+  --on-primary: #04201C; --topbar-fondo: #0A0E15; --topbar-texto: #E7ECF4;
+  --campo-fondo: #111823; --tabla-cab: #121925; --fila-hover: #1D2636; --fila-borde: #212B3C;
+  --sidebar-fondo: #0A0E15; --sidebar-texto: #C3CBD8; --sidebar-texto-tenue: #6C788C; --sidebar-borde: #19212F;
+  --sidebar-hover: #121A27; --sidebar-activo-fondo: #10272A; --sidebar-activo-texto: #3DDCC6; --sidebar-activo-borde: #12A594;
+}
+
+/* ---------- MENTA: claro y suave ---------- */
+html[data-color-tema="menta"] {
+  --primary: #23805F; --primary-dark: #1A6A4E;
+  --background: #F1F6F4; --surface: #FFFFFF; --text: #14302A; --muted: #6A817A; --border: #DAE6E1; --secondary: #DAE6E1;
+  --on-primary: #FFFFFF; --topbar-fondo: #14302A; --topbar-texto: #FFFFFF;
+  --campo-fondo: #FFFFFF; --tabla-cab: #F3F8F6; --fila-hover: #F3F9F7; --fila-borde: #E6EFEB;
+  --sidebar-fondo: #FFFFFF; --sidebar-texto: #3E5A52; --sidebar-texto-tenue: #93AAA3; --sidebar-borde: #E3EDE9;
+  --sidebar-hover: #F1F7F5; --sidebar-activo-fondo: #E1F3EC; --sidebar-activo-texto: #1A6A4E; --sidebar-activo-borde: #23805F;
+}
+html[data-tema="oscuro"][data-color-tema="menta"] {
+  --primary: #4FC8A4; --primary-dark: #35AD8A;
+  --background: #0F1A17; --surface: #172421; --text: #E4F2EE; --muted: #8FAAA2; --border: #29403A; --secondary: #29403A;
+  --on-primary: #05231A; --topbar-fondo: #0A1311; --topbar-texto: #E4F2EE;
+  --campo-fondo: #121E1B; --tabla-cab: #132120; --fila-hover: #1F302C; --fila-borde: #243732;
+  --sidebar-fondo: #0B1512; --sidebar-texto: #C5DAD4; --sidebar-texto-tenue: #6F8A82; --sidebar-borde: #1A2B26;
+  --sidebar-hover: #12201C; --sidebar-activo-fondo: #12302A; --sidebar-activo-texto: #6FE0BE; --sidebar-activo-borde: #4FC8A4;
+}
 
 .boton-tema-flotante {
   position: fixed;
@@ -214,6 +311,23 @@ tbody tr:hover { background: #FAFAFB; }
   cursor: pointer;
   z-index: 999;
 }
+
+/* ===== Menú «⋯ Más»: para dejar a la vista solo los botones principales y
+   guardar el resto en una lista desplegable (se usa en Pedidos). ===== */
+.menu-mas { position: relative; display: inline-block; }
+.menu-mas-lista {
+  display: none; position: absolute; right: 0; top: calc(100% + 6px); min-width: 230px; z-index: 800;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 13px;
+  box-shadow: 0 14px 36px rgba(16,24,40,0.22); padding: 8px;
+}
+.menu-mas.abierto .menu-mas-lista { display: block; }
+.menu-mas-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none;
+  border-radius: 9px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text); text-align: left; cursor: pointer; text-decoration: none;
+}
+.menu-mas-item:hover { background: rgba(128,128,128,0.12); }
+.menu-mas-item .em { width: 22px; text-align: center; flex: none; }
+.menu-mas-lista hr { border: 0; border-top: 1px solid var(--border); margin: 6px 4px; }
 
 /* Cuando una pantalla abre su "hoja" desde abajo (celular), los botones
    flotantes globales (tema y estado de conexión) se esconden para no tapar

@@ -18,6 +18,8 @@
   .saludo .acciones { display: flex; align-items: center; gap: 8px; }
 
   .kpis { margin-bottom: 14px; grid-template-columns: repeat(4, 1fr); }
+  a.kpi { text-decoration: none; color: inherit; }
+  .kpi .l.sec { margin-top: 2px; font-size: 11.5px; }
   .kpi .ic.verde { background: rgba(95,174,70,.18); }
   .kpi .ic.amarillo { background: rgba(249,168,37,.2); }
   .kpi .ic.rojo { background: rgba(198,40,40,.14); }
@@ -38,7 +40,7 @@
   .grafica-hora { display: flex; align-items: flex-end; gap: 6px; height: 170px; padding: 6px 16px 0; }
   .grafica-hora .col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; }
   .grafica-hora .barra { background: var(--primary, #5FAE46); border-radius: 6px 6px 0 0; min-height: 3px; transition: filter .15s; }
-  .grafica-hora .col.pico .barra { background: #2E7D32; }
+  .grafica-hora .col.pico .barra { background: #2E7D32; background: color-mix(in srgb, var(--primary, #5FAE46) 58%, #000); }
   .grafica-hora .col.sel .barra { outline: 2px solid var(--text, #1F2023); outline-offset: 1px; }
   .grafica-hora .col:hover .barra { filter: brightness(1.12); }
   .horas { display: flex; gap: 6px; padding: 4px 16px 14px; }
@@ -70,9 +72,27 @@
   .ver-mas { display: block; width: 100%; padding: 11px; border: none; border-top: 1px solid var(--border, #E4E6E9); background: none; color: var(--primary-dark, #4C9439); font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
 
   /* Accesos rápidos */
-  .accesos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .acceso { padding: 14px 8px; text-align: center; font-weight: 700; font-size: 14px; color: var(--text, #1F2023); text-decoration: none; display: block; }
-  .acceso .em { display: block; font-size: 28px; margin-bottom: 4px; }
+  .accesos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .accesos:empty { display: none; }
+  .acceso { padding: 12px 6px; text-align: center; font-weight: 700; font-size: 13px; color: var(--text, #1F2023); text-decoration: none; display: block; }
+  .acceso .em { display: block; font-size: 26px; margin-bottom: 4px; }
+
+  /* Pedidos a domicilio de hoy */
+  .ped-est { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px 16px 12px; }
+  .ped-est a { flex: 1; min-width: 100px; text-decoration: none; color: var(--text, #1F2023); border: 1px solid var(--border, #E4E6E9); border-left-width: 4px; border-radius: 11px; padding: 9px 12px; background: var(--surface, #fff); }
+  .ped-est a:hover { filter: brightness(.97); }
+  .ped-est a b { display: block; font-size: 22px; line-height: 1.1; }
+  .ped-est a span { font-size: 12px; color: var(--muted, #7A7D83); }
+  .rep-fila { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border, #E4E6E9); }
+  .rep-fila .av { width: 34px; height: 34px; border-radius: 50%; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); display: flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+  .rep-fila .info { flex: 1; min-width: 0; }
+  .rep-fila .info b { display: block; font-size: 14px; }
+  .rep-fila .info small { color: var(--muted, #7A7D83); font-size: 12px; display: block; }
+  .rep-tag { font-size: 10.5px; font-weight: 800; border-radius: 9px; padding: 2px 8px; letter-spacing: .02em; margin-left: 4px; vertical-align: 1px; }
+  .rep-tag.libre { background: rgba(95,174,70,.18); color: #2E7D32; }
+  .rep-tag.ruta { background: rgba(249,168,37,.22); color: #B25E00; }
+  [data-tema="oscuro"] .rep-tag.libre { color: #8BD97A; }
+  [data-tema="oscuro"] .rep-tag.ruta { color: #F2B14C; }
   .acceso:hover { filter: brightness(.97); }
 
   @media (max-width: 1000px) {
@@ -80,7 +100,7 @@
     .tablero { grid-template-columns: 1fr; }
     /* En celular lo más importante va primero: ventas, atención, accesos y al final la actividad */
     .tablero > div { display: contents; }
-    #cardHora { order: 1; } #cardAtencion { order: 2; } .accesos { order: 3; } #cardActividad { order: 4; }
+    #cardPedidos { order: 1; } #cardHora { order: 2; } #cardAtencion { order: 3; } .accesos { order: 4; } #cardActividad { order: 5; }
   }
   @media (max-width: 600px) {
     .saludo h2 { font-size: 21px; }
@@ -104,7 +124,6 @@
       </button>
       <h1>🏠 Inicio</h1>
     </div>
-    <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
   </div>
 
   <div class="contenido">
@@ -123,6 +142,10 @@
 
     <div class="tablero">
       <div>
+        <div class="caja recorta" id="cardPedidos" style="display:none">
+          <div class="tarjeta-tit"><h3>🛵 Pedidos a domicilio de hoy</h3><small>se actualiza solo</small></div>
+          <div id="listaPedidos"></div>
+        </div>
         <div class="caja recorta" id="cardHora">
           <div class="tarjeta-tit"><h3>🕒 Ventas por hora</h3><small id="infoHora"></small></div>
           <div id="ventasPorHora"><div class="vacio">Cargando…</div></div>
@@ -137,12 +160,7 @@
           <div class="tarjeta-tit"><h3>🔔 Atención</h3></div>
           <div id="listaAlertas"><div class="vacio">Cargando…</div></div>
         </div>
-        <div class="accesos">
-          <a class="caja acceso" href="../mostrador.html"><span class="em">🛒</span>Ir al mostrador</a>
-          <a class="caja acceso" href="devoluciones.html"><span class="em">↩️</span>Devoluciones</a>
-          <a class="caja acceso" href="productos.html"><span class="em">📦</span>Productos</a>
-          <a class="caja acceso" href="caja-turno.html"><span class="em">📊</span>Corte de caja</a>
-        </div>
+        <div class="accesos" id="accesos"></div>
       </div>
     </div>
   </div>
@@ -195,20 +213,24 @@ async function pintarTurno() {
 }
 
 // ---------- Carga ----------
+let primeraCarga = true;
 async function cargarDashboard(manual) {
   const btn = document.getElementById('btnActualizar');
   btn.disabled = true;
+  const avisar = manual || primeraCarga;   // el refresco automático no molesta con avisos
+  primeraCarga = false;
   try {
-    const data = await apiFetch('/dashboard/resumen');
-    renderTarjetas(data);
+    const [data, ped] = await Promise.all([apiFetch('/dashboard/resumen'), cargarPedidosInicio()]);
+    renderTarjetas(data, ped);
+    renderPedidos(ped);
     renderVentasPorHora(data.ventas_por_hora);
-    renderAlertas(data);
+    renderAlertas(data, ped);
     renderActividad(data.actividad_reciente);
     pintarTurno();
     if (manual) mostrarToast('Datos actualizados', 'exito');
   } catch (err) {
     console.error(err);
-    mostrarToast('No se pudo cargar el resumen: ' + err.message, 'error');
+    if (avisar) mostrarToast('No se pudo cargar el resumen: ' + err.message, 'error');
     ['ventasPorHora', 'listaAlertas', 'listaActividad'].forEach((id) => {
       const el = document.getElementById(id);
       if (el.querySelector('.vacio') && el.textContent.trim() === 'Cargando…') el.innerHTML = '<div class="vacio">No se pudo cargar. Usa “Actualizar” para reintentar.</div>';
@@ -218,14 +240,90 @@ async function cargarDashboard(manual) {
   }
 }
 
+// ---------- Pedidos a domicilio (mismos datos que la pantalla de Pedidos) ----------
+function fechaLocalISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function hora12Texto(iso) {   // 'AAAA-MM-DDTHH:MM' → '7:24 pm'
+  const m = /T(\d{2}):(\d{2})/.exec(iso || '');
+  if (!m) return '';
+  const h = Number(m[1]);
+  return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'pm' : 'am'}`;
+}
+function puedeVer(permiso) {
+  return typeof usuarioTienePermisoSidebar === 'function' ? usuarioTienePermisoSidebar(getUsuario(), permiso, permisosExtraDelToken()) : true;
+}
+
+// Si algo falla (sin conexión, sin permiso), el Inicio sigue funcionando sin la parte de pedidos.
+async function cargarPedidosInicio() {
+  const [lista, resumen, reps] = await Promise.allSettled([
+    apiFetch(`/pedidos?fecha=${fechaLocalISO()}&limit=800`),
+    apiFetch('/pedidos/resumen'),
+    apiFetch('/pedidos/repartidores')
+  ]);
+  if (lista.status !== 'fulfilled' || resumen.status !== 'fulfilled') return null;
+  const l = Array.isArray(lista.value) ? lista.value : [];
+  const r = resumen.value || {};
+  const x = reps.status === 'fulfilled' && Array.isArray(reps.value) ? reps.value : [];
+  return {
+    usa: (r.pedidos_dia || 0) > 0 || l.length > 0 || x.length > 0,
+    lista: l, resumen: r, reps: x,
+    porLiquidar: x.reduce((s, y) => s + (y.por_entregar_a_caja || 0), 0),
+    repsPorLiquidar: x.filter((y) => y.pedidos_por_liquidar > 0)
+  };
+}
+
+const ESTADOS_PEDIDO_INICIO = [
+  { estado: 'programado', texto: 'Programados', color: '#7E57C2' },
+  { estado: 'preparando', texto: 'Preparando', color: '#F9A825' },
+  { estado: 'listo', texto: 'Listos', color: '#5FAE46' },
+  { estado: 'en_camino', texto: 'En camino', color: '#1565C0' },
+  { estado: 'entregado', texto: 'Entregados', color: '#9AA0AA' }
+];
+
+function renderPedidos(ped) {
+  const card = document.getElementById('cardPedidos');
+  if (!ped || !ped.usa) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const cuenta = (e) => ped.lista.filter((p) => p.estado === e).length;
+  const chips = ESTADOS_PEDIDO_INICIO.concat(cuenta('no_entregado') ? [{ estado: 'no_entregado', texto: 'No entregados', color: '#C62828' }] : [])
+    .map((e) => `<a href="../pedidos.html" style="border-left-color:${e.color}"><b>${cuenta(e.estado)}</b><span>${e.texto}</span></a>`).join('');
+  const puedeLiquidar = puedeVer('CAJA_MOVIMIENTO');
+  const filas = ped.reps.map((r) => {
+    const partes = [`${r.entregas_hoy} ${r.entregas_hoy === 1 ? 'entrega' : 'entregas'} hoy`];
+    if (r.en_camino > 0) partes.push(`${r.en_camino} en camino`);
+    if (r.trae_por_cobrar > 0) partes.push(`trae por cobrar ${dinero(r.trae_por_cobrar)}`);
+    if (r.por_entregar_a_caja > 0) partes.push(`ya cobró ${dinero(r.por_entregar_a_caja)} sin entregar a caja`);
+    const enRuta = r.estado === 'en_ruta';
+    return `<div class="rep-fila">
+      <div class="av">${escapar(String(r.nombre || '?').trim().charAt(0).toUpperCase())}</div>
+      <div class="info"><b>${escapar(r.nombre)} <span class="rep-tag ${enRuta ? 'ruta' : 'libre'}">${enRuta ? 'EN RUTA' : 'LIBRE'}</span></b><small>${escapar(partes.join(' · '))}</small></div>
+      ${r.pedidos_por_liquidar > 0 && puedeLiquidar ? `<a class="btn btn-primary btn-chico" href="../pedidos.html?liquidar=${r.id}">Liquidar</a>` : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('listaPedidos').innerHTML = `<div class="ped-est">${chips}</div>${filas}
+    <a class="ver-mas" href="../pedidos.html" style="text-align:center;text-decoration:none">Ver todos los pedidos →</a>`;
+}
+
 // ---------- Cifras ----------
-function renderTarjetas(data) {
+function renderTarjetas(data, ped) {
   const bajos = data.stock_bajo.length, agot = data.agotados.length;
-  document.getElementById('tarjetasMetricas').innerHTML = `
-    <div class="caja kpi"><div class="ic verde">💰</div><div><div class="v num">${dinero(data.ventas_hoy.total)}</div><div class="l">Ventas de hoy · ${data.ventas_hoy.num_tickets} ${Number(data.ventas_hoy.num_tickets) === 1 ? 'ticket' : 'tickets'}</div></div></div>
-    <div class="caja kpi"><div class="ic amarillo">📈</div><div><div class="v num verde-t">${dinero(data.utilidad_hoy.ganancia)}</div><div class="l" title="Ganancia estimada con el costo registrado en cada producto">Utilidad estimada de hoy</div></div></div>
-    <div class="caja kpi"><div class="ic rojo">📒</div><div><div class="v num naranja-t">${dinero(data.fiado_total)}</div><div class="l">Fiado por cobrar</div></div></div>
-    <div class="caja kpi ${bajos + agot > 0 ? 'alerta' : ''}"><div class="ic azul">📦</div><div><div class="v num">${bajos} · ${agot}</div><div class="l">Stock bajo · Agotados</div></div></div>`;
+  const usaPedidos = !!(ped && ped.usa);
+  const nTickets = Number(data.ventas_hoy.num_tickets);
+  const ventas = `<div class="caja kpi"><div class="ic verde">💰</div><div><div class="v num">${dinero(data.ventas_hoy.total)}</div><div class="l">Ventas de hoy · ${nTickets} ${nTickets === 1 ? 'ticket' : 'tickets'}</div>${usaPedidos ? `<div class="l sec" title="Ganancia estimada con el costo registrado en cada producto">Utilidad estimada ${dinero(data.utilidad_hoy.ganancia)}</div>` : ''}</div></div>`;
+  const stock = `<div class="caja kpi ${bajos + agot > 0 ? 'alerta' : ''}"><div class="ic ${bajos + agot > 0 ? 'rojo' : 'azul'}">📦</div><div><div class="v num">${bajos} · ${agot}</div><div class="l">Stock bajo · Agotados</div></div></div>`;
+  let medio;
+  if (usaPedidos) {
+    const r = ped.resumen;
+    const nReps = ped.repsPorLiquidar.length;
+    medio = `<a class="caja kpi" href="../pedidos.html"><div class="ic azul">🛵</div><div><div class="v num">${r.pedidos_dia || 0}</div><div class="l">Pedidos de hoy · ${r.en_camino || 0} en camino</div></div></a>
+      <a class="caja kpi" href="../pedidos.html"><div class="ic amarillo">💵</div><div><div class="v num naranja-t">${dinero(ped.porLiquidar)}</div><div class="l">Por liquidar${nReps ? ` (${nReps} ${nReps === 1 ? 'repartidor' : 'repartidores'})` : ''}</div></div></a>`;
+  } else {
+    medio = `<div class="caja kpi"><div class="ic amarillo">📈</div><div><div class="v num verde-t">${dinero(data.utilidad_hoy.ganancia)}</div><div class="l" title="Ganancia estimada con el costo registrado en cada producto">Utilidad estimada de hoy</div></div></div>
+      <div class="caja kpi"><div class="ic rojo">📒</div><div><div class="v num naranja-t">${dinero(data.fiado_total)}</div><div class="l">Fiado por cobrar</div></div></div>`;
+  }
+  document.getElementById('tarjetasMetricas').innerHTML = ventas + medio + stock;
 }
 
 // ---------- Ventas por hora ----------
@@ -269,9 +367,33 @@ function resumenNombres(lista, max = 2) {
   return nombres.join(', ') + (lista.length > max ? '…' : '');
 }
 
-function renderAlertas(data) {
+function renderAlertas(data, ped) {
   const cont = document.getElementById('listaAlertas');
   const grupos = [];
+  if (ped && ped.usa) {
+    if (ped.porLiquidar > 0) grupos.push({
+      id: 'liquidar', icono: '💵', color: 'amarillo', href: '../pedidos.html',
+      titulo: `${dinero(ped.porLiquidar)} por liquidar`,
+      resumen: ped.repsPorLiquidar.filter((r) => r.por_entregar_a_caja > 0).slice(0, 2).map((r) => `${r.nombre} ${dinero(r.por_entregar_a_caja)}`).join(' · '),
+      detalle: ped.repsPorLiquidar.map((r) => `<div class="linea"><span>🛵 ${escapar(r.nombre)}</span><span class="num">${dinero(r.por_entregar_a_caja)}</span></div>`).join('')
+    });
+    const atrasados = ped.lista.filter((p) => p.retraso_min > 0 && !['entregado', 'cancelado'].includes(p.estado));
+    if (atrasados.length) grupos.push({
+      id: 'retraso', icono: '⏰', color: 'rojo', href: '../pedidos.html',
+      titulo: `${atrasados.length} ${atrasados.length === 1 ? 'pedido con retraso' : 'pedidos con retraso'}`,
+      resumen: atrasados.slice(0, 2).map((p) => p.nombre_contacto || p.etiqueta).join(', ') + (atrasados.length > 2 ? '…' : ''),
+      detalle: atrasados.map((p) => `<div class="linea"><span>🔴 ${escapar(p.nombre_contacto || p.etiqueta)}</span><span class="num">${p.retraso_min} min tarde</span></div>`).join('')
+    });
+    const hoyISO = fechaLocalISO();
+    const programados = ped.lista.filter((p) => p.estado === 'programado' && p.fecha_entrega === hoyISO && p.programado_para)
+      .sort((a, b) => String(a.programado_para).localeCompare(String(b.programado_para)));
+    if (programados.length) grupos.push({
+      id: 'programados', icono: '📅', color: 'amarillo', href: '../pedidos.html',
+      titulo: `${programados.length} ${programados.length === 1 ? 'pedido programado para hoy' : 'pedidos programados para hoy'}`,
+      resumen: `${programados[0].nombre_contacto || programados[0].etiqueta} · ${hora12Texto(programados[0].programado_para)}${programados[0].preparar_desde ? ` (se empieza a preparar ${hora12Texto(programados[0].preparar_desde)})` : ''}`,
+      detalle: programados.map((p) => `<div class="linea"><span>🕒 ${escapar(p.nombre_contacto || p.etiqueta)}</span><span class="num">${hora12Texto(p.programado_para)}</span></div>`).join('')
+    });
+  }
   if (data.stock_bajo.length) grupos.push({
     id: 'bajo', icono: '📉', color: 'amarillo', href: 'productos.html',
     titulo: `${data.stock_bajo.length} ${data.stock_bajo.length === 1 ? 'producto con stock bajo' : 'productos con stock bajo'}`,
@@ -289,6 +411,12 @@ function renderAlertas(data) {
     titulo: `${data.creditos_cerca_limite.length} ${data.creditos_cerca_limite.length === 1 ? 'cliente cerca de su límite' : 'clientes cerca de su límite'}`,
     resumen: data.creditos_cerca_limite.slice(0, 2).map((c) => `${c.nombre} ${Math.round(parseFloat(c.saldo_actual) / parseFloat(c.limite_credito) * 100)}%`).join(', ') + (data.creditos_cerca_limite.length > 2 ? '…' : ''),
     detalle: data.creditos_cerca_limite.map((c) => `<div class="linea"><span>💳 ${escapar(c.nombre)}</span><span class="num">${dinero(c.saldo_actual)} / ${dinero(c.limite_credito)}</span></div>`).join('')
+  });
+
+  if (ped && ped.usa && data.fiado_total > 0) grupos.push({
+    id: 'fiado', icono: '📒', color: 'amarillo', href: 'clientes.html',
+    titulo: `${dinero(data.fiado_total)} de fiado por cobrar`, resumen: 'Dinero que te deben los clientes',
+    detalle: '<div class="linea"><span>Abre Clientes/Créditos para ver quién debe y registrar abonos.</span></div>'
   });
 
   if (!grupos.length) {
@@ -341,8 +469,32 @@ function pintarActividad() {
     + (faltan > 0 ? `<button class="ver-mas" onclick="actividadCompleta = true; pintarActividad();">Ver ${faltan} más</button>` : '');
 }
 
+// Atajos: solo los módulos que esta persona puede usar (los mismos que ve en el menú).
+const ACCESOS_INICIO = [
+  { href: 'mostrador.html', ruta: '../mostrador.html', em: '🛒', texto: 'Mostrador' },
+  { href: 'pedidos.html', ruta: '../pedidos.html', em: '🛵', texto: 'Pedidos' },
+  { href: 'caja.html', ruta: '../caja.html', em: '💳', texto: 'Caja' },
+  { href: 'devoluciones.html', ruta: 'devoluciones.html', em: '↩️', texto: 'Devoluciones' },
+  { href: 'productos.html', ruta: 'productos.html', em: '📦', texto: 'Productos' },
+  { href: 'caja-turno.html', ruta: 'caja-turno.html', em: '📊', texto: 'Corte de caja' }
+];
+function pintarAccesos() {
+  const itemsMenu = typeof GRUPOS_SIDEBAR !== 'undefined' ? GRUPOS_SIDEBAR.flatMap((g) => g.items) : [];
+  const u = getUsuario();
+  const extra = typeof permisosExtraDelToken === 'function' ? permisosExtraDelToken() : {};
+  const visibles = ACCESOS_INICIO.filter((a) => {
+    const it = itemsMenu.find((x) => x.href === a.href);
+    return !it || typeof itemVisibleSidebar !== 'function' || itemVisibleSidebar(it, u, extra);
+  });
+  document.getElementById('accesos').innerHTML = visibles.map((a) => `<a class="caja acceso" href="${a.ruta}"><span class="em">${a.em}</span>${a.texto}</a>`).join('');
+}
+// El menú lateral se carga al final de la página; los atajos se pintan cuando ya está listo.
+document.addEventListener('DOMContentLoaded', pintarAccesos);
+
 pintarSaludo();
 cargarDashboard();
+// Se renueva solo cada minuto mientras tengas esta pantalla a la vista.
+setInterval(() => { if (!document.hidden) cargarDashboard(); }, 60000);
 // En la prueba de 30 días, pide los datos del negocio (una ventana de bienvenida; se puede dejar para después).
 setTimeout(() => LicDatos.revisarBienvenida(), 900);
 </script>
