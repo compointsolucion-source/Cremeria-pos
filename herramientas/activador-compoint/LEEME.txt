@@ -1,0 +1,66 @@
+ACTIVADOR COMPOINT
+==================
+Programa SOLO PARA COMPOINT (no se les da a los clientes). Sirve para:
+  - crear y guardar la LLAVE que firma los códigos de licencia,
+  - llevar la lista de clientes con sus vencimientos (y avisarles por WhatsApp),
+  - generar los códigos de activación  CPT1-…  (anual, permanente o prueba),
+  - guardar el historial de códigos emitidos y hacer respaldos de la llave.
+
+PRIMERA VEZ (en tu computadora)
+  1. Abre Activador-Compoint.exe  (si Windows dice «Windows protegió su PC»:
+     «Más información» → «Ejecutar de todas formas»; el programa no está firmado).
+  2. Crea tu contraseña. ANÓTALA en un lugar seguro: nadie la puede recuperar.
+  3. Mi llave → «Guardar archivo para el sistema». Se crea licencia-clave-publica.js.
+     Cópialo a  backend\utils\  (reemplaza el que está), súbelo a GitHub y publica.
+     Hasta que hagas esto el sistema NO acepta códigos.
+  4. Mi llave → haz los 2 RESPALDOS (una USB y otro lugar distinto, p. ej. tu nube).
+     El archivo .cptbak está cifrado con tu contraseña: sin ella no sirve a nadie.
+
+CADA CLIENTE NUEVO O RENOVACIÓN
+  1. El cliente manda su CÓDIGO DE SOLICITUD (CPT-REQ-…), por WhatsApp, correo o solicitud.php.
+  2. Nueva activación → pega el mensaje completo → «Leer solicitud».
+  3. Elige tipo (Anual / Permanente / Prueba), plan y sucursales. Vence a 12 meses por
+     omisión; si el cliente ya tenía días, cuenta desde su vencimiento actual.
+  4. «Generar código» → «Copiar mensaje para WhatsApp» y se lo mandas.
+  El código solo sirve en el equipo con ese ID. Si cambia de computadora: nueva solicitud.
+
+DÓNDE SE GUARDA TODO (en esta computadora)
+  %APPDATA%\Compoint Activador\llave.cptkey   la llave privada, CIFRADA con tu contraseña
+  %APPDATA%\Compoint Activador\datos.json     clientes, códigos emitidos y respaldos
+  (datos.json.bak es la copia del guardado anterior)
+  Nada de esto se sube a GitHub ni sale de la computadora.
+
+SI SE PIERDE LA COMPUTADORA: instala el Activador en la nueva, y en la pantalla de inicio
+pulsa «Ya tengo un respaldo de mi llave» → elige el .cptbak → escribe tu contraseña.
+Recuperas la llave, los clientes y el historial (hasta el momento de ese respaldo).
+Si NO tienes respaldo ni contraseña habría que crear una llave nueva y mandar una
+actualización a TODOS los clientes (llevan la llave pública adentro).
+
+SEGURIDAD
+  - La llave se cifra con AES-256-GCM; la contraseña se convierte con PBKDF2-SHA256 (600 000 vueltas).
+  - La pantalla solo se abre en esta computadora (127.0.0.1) con una clave distinta cada vez.
+  - El registro de soporte (%TEMP%\CompointActivador\activador-log.txt) NO guarda contraseñas,
+    códigos ni datos de clientes.
+
+COMPATIBILIDAD CON EL SISTEMA
+  Hace las mismas cuentas que backend/utils/licenciaCodigo.js y licenciaSolicitud.js.
+  Las pruebas (codigo_test.go) comparan contra los mismos códigos de ejemplo fijos que
+  backend/pruebas/licencia-codigo.test.js. Si algún día cambia el formato en el sistema,
+  hay que cambiarlo aquí y volver a compilar.
+
+PARA PROGRAMADORES
+  go test ./...                       pruebas (tardan ~10 s por el cifrado de la contraseña)
+  ./construir.sh                      compila salida/Activador-Compoint.exe (carpeta fuera de GitHub)
+  go build -o activador . && ./activador --datos /tmp/act --sin-ventana --puerto 8791 --token prueba
+     y abrir http://127.0.0.1:8791/?t=prueba     (en Linux/Mac solo para probar)
+  ACTIVADOR_CARPETA_SIM=/ruta   en Linux simula la carpeta elegida para el respaldo
+
+ARCHIVOS
+  main.go      servidor local, API, respaldo y restauración
+  codigo.go    códigos CPT1, ID del equipo y solicitudes CPT-REQ (idéntico al sistema)
+  llave.go     cifrado de la llave y de los respaldos
+  datos.go     lista de clientes y códigos emitidos (guardado seguro)
+  windows.go   ventana, selector de carpetas y «un solo Activador abierto»
+  otros.go     versión de pruebas para Linux/Mac
+  ui/          la pantalla
+  recursos/    icono, manifiesto y versión del .exe

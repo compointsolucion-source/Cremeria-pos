@@ -20,7 +20,8 @@ QUE VE EL CLIENTE
   - Con un codigo nuevo (Configuracion -> Licencia) todo vuelve al instante.
 
 CODIGOS DE ACTIVACION (funcionan SIN internet)
-  - Los crea el "Activador Compoint" en tu computadora. Son una firma:
+  - Los crea el "Activador Compoint" en tu computadora (herramientas/activador-compoint,
+    ver su LEEME.txt). Son una firma:
     nadie puede fabricar uno ni cambiarle la fecha sin que el programa lo note.
   - Cada codigo va ligado al "ID del equipo" (aparece en Configuracion ->
     Licencia, tipo 7KQ2-9XMA-4TPL). Si el cliente cambia de computadora o

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activador Compoint</title>
+<link rel="icon" href="emblema.png">
+<style>
+  :root { --verde:#5FAE46; --verde-osc:#4C9439; --texto:#1F2023; --muted:#6a6e75; --borde:#e3e6ea; --fondo:#f6f8f7; --noche:#1d2b22; --ambar:#8A5A00; --rojo:#B3261E; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; color: var(--texto); background: var(--fondo); font-size: 14px; overflow: hidden; }
+  button { font-family: inherit; border: 0; border-radius: 9px; padding: 10px 18px; font-size: 14px; font-weight: 700; cursor: pointer; transition: filter .12s, transform .05s; }
+  button:hover:not(:disabled) { filter: brightness(.96); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .pri { background: var(--verde); color: #fff; }
+  .sec { background: #e9ecef; color: #333; }
+  .peq { padding: 6px 12px; font-size: 12.5px; border-radius: 8px; }
+  .enlace { background: none; color: #1565C0; padding: 4px 0; font-weight: 700; font-size: 13px; }
+  .enlace:hover { text-decoration: underline; filter: none; }
+  input, select, textarea { font-family: inherit; border: 1px solid #cfd4da; border-radius: 8px; padding: 9px 11px; font-size: 14px; width: 100%; background: #fff; color: #222; }
+  textarea { resize: vertical; min-height: 96px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid rgba(95,174,70,.45); border-color: var(--verde); }
+  label.l { font-size: 11.5px; color: #6a6e75; font-weight: 700; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+  code, .mono { font-family: Consolas, 'Cascadia Mono', monospace; }
+
+  .app { display: flex; height: 100vh; min-height: 600px; }
+  .lado { width: 246px; flex: none; background: linear-gradient(170deg,#1d2b22,#25352b 60%,#2c4333); color: #fff; padding: 22px 14px 16px; display: flex; flex-direction: column; gap: 18px; }
+  .lado img.lg { width: 160px; display: block; margin: 0 auto 2px; }
+  .lado nav { display: grid; gap: 4px; }
+  .lado nav button { white-space: nowrap; background: transparent; color: #b9cbbe; text-align: left; padding: 11px 13px; border-radius: 10px; display: flex; align-items: center; gap: 11px; font-size: 14.5px; font-weight: 600; }
+  .lado nav button .ic { width: 22px; text-align: center; font-size: 17px; }
+  .lado nav button:hover:not(:disabled) { background: rgba(255,255,255,.07); filter: none; }
+  .lado nav button.on { background: var(--verde); color: #fff; font-weight: 800; }
+  .lado nav button .n { margin-left: auto; background: #f5b82e; color: #3b2a00; border-radius: 10px; font-size: 11.5px; font-weight: 800; padding: 1px 8px; }
+  .lado .resp { margin-top: auto; border-radius: 12px; padding: 11px 12px; font-size: 12.5px; line-height: 1.45; background: rgba(255,255,255,.07); }
+  .lado .resp b { display: block; font-size: 13px; margin-bottom: 2px; }
+  .lado .resp.mal { background: rgba(245,184,46,.18); color: #ffe7a6; }
+  .lado .resp.bien { color: #cfe6d3; }
+  .lado .v { font-size: 11.5px; color: #8aa292; line-height: 1.5; padding: 0 4px; }
+
+  .main { flex: 1; min-width: 0; padding: 26px 32px 28px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+  .cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 23px; line-height: 1.2; }
+  p.s { color: var(--muted); font-size: 14px; line-height: 1.5; margin-top: 3px; }
+  .card { background: #fff; border: 1px solid var(--borde); border-radius: 14px; padding: 18px 20px; }
+  .card h2 { font-size: 15.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .aviso { background: #FFF8E1; border: 1px solid #f5d98a; color: #7a5b00; border-radius: 11px; padding: 11px 14px; font-size: 13.5px; line-height: 1.5; }
+  .aviso.rojo { background: #FDECEA; border-color: #f2b8b5; color: #8E1B1B; }
+  .aviso.azul { background: #e8f1fb; border-color: #b7d3f2; color: #0D47A1; }
+  .aviso.verde { background: #eaf6e6; border-color: #bfe0b4; color: #2E6B1F; }
+
+  /* Resumen */
+  .cifras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .cifra { background: #fff; border: 1px solid var(--borde); border-radius: 13px; padding: 13px 16px; text-align: left; cursor: pointer; font-weight: 400; color: inherit; border-width: 2px; }
+  .cifra:hover:not(:disabled) { border-color: #b9dcab; filter: none; }
+  .cifra.sel { border-color: var(--verde); background: rgba(95,174,70,.06); }
+  .cifra small { display: block; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .cifra b { font-size: 27px; line-height: 1.2; }
+  .cifra.amb b { color: var(--ambar); } .cifra.roj b { color: var(--rojo); }
+  .barra-b { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .barra-b input { max-width: 340px; }
+
+  /* Tabla */
+  .tabla { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--borde); border-radius: 14px; overflow: hidden; }
+  .tabla th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: #6a6e75; padding: 11px 12px; background: #f1f4f2; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+  .tabla td { padding: 11px 12px; border-bottom: 1px solid #eef0f1; vertical-align: middle; }
+  .tabla tr:last-child td { border-bottom: 0; }
+  .tabla tr:hover td { background: #fafcfa; }
+  .tabla td small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+  .tabla td.acc { text-align: right; white-space: nowrap; }
+  .tabla td.acc button { margin-left: 6px; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 800; border-radius: 12px; padding: 3px 10px; white-space: nowrap; }
+  .pill.vig { background: rgba(95,174,70,.16); color: #2E7D32; }
+  .pill.por { background: #FFF1C9; color: #8A5A00; }
+  .pill.gra { background: #FFE0CC; color: #A14A00; }
+  .pill.ven { background: #FDECEA; color: #B3261E; }
+  .pill.pru { background: #e3effc; color: #0D47A1; }
+  .pill.per { background: #ece7f7; color: #4527A0; }
+  .nw { white-space: nowrap; }
+  .tabla .mono { font-size: 11.5px; white-space: nowrap; }
+  .tag { font-size: 12px; background: #eef0f2; color: #444; border-radius: 6px; padding: 2px 8px; font-weight: 700; }
+  .wa { background: #25D366; color: #fff; }
+
+  /* Nueva activación */
+  .dos { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; align-items: start; }
+  .filas { display: grid; gap: 0; }
+  .filas .f { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eef0f1; font-size: 14px; }
+  .filas .f:last-child { border-bottom: 0; }
+  .filas .f span { color: var(--muted); width: 118px; flex: none; }
+  .filas .f b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .gr2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gr2 .ancho { grid-column: 1 / -1; }
+  .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seg button { background: #fff; border: 2px solid var(--borde); color: #333; padding: 9px 14px; font-weight: 700; }
+  .seg button.sel { border-color: var(--verde); background: rgba(95,174,70,.09); color: #1f5f12; }
+  .ayuda { font-size: 12.5px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+  .pie-acc { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 14px; }
+
+  /* Resultado */
+  .codigo { background: var(--noche); color: #fff; border-radius: 14px; padding: 18px 20px; }
+  .codigo small { color: #9fb8a6; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 8px; }
+  .codigo .txt { font-family: Consolas, 'Cascadia Mono', monospace; font-size: 15px; line-height: 1.75; letter-spacing: .03em; overflow-wrap: anywhere; user-select: all; color: #e9f5ec; }
+  .grande { display: flex; gap: 14px; align-items: center; }
+  .grande .c { width: 52px; height: 52px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 28px; flex: none; }
+  .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* Llave */
+  .hex { font-family: Consolas, 'Cascadia Mono', monospace; font-size: 14.5px; background: #f1f4f2; border: 1px solid var(--borde); border-radius: 10px; padding: 12px 14px; overflow-wrap: anywhere; letter-spacing: .02em; user-select: all; }
+  .slot { display: flex; align-items: center; gap: 13px; border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; }
+  .slot .ic { width: 34px; height: 34px; border-radius: 50%; background: #eef0f2; display: flex; align-items: center; justify-content: center; font-size: 17px; flex: none; }
+  .slot.ok { background: rgba(95,174,70,.08); border-color: #bfe0b4; } .slot.ok .ic { background: var(--verde); color: #fff; }
+  .slot.no { background: #FFF8E1; border-color: #f5d98a; }
+  .slot .t { flex: 1; min-width: 0; } .slot .t small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; overflow-wrap: anywhere; }
+  .pasos-n { counter-reset: p; display: grid; gap: 8px; }
+  .pasos-n div { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; }
+  .pasos-n div::before { counter-increment: p; content: counter(p); width: 22px; height: 22px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; margin-top: 1px; }
+
+  /* Pantalla completa (crear / abrir) */
+  .centrada { margin: auto; width: 100%; max-width: 480px; display: grid; gap: 14px; }
+  .centrada .lg { width: 190px; margin: 0 auto; display: block; }
+  .main.noche { background: linear-gradient(170deg,#1d2b22,#25352b 60%,#2c4333); }
+  .centrada .card { box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .vel { position: fixed; inset: 0; background: rgba(20,30,24,.55); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+  .vel .card { width: min(470px, 100%); display: grid; gap: 13px; box-shadow: 0 14px 40px rgba(0,0,0,.3); }
+  .vacio { text-align: center; color: var(--muted); padding: 34px 10px; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1d2b22; color: #fff; padding: 11px 20px; border-radius: 24px; font-weight: 700; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 9; }
+  .chk { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; cursor: pointer; }
+  .chk input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--verde); padding: 0; flex: none; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div id="avisoTmp"></div>
+
+<script>
+const TOKEN = '__TOKEN__';
+const MAQUETA = new URLSearchParams(location.search).get('maqueta'); // solo para dibujar pantallas con datos de ejemplo
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ---------- fechas (todo en texto AAAA-MM-DD, hora local) ----------
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const hoyISO = () => { if (MAQUETA) return '2026-10-20'; const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const aDias = (iso) => Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000);
+const difDias = (a, b) => aDias(a) - aDias(b);
+function sumarMeses(iso, n) {
+  let a = +iso.slice(0, 4), m = +iso.slice(5, 7) - 1 + n, d = +iso.slice(8, 10);
+  a += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  const ult = new Date(Date.UTC(a, m + 1, 0)).getUTCDate();
+  d = Math.min(d, ult);
+  return a + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+const sumarDias = (iso, n) => new Date((aDias(iso) + n) * 86400000).toISOString().slice(0, 10);
+const bonita = (iso) => iso ? (+iso.slice(8, 10)) + ' ' + MESES[+iso.slice(5, 7) - 1] + ' ' + iso.slice(0, 4) : '—';
+
+// Estado de la licencia de un cliente (igual que en el sistema: 5 días de gracia en pagadas, la prueba no tiene)
+function estadoDe(c) {
+  if (c.tipo === 'permanente') return { clave: 'per', texto: 'Permanente', orden: 9, sub: 'No vence' };
+  const dias = difDias(c.vence, hoyISO());
+  if (c.tipo === 'demo') {
+    if (dias < 0) return { clave: 'ven', texto: 'Prueba terminada', orden: 1, sub: 'Terminó hace ' + (-dias) + ' día' + (dias === -1 ? '' : 's'), dias };
+    return { clave: 'pru', texto: 'Prueba', orden: dias <= 7 ? 2 : 6, sub: dias === 0 ? 'Termina hoy' : 'Quedan ' + dias + ' día' + (dias === 1 ? '' : 's'), dias };
+  }
+  if (dias > 30) return { clave: 'vig', texto: 'Vigente', orden: 7, sub: 'Faltan ' + dias + ' días', dias };
+  if (dias >= 0) return { clave: 'por', texto: 'Por vencer', orden: 3, sub: dias === 0 ? 'Vence hoy' : 'Faltan ' + dias + ' día' + (dias === 1 ? '' : 's'), dias };
+  if (dias >= -5) return { clave: 'gra', texto: 'En gracia', orden: 2, sub: 'Venció hace ' + (-dias) + ' día' + (dias === -1 ? '' : 's') + ' · gracia de 5', dias };
+  return { clave: 'ven', texto: 'Vencida', orden: 1, sub: 'Venció hace ' + (-dias) + ' días · solo consulta', dias };
+}
+const TIPOS = { anual: 'Anual', permanente: 'Permanente', demo: 'Prueba' };
+const PLANES = { nube: 'Con nube', local: 'Sin nube' };
+
+// ---------- datos de ejemplo (solo ?maqueta=...) ----------
+const CLIENTES_EJ = [
+  { id: 1, negocio: 'Cremería La Esperanza', contacto: 'Rosa Gómez', whatsapp: '33 1234 5678', plan: 'nube', sucursales: 2, tipo: 'anual', vence: '2027-03-10', idEquipo: '7KQ2-9XMA-4TP2' },
+  { id: 2, negocio: 'Carnicería El Torito', contacto: 'Luis Ramírez', whatsapp: '33 4455 8899', plan: 'nube', sucursales: 1, tipo: 'anual', vence: '2026-11-02', idEquipo: '3FH8-QW2R-9NDC' },
+  { id: 3, negocio: 'Abarrotes Doña Lupe', contacto: 'Guadalupe Torres', whatsapp: '33 2020 3131', plan: 'local', sucursales: 1, tipo: 'permanente', vence: null, idEquipo: '8MM7-DE86-3CX7' },
+  { id: 4, negocio: 'Tienda Los Pinos', contacto: 'Ernesto Ruiz', whatsapp: '33 7788 1122', plan: 'local', sucursales: 1, tipo: 'anual', vence: '2026-10-17', idEquipo: '5RT2-KP71-ZZ4A' },
+  { id: 5, negocio: 'Pizzería Don Mario', contacto: 'Mario Cárdenas', whatsapp: '33 9090 4040', plan: 'nube', sucursales: 3, tipo: 'anual', vence: '2027-01-25', idEquipo: '2BXM-0CV9-TT6H' },
+  { id: 6, negocio: 'Dulcería Mary', contacto: 'María Ibarra', whatsapp: '33 5656 7070', plan: 'local', sucursales: 1, tipo: 'demo', vence: '2026-11-12', idEquipo: '9GJ4-8DWP-1KS3' },
+  { id: 7, negocio: 'Frutería San Juan', contacto: 'Juan Pérez', whatsapp: '33 1111 2200', plan: 'nube', sucursales: 1, tipo: 'anual', vence: '2026-09-01', idEquipo: '6VN5-HE3M-QY8B' },
+  { id: 8, negocio: 'Papelería Central', contacto: 'Sofía Mendoza', whatsapp: '33 6060 9191', plan: 'local', sucursales: 2, tipo: 'anual', vence: '2027-08-05', idEquipo: '4ZK9-CA6T-WR2D' }
+];
+const CODIGO_EJ = 'CPT1-04104-0R3ZC-2PG12-JGXNS-0RDKM-W0000-07KP7-HDSD7-YJ3MR-F02T0-WD5M1-ZBVME-HXZNC-ZSYT9-VRYKC-7CHTG-6WN2G-ER744-H903Y-BW5ZW-ZXGSP-Y8TGZ-A8AT2-XB8MT-S7C7H-0WF2A-SJW3G';
+const MOCK = {
+  '/api/estado': { fase: 'abierto', version: '1.0.0', respaldos: { hechos: 1, ultimo: '2026-10-20', lugares: [{ ruta: 'E:\\Respaldos Compoint\\', fecha: '2026-10-20' }] }, llavePublica: '03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8', siguienteSerie: 13 },
+  '/api/clientes': { clientes: CLIENTES_EJ },
+  '/api/historial': { codigos: [
+    { serie: 12, fecha: '2026-10-16', negocio: 'Cremería La Esperanza', tipo: 'anual', plan: 'nube', sucursales: 2, vence: '2027-03-10', idEquipo: '7KQ2-9XMA-4TP2', codigo: CODIGO_EJ },
+    { serie: 11, fecha: '2026-10-09', negocio: 'Papelería Central', tipo: 'anual', plan: 'local', sucursales: 2, vence: '2027-08-05', idEquipo: '4ZK9-CA6T-WR2D', codigo: CODIGO_EJ },
+    { serie: 10, fecha: '2026-10-03', negocio: 'Dulcería Mary', tipo: 'demo', plan: 'local', sucursales: 1, vence: '2026-11-12', idEquipo: '9GJ4-8DWP-1KS3', codigo: CODIGO_EJ },
+    { serie: 9, fecha: '2026-09-28', negocio: 'Abarrotes Doña Lupe', tipo: 'permanente', plan: 'local', sucursales: 1, vence: null, idEquipo: '8MM7-DE86-3CX7', codigo: CODIGO_EJ }
+  ] },
+  '/api/leer-solicitud': { ok: true, datos: { tipo: 'renovar', plan: 'nube', sucursales: 2, id_equipo: '7KQ2-9XMA-4TP2', fecha: '2026-10-20', app: '1.1.0', prueba_dias_restantes: null,
+    negocio: { negocio: 'Cremería La Esperanza', giro: 'Cremería', nombre_dueno: 'Rosa Gómez', whatsapp: '33 1234 5678', email: 'rosa@laesperanza.mx', ciudad: 'Guadalajara', estado: 'Jalisco' }, nota: 'Quiero agregar otra sucursal' }, clienteId: 1 },
+  '/api/generar': { ok: true, codigo: CODIGO_EJ, serie: 13 }
+};
+
+async function api(ruta, cuerpo) {
+  if (MAQUETA) { await new Promise((r) => setTimeout(r, 60)); return JSON.parse(JSON.stringify(MOCK[ruta.split('?')[0]] || { ok: true })); }
+  let r;
+  try {
+    r = await fetch(ruta, { method: cuerpo ? 'POST' : 'GET', headers: { 'X-Token': TOKEN, 'Content-Type': 'application/json' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+  } catch (e) { throw new Error('Se perdió la conexión con el programa. Ciérralo y ábrelo otra vez.'); }
+  let j = {};
+  try { j = await r.json(); } catch (e) { /* respuesta vacía */ }
+  if (!r.ok) { const e = new Error(j.error || 'No se pudo completar.'); e.datos = j; e.status = r.status; throw e; }
+  return j;
+}
+
+// ---------- estado de la pantalla ----------
+const S = { fase: 'cargando', vista: 'clientes', est: null, clientes: [], historial: [], filtro: 'todos', buscar: '',
+  N: null, err: '', ocupado: false, claveTmp: '' };
+
+function aviso(txt) {
+  $('#avisoTmp').innerHTML = '';
+  const d = document.createElement('div'); d.className = 'toast'; d.textContent = txt;
+  $('#avisoTmp').appendChild(d); setTimeout(() => d.remove(), 3200);
+}
+async function copiar(texto, msg) {
+  try { await navigator.clipboard.writeText(texto); } catch (e) {
+    const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  aviso(msg || 'Copiado ✔');
+}
+
+// ---------- estructura general ----------
+function lado() {
+  const e = S.est || {};
+  const r = e.respaldos || { hechos: 0 };
+  const porVencer = S.clientes.filter((c) => { const x = estadoDe(c); return x.orden <= 3; }).length;
+  const item = (v, ic, t, n) => `<button class="${S.vista === v ? 'on' : ''}" onclick="ir('${v}')"><span class="ic">${ic}</span>${t}${n ? `<span class="n">${n}</span>` : ''}</button>`;
+  const resp = r.hechos >= 2
+    ? `<div class="resp bien" ${r.nuevosDesde ? 'style="cursor:pointer" onclick="ir(\'llave\')"' : ''}><b>✅ Llave respaldada</b>En ${r.hechos} lugares · último ${bonita(r.ultimo)}${r.nuevosDesde ? `<br>📝 ${r.nuevosDesde} código${r.nuevosDesde === 1 ? '' : 's'} nuevo${r.nuevosDesde === 1 ? '' : 's'} sin respaldar` : ''}</div>`
+    : `<div class="resp mal" style="cursor:pointer" onclick="ir('llave')"><b>⚠️ Falta respaldar tu llave</b>${r.hechos === 0 ? 'Aún no tienes ningún respaldo.' : 'Tienes 1 de 2 respaldos.'} Toca aquí.</div>`;
+  return `<aside class="lado">
+    <img class="lg" src="logo-claro.png" alt="Compoint, punto de soluciones">
+    <nav>
+      ${item('clientes', '👥', 'Clientes', porVencer || '')}
+      ${item('nueva', '➕', 'Nueva activación')}
+      ${item('historial', '🧾', 'Códigos emitidos')}
+      ${item('llave', '🔑', 'Mi llave')}
+    </nav>
+    ${resp}
+    <div class="v">Activador Compoint<br>Versión ${esc(e.version || '1.0.0')}</div>
+  </aside>`;
+}
+
+function pintar() {
+  const app = $('#app');
+  if (S.fase === 'cargando') { app.innerHTML = `<main class="main"><div class="vacio" style="margin:auto">Abriendo…</div></main>`; return; }
+  if (S.fase === 'crear') { app.innerHTML = `<main class="main noche">${pantallaCrear()}</main>`; return; }
+  if (S.fase === 'bloqueado') { app.innerHTML = `<main class="main noche">${pantallaAbrir()}</main>`; return; }
+  const vistas = { clientes: vistaClientes, nueva: vistaNueva, historial: vistaHistorial, llave: vistaLlave };
+  app.innerHTML = lado() + `<main class="main">${(vistas[S.vista] || vistaClientes)()}</main>`;
+}
+
+async function ir(v) { S.vista = v; S.err = ''; if (v === 'nueva' && (!S.N || S.N.paso === 3)) S.N = nuevoN(); try { if (v === 'historial') await cargarHistorial(); if (v === 'llave' || v === 'clientes') S.est = await api('/api/estado'); } catch (e) { aviso(e.message); } pintar(); }
+
+// ---------- primera vez / abrir ----------
+function pantallaCrear() {
+  return `<div class="centrada">
+    <img class="lg" src="logo-claro.png" alt="">
+    <div class="card" style="display:grid;gap:13px">
+      <div><h1>Bienvenido al Activador</h1><p class="s">Con este programa tú creas los códigos de licencia de tus clientes. Vamos a crear <b>tu llave</b>: es lo que firma cada código y lo que lo hace imposible de falsificar.</p></div>
+      <div><label class="l">Crea tu contraseña</label><input type="password" id="c1" placeholder="Mínimo 8 caracteres" autocomplete="new-password"></div>
+      <div><label class="l">Repite la contraseña</label><input type="password" id="c2" autocomplete="new-password"></div>
+      <div class="aviso">⚠️ <b>Anota esta contraseña en un lugar seguro.</b> Protege tu llave y tus respaldos. Si la pierdes, nadie la puede recuperar (ni yo).</div>
+      <label class="chk"><input type="checkbox" id="ent"> Entiendo que debo guardar mi contraseña y hacer 2 respaldos de la llave.</label>
+      ${S.err ? `<div class="aviso rojo">${esc(S.err)}</div>` : ''}
+      <button class="pri" onclick="crearLlave()" ${S.ocupado ? 'disabled' : ''}>Crear mi llave</button>
+      <button class="enlace" onclick="restaurarDesdeArchivo()">Ya tengo un respaldo de mi llave · restaurarlo en esta computadora</button>
+    </div></div>`;
+}
+function pantallaAbrir() {
+  return `<div class="centrada" style="max-width:400px">
+    <img class="lg" src="logo-claro.png" alt="">
+    <div class="card" style="display:grid;gap:13px">
+      <div><h1>Activador Compoint</h1><p class="s">Escribe tu contraseña para abrir.</p></div>
+      <div><label class="l">Contraseña</label><input type="password" id="c1" autocomplete="current-password" onkeydown="if(event.key==='Enter')abrirLlave()"></div>
+      ${S.err ? `<div class="aviso rojo">${esc(S.err)}</div>` : ''}
+      <button class="pri" onclick="abrirLlave()" ${S.ocupado ? 'disabled' : ''}>Abrir</button>
+      <button class="enlace" onclick="restaurarDesdeArchivo()">La llave de esta computadora no abre · restaurar un respaldo</button>
+    </div></div>`;
+}
+async function crearLlave() {
+  const c1 = $('#c1').value, c2 = $('#c2').value;
+  if (c1.length < 8) { S.err = 'La contraseña debe tener al menos 8 caracteres.'; return pintar(); }
+  if (c1 !== c2) { S.err = 'Las dos contraseñas no son iguales.'; return pintar(); }
+  if (!$('#ent').checked) { S.err = 'Marca la casilla para continuar.'; return pintar(); }
+  S.err = ''; S.ocupado = true; pintar();
+  try { await api('/api/crear-llave', { clave: c1 }); await entrar(); S.vista = 'llave'; } catch (e) { S.err = e.message; }
+  S.ocupado = false; pintar();
+}
+async function abrirLlave() {
+  const c1 = $('#c1').value;
+  S.err = ''; S.ocupado = true; pintar();
+  try { await api('/api/abrir', { clave: c1 }); await entrar(); } catch (e) { S.err = e.message; }
+  S.ocupado = false; pintar();
+}
+async function entrar() {
+  S.est = await api('/api/estado'); S.fase = S.est.fase;
+  if (S.fase === 'abierto') { await cargarClientes(); S.vista = 'clientes'; }
+}
+async function cargarClientes() { S.clientes = (await api('/api/clientes')).clientes || []; }
+async function cargarHistorial() { S.historial = (await api('/api/historial')).codigos || []; }
+
+// ---------- Clientes ----------
+function vistaClientes() {
+  const todos = S.clientes.map((c) => ({ c, e: estadoDe(c) }));
+  const cuenta = (f) => todos.filter(f).length;
+  const filtros = {
+    todos: () => true,
+    vigentes: (x) => x.e.clave === 'vig' || x.e.clave === 'per' || x.e.clave === 'pru',
+    por: (x) => x.e.clave === 'por' || x.e.clave === 'gra' || (x.e.clave === 'pru' && x.e.orden <= 2),
+    vencidos: (x) => x.e.clave === 'ven'
+  };
+  const q = S.buscar.trim().toLowerCase();
+  let filas = todos.filter(filtros[S.filtro] || filtros.todos).filter((x) => !q || (x.c.negocio + ' ' + (x.c.contacto || '') + ' ' + (x.c.idEquipo || '')).toLowerCase().includes(q));
+  filas.sort((a, b) => a.e.orden - b.e.orden || (a.e.dias ?? 9999) - (b.e.dias ?? 9999));
+  const cif = (k, t, n, cls) => `<button class="cifra ${cls || ''} ${S.filtro === k ? 'sel' : ''}" onclick="S.filtro='${k}';pintar()"><small>${t}</small><b>${n}</b></button>`;
+  return `<div class="cab"><div><h1>Clientes</h1><p class="s">Quién tiene licencia, hasta cuándo, y a quién hay que avisar para renovar.</p></div>
+      <button class="pri" onclick="nuevaDe(null)">➕ Nueva activación</button></div>
+    <div class="cifras">
+      ${cif('todos', 'Clientes', todos.length)}
+      ${cif('vigentes', 'Al corriente', cuenta(filtros.vigentes))}
+      ${cif('por', 'Por vencer o en gracia', cuenta(filtros.por), 'amb')}
+      ${cif('vencidos', 'Vencidos', cuenta(filtros.vencidos), 'roj')}
+    </div>
+    <div class="barra-b"><input type="search" placeholder="🔍 Buscar por negocio, contacto o ID del equipo" value="${esc(S.buscar)}" oninput="S.buscar=this.value;pintar();this.focus()">
+      <span class="s" style="color:var(--muted)">${filas.length} de ${todos.length}</span></div>
+    ${filas.length ? `<table class="tabla"><thead><tr><th>Negocio</th><th>Licencia</th><th>Vence</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${filas.map(({ c, e }) => `<tr>
+        <td><b>${esc(c.negocio)}</b><small>${esc(c.contacto || '')}${c.whatsapp ? ' · ' + esc(c.whatsapp) : ''}</small></td>
+        <td class="nw"><span class="tag">${TIPOS[c.tipo] || c.tipo}</span><small>${PLANES[c.plan] || ''} · ${c.sucursales} suc.</small></td>
+        <td class="nw">${c.vence ? bonita(c.vence) : '—'}<small class="mono">${esc(c.idEquipo || '')}</small></td>
+        <td><span class="pill ${e.clave}">${e.texto}</span><small>${esc(e.sub)}</small></td>
+        <td class="acc">${(e.clave === 'por' || e.clave === 'gra' || e.clave === 'ven' || (e.clave === 'pru' && e.orden <= 2)) ? `<button class="wa peq" title="Mandar recordatorio por WhatsApp" onclick="recordar(${c.id})">💬</button>` : ''}
+          <button class="pri peq" onclick="nuevaDe(${c.id})">${c.tipo === 'permanente' ? 'Nuevo código' : 'Renovar'}</button></td></tr>`).join('')}
+      </tbody></table>` : `<div class="card vacio">No hay clientes con ese filtro.</div>`}`;
+}
+function recordar(id) {
+  const c = S.clientes.find((x) => x.id === id); if (!c) return;
+  const e = estadoDe(c);
+  const msg = e.clave === 'ven' || e.clave === 'gra'
+    ? `Hola ${c.contacto || ''}, te saluda Compoint. La licencia de Compoint Punto de ${c.negocio} venció el ${bonita(c.vence)}. Para seguir vendiendo sin interrupciones podemos renovarla hoy mismo. ¿Te ayudamos?`
+    : `Hola ${c.contacto || ''}, te saluda Compoint. La licencia de Compoint Punto de ${c.negocio} vence el ${bonita(c.vence)}. ¿Quieres que la renovemos para que no se interrumpa tu servicio?`;
+  const tel = String(c.whatsapp || '').replace(/\D/g, '');
+  if (tel.length >= 10) window.open('https://wa.me/52' + tel.slice(-10) + '?text=' + encodeURIComponent(msg), '_blank');
+  else copiar(msg, 'Mensaje copiado (el cliente no tiene WhatsApp guardado)');
+}
+
+// ---------- Nueva activación ----------
+function nuevoN() { return { paso: 1, texto: '', sol: null, clienteId: null, f: formVacio(), res: null, err: '' }; }
+function formVacio() { return { negocio: '', contacto: '', whatsapp: '', email: '', idEquipo: '', tipo: 'anual', plan: 'nube', sucursales: 1, emitida: hoyISO(), vence: sumarMeses(hoyISO(), 12), meses: 12 }; }
+function nuevaDe(id) {
+  S.N = nuevoN();
+  if (id != null) {
+    const c = S.clientes.find((x) => x.id === id);
+    if (c) {
+      S.N.clienteId = c.id;
+      Object.assign(S.N.f, { negocio: c.negocio, contacto: c.contacto || '', whatsapp: c.whatsapp || '', email: c.email || '', idEquipo: c.idEquipo || '', plan: c.plan, sucursales: c.sucursales, tipo: c.tipo === 'demo' ? 'anual' : c.tipo });
+      ajustarVence(S.N.f, c);
+      S.N.paso = 2;
+    }
+  }
+  S.vista = 'nueva'; pintar();
+}
+// La renovación cuenta desde el vencimiento actual si todavía no pasó; si ya pasó, desde hoy.
+function ajustarVence(f, cli) {
+  if (f.tipo === 'permanente') { f.vence = null; return; }
+  const inicio = (cli && cli.tipo !== 'demo' && cli.vence && difDias(cli.vence, hoyISO()) >= 0) ? cli.vence : hoyISO();
+  f.vence = f.tipo === 'demo' ? sumarDias(hoyISO(), 30) : sumarMeses(inicio, f.meses || 12);
+}
+function clienteN() { return S.clientes.find((x) => x.id === S.N.clienteId); }
+
+async function leerSolicitud() {
+  const N = S.N; const el = $('#sol'); if (el) N.texto = el.value; N.err = '';
+  if (!N.texto.trim()) { N.err = 'Pega aquí el código de solicitud (empieza con CPT-REQ-).'; return pintar(); }
+  try {
+    const r = await api('/api/leer-solicitud', { texto: N.texto });
+    if (!r.ok) { N.err = r.mensaje || 'No pude leer ese código.'; return pintar(); }
+    const d = r.datos, n = d.negocio || {};
+    N.sol = d; N.clienteId = r.clienteId || null;
+    Object.assign(N.f, { negocio: n.negocio || '', contacto: n.nombre_dueno || '', whatsapp: n.whatsapp || n.telefono || '', email: n.email || '', idEquipo: d.id_equipo || '', plan: d.plan === 'local' ? 'local' : 'nube', sucursales: d.sucursales || 1 });
+    ajustarVence(N.f, clienteN());
+    N.paso = 2;
+  } catch (e) { N.err = e.message; }
+  pintar();
+}
+function capturaManual() { S.N.paso = 2; S.N.sol = null; pintar(); }
+
+function setF(k, v) { const f = S.N.f; f[k] = k === 'sucursales' ? Math.max(1, Math.min(50, +v || 1)) : v; if (k === 'tipo') ajustarVence(f, clienteN()); pintar(); }
+function setMeses(m) { S.N.f.meses = m; ajustarVence(S.N.f, clienteN()); pintar(); }
+function setVence(v) { S.N.f.vence = v; S.N.f.meses = 0; pintar(); }
+
+function vistaNueva() {
+  const N = S.N || (S.N = nuevoN());
+  if (N.paso === 1) return `<div class="cab"><div><h1>Nueva activación</h1><p class="s">Paso 1 de 3 · Pega la solicitud que te mandó el cliente.</p></div></div>
+    <div class="card"><label class="l">Código de solicitud (o el mensaje de WhatsApp completo)</label>
+      <textarea id="sol" class="mono" placeholder="CPT-REQ-…">${esc(N.texto)}</textarea>
+      ${N.err ? `<div class="aviso rojo" style="margin-top:10px">${esc(N.err)}</div>` : ''}
+      <div class="pie-acc" style="justify-content:space-between"><button class="enlace" onclick="capturaManual()">No tengo solicitud · capturar los datos a mano</button><button class="pri" onclick="leerSolicitud()">Leer solicitud →</button></div></div>`;
+  if (N.paso === 3) return vistaResultado();
+  const f = N.f, cli = clienteN(), d = N.sol, n = (d && d.negocio) || {};
+  const nota = cli && cli.tipo !== 'demo' && cli.vence
+    ? (difDias(cli.vence, hoyISO()) >= 0 ? `Este cliente ya tiene licencia hasta el ${bonita(cli.vence)}. La nueva cuenta desde esa fecha, para que no pierda días.` : `La licencia de este cliente venció el ${bonita(cli.vence)}. La nueva cuenta desde hoy.`)
+    : '';
+  const chipM = (m, t) => `<button class="${f.meses === m ? 'sel' : ''}" onclick="setMeses(${m})">${t}</button>`;
+  return `<div class="cab"><div><h1>Nueva activación</h1><p class="s">Paso 2 de 3 · Revisa los datos y elige qué vas a activar.</p></div></div>
+    <div class="dos">
+      <div class="card"><h2>📋 ${d ? 'Lo que mandó el cliente' : 'Datos del cliente'}</h2>
+        ${d ? `<div class="filas">
+          <div class="f"><span>Negocio</span><b>${esc(f.negocio)}</b></div>
+          <div class="f"><span>Contacto</span><b>${esc(f.contacto)}${f.whatsapp ? ' · ' + esc(f.whatsapp) : ''}</b></div>
+          ${f.email ? `<div class="f"><span>Correo</span><b>${esc(f.email)}</b></div>` : ''}
+          ${n.ciudad ? `<div class="f"><span>Ciudad</span><b>${esc(n.ciudad)}${n.estado ? ', ' + esc(n.estado) : ''}</b></div>` : ''}
+          <div class="f"><span>Pide</span><b>${d.tipo === 'renovar' ? 'Renovar' : 'Contratar'} · ${PLANES[d.plan] || ''} · ${d.sucursales} sucursal${d.sucursales === 1 ? '' : 'es'}</b></div>
+          <div class="f"><span>ID del equipo</span><b class="mono">${esc(f.idEquipo)}</b></div>
+          ${d.nota ? `<div class="f"><span>Nota</span><b>${esc(d.nota)}</b></div>` : ''}
+          ${d.prueba_dias_restantes != null ? `<div class="f"><span>Su prueba</span><b>Le quedan ${d.prueba_dias_restantes} días</b></div>` : ''}
+        </div>
+        ${cli ? `<div class="aviso verde" style="margin-top:12px">✔ Ya está en tu lista de clientes. Se actualiza solo.</div>` : `<div class="aviso azul" style="margin-top:12px">Cliente nuevo: se agrega a tu lista al generar el código.</div>`}`
+        : `<div style="display:grid;gap:11px">
+          <div><label class="l">Negocio</label><input value="${esc(f.negocio)}" oninput="S.N.f.negocio=this.value"></div>
+          <div><label class="l">Contacto</label><input value="${esc(f.contacto)}" oninput="S.N.f.contacto=this.value"></div>
+          <div><label class="l">WhatsApp</label><input value="${esc(f.whatsapp)}" oninput="S.N.f.whatsapp=this.value"></div>
+          <div><label class="l">ID del equipo (7KQ2-9XMA-4TP2)</label><input class="mono" value="${esc(f.idEquipo)}" oninput="S.N.f.idEquipo=this.value"></div></div>`}
+        <button class="enlace" style="margin-top:8px" onclick="S.N=nuevoN();pintar()">← Empezar con otra solicitud</button></div>
+      <div class="card"><h2>🔑 Qué vas a activar</h2>
+        <div class="gr2">
+          <div class="ancho"><label class="l">Tipo de licencia</label><div class="seg">
+            <button class="${f.tipo === 'anual' ? 'sel' : ''}" onclick="setF('tipo','anual')">📅 Anual</button>
+            <button class="${f.tipo === 'permanente' ? 'sel' : ''}" onclick="setF('tipo','permanente')">♾️ Permanente</button>
+            <button class="${f.tipo === 'demo' ? 'sel' : ''}" onclick="setF('tipo','demo')">🧪 Prueba (30 días)</button></div></div>
+          <div class="ancho"><label class="l">Plan</label><div class="seg">
+            <button class="${f.plan === 'nube' ? 'sel' : ''}" onclick="setF('plan','nube')">☁️ Con nube</button>
+            <button class="${f.plan === 'local' ? 'sel' : ''}" onclick="setF('plan','local')">🖥️ Sin nube (local)</button></div></div>
+          <div><label class="l">Sucursales</label><input type="number" min="1" max="50" value="${f.sucursales}" onchange="setF('sucursales',this.value)"></div>
+          <div><label class="l">Se emite el</label><input value="${bonita(f.emitida)}" disabled></div>
+          ${f.tipo === 'permanente' ? `<div class="ancho"><div class="aviso azul">Una licencia permanente no vence nunca.</div></div>`
+            : `<div class="ancho"><label class="l">Vence el</label>
+              ${f.tipo === 'anual' ? `<div class="seg" style="margin-bottom:8px">${chipM(12, '12 meses')}${chipM(24, '24 meses')}${chipM(6, '6 meses')}</div>` : ''}
+              <input type="date" value="${f.vence || ''}" onchange="setVence(this.value)">
+              <div class="ayuda">${f.vence ? 'Hasta el <b>' + bonita(f.vence) + '</b>. Después tiene 5 días de gracia antes de quedar en «solo consulta».' : ''}</div></div>`}
+        </div>
+        ${nota ? `<div class="aviso azul" style="margin-top:12px">${nota}</div>` : ''}
+        ${N.err ? `<div class="aviso rojo" style="margin-top:12px">${esc(N.err)}</div>` : ''}
+        <div class="pie-acc"><button class="sec" onclick="S.N=null;ir('clientes')">Cancelar</button><button class="pri" onclick="generar()" ${S.ocupado ? 'disabled' : ''}>Generar código →</button></div></div>
+    </div>`;
+}
+
+async function generar() {
+  const N = S.N, f = N.f; N.err = '';
+  if (!f.negocio.trim()) { N.err = 'Falta el nombre del negocio.'; return pintar(); }
+  if (!/^[0-9A-Za-z\s-]{12,16}$/.test(f.idEquipo.trim())) { N.err = 'El ID del equipo no parece correcto (son 12 letras y números, como 7KQ2-9XMA-4TP2).'; return pintar(); }
+  if (f.tipo !== 'permanente' && !f.vence) { N.err = 'Elige la fecha de vencimiento.'; return pintar(); }
+  S.ocupado = true; pintar();
+  try {
+    const r = await api('/api/generar', { clienteId: N.clienteId, negocio: f.negocio, contacto: f.contacto, whatsapp: f.whatsapp, email: f.email, idEquipo: f.idEquipo, tipo: f.tipo, plan: f.plan, sucursales: f.sucursales, emitida: f.emitida, vence: f.tipo === 'permanente' ? null : f.vence, solicitud: N.texto });
+    N.res = r; N.paso = 3; await cargarClientes(); S.est = await api('/api/estado');
+  } catch (e) { N.err = e.message; }
+  S.ocupado = false; pintar();
+}
+
+function mensajeCodigo() {
+  const N = S.N, f = N.f;
+  const dur = f.tipo === 'permanente' ? 'Licencia permanente' : (f.tipo === 'demo' ? 'Prueba hasta el ' : 'Licencia hasta el ') + bonita(f.vence);
+  return `Hola ${f.contacto || ''}, aquí está tu código de activación de Compoint Punto 🎉\n\n${dur} · ${PLANES[f.plan]} · ${f.sucursales} sucursal${f.sucursales === 1 ? '' : 'es'}\n\nCópialo completo y pégalo en Configuración → Licencia:\n\n${N.res.codigo}\n\nCualquier duda estamos para ayudarte. — Compoint`;
+}
+function vistaResultado() {
+  const N = S.N, f = N.f;
+  return `<div class="cab"><div><h1>Nueva activación</h1><p class="s">Paso 3 de 3 · Listo.</p></div></div>
+    <div class="grande"><div class="c">✓</div><div><h1 style="font-size:20px">Código listo para ${esc(f.negocio)}</h1>
+      <p class="s">${f.tipo === 'permanente' ? 'Permanente' : (f.tipo === 'demo' ? 'Prueba hasta el ' : 'Anual hasta el ') + bonita(f.vence)} · ${PLANES[f.plan]} · ${f.sucursales} sucursal${f.sucursales === 1 ? '' : 'es'} · serie #${N.res.serie}</p></div></div>
+    <div class="codigo"><small>Código de activación</small><div class="txt">${esc(N.res.codigo)}</div></div>
+    <div class="btns"><button class="pri" onclick="copiar(S.N.res.codigo,'Código copiado ✔')">📋 Copiar código</button>
+      <button class="wa" onclick="copiar(mensajeCodigo(),'Mensaje para WhatsApp copiado ✔')">💬 Copiar mensaje para WhatsApp</button>
+      <button class="sec" onclick="descargarCodigo()">💾 Guardar archivo</button></div>
+    <div class="aviso azul">Este código solo sirve en el equipo con ID <b class="mono">${esc(f.idEquipo)}</b>. El cliente lo pega en <b>Configuración → Licencia</b>. Ya quedó guardado en «Códigos emitidos» y la lista de clientes se actualizó.</div>
+    <div class="btns"><button class="sec" onclick="S.N=nuevoN();pintar()">➕ Otra activación</button><button class="sec" onclick="S.N=null;ir('clientes')">Volver a clientes</button></div>`;
+}
+function descargarCodigo() {
+  const N = S.N;
+  const blob = new Blob([`Código de activación Compoint Punto\nNegocio: ${N.f.negocio}\nID del equipo: ${N.f.idEquipo}\n\n${N.res.codigo}\n`], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Codigo-' + N.f.negocio.replace(/[^\w]+/g, '-') + '.txt'; a.click();
+}
+
+// ---------- Códigos emitidos ----------
+function vistaHistorial() {
+  const h = S.historial;
+  return `<div class="cab"><div><h1>Códigos emitidos</h1><p class="s">Todo lo que has generado. Puedes volver a copiar cualquier código.</p></div></div>
+    ${h.length ? `<table class="tabla"><thead><tr><th>Serie</th><th>Fecha</th><th>Negocio</th><th>Licencia</th><th>Vence</th><th></th></tr></thead><tbody>
+      ${h.map((x, i) => `<tr><td><b>#${x.serie}</b></td><td class="nw">${bonita(x.fecha)}</td><td><b>${esc(x.negocio)}</b><small class="mono">${esc(x.idEquipo)}</small></td>
+        <td class="nw"><span class="tag">${TIPOS[x.tipo] || x.tipo}</span><small>${PLANES[x.plan] || ''} · ${x.sucursales} suc.</small></td>
+        <td class="nw">${x.vence ? bonita(x.vence) : 'No vence'}</td>
+        <td class="acc"><button class="sec peq" onclick="copiar(S.historial[${i}].codigo,'Código copiado ✔')">📋 Copiar código</button></td></tr>`).join('')}
+      </tbody></table>` : `<div class="card vacio">Todavía no has generado códigos.</div>`}`;
+}
+
+// ---------- Mi llave ----------
+function vistaLlave() {
+  const e = S.est || {}, r = e.respaldos || { hechos: 0, lugares: [] };
+  const lug = r.lugares || [];
+  const slot = (i) => lug[i]
+    ? `<div class="slot ok"><div class="ic">✓</div><div class="t"><b>Respaldo ${i + 1}</b><small>${esc(lug[i].ruta)} · ${bonita(lug[i].fecha)}</small></div><button class="sec peq" onclick="hacerRespaldo()">Actualizar</button></div>`
+    : `<div class="slot no"><div class="ic">!</div><div class="t"><b>Respaldo ${i + 1} · pendiente</b><small>${i === 0 ? 'Elige una memoria USB o una carpeta.' : 'Guárdalo en otro lugar distinto (otra USB, tu nube personal).'}</small></div><button class="pri peq" onclick="hacerRespaldo()">Hacer respaldo</button></div>`;
+  return `<div class="cab"><div><h1>Mi llave</h1><p class="s">La llave firma tus códigos. Es lo más importante de este programa.</p></div></div>
+    <div class="card"><h2>🔓 Tu llave pública</h2>
+      <div class="hex">${esc(e.llavePublica || '')}</div>
+      <p class="ayuda">Esta no es secreta: solo sirve para <b>comprobar</b> códigos. Va dentro del sistema de tus clientes.</p>
+      <div class="pasos-n" style="margin:12px 0">
+        <div>Pulsa <b>Guardar archivo para el sistema</b>. Se crea <code>licencia-clave-publica.js</code>.</div>
+        <div>Cópialo en la carpeta <code>backend\\utils</code> del proyecto (reemplaza el que está).</div>
+        <div>Súbelo a GitHub y publícalo. Desde ese momento el sistema acepta tus códigos.</div></div>
+      <div class="btns"><button class="pri" onclick="descargarClavePublica()">💾 Guardar archivo para el sistema</button><button class="sec" onclick="copiar(S.est.llavePublica,'Llave pública copiada ✔')">📋 Copiar llave</button></div></div>
+    <div class="card"><h2>🛟 Respaldo de tu llave privada</h2>
+      <p class="ayuda" style="margin:-4px 0 12px">El respaldo es un archivo protegido con tu contraseña: sin ella no sirve a nadie. Hazlo en <b>2 lugares distintos</b>.</p>
+      <div style="display:grid;gap:10px">${slot(0)}${slot(1)}</div>
+      <details style="margin-top:10px"><summary class="enlace" style="cursor:pointer">¿No se abre el selector de carpetas? Escribe la carpeta a mano</summary>
+        <div class="btns" style="margin-top:8px"><input id="rutaMano" placeholder="Ejemplo: E:\\Respaldos Compoint" style="max-width:380px"><button class="sec" onclick="respaldoManual()">Respaldar aquí</button></div></details>
+      ${r.hechos > 0 && r.nuevosDesde ? `<div class="aviso azul" style="margin-top:12px">📝 Desde tu último respaldo emitiste <b>${r.nuevosDesde}</b> código${r.nuevosDesde === 1 ? '' : 's'} nuevo${r.nuevosDesde === 1 ? '' : 's'}. La llave no cambia, pero conviene <b>actualizar el respaldo</b> para guardar también tu lista de clientes.</div>` : ''}
+      ${r.hechos < 2 ? `<div class="aviso rojo" style="margin-top:12px"><b>Si pierdes la llave y no tienes respaldo</b>, habría que crear una llave nueva y mandar una actualización a <b>todos</b> tus clientes para que vuelvan a aceptar códigos.</div>` : ''}
+      <button class="enlace" style="margin-top:10px" onclick="restaurarDesdeArchivo()">Restaurar la llave desde un respaldo…</button></div>`;
+}
+function descargarClavePublica() {
+  const hex = S.est.llavePublica;
+  const js = `// LLAVE PÚBLICA de Compoint para comprobar los códigos de activación.\n//\n// Esta llave NO es secreta (solo sirve para COMPROBAR códigos, no para crearlos),\n// por eso puede estar en GitHub. La llave PRIVADA (la que crea los códigos)\n// vive solo en la computadora de Compoint, dentro del programa «Activador\n// Compoint», y NUNCA debe subirse a GitHub ni mandarse a nadie.\nmodule.exports = {\n  CLAVE_PUBLICA_HEX: '${hex}'   // 64 caracteres (0-9 y a-f)\n};\n`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([js], { type: 'text/javascript;charset=utf-8' })); a.download = 'licencia-clave-publica.js'; a.click();
+  aviso('Archivo guardado en tu carpeta de Descargas ✔');
+}
+async function hacerRespaldo() {
+  aviso('Elige la carpeta en la ventana de Windows que se abrió…');
+  try {
+    const r = await api('/api/respaldo', {});
+    if (r.cancelado) return;
+    S.est = await api('/api/estado');
+    const h = (S.est.respaldos || {}).hechos || 0;
+    aviso(r.nuevo === false && h < 2 ? 'Ese lugar ya tenía respaldo y se actualizó. Elige OTRO lugar para el segundo.' : 'Respaldo guardado ✔');
+  } catch (e) { aviso(e.message); }
+  pintar();
+}
+
+async function respaldoManual() {
+  const c = ($('#rutaMano').value || '').trim();
+  if (!c) return aviso('Escribe primero la carpeta.');
+  try {
+    const r = await api('/api/respaldo', { carpeta: c });
+    S.est = await api('/api/estado');
+    const h = (S.est.respaldos || {}).hechos || 0;
+    aviso(r.nuevo === false && h < 2 ? 'Ese lugar ya tenía respaldo y se actualizó. Elige OTRO lugar para el segundo.' : 'Respaldo guardado ✔');
+  } catch (e) { aviso(e.message); }
+  pintar();
+}
+
+// Restaurar: se elige el archivo .cptbak y se escribe la contraseña con que se hizo.
+function restaurarDesdeArchivo() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.cptbak,.json,.txt';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    S.R = { texto: await f.text(), nombre: f.name, err: '', confirmar: false, pidiendo: false };
+    pintarModal();
+  };
+  inp.click();
+}
+function pintarModal() {
+  let m = $('#modal'); if (!S.R) { if (m) m.remove(); return; }
+  if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'vel'; document.body.appendChild(m); }
+  const R = S.R;
+  m.innerHTML = `<div class="card"><h2 style="margin:0">🛟 Restaurar mi llave</h2>
+    <p class="ayuda" style="margin:0">Archivo: <b>${esc(R.nombre)}</b></p>
+    <div><label class="l">Contraseña con la que hiciste el respaldo</label><input type="password" id="rc" onkeydown="if(event.key==='Enter')restaurar()" autofocus></div>
+    ${R.err ? `<div class="aviso ${R.confirmar ? '' : 'rojo'}">${esc(R.err)}</div>` : ''}
+    <div class="pie-acc" style="margin-top:0"><button class="sec" onclick="S.R=null;pintarModal()">Cancelar</button>
+      <button class="pri" onclick="restaurar()" ${R.pidiendo ? 'disabled' : ''}>${R.confirmar ? 'Sí, reemplazar mi llave' : 'Restaurar'}</button></div></div>`;
+  const c = $('#rc'); if (c) c.focus();
+}
+async function restaurar() {
+  const R = S.R, clave = $('#rc').value;
+  if (!clave) { R.err = 'Escribe la contraseña.'; return pintarModal(); }
+  R.pidiendo = true; R.err = ''; pintarModal();
+  try {
+    await api('/api/restaurar', { archivo: R.texto, clave, confirmar: R.confirmar });
+    S.R = null; pintarModal(); S.N = null; await entrar(); S.vista = 'llave'; pintar(); aviso('Llave restaurada ✔');
+  } catch (e) {
+    R.pidiendo = false;
+    if (e.datos && e.datos.confirmar) { R.confirmar = true; R.err = e.message; } else { R.confirmar = false; R.err = e.message; }
+    pintarModal(); const c = $('#rc'); if (c) c.value = clave;
+  }
+}
+
+// ---------- arranque ----------
+(async function () {
+  try {
+    if (MAQUETA) {
+      const sub = MAQUETA.split(':');
+      if (sub[0] === 'crear') { S.fase = 'crear'; return pintar(); }
+      if (sub[0] === 'bloqueado') { S.fase = 'bloqueado'; return pintar(); }
+      await entrar();
+      if (sub[0] === 'nueva1') { S.vista = 'nueva'; S.N = nuevoN(); }
+      if (sub[0] === 'nueva2') { S.vista = 'nueva'; S.N = nuevoN(); S.N.texto = 'CPT-REQ-eJxVjk…'; await leerSolicitud(); return; }
+      if (sub[0] === 'nueva3') { S.vista = 'nueva'; S.N = nuevoN(); S.N.texto = 'x'; await leerSolicitud(); await generar(); return; }
+      if (sub[0] === 'historial') { await cargarHistorial(); S.vista = 'historial'; }
+      if (sub[0] === 'llave') S.vista = 'llave';
+      if (sub[0] === 'llave1') { S.vista = 'llave'; S.est.respaldos = { hechos: 0, lugares: [] }; }
+      return pintar();
+    }
+    await entrar();
+    pintar();
+    setInterval(() => { api('/api/latido', {}).catch(() => {}); }, 20000);
+  } catch (e) { $('#app').innerHTML = `<main class="main"><div class="aviso rojo" style="margin:auto">${esc(e.message)}</div></main>`; }
+  pintar();
+})();
+</script>
+</body>
+</html>
