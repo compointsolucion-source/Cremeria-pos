@@ -12,6 +12,12 @@ router.use(verificarToken, requiereSucursalId);
 const FORMAS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'dolares', 'cheque', 'vales'];
 const redondear = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
+// Zona horaria del negocio. Los turnos guardan la hora "de pared" del servidor (UTC en la nube,
+// hora local en un servidor del negocio); esto la convierte a la hora local del negocio sin
+// importar dónde corra el servidor. `tz` es el marcador del parámetro (ej. '$2').
+const TZ_NEGOCIO = process.env.TZ_NEGOCIO || 'America/Mexico_City';
+const sqlHoraLocal = (columna, tz) => `((${columna} AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE ${tz}::text)`;
+
 // Arma todo el resumen de un turno (abierto o cerrado): caja, formas de pago,
 // ventas por departamento, cuentas y movimientos. Es lo que se imprime en el
 // corte de caja (X = turno abierto, Z = turno cerrado).
@@ -307,10 +313,14 @@ router.get('/historial', verificarToken, async (req, res) => {
     // Filtros opcionales (buscador de cortes): desde, hasta (YYYY-MM-DD), usuario_id, estado
     const params = [req.sucursalId];
     const filtros = ['t.sucursal_id = $1'];
-    const fechaLocal = "(t.fecha_apertura AT TIME ZONE 'America/Mexico_City')::date";
     const esFecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
-    if (esFecha(req.query.desde)) { params.push(req.query.desde); filtros.push(`${fechaLocal} >= $${params.length}`); }
-    if (esFecha(req.query.hasta)) { params.push(req.query.hasta); filtros.push(`${fechaLocal} <= $${params.length}`); }
+    let fechaLocal = null;
+    if (esFecha(req.query.desde) || esFecha(req.query.hasta)) {
+      params.push(TZ_NEGOCIO);
+      fechaLocal = `${sqlHoraLocal('t.fecha_apertura', '$' + params.length)}::date`;
+    }
+    if (esFecha(req.query.desde)) { params.push(req.query.desde); filtros.push(`${fechaLocal} >= $${params.length}::date`); }
+    if (esFecha(req.query.hasta)) { params.push(req.query.hasta); filtros.push(`${fechaLocal} <= $${params.length}::date`); }
     // Cajero: solo ve sus turnos. Supervisor: todos, o el que elija en el filtro.
     const usuarioFiltro = esSupervisor(req.usuario) ? parseInt(req.query.usuario_id, 10) : req.usuario.id;
     if (usuarioFiltro > 0) { params.push(usuarioFiltro); filtros.push(`t.usuario_id = $${params.length}`); }
@@ -326,6 +336,95 @@ router.get('/historial', verificarToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener el historial' });
+  }
+});
+
+// Reporte de cortes por periodo: una fila por turno CERRADO con sus totales (sin imprimir nada).
+// Los totales salen de la misma lógica que el corte de cada turno (construirResumenTurno), pero en una
+// sola consulta para que un mes completo cargue rápido. El cajero solo ve sus turnos; dueño, gerente
+// y jefe general ven todos. El día de cada turno es el día local en que se ABRIÓ (igual que el buscador).
+router.get('/reporte', verificarToken, async (req, res) => {
+  try {
+    const esFecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+    const hoyLocal = (await pool.query("SELECT to_char(NOW() AT TIME ZONE $1::text, 'YYYY-MM-DD') AS hoy", [TZ_NEGOCIO])).rows[0].hoy;
+    const desde = esFecha(req.query.desde) ? req.query.desde : hoyLocal.slice(0, 8) + '01';
+    const hasta = esFecha(req.query.hasta) ? req.query.hasta : hoyLocal;
+    const dias = (Date.parse(hasta + 'T00:00:00Z') - Date.parse(desde + 'T00:00:00Z')) / 86400000;
+    if (!Number.isFinite(dias)) return res.status(400).json({ error: 'Fechas no válidas' });
+    if (dias < 0) return res.status(400).json({ error: 'La fecha "desde" no puede ser después de "hasta"' });
+    if (dias > 366) return res.status(400).json({ error: 'El periodo máximo es de un año' });
+
+    const usuarioFiltro = esSupervisor(req.usuario) ? parseInt(req.query.usuario_id, 10) : req.usuario.id;
+    const params = [req.sucursalId, TZ_NEGOCIO, desde, hasta];
+    let filtroUsuario = '';
+    if (usuarioFiltro > 0) { params.push(usuarioFiltro); filtroUsuario = `AND t.usuario_id = $${params.length}`; }
+    const apertura = sqlHoraLocal('t.fecha_apertura', '$2');
+
+    const turnos = await pool.query(
+      `WITH tu AS (
+         SELECT t.id, t.usuario_id, u.nombre AS cajero, t.fecha_apertura, t.fecha_cierre,
+                t.saldo_teorico, t.saldo_contado, t.declaracion,
+                to_char(${apertura}, 'YYYY-MM-DD') AS dia
+         FROM turnos t JOIN usuarios u ON u.id = t.usuario_id
+         WHERE t.sucursal_id = $1 AND t.estado = 'cerrado'
+           AND ${apertura}::date BETWEEN $3::date AND $4::date ${filtroUsuario}
+         ORDER BY t.fecha_apertura DESC LIMIT 500
+       ), tk AS (
+         SELECT k.turno_id, k.total, k.metodo_pago,
+                COALESCE(k.monto_efectivo, 0) AS monto_efectivo, COALESCE(k.monto_tarjeta, 0) AS monto_tarjeta,
+                COALESCE(k.descuento_monto, 0) + COALESCE((SELECT SUM(d.descuento_monto) FROM ticket_detalle d WHERE d.ticket_id = k.id), 0) AS desc_total
+         FROM tickets k
+         WHERE k.turno_id IN (SELECT id FROM tu) AND k.estado = 'pagado'
+       ), ag AS (
+         SELECT turno_id,
+                COUNT(*) AS tickets,
+                SUM(total) AS bruto,
+                SUM(desc_total) AS descuentos,
+                SUM(monto_efectivo) AS efectivo,
+                SUM(CASE WHEN COALESCE(metodo_pago, '') IN ('transferencia', 'dolares', 'cheque', 'vale_despensa', 'credito') THEN 0 ELSE monto_tarjeta END) AS tarjeta,
+                SUM(CASE WHEN metodo_pago = 'transferencia' THEN monto_tarjeta ELSE 0 END) AS transferencia,
+                SUM(CASE WHEN metodo_pago IN ('dolares', 'cheque', 'vale_despensa') THEN monto_tarjeta ELSE 0 END) AS otros,
+                SUM(CASE WHEN metodo_pago = 'credito' THEN total - desc_total ELSE 0 END) AS credito
+         FROM tk GROUP BY turno_id
+       )
+       SELECT tu.*, COALESCE(ag.tickets, 0) AS tickets, COALESCE(ag.bruto, 0) AS bruto, COALESCE(ag.descuentos, 0) AS descuentos,
+              COALESCE(ag.efectivo, 0) AS efectivo, COALESCE(ag.tarjeta, 0) AS tarjeta, COALESCE(ag.transferencia, 0) AS transferencia,
+              COALESCE(ag.otros, 0) AS otros, COALESCE(ag.credito, 0) AS credito
+       FROM tu LEFT JOIN ag ON ag.turno_id = tu.id
+       ORDER BY tu.fecha_apertura DESC`,
+      params
+    );
+
+    const abiertos = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM turnos t
+       WHERE t.sucursal_id = $1 AND t.estado = 'abierto'
+         AND ${apertura}::date BETWEEN $3::date AND $4::date ${filtroUsuario}`,
+      params
+    );
+
+    res.json({
+      desde, hasta,
+      abiertos: abiertos.rows[0].n,
+      turnos: turnos.rows.map((t) => {
+        const declarado = !!t.declaracion || t.saldo_contado !== null;
+        let diferencia = null;
+        if (t.declaracion && t.declaracion.diferencia !== undefined && t.declaracion.diferencia !== null) diferencia = redondear(t.declaracion.diferencia);
+        else if (t.saldo_contado !== null) diferencia = redondear(Number(t.saldo_contado) - Number(t.saldo_teorico));
+        return {
+          id: t.id, usuario_id: t.usuario_id, cajero: t.cajero, dia: t.dia,
+          fecha_apertura: t.fecha_apertura, fecha_cierre: t.fecha_cierre,
+          tickets: Number(t.tickets),
+          efectivo: redondear(t.efectivo), tarjeta: redondear(t.tarjeta), transferencia: redondear(t.transferencia),
+          credito: redondear(t.credito), otros: redondear(t.otros),
+          descuentos: redondear(t.descuentos),
+          venta_neta: redondear(Number(t.bruto) - Number(t.descuentos)),
+          declarado, diferencia
+        };
+      })
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener el reporte de cortes' });
   }
 });
 

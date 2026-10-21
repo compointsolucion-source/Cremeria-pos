@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Cortes de caja - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
+<script src="../js/tema.js"></script>
+<style>
+  .oculto { display: none !important; }
+  .acciones-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .rc { display: grid; gap: 12px; }
+
+  /* Filtros */
+  .filtros { padding: 14px 16px; display: grid; gap: 12px; }
+  .fila-f { display: grid; grid-template-columns: 150px 150px 230px minmax(0, 1fr); gap: 12px; align-items: end; }
+  .fila-f.sin-cajero { grid-template-columns: 150px 150px minmax(0, 1fr); }
+  .fila-f .campo input, .fila-f .campo select { width: 100%; }
+  .fila-f .seg { max-width: 340px; }
+
+  /* Cifras del periodo */
+  .kp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  .kp .kpi { padding: 12px 14px; min-width: 0; }
+  .kp .kpi .v { font-size: 21px; overflow-wrap: anywhere; }
+  .kpi .ic.verde { background: rgba(95,174,70,.18); }
+  .kpi .ic.rojo { background: rgba(198,40,40,.14); }
+  .kpi .ic.azul { background: rgba(21,101,192,.14); }
+  .kpi .ic.ambar { background: rgba(249,168,37,.22); }
+
+  .aviso-abiertos { background: rgba(249,168,37,.2); color: var(--text, #1F2023); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; font-weight: 600; }
+
+  /* Tabla */
+  .barra-tabla { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 14px 16px 8px; flex-wrap: wrap; }
+  .barra-tabla h3 { font-size: 16px; }
+  .barra-tabla span { color: var(--muted, #7A7D83); font-size: 12.5px; }
+  .tabla-esc { overflow-x: auto; }
+  .tabla-esc table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tabla-esc th { background: var(--tabla-cab, #F1F3F4); text-align: right; padding: 10px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #7A7D83); white-space: nowrap; }
+  .tabla-esc th.i, .tabla-esc td.i { text-align: left; }
+  .tabla-esc td { padding: 10px 12px; border-bottom: 1px solid var(--fila-borde, #E4E6E9); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tabla-esc tbody tr:hover { background: var(--fila-hover, #F6F8F8); }
+  .tabla-esc td.i small { display: block; color: var(--muted, #7A7D83); font-size: 12px; }
+  .tabla-esc td b.neta { font-weight: 800; }
+  .tabla-esc tr.hijo td { background: rgba(128,128,128,.07); font-size: 13.5px; }
+  .tabla-esc tr.hijo td.i { padding-left: 30px; }
+  .tabla-esc tr.grupo { cursor: pointer; }
+  .tabla-esc tfoot td { font-weight: 800; background: var(--tabla-cab, #F1F3F4); border-bottom: none; font-size: 14.5px; }
+  .tabla-esc td.izq, .tabla-esc th.izq { text-align: left; }
+  .tabla-esc td.acc { text-align: right; width: 1%; }
+  .flecha { display: inline-block; width: 18px; text-align: center; line-height: 1; vertical-align: middle; color: var(--muted, #7A7D83); transition: transform .12s; }
+  tr.grupo.abierta .flecha { transform: rotate(90deg); }
+  .nota-pie { padding: 10px 16px 14px; color: var(--muted, #7A7D83); font-size: 12px; }
+
+  /* Lista de tarjetas (celular) */
+  .lista-cel { display: none; }
+  .tarj-m { padding: 12px 14px; border-bottom: 1px solid var(--border, #E4E6E9); display: grid; gap: 6px; cursor: pointer; }
+  .tarj-m:last-child { border-bottom: none; }
+  .tarj-m.hijo { background: rgba(128,128,128,.07); padding-left: 24px; }
+  .tarj-m .l1 { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .tarj-m .l1 b { font-size: 15px; }
+  .tarj-m .sub { font-size: 12px; color: var(--muted, #7A7D83); }
+  .tarj-m .l2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 12px; color: var(--muted, #7A7D83); }
+  .tarj-m .l2 b { display: block; color: var(--text, #1F2023); font-size: 13px; overflow-wrap: anywhere; }
+  .tarj-total { padding: 12px 14px; background: var(--tabla-cab, #F1F3F4); display: flex; justify-content: space-between; align-items: center; font-weight: 800; }
+
+  /* Ver el corte (ventana) */
+  .ov-det { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 12px; }
+  .ov-det .caja-det { background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 14px; padding: 16px; width: auto; max-width: 96vw; max-height: 94vh; display: flex; flex-direction: column; gap: 12px; }
+  .ov-det pre { font: 13px/1.35 monospace; white-space: pre; margin: 0; overflow: auto; flex: 1 1 auto; min-height: 0; }
+  .ov-det .botones-det { display: flex; gap: 8px; flex: none; }
+  .ov-det .botones-det .btn { flex: 1; }
+
+  /* Barra de abajo (celular) */
+  .barra-inferior { display: none; }
+
+  @media (max-width: 1100px) {
+    .kp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 820px) {
+    .tabla-esc { display: none; }
+    .lista-cel { display: block; }
+    .acciones-top { display: none; }
+    .contenido { padding-bottom: 100px; }
+    .kp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kp .kpi { padding: 12px; gap: 10px; }
+    .kp .kpi .ic { display: none; }
+    .kp .kpi .v { font-size: 19px; }
+    .fila-f, .fila-f.sin-cajero { grid-template-columns: 1fr 1fr; }
+    .fila-f .campo.ancho { grid-column: 1 / -1; }
+    .fila-f .seg { max-width: none; }
+    #filaFiltros .campo:last-child { display: none; }
+    .filtros .fila-f.plegada { display: none; }
+    .barra-inferior { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; background: var(--surface, #fff); border-top: 1px solid var(--border, #E4E6E9); padding: 10px 12px; box-shadow: 0 -4px 14px rgba(0,0,0,.18); }
+    .barra-inferior .btn { padding: 11px 4px; font-weight: 800; }
+    .barra-inferior .menu-mas { display: block; }
+    .barra-inferior .menu-mas .btn { width: 100%; }
+    .barra-inferior .menu-mas-lista { right: 0; top: auto; bottom: calc(100% + 8px); }
+  }
+  @media (min-width: 821px) {
+    .solo-cel { display: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>📊 Cortes de caja</h1></div>
+    <div class="acciones-top">
+      <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
+      <div class="menu-mas">
+        <button type="button" class="btn btn-primary" onclick="alternarMenuMas(this)" aria-haspopup="true" aria-expanded="false">⬇️ Descargar Excel</button>
+        <div class="menu-mas-lista" role="menu" style="min-width:300px">
+          <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); exportarExcel()"><span class="em">📗</span><span>Excel completo (.xlsx)<br><small style="font-weight:500;color:var(--muted)">Hojas: Resumen · Cortes · Por día · Por mes</small></span></button>
+          <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); descargarCSV()"><span class="em">📄</span><span>Solo esta tabla (CSV)<br><small style="font-weight:500;color:var(--muted)">Lo mismo que ves en pantalla</small></span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="contenido">
+    <div class="rc">
+      <div class="caja filtros">
+        <div class="chips desliza" id="chipsRango">
+          <button type="button" class="chip" data-rango="hoy">Hoy</button>
+          <button type="button" class="chip" data-rango="ayer">Ayer</button>
+          <button type="button" class="chip" data-rango="semana">Esta semana</button>
+          <button type="button" class="chip activo" data-rango="mes">Este mes</button>
+          <button type="button" class="chip" data-rango="mespasado">Mes pasado</button>
+          <button type="button" class="chip" data-rango="otro">Otro periodo…</button>
+        </div>
+        <div class="fila-f plegada" id="filaFiltros">
+          <div class="campo"><label for="fDesde">Desde</label><input type="date" id="fDesde"></div>
+          <div class="campo"><label for="fHasta">Hasta</label><input type="date" id="fHasta"></div>
+          <div class="campo ancho" id="campoCajero"><label for="fCajero">Cajero</label><select id="fCajero"><option value="">Todos los cajeros</option></select></div>
+          <div class="campo ancho"><label>Ver por</label>
+            <div class="seg" id="segVista">
+              <button type="button" data-vista="turno">Por turno</button>
+              <button type="button" data-vista="dia">Por día</button>
+              <button type="button" data-vista="mes">Por mes</button>
+            </div>
+          </div>
+        </div>
+        <div class="solo-cel" id="vistaCel">
+          <div class="seg" id="segVistaCel">
+            <button type="button" data-vista="turno">Por turno</button>
+            <button type="button" data-vista="dia">Por día</button>
+            <button type="button" data-vista="mes">Por mes</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="avisoAbiertos" class="aviso-abiertos oculto"></div>
+      <div class="kp" id="kpis"></div>
+
+      <div class="caja recorta">
+        <div class="barra-tabla"><h3 id="tituloTabla">Cortes del periodo</h3><span id="ayudaTabla"></span></div>
+        <div id="cuerpo"><div class="vacio">Cargando…</div></div>
+        <div class="nota-pie" id="notaPie"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="barra-inferior">
+    <button type="button" class="btn btn-secondary" onclick="alternarPeriodoCel()">🔍 Otro periodo</button>
+    <div class="menu-mas">
+      <button type="button" class="btn btn-primary" onclick="alternarMenuMas(this)" aria-haspopup="true" aria-expanded="false">⬇️ Excel</button>
+      <div class="menu-mas-lista" role="menu" style="min-width:270px">
+        <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); exportarExcel()"><span class="em">📗</span><span>Excel completo (.xlsx)</span></button>
+        <button type="button" class="menu-mas-item" role="menuitem" onclick="cerrarMenusMas(); descargarCSV()"><span class="em">📄</span><span>Solo esta tabla (CSV)</span></button>
+      </div>
+    </div>
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/impresora-termica.js"></script>
+<script src="../js/turno-caja.js"></script>
+<script src="../js/vendor/xlsx.full.min.js"></script>
+<script>
+requiereLogin();
+
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dinero = (n) => { const v = Number(n) || 0; return (v < 0 ? '-' : '') + '$' + Math.abs(v).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+const redondear = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const p2 = (n) => String(n).padStart(2, '0');
+const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const isoFecha = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+const fechaDeISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const etiquetaDia = (s) => { const d = fechaDeISO(s); return `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`; };
+const etiquetaMes = (s) => { const [y, m] = s.split('-').map(Number); return `${MESES_LARGO[m - 1]} ${y}`; };
+const hhmm = (iso) => { const d = new Date(iso); return `${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+const textoFechaHora = (iso) => { const d = new Date(iso); return `${isoFecha(d)} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+const esSupervisorUI = () => { const u = getUsuario(); return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol); };
+
+const CAMPOS_SUMA = ['tickets', 'efectivo', 'tarjeta', 'transferencia', 'credito', 'otros', 'descuentos', 'venta_neta'];
+const S = {
+  rango: 'mes', desde: '', hasta: '',
+  vista: localStorage.getItem('cortes_vista') || 'turno',
+  cajero: '', datos: null, abiertas: new Set(), pedido: 0
+};
+if (!['turno', 'dia', 'mes'].includes(S.vista)) S.vista = 'turno';
+
+// ---------- Periodos rápidos ----------
+function rangoRapido(clave) {
+  const hoy = new Date(), h = isoFecha(hoy);
+  if (clave === 'hoy') return [h, h];
+  if (clave === 'ayer') { const d = new Date(hoy); d.setDate(d.getDate() - 1); const a = isoFecha(d); return [a, a]; }
+  if (clave === 'semana') { const d = new Date(hoy); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return [isoFecha(d), h]; }
+  if (clave === 'mes') return [`${hoy.getFullYear()}-${p2(hoy.getMonth() + 1)}-01`, h];
+  if (clave === 'mespasado') return [isoFecha(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)), isoFecha(new Date(hoy.getFullYear(), hoy.getMonth(), 0))];
+  return null;
+}
+function elegirRango(clave) {
+  S.rango = clave;
+  if (clave !== 'otro') {
+    [S.desde, S.hasta] = rangoRapido(clave);
+    document.getElementById('fDesde').value = S.desde;
+    document.getElementById('fHasta').value = S.hasta;
+  } else {
+    document.getElementById('filaFiltros').classList.remove('plegada');
+    document.getElementById('fDesde').focus();
+  }
+  marcarControles();
+  if (clave !== 'otro') cargar();
+}
+function alternarPeriodoCel() {
+  const fila = document.getElementById('filaFiltros');
+  fila.classList.toggle('plegada');
+  S.rango = 'otro'; marcarControles();
+  if (!fila.classList.contains('plegada')) document.getElementById('fDesde').focus();
+}
+function marcarControles() {
+  document.querySelectorAll('#chipsRango .chip').forEach((c) => c.classList.toggle('activo', c.dataset.rango === S.rango));
+  document.querySelectorAll('#segVista button, #segVistaCel button').forEach((b) => b.classList.toggle('activo', b.dataset.vista === S.vista));
+}
+document.getElementById('chipsRango').addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (c) elegirRango(c.dataset.rango); });
+function cambiarVista(v) { S.vista = v; S.abiertas.clear(); localStorage.setItem('cortes_vista', v); marcarControles(); render(); }
+document.getElementById('filaFiltros').addEventListener('click', (e) => { const b = e.target.closest('#segVista button'); if (b) cambiarVista(b.dataset.vista); });
+document.getElementById('segVistaCel').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) cambiarVista(b.dataset.vista); });
+function cambioFechas() {
+  const d = document.getElementById('fDesde').value, h = document.getElementById('fHasta').value;
+  if (!d || !h) return;
+  if (d > h) { mostrarToast('La fecha "Desde" no puede ser después de "Hasta"', 'error'); return; }
+  S.desde = d; S.hasta = h; S.rango = 'otro'; marcarControles(); cargar();
+}
+document.getElementById('fDesde').addEventListener('change', cambioFechas);
+document.getElementById('fHasta').addEventListener('change', cambioFechas);
+document.getElementById('fCajero').addEventListener('change', (e) => { S.cajero = e.target.value; S.abiertas.clear(); render(); });
+
+// ---------- Carga ----------
+async function cargar() {
+  const mio = ++S.pedido;
+  document.getElementById('cuerpo').innerHTML = '<div class="vacio">Cargando…</div>';
+  try {
+    const datos = await apiFetch(`/turnos/reporte?desde=${S.desde}&hasta=${S.hasta}`);
+    if (mio !== S.pedido) return; // llegó una respuesta vieja
+    S.datos = datos; S.abiertas.clear();
+    llenarCajeros();
+    render();
+  } catch (err) {
+    if (mio !== S.pedido) return;
+    console.error(err);
+    S.datos = null;
+    document.getElementById('kpis').innerHTML = '';
+    document.getElementById('cuerpo').innerHTML = `<div class="vacio">No se pudo cargar el reporte.<br><small>${escapar(err.message || '')}</small><br><br><button class="btn btn-secondary" onclick="cargar()">Reintentar</button></div>`;
+  }
+}
+function llenarCajeros() {
+  const campo = document.getElementById('campoCajero');
+  const fila = document.getElementById('filaFiltros');
+  if (!esSupervisorUI()) { campo.classList.add('oculto'); fila.classList.add('sin-cajero'); return; }
+  const vistos = {};
+  S.datos.turnos.forEach((t) => { vistos[t.usuario_id] = t.cajero; });
+  const sel = document.getElementById('fCajero');
+  sel.innerHTML = '<option value="">Todos los cajeros</option>' + Object.entries(vistos).sort((a, b) => a[1].localeCompare(b[1])).map(([id, n]) => `<option value="${escapar(id)}">${escapar(n)}</option>`).join('');
+  if (S.cajero && !vistos[S.cajero]) S.cajero = '';
+  sel.value = S.cajero;
+}
+const turnosFiltrados = () => (S.datos ? S.datos.turnos : []).filter((t) => !S.cajero || String(t.usuario_id) === String(S.cajero));
+
+// ---------- Cálculos ----------
+function vacio() { return { n: 0, tickets: 0, efectivo: 0, tarjeta: 0, transferencia: 0, credito: 0, otros: 0, descuentos: 0, venta_neta: 0, dif: 0, sinDeclarar: 0 }; }
+function sumar(acc, t) {
+  acc.n++;
+  CAMPOS_SUMA.forEach((c) => { acc[c] += Number(t[c]) || 0; });
+  if (t.diferencia === null || t.diferencia === undefined) acc.sinDeclarar++; else acc.dif += Number(t.diferencia);
+  return acc;
+}
+function cerrarCifras(a) { CAMPOS_SUMA.forEach((c) => { a[c] = redondear(a[c]); }); a.dif = redondear(a.dif); return a; }
+function totales(lista) { return cerrarCifras(lista.reduce(sumar, vacio())); }
+function agrupar(lista, vista) {
+  const g = new Map();
+  lista.forEach((t) => {
+    const clave = vista === 'dia' ? t.dia : t.dia.slice(0, 7);
+    if (!g.has(clave)) g.set(clave, Object.assign(vacio(), { clave, hijos: [] }));
+    const x = g.get(clave); sumar(x, t); x.hijos.push(t);
+  });
+  return [...g.values()].sort((a, b) => b.clave.localeCompare(a.clave)).map((x) => { cerrarCifras(x); x.titulo = vista === 'dia' ? etiquetaDia(x.clave) : etiquetaMes(x.clave); return x; });
+}
+function pill(dif, sinDeclarar, n) {
+  if (n !== undefined && sinDeclarar >= n) return '<span class="pill gris">sin declarar</span>';
+  if (dif === null || dif === undefined) return '<span class="pill gris">sin declarar</span>';
+  if (Math.abs(dif) < 0.005) return '<span class="pill verde">cuadrada</span>';
+  return dif > 0 ? `<span class="pill amarillo">sobrante ${dinero(dif)}</span>` : `<span class="pill rojo">faltante ${dinero(Math.abs(dif))}</span>`;
+}
+const pillTurno = (t) => pill(t.diferencia);
+const estadoDif = (d) => (d === null || d === undefined ? 'Sin declarar' : Math.abs(d) < 0.005 ? 'Cuadrada' : d > 0 ? 'Sobrante' : 'Faltante');
+
+// ---------- Pantalla ----------
+function kpi(ic, cls, v, l) { return `<div class="caja kpi"><div class="ic ${cls}">${ic}</div><div><div class="v">${v}</div><div class="l">${l}</div></div></div>`; }
+
+function render() {
+  const lista = turnosFiltrados();
+  const T = totales(lista);
+  const ab = S.datos ? S.datos.abiertos : 0;
+  const aviso = document.getElementById('avisoAbiertos');
+  if (ab > 0 && !S.cajero) { aviso.textContent = `⏳ Hay ${ab} turno${ab === 1 ? '' : 's'} abierto${ab === 1 ? '' : 's'} en este periodo. Aparece${ab === 1 ? '' : 'n'} aquí cuando se haga su corte.`; aviso.classList.remove('oculto'); }
+  else aviso.classList.add('oculto');
+
+  const difTxt = T.n && T.sinDeclarar >= T.n ? ['⚖️', 'ambar', 'Sin declarar', 'Diferencia del periodo']
+    : Math.abs(T.dif) < 0.005 ? ['⚖️', 'verde', 'Cuadrada', 'Diferencia del periodo']
+    : T.dif > 0 ? ['⚖️', 'ambar', '+' + dinero(T.dif), 'Sobrante del periodo'] : ['⚖️', 'rojo', dinero(T.dif), 'Faltante del periodo'];
+  document.getElementById('kpis').innerHTML = [
+    kpi('💰', 'verde', dinero(T.venta_neta), `Venta neta · ${T.n} ${T.n === 1 ? 'corte' : 'cortes'}`),
+    kpi('💵', 'verde', dinero(T.efectivo), 'Efectivo'),
+    kpi('💳', 'azul', dinero(T.tarjeta), 'Tarjeta'),
+    kpi('🏦', 'azul', dinero(T.transferencia), 'Transferencia'),
+    kpi('📒', '', dinero(T.credito), 'Crédito (fiado)'),
+    kpi(...difTxt)
+  ].join('');
+
+  const titulos = { turno: 'Cortes del periodo', dia: 'Resumen por día', mes: 'Resumen por mes' };
+  document.getElementById('tituloTabla').textContent = titulos[S.vista];
+  document.getElementById('ayudaTabla').textContent = S.vista === 'turno' ? 'Toca un corte para verlo completo, sin imprimir' : `Suma de todos los turnos del ${S.vista === 'dia' ? 'día' : 'mes'}. Toca para ver sus turnos`;
+  document.getElementById('notaPie').textContent = T.otros > 0
+    ? `Venta neta = ventas pagadas menos descuentos. “Otros” = dólares, cheques y vales (${dinero(T.otros)}). El día de cada turno es el día en que se abrió.`
+    : 'Venta neta = ventas pagadas menos descuentos. El día de cada turno es el día en que se abrió.';
+
+  const cuerpo = document.getElementById('cuerpo');
+  if (!lista.length) {
+    cuerpo.innerHTML = `<div class="vacio"><div style="font-size:34px">📭</div>No hay cortes en este periodo${S.cajero ? ' para ese cajero' : ''}.<br><small>Prueba con otro periodo. Los turnos abiertos aparecen cuando se hace su corte.</small></div>`;
+    return;
+  }
+  const grupos = S.vista === 'turno' ? null : agrupar(lista, S.vista);
+  cuerpo.innerHTML = tablaHTML(lista, grupos, T) + listaCelHTML(lista, grupos, T);
+}
+
+const conOtros = () => turnosFiltrados().some((t) => Number(t.otros) > 0);
+
+function celdasMonto(x, otros) {
+  return `<td>${dinero(x.efectivo)}</td><td>${dinero(x.tarjeta)}</td><td>${dinero(x.transferencia)}</td><td>${dinero(x.credito)}</td>${otros ? `<td>${dinero(x.otros)}</td>` : ''}<td><b class="neta">${dinero(x.venta_neta)}</b></td>`;
+}
+function textoHoras(t) {
+  const ap = new Date(t.fecha_apertura), ci = t.fecha_cierre ? new Date(t.fecha_cierre) : null;
+  if (!ci) return `abrió ${hhmm(t.fecha_apertura)}`;
+  const otroDia = isoFecha(ap) !== isoFecha(ci);
+  return `${hhmm(t.fecha_apertura)} → ${hhmm(t.fecha_cierre)}${otroDia ? ` (cerró ${ci.getDate()} ${MESES[ci.getMonth()]})` : ''}`;
+}
+function filaTurnoTabla(t, otros, hijo) {
+  const primera = hijo ? `↳ Turno ${escapar(t.id)}<small>${escapar(t.cajero)}</small>` : `<b>Turno ${escapar(t.id)}</b><small>${escapar(t.cajero)}</small>`;
+  return `<tr class="${hijo ? 'hijo' : ''}" data-turno="${Number(t.id)}" style="cursor:pointer"><td class="i">${primera}</td>
+    <td class="i">${hijo ? '' : etiquetaDia(t.dia)}<small>${escapar(textoHoras(t))}</small></td>
+    ${celdasMonto(t, otros)}<td class="izq">${pillTurno(t)}</td><td class="acc"><button type="button" class="mini" title="Ver el corte" data-turno="${Number(t.id)}">👁</button></td></tr>`;
+}
+function tablaHTML(lista, grupos, T) {
+  const otros = conOtros();
+  const cab = (turno) => `<thead><tr><th class="i">${turno ? 'Turno / Cajero' : S.vista === 'dia' ? 'Día' : 'Mes'}</th><th class="${turno ? 'i' : ''}">${turno ? 'Fecha' : 'Turnos'}</th><th>Efectivo</th><th>Tarjeta</th><th>Transf.</th><th>Crédito</th>${otros ? '<th>Otros</th>' : ''}<th>Venta neta</th><th class="izq">Diferencia</th><th></th></tr></thead>`;
+  let filas;
+  if (!grupos) filas = lista.map((t) => filaTurnoTabla(t, otros, false)).join('');
+  else filas = grupos.map((g) => {
+    const abierta = S.abiertas.has(g.clave);
+    const cabeza = `<tr class="grupo ${abierta ? 'abierta' : ''}" data-grupo="${escapar(g.clave)}"><td class="i"><span class="flecha">▸</span><b>${escapar(g.titulo)}</b></td><td>${g.n}</td>${celdasMonto(g, otros)}<td class="izq">${pill(g.dif, g.sinDeclarar, g.n)}</td><td class="acc"></td></tr>`;
+    return cabeza + (abierta ? g.hijos.map((t) => filaTurnoTabla(t, otros, true)).join('') : '');
+  }).join('');
+  const pie = `<tfoot><tr><td class="i">TOTAL DEL PERIODO</td><td>${grupos ? T.n : ''}</td>${celdasMonto(T, otros)}<td class="izq">${pill(T.dif, T.sinDeclarar, T.n)}</td><td></td></tr></tfoot>`;
+  return `<div class="tabla-esc"><table>${cab(!grupos)}<tbody>${filas}</tbody>${pie}</table></div>`;
+}
+function tarjetaCel(x, { hijo = false, grupo = false } = {}) {
+  const titulo = grupo ? x.titulo : `Turno ${x.id} · ${etiquetaDia(x.dia)}`;
+  const sub = grupo ? `${x.n} turno${x.n === 1 ? '' : 's'}` : `${x.cajero} · ${textoHoras(x)}`;
+  const p = grupo ? pill(x.dif, x.sinDeclarar, x.n) : pillTurno(x);
+  const attr = grupo ? `data-grupo="${escapar(x.clave)}"` : `data-turno="${Number(x.id)}"`;
+  return `<div class="tarj-m ${hijo ? 'hijo' : ''}" ${attr}><div class="l1"><b>${escapar(titulo)}</b>${p}</div><div class="sub">${escapar(sub)}</div>
+    <div class="l2"><span>Efectivo<b>${dinero(x.efectivo)}</b></span><span>Tarjeta<b>${dinero(x.tarjeta)}</b></span><span>Transf.<b>${dinero(x.transferencia)}</b></span><span>Neta<b>${dinero(x.venta_neta)}</b></span></div></div>`;
+}
+function listaCelHTML(lista, grupos, T) {
+  let html;
+  if (!grupos) html = lista.map((t) => tarjetaCel(t)).join('');
+  else html = grupos.map((g) => tarjetaCel(g, { grupo: true }) + (S.abiertas.has(g.clave) ? g.hijos.map((t) => tarjetaCel(t, { hijo: true })).join('') : '')).join('');
+  return `<div class="lista-cel">${html}<div class="tarj-total"><span>TOTAL DEL PERIODO</span><span>${dinero(T.venta_neta)}</span></div></div>`;
+}
+
+// Clic en la tabla o en las tarjetas: abrir un grupo (día/mes) o ver un corte
+document.getElementById('cuerpo').addEventListener('click', (e) => {
+  const turno = e.target.closest('[data-turno]');
+  if (turno) { verCorte(Number(turno.dataset.turno)); return; }
+  const grupo = e.target.closest('[data-grupo]');
+  if (grupo) {
+    const k = grupo.dataset.grupo;
+    if (S.abiertas.has(k)) S.abiertas.delete(k); else S.abiertas.add(k);
+    render();
+  }
+});
+
+// ---------- Ver un corte completo en pantalla ----------
+function cerrarDetalle() { const ov = document.getElementById('ovDetalle'); if (ov) ov.remove(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarDetalle(); });
+async function verCorte(id) {
+  try {
+    const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${id}/resumen`), configNegocioTurno()]);
+    const texto = lineasCorteCaja(corte, { columnas: 40, negocio: (cfg && cfg.nombre_negocio) || '' })
+      .map((l) => (typeof l === 'string' ? l : l.t)).join('\n');
+    cerrarDetalle();
+    const ov = document.createElement('div');
+    ov.id = 'ovDetalle'; ov.className = 'ov-det';
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) cerrarDetalle(); });
+    const caja = document.createElement('div'); caja.className = 'caja-det';
+    const pre = document.createElement('pre'); pre.textContent = texto;
+    const botones = document.createElement('div'); botones.className = 'botones-det';
+    const imprimir = document.createElement('button'); imprimir.className = 'btn btn-secondary'; imprimir.textContent = '🖨️ Imprimir';
+    imprimir.onclick = async () => { try { await imprimirCorteTurno(id); } catch (err) { mostrarToast(err.message, 'error'); } };
+    const cerrar = document.createElement('button'); cerrar.className = 'btn btn-primary'; cerrar.textContent = 'Cerrar';
+    cerrar.onclick = cerrarDetalle;
+    botones.append(imprimir, cerrar); caja.append(pre, botones); ov.appendChild(caja); document.body.appendChild(ov);
+  } catch (err) { mostrarToast(err.message || 'No se pudo abrir el corte', 'error'); }
+}
+
+// ---------- Descargas ----------
+function nombreArchivo(ext) { return `cortes_${S.desde}_a_${S.hasta}.${ext}`; }
+function nombreCajeroElegido() {
+  if (!S.cajero) return 'Todos';
+  const t = (S.datos ? S.datos.turnos : []).find((x) => String(x.usuario_id) === String(S.cajero));
+  return t ? t.cajero : '';
+}
+function hojaExcel(aoa, anchos, colsDinero) {
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const r = XLSX.utils.decode_range(ws['!ref']);
+  for (let fila = 1; fila <= r.e.r; fila++) {
+    colsDinero.forEach((col) => { const c = ws[XLSX.utils.encode_cell({ r: fila, c: col })]; if (c && c.t === 'n') c.z = '"$"#,##0.00'; });
+  }
+  ws['!cols'] = anchos.map((w) => ({ wch: w }));
+  return ws;
+}
+function exportarExcel() {
+  const lista = turnosFiltrados().slice().sort((a, b) => new Date(a.fecha_apertura) - new Date(b.fecha_apertura));
+  if (!lista.length) { mostrarToast('No hay cortes en este periodo para descargar', 'error'); return; }
+  if (typeof XLSX === 'undefined') { mostrarToast('No se pudo cargar el generador de Excel. Recarga la página.', 'error'); return; }
+  const T = totales(lista);
+  const wb = XLSX.utils.book_new();
+
+  const resumen = [
+    ['Cortes de caja'],
+    ['Periodo', `${S.desde} a ${S.hasta}`],
+    ['Cajero', nombreCajeroElegido()],
+    ['Generado', textoFechaHora(new Date().toISOString())],
+    [],
+    ['Concepto', 'Importe'],
+    ['Cortes (turnos)', T.n], ['Tickets', T.tickets],
+    ['Efectivo', T.efectivo], ['Tarjeta', T.tarjeta], ['Transferencia', T.transferencia], ['Crédito (fiado)', T.credito],
+    ['Otros (dólares, cheques, vales)', T.otros], ['Descuentos', T.descuentos], ['Venta neta', T.venta_neta],
+    ['Diferencia (sobrante + / faltante −)', T.dif]
+  ];
+  const wsRes = XLSX.utils.aoa_to_sheet(resumen);
+  for (let fila = 8; fila < resumen.length; fila++) { const c = wsRes[XLSX.utils.encode_cell({ r: fila, c: 1 })]; if (c && c.t === 'n') c.z = '"$"#,##0.00'; }
+  wsRes['!cols'] = [{ wch: 38 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
+
+  const cabCortes = ['Turno', 'Cajero', 'Día', 'Apertura', 'Cierre', 'Tickets', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia', 'Estado'];
+  const filasCortes = lista.map((t) => [t.id, t.cajero, t.dia, textoFechaHora(t.fecha_apertura), t.fecha_cierre ? textoFechaHora(t.fecha_cierre) : '', t.tickets,
+    t.efectivo, t.tarjeta, t.transferencia, t.credito, t.otros, t.descuentos, t.venta_neta, t.diferencia === null ? '' : t.diferencia, estadoDif(t.diferencia)]);
+  filasCortes.push(['TOTAL', '', '', '', '', T.tickets, T.efectivo, T.tarjeta, T.transferencia, T.credito, T.otros, T.descuentos, T.venta_neta, T.dif, '']);
+  XLSX.utils.book_append_sheet(wb, hojaExcel([cabCortes, ...filasCortes], [8, 26, 12, 17, 17, 9, 14, 14, 14, 14, 12, 12, 14, 14, 13], [6, 7, 8, 9, 10, 11, 12, 13]), 'Cortes');
+
+  const cabAgr = (primera) => [primera, 'Turnos', 'Tickets', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia'];
+  const filaAgr = (g, nombre) => [nombre, g.n, g.tickets, g.efectivo, g.tarjeta, g.transferencia, g.credito, g.otros, g.descuentos, g.venta_neta, g.dif];
+  ['dia', 'mes'].forEach((vista) => {
+    const grupos = agrupar(lista, vista).reverse(); // del más viejo al más nuevo
+    const filas = grupos.map((g) => filaAgr(g, vista === 'dia' ? g.clave : etiquetaMes(g.clave)));
+    filas.push(filaAgr(T, 'TOTAL'));
+    XLSX.utils.book_append_sheet(wb, hojaExcel([cabAgr(vista === 'dia' ? 'Día' : 'Mes'), ...filas], [18, 8, 9, 14, 14, 14, 14, 12, 12, 14, 14], [3, 4, 5, 6, 7, 8, 9, 10]), vista === 'dia' ? 'Por día' : 'Por mes');
+  });
+
+  XLSX.writeFile(wb, nombreArchivo('xlsx'));
+  mostrarToast('Excel descargado', 'exito');
+}
+function descargarCSV() {
+  const lista = turnosFiltrados();
+  if (!lista.length) { mostrarToast('No hay cortes en este periodo para descargar', 'error'); return; }
+  const T = totales(lista);
+  const f = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  const turno = S.vista === 'turno';
+  const cab = [turno ? 'Turno' : S.vista === 'dia' ? 'Día' : 'Mes', turno ? 'Cajero' : 'Turnos', turno ? 'Fecha' : '', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia', 'Estado'];
+  const fila = (a, b, c, x, dif) => [a, b, c, x.efectivo, x.tarjeta, x.transferencia, x.credito, x.otros, x.descuentos, x.venta_neta, dif === null || dif === undefined ? '' : dif, estadoDif(dif)];
+  let filas;
+  if (turno) filas = lista.map((t) => fila(t.id, t.cajero, `${t.dia} ${textoHoras(t)}`, t, t.diferencia));
+  else filas = agrupar(lista, S.vista).map((g) => fila(S.vista === 'dia' ? g.clave : etiquetaMes(g.clave), g.n, '', g, g.sinDeclarar >= g.n ? null : g.dif));
+  filas.push(fila('TOTAL', turno ? '' : T.n, '', T, T.sinDeclarar >= T.n ? null : T.dif));
+  const csv = '﻿' + [cab, ...filas].map((r) => r.map(f).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = nombreArchivo('csv');
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------- Arranque ----------
+// En celular hay una barra fija abajo: se esconden los botones flotantes para no taparla.
+const esCelular = window.matchMedia('(max-width: 820px)');
+const ajustarBarraFija = () => document.body.classList.toggle('barra-fija', esCelular.matches);
+esCelular.addEventListener('change', ajustarBarraFija); ajustarBarraFija();
+[S.desde, S.hasta] = rangoRapido('mes');
+document.getElementById('fDesde').value = S.desde;
+document.getElementById('fHasta').value = S.hasta;
+marcarControles();
+cargar();
+</script>
+<script src="../js/sidebar-nav.js"></script>
+</body>
+</html>
