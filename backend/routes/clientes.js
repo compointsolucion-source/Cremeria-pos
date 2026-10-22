@@ -88,6 +88,76 @@ router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, 
   }
 });
 
+// Importación masiva desde Excel (columnas: Nombre, Teléfono, Límite de crédito y Saldo).
+// El navegador ya convirtió el archivo a una lista; llega en tandas chicas. Si el nombre
+// ya existe (sin importar mayúsculas), se ACTUALIZAN su teléfono y su límite de crédito
+// pero NUNCA su saldo (para no pisar lo que ya debe de verdad); si no existe, se CREA
+// con el saldo que traía del sistema anterior. Filas sin nombre se omiten.
+router.post('/importar', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
+  try {
+    const { clientes } = req.body;
+    if (!Array.isArray(clientes) || clientes.length === 0) {
+      return res.status(400).json({ error: 'No se recibieron clientes para importar' });
+    }
+    if (clientes.length > 500) {
+      return res.status(400).json({ error: 'Son demasiados clientes en una sola tanda (máximo 500)' });
+    }
+
+    const monto = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n * 100) / 100, 99999999) : 0; };
+
+    const existentes = await conexion.query('SELECT id, LOWER(TRIM(nombre)) AS nombre_lower FROM clientes WHERE sucursal_id = $1', [req.sucursalId]);
+    const porNombre = {};
+    existentes.rows.forEach(c => { porNombre[c.nombre_lower] = c.id; });
+
+    let creados = 0, actualizados = 0, omitidos = 0;
+    await conexion.query('BEGIN');
+    for (const fila of clientes) {
+      const nombre = String(fila.nombre || '').trim().slice(0, 150);
+      if (!nombre) { omitidos++; continue; }
+      const telefono = String(fila.telefono || '').trim().slice(0, 20) || null;
+      const limite = monto(fila.limite_credito);
+      const saldo = monto(fila.saldo);
+      const clave = nombre.toLowerCase();
+
+      if (porNombre[clave]) {
+        await conexion.query(
+          `UPDATE clientes SET telefono = COALESCE($1, telefono),
+             limite_credito = CASE WHEN $2 > 0 THEN $2 ELSE limite_credito END
+           WHERE id = $3`,
+          [telefono, limite, porNombre[clave]]
+        );
+        actualizados++;
+      } else {
+        const nuevo = await conexion.query(
+          `INSERT INTO clientes (sucursal_id, nombre, telefono, limite_credito, saldo_actual)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [req.sucursalId, nombre, telefono, limite, saldo]
+        );
+        // Se anota en memoria: si el archivo repite el nombre más abajo, se actualiza en vez de duplicar.
+        porNombre[clave] = nuevo.rows[0].id;
+        creados++;
+      }
+    }
+    await conexion.query('COMMIT');
+
+    await registrarBitacora(pool, {
+      usuario_id: req.usuario.id,
+      accion: 'importar_clientes',
+      modulo: 'clientes',
+      valor_nuevo: { total: clientes.length, creados, actualizados, omitidos }
+    });
+
+    res.json({ creados, actualizados, omitidos });
+  } catch (err) {
+    await conexion.query('ROLLBACK').catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: 'Error al importar los clientes: ' + err.message });
+  } finally {
+    conexion.release();
+  }
+});
+
 // Editar cliente (nombre, teléfono, límite)
 router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {

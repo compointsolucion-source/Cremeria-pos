@@ -1,0 +1,49 @@
+ELEVENTA -> COMPOINT PUNTO
+==========================
+
+Para que un negocio que viene de Eleventa empiece con SUS productos y SUS clientes ya cargados.
+
+QUE SE PASA
+  Productos: codigo, nombre, costo, precio, mayoreo, existencia (inventario), minimo, maximo,
+             departamento y si se vende "A Granel" o "Por Pieza".
+  Clientes:  nombre, telefono, limite de credito y lo que deben (saldo).
+
+QUE NO SE PASA
+  El "catalogo base" que trae Eleventa (tablas PRODUCTOS_BASE y PROVEEDORES_BASE). Es de Eleventa
+  y viene protegido con las letras cambiadas; no se toca.
+  Tampoco "Publico en General" ni "Venta al extranjero" (son clientes de sistema de Eleventa).
+
+COMO SE USA (lo normal)
+  1) Sacar el archivo PDVDATA.FDB de la computadora del cliente. Esta en la carpeta de datos de
+     Eleventa (busca "PDVDATA.FDB"). Copiarlo con Eleventa CERRADO.
+  2) Convertirlo (lo hace Claude, o tu corriendo convertir_fdb.py). Salen dos Excel:
+        Productos-Eleventa.xlsx
+        Clientes-Eleventa.xlsx   (solo sale si el negocio tiene clientes reales)
+  3) En Compoint Punto, con el usuario dueno:
+        Catalogo > Reporte Inventario > Importar Excel -> Productos-Eleventa.xlsx
+        Clientes > Importar Excel                  -> Clientes-Eleventa.xlsx
+     Si se importa dos veces el mismo archivo NO se duplica nada: actualiza lo que ya existe
+     (en clientes, el saldo no se toca la segunda vez).
+
+REVISAR DESPUES DE IMPORTAR
+  - Productos que en Eleventa tenian IMPUESTOS: el Excel trae el precio final (con impuesto).
+    El convertidor avisa cuantos son. Revisa que el precio sea el que cobras.
+  - Productos que en Eleventa NO controlaban inventario quedan con existencia 0.
+  - Si Eleventa tenia existencia negativa, pasa tal cual (negativa).
+
+REQUISITOS DEL CONVERTIDOR (convertir_fdb.py)
+  Python 3 con:  pip install fdb openpyxl
+  Eleventa usa Firebird 2.5 (los archivos .FDB de Eleventa NO abren con Firebird 3 o mas nuevo).
+  Dos formas de leer el archivo:
+   a) Servidor: si la computadora tiene Eleventa/Firebird 2.5 corriendo
+        python convertir_fdb.py PDVDATA.FDB -o salida --servidor localhost --clave masterkey
+   b) Embebido (sin servidor), por ejemplo en Linux:
+        - Bajar de los repositorios de Ubuntu (bionic) los paquetes: libfbembed2.5, libfbclient2,
+          libib-util, firebird2.5-common, firebird2.5-server-common, firebird2.5-super
+          (version 2.5.4.26856) y libicu55 (xenial), y descomprimirlos con "dpkg -x" en una carpeta.
+        - Crear una carpeta con enlaces a firebird.conf, fbintl.conf, firebird.msg e intl
+          y apuntar las variables FIREBIRD, FIREBIRD_LOCK y FIREBIRD_TMP a ella.
+        - Poner LD_LIBRARY_PATH a la carpeta de librerias (.../usr/lib/x86_64-linux-gnu).
+        python3 convertir_fdb.py PDVDATA.FDB -o salida --lib .../libfbembed.so.2.5.4
+  Notas tecnicas: en modo embebido se abre SIN usuario ni clave; la base no declara su juego de
+  caracteres (NONE), por eso los textos se leen como bytes y se decodifican como Windows-1252.

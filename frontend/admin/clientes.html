@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../css/sidebar.css">
 <link rel="stylesheet" href="../css/vistas-admin.css">
 <script src="../js/tema.js"></script>
+<script src="../js/vendor/xlsx.full.min.js"></script>
 <style>
   .columnas { --ancho-panel: 440px; }
 
@@ -74,7 +75,11 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>👤 Clientes y Créditos</h1></div>
-    <button class="btn btn-primary solo-pc" onclick="nuevoCliente()">＋ Nuevo cliente</button>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary solo-pc" id="btnImportarClientes" style="display:none;" onclick="document.getElementById('inputImportarClientes').click()" title="Columnas: Nombre, Teléfono, Límite de crédito, Saldo">📥 Importar Excel</button>
+      <input type="file" id="inputImportarClientes" accept=".xlsx,.xls" style="display:none;" onchange="importarClientesExcel(event)">
+      <button class="btn btn-primary solo-pc" onclick="nuevoCliente()">＋ Nuevo cliente</button>
+    </div>
   </div>
 
   <div class="contenido">
@@ -562,6 +567,58 @@ async function registrarAbono() {
   }
 }
 
+// ---------- Importar clientes desde Excel ----------
+// Columnas: Nombre, Teléfono, Límite de crédito y Saldo. Si el nombre ya existe se
+// actualiza su teléfono y límite (el saldo NO se toca); si no, se crea con su saldo.
+function numeroDeExcel(valor) {
+  if (valor === null || valor === undefined || valor === '') return 0;
+  if (typeof valor === 'number') return valor;
+  const n = parseFloat(String(valor).replace(/[$\s,]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+async function importarClientesExcel(evento) {
+  const archivo = evento.target.files[0];
+  if (!archivo) return;
+  try {
+    mostrarToast('Leyendo archivo...', 'info');
+    const libro = XLSX.read(await archivo.arrayBuffer(), { type: 'array' });
+    const filas = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { defval: '' });
+    const lista = filas.map(f => ({
+      nombre: String(f['Nombre'] || '').trim(),
+      telefono: String(f['Teléfono'] || f['Telefono'] || '').trim(),
+      limite_credito: numeroDeExcel(f['Límite de crédito'] !== undefined ? f['Límite de crédito'] : f['Limite de credito']),
+      saldo: numeroDeExcel(f['Saldo'])
+    })).filter(c => c.nombre);
+
+    if (!lista.length) { mostrarToast('No encontré clientes en el archivo. Revisa que tenga la columna "Nombre".', 'error'); return; }
+
+    const conDeuda = lista.filter(c => c.saldo > 0).length;
+    const sigue = await confirmarAccion(`Se van a procesar ${lista.length} clientes${conDeuda ? ` (${conDeuda} con saldo pendiente)` : ''}. Los que ya existan por nombre solo actualizan teléfono y límite; los nuevos se crean. ¿Continuar?`);
+    if (!sigue) return;
+
+    const TANDA = 100;
+    let creados = 0, actualizados = 0, omitidos = 0;
+    const errores = [];
+    for (let i = 0; i < lista.length; i += TANDA) {
+      mostrarToast(`Importando clientes ${i + 1} a ${Math.min(i + TANDA, lista.length)} de ${lista.length}...`, 'info');
+      try {
+        const r = await apiFetch('/clientes/importar', { method: 'POST', body: JSON.stringify({ clientes: lista.slice(i, i + TANDA) }) });
+        creados += r.creados; actualizados += r.actualizados; omitidos += r.omitidos;
+      } catch (err) {
+        errores.push(`Filas ${i + 1}-${Math.min(i + TANDA, lista.length)}: ${err.message}`);
+      }
+    }
+    await cargarClientes();
+    if (errores.length) mostrarToast(`Terminó con errores: ${errores.join(' | ')}`, 'error', 9000);
+    else mostrarToast(`Listo: ${creados} clientes nuevos, ${actualizados} actualizados${omitidos ? `, ${omitidos} omitidos` : ''}`, 'exito', 6000);
+  } catch (err) {
+    mostrarToast('No se pudo leer el archivo: ' + err.message, 'error');
+  } finally {
+    evento.target.value = '';
+  }
+}
+
 // ---------- Comprobante imprimible ----------
 function generarComprobante() {
   const data = cuenta;
@@ -620,6 +677,8 @@ function generarComprobante() {
 
 pintarPanel();
 cargarClientes();
+// Importar desde Excel: solo para dueño/gerente (igual que editar clientes).
+if (puedeEditar()) document.getElementById('btnImportarClientes').style.display = '';
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>

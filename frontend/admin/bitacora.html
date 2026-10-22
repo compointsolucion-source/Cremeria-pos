@@ -146,6 +146,7 @@ function describir(r) {
     case 'procesar_devolucion': return D('↩️', 'azul', `registró una devolución${n.ticket_folio ? ' del ticket ' + b(n.ticket_folio) : ''} · ${b(dinero(n.monto_total))}${n.metodo_reembolso ? ' (' + escapar(PAGOS[n.metodo_reembolso] || n.metodo_reembolso) + ')' : ''}`);
     case 'crear_producto': return D('🆕', 'azul', `creó el producto ${b(n.nombre || '')}${n.precio != null ? ' · ' + dinero(n.precio) : ''}`);
     case 'importar_productos': return D('📥', 'azul', `importó productos · ${n.creados || 0} nuevos, ${n.actualizados || 0} actualizados`);
+    case 'importar_clientes': return D('📥', 'azul', `importó clientes · ${n.creados || 0} nuevos, ${n.actualizados || 0} actualizados`);
     case 'crear_departamento': return D('🏷️', 'azul', `creó el departamento ${b(n.nombre || '')}`);
     case 'eliminar_departamento': return D('🗑️', 'rojo', 'eliminó un departamento');
     case 'crear_promocion': return D('🏷️', 'amarillo', `creó una promoción${n.cantidad_minima ? ' · desde ' + escapar(n.cantidad_minima) + ' piezas a ' + b(dinero(n.precio_promocional)) : ''}`);
