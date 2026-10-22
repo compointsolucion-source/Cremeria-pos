@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const intermediario = require('./intermediario');
 const instalacion = require('./instalacion');
+const { dibujarBarras, MEDIR_BARRAS } = require('./barras');
+const { COMANDO_CAJON, resolverImpresoraCajon } = require('./cajon');
 const { rutasPrevistas } = require('./servidor/rutas');
 
 const PUERTO_INTERMEDIARIO = 3500;
@@ -420,6 +422,16 @@ function bitmapAEscPos(buf, ancho, alto) {
   return Buffer.concat(partes);
 }
 
+// Abre el cajón de dinero con la impresora de Windows (sin imprimir nada).
+// opciones: { impresora: 'nombre exacto' | '' (la predeterminada de Windows) }
+ipcMain.handle('abrir-cajon', async (e, opciones = {}) => {
+  if (!esDelSistema(e)) throw new Error('No permitido');
+  const r = resolverImpresoraCajon(await e.sender.getPrintersAsync(), opciones && opciones.impresora);
+  if (r.error) throw new Error(r.error);
+  await enviarRaw(r.destino, COMANDO_CAJON);
+  return { ok: true };
+});
+
 ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
   if (!esDelSistema(e)) throw new Error('No permitido');
   const anchoMM = parseInt(opciones.anchoMM, 10) === 58 ? 58 : 80;
@@ -474,6 +486,16 @@ ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
           const v = (lum * a + 255 * (1 - a)) < 160 ? 0 : 255;
           buf[p] = buf[p + 1] = buf[p + 2] = v; buf[p + 3] = 255;
         }
+        // Los códigos de barras se redibujan con barras exactas (ver barras.js): al achicar/estirar
+        // la imagen quedaban de grosor desigual y el lector no los leía.
+        try {
+          const medida = await oculta.webContents.executeJavaScript(MEDIR_BARRAS);
+          const escala = medida && medida.anchoPagina > 0 ? t.width / medida.anchoPagina : 0;
+          // Solo si las medidas cuadran con lo esperado (si no, se deja la imagen como está).
+          if (medida && medida.barras.length && Math.abs(escala / zoom - 1) < 0.03) {
+            dibujarBarras(buf, t.width, t.height, medida.barras, escala);
+          }
+        } catch (err) { log('No se pudo redibujar el código de barras: ' + err.message); }
         bitmapBN = { buf, ancho: t.width, alto: t.height };
         png = nativeImage.createFromBitmap(buf, { width: t.width, height: t.height }).toPNG();
         var altoImgPx = Math.ceil(t.height / zoom);

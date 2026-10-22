@@ -192,7 +192,7 @@
             </div>
             <div class="campo">
               <label>Departamento</label>
-              <select id="categoriaId"><option value="">Sin departamento</option></select>
+              <select id="categoriaId" onchange="alCambiarDepartamento()"><option value="">Sin departamento</option></select>
             </div>
           </div>
 
@@ -464,10 +464,30 @@ function cancelarEdicion(cerrar = true) {
   if (cerrar) cerrarHoja();
 }
 
+// Último departamento usado al dar de alta productos: se queda elegido en cada producto nuevo
+// hasta que se cambie (así se capturan varios productos seguidos del mismo departamento).
+// Se guarda en este equipo; "Sin departamento" también cuenta como elección.
+const CLAVE_ULTIMO_DEPTO = 'productos_ultimo_departamento';
+function leerUltimoDepartamento() {
+  try { return localStorage.getItem(CLAVE_ULTIMO_DEPTO) || ''; } catch (e) { return ''; }
+}
+function recordarDepartamento(id) {
+  try { localStorage.setItem(CLAVE_ULTIMO_DEPTO, id ? String(id) : ''); } catch (e) { /* sin almacenamiento */ }
+}
+function aplicarUltimoDepartamento() {
+  const sel = document.getElementById('categoriaId');
+  const id = leerUltimoDepartamento();
+  // Si ese departamento ya no existe, se queda en "Sin departamento".
+  sel.value = [...sel.options].some(o => o.value === id) ? id : '';
+}
+function alCambiarDepartamento() {
+  if (!productoEditandoId) recordarDepartamento(document.getElementById('categoriaId').value);
+}
+
 function limpiarFormulario() {
   ['nombre', 'precio', 'precioCosto', 'gananciaPorcentaje', 'precioMayoreo', 'codigoBarras', 'existenciaInicial', 'stockMinimo', 'stockMaximo']
     .forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('categoriaId').value = '';
+  aplicarUltimoDepartamento();           // el departamento que se usó la última vez se queda elegido
   document.getElementById('tipoVenta').value = 'unidad';
   document.getElementById('favorito').checked = false;
   document.getElementById('usaInventario').checked = true;
@@ -601,6 +621,7 @@ async function cargarCategorias() {
   const cats = await apiFetch('/departamentos');
   document.getElementById('categoriaId').innerHTML = '<option value="">Sin departamento</option>' + cats.map(c => `<option value="${c.id}">${escapar(c.nombre)}</option>`).join('');
   document.getElementById('filtroDepto').innerHTML = '<option value="">Todos los departamentos</option>' + cats.map(c => `<option value="${c.id}">${escapar(c.nombre)}</option>`).join('');
+  if (!productoEditandoId) aplicarUltimoDepartamento();
 }
 
 async function guardarProducto() {
@@ -642,6 +663,7 @@ async function guardarProducto() {
         })
       });
       mostrarToast('Producto guardado', 'exito');
+      recordarDepartamento(categoria_id);
       limpiarFormulario();
       if (esAngosto.matches) cerrarHoja();
       else document.getElementById('codigoBarras').focus();

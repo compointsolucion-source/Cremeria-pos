@@ -1011,6 +1011,11 @@ async function agregarKitAvanzada(kit) {
   renderTablaVentaAvanzada();
 }
 
+// Lo que se teclea libre (artículo en común) no debe poder romper la tabla si lleva < o &.
+function escaparNombreAv(t) {
+  return String(t === null || t === undefined ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function renderTablaVentaAvanzada() {
   const tbody = document.getElementById('tablaVentaAvanzada');
   let total = 0;
@@ -1022,7 +1027,7 @@ function renderTablaVentaAvanzada() {
     return `
       <tr class="${idx === filaSeleccionadaIndex ? 'fila-seleccionada' : ''}" onclick="seleccionarFilaAvanzada(${idx})">
         <td>${item.codigo_barras || '—'}</td>
-        <td>${item.nombre_producto}</td>
+        <td>${escaparNombreAv(item.nombre_producto)}</td>
         <td class="numero">$${item.precio_unitario.toFixed(2)}</td>
         <td class="numero">${item.cantidad}</td>
         <td class="numero">$${importe.toFixed(2)}</td>
@@ -1069,25 +1074,114 @@ async function abrirVarios() {
   mostrarToast(`${cantidad} x ${producto.nombre} agregado`, 'exito');
 }
 
-// "Artículo en Común": para vender algo que no está dado de alta en el
-// catálogo — se captura libre (descripción y precio) y no afecta inventario
-// porque no está ligado a ningún producto real.
-async function abrirArticuloComun() {
-  const descripcion = await solicitarTexto('¿Qué vas a vender? (descripción libre)');
-  if (!descripcion) return;
+// Convierte lo que teclea una persona en un número: acepta "35", "35.50", "35,50", "$35.50",
+// "1,250.00", "1.250,00" y "35 pesos". Devuelve NaN si no se entiende.
+function numeroTecleadoAv(texto) {
+  let t = String(texto === null || texto === undefined ? '' : texto).trim().toLowerCase();
+  t = t.replace(/pesos?|mxn|mn|\$|\s/g, '');
+  if (!t) return NaN;
+  if (t.includes(',') && t.includes('.')) {
+    // el último separador es el decimal
+    t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  } else if (t.includes(',')) {
+    // "1,250" = mil doscientos cincuenta; "35,5" = 35.5
+    t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
+  }
+  return /^(\d+\.?\d*|\.\d+)$/.test(t) ? parseFloat(t) : NaN;
+}
 
-  const precioTexto = await solicitarTexto(`Precio de "${descripcion}":`);
-  if (!precioTexto) return;
-  const precio = parseFloat(precioTexto);
-  if (isNaN(precio) || precio <= 0) { mostrarToast('Precio inválido', 'error'); return; }
+// "Artículo en Común": para vender algo que no está dado de alta en el catálogo.
+// Una sola ventana con descripción, precio y cantidad (antes eran dos preguntas seguidas, y si el
+// precio llevaba "$" o coma se perdía todo). Si algo falta lo dice ahí mismo sin cerrar la ventana.
+function pedirArticuloComunAv() {
+  return new Promise((resolve) => {
+    let ov = document.getElementById('modalArticuloComunAv');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'modalArticuloComunAv';
+      ov.className = 'modal-confirm-overlay';
+      ov.innerHTML = `
+        <div class="modal-confirm-caja" style="max-width:380px; text-align:left;">
+          <p style="font-weight:700; font-size:17px; margin-bottom:12px;">📝 Artículo en común</p>
+          <p style="margin-bottom:10px; color:var(--text-secondary,#666); font-size:13px;">Para vender algo que no está en el catálogo. No descuenta inventario.</p>
+          <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;" for="acDescripcion">¿Qué vas a vender?</label>
+          <input type="text" id="acDescripcion" maxlength="120" placeholder="Ej. Bolsa de regalo" autocomplete="off" style="width:100%; margin-bottom:10px;">
+          <div style="display:flex; gap:10px; margin-bottom:6px;">
+            <div style="flex:1;">
+              <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;" for="acPrecio">Precio ($)</label>
+              <input type="text" id="acPrecio" inputmode="decimal" placeholder="0.00" autocomplete="off" style="width:100%;">
+            </div>
+            <div style="width:90px;">
+              <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;" for="acCantidad">Cantidad</label>
+              <input type="text" id="acCantidad" inputmode="decimal" value="1" autocomplete="off" style="width:100%;">
+            </div>
+          </div>
+          <div id="acError" style="color:#c62828; font-size:13px; min-height:18px; margin-bottom:8px;"></div>
+          <div class="modal-confirm-botones">
+            <button class="btn btn-secondary" id="acCancelar" type="button">Cancelar</button>
+            <button class="btn btn-primary" id="acAceptar" type="button">Agregar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(ov);
+    }
+    const desc = document.getElementById('acDescripcion'), precio = document.getElementById('acPrecio'), cant = document.getElementById('acCantidad');
+    const err = document.getElementById('acError');
+    const aceptar = document.getElementById('acAceptar'), cancelar = document.getElementById('acCancelar');
+    desc.value = ''; precio.value = ''; cant.value = '1'; err.textContent = '';
+    ov.classList.add('abierto');
+    setTimeout(() => desc.focus(), 0);
+
+    const cerrar = (resultado) => {
+      ov.classList.remove('abierto');
+      aceptar.removeEventListener('click', alAceptar);
+      cancelar.removeEventListener('click', alCancelar);
+      ov.removeEventListener('keydown', alTeclado, true);
+      precio.removeEventListener('input', limpiarError);
+      cant.removeEventListener('input', limpiarError);
+      resolve(resultado);
+    };
+    const alCancelar = () => cerrar(null);
+    const alAceptar = () => {
+      const p = numeroTecleadoAv(precio.value);
+      const c = numeroTecleadoAv(cant.value);
+      if (!(p > 0)) { err.textContent = 'Escribe el precio, por ejemplo 35 o 35.50'; precio.focus(); precio.select(); return; }
+      if (!(c > 0)) { err.textContent = 'La cantidad debe ser mayor que cero'; cant.focus(); cant.select(); return; }
+      cerrar({
+        descripcion: desc.value.trim() || 'Artículo común',
+        precio: Math.round(p * 100) / 100,
+        cantidad: Math.round(c * 1000) / 1000
+      });
+    };
+    const alTeclado = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); alCancelar(); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault(); e.stopPropagation();
+        if (e.target === desc) precio.focus();
+        else if (e.target === precio && !String(precio.value).trim()) return;
+        else alAceptar();
+      }
+    };
+    const limpiarError = () => { err.textContent = ''; };
+    precio.addEventListener('input', limpiarError);
+    cant.addEventListener('input', limpiarError);
+    aceptar.addEventListener('click', alAceptar);
+    cancelar.addEventListener('click', alCancelar);
+    ov.addEventListener('keydown', alTeclado, true);
+  });
+}
+
+async function abrirArticuloComun() {
+  const datos = await pedirArticuloComunAv();
+  if (!datos) return;
 
   const nuevoItem = {
     tipo: 'producto',
     producto_id: null, // sin producto real: no descuenta inventario
     codigo_barras: '0',
-    nombre_producto: descripcion,
-    cantidad: 1,
-    precio_unitario: precio,
+    nombre_producto: datos.descripcion,
+    tipo_venta: 'unidad',
+    cantidad: datos.cantidad,
+    precio_unitario: datos.precio,
     existencia_referencia: null
   };
 
@@ -1104,12 +1198,13 @@ async function abrirArticuloComun() {
     } catch (err) {
       mostrarToast('No se pudo agregar al ticket: ' + err.message, 'error');
     }
-    return;
+  } else {
+    carritoActivo().push(nuevoItem);
+    renderTablaVentaAvanzada();
+    mostrarToast('Artículo agregado', 'exito');
   }
-
-  carritoActivo().push(nuevoItem);
-  renderTablaVentaAvanzada();
-  mostrarToast('Artículo agregado', 'exito');
+  const campo = document.getElementById('campoCodigoProducto');
+  if (campo) campo.focus();
 }
 
 // Genera el ticket (igual que Mostrador) y de inmediato lo carga en Caja

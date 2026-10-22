@@ -246,21 +246,44 @@ function guardarConfiguracionRedEtiqueta(urlIntermediario, ipImpresora, puertoIm
   localStorage.setItem('intermediario_puerto_impresora_etiqueta', puertoImpresora || 9100);
 }
 
-// Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) usando
-// el comando ESC/POS estándar. Solo funciona con impresión directa
-// (Bluetooth/USB) — el método "diálogo del sistema" pasa por el driver de
-// Windows y no manda comandos crudos, así que ahí no hay forma de abrirlo.
+// Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) con el comando
+// ESC/POS estándar. Hay dos caminos, según cómo imprime ESTE equipo:
+//  1) Impresora directa (Bluetooth/USB): se manda el comando por la conexión.
+//  2) Programa de escritorio con impresora de Windows: se manda por el spooler de Windows
+//     (compointDesktop.abrirCajon), a la misma impresora del ticket.
+// Un navegador normal con impresora de Windows no puede mandar comandos crudos: ahí el cajón
+// solo se abre si el driver de la impresora lo hace al imprimir (opción de Windows).
 async function abrirCajonDinero() {
-  if (!impresoraConectada()) {
-    await reconectarSiEsPosible();
+  const modo = localStorage.getItem('modo_impresion') || 'directo';
+
+  if (modo !== 'sistema') {
+    if (!impresoraConectada()) {
+      await reconectarSiEsPosible();
+    }
+    if (impresoraConectada()) {
+      // ESC p m t1 t2 — comando estándar "kick out drawer" que reconocen casi
+      // todas las impresoras térmicas con conector de cajón.
+      await enviarBytes(new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]));
+      return;
+    }
   }
-  if (!impresoraConectada()) {
-    throw new Error('No hay impresora conectada — el cajón se abre a través de ella. Conéctala primero.');
+
+  if (escritorioDisponible()) {
+    const escritorio = window.compointDesktop;
+    if (typeof escritorio.abrirCajon !== 'function') {
+      throw new Error('Esta versión del programa de escritorio todavía no abre la caja. Instala la versión nueva de Compoint Punto.');
+    }
+    const eleccion = eleccionImpresoraWindows('ticket');
+    await escritorio.abrirCajon({
+      impresora: (eleccion === '__predeterminada__' || eleccion === '__preguntar__') ? '' : eleccion
+    });
+    return;
   }
-  // ESC p m t1 t2 — comando estándar "kick out drawer" que reconocen casi
-  // todas las impresoras térmicas con conector de cajón.
-  const comando = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
-  await enviarBytes(comando);
+
+  if (modo === 'sistema') {
+    throw new Error('Desde el navegador no se puede mandar la orden de abrir la caja a una impresora de Windows. Usa el programa de escritorio de Compoint Punto, o activa en las propiedades de la impresora (Windows) la opción de abrir el cajón al imprimir.');
+  }
+  throw new Error('No hay impresora conectada — el cajón se abre a través de ella. Conéctala primero (Configuración → Impresión de este dispositivo).');
 }
 
 // Imprime una ficha de turno: solo el número, en letra gigante, sin QR ni
@@ -794,17 +817,64 @@ function generarCanvasQR(texto, tamanoPx) {
 // físicos básicos que solo leen códigos de barras, no QR.
 // "chico" (ticket de domicilio con ahorro de papel): barras más bajas y sin el número debajo
 // (el folio ya sale escrito en el ticket), para gastar menos papel.
-function generarCanvasBarras(texto, anchoTotalPx, chico) {
+// "zonaBlanca" (solo tickets): deja 10 módulos en blanco a cada lado, que el lector necesita para
+// encontrar dónde empieza el código. Se recorta si no cabría en el papel (58 mm = 384 puntos, 80 mm = 576).
+function generarCanvasBarras(texto, anchoTotalPx, chico, zonaBlanca) {
   const canvas = document.createElement('canvas');
-  JsBarcode(canvas, texto, {
+  const moduloPx = Math.max(1, Math.floor(anchoTotalPx / (texto.length * 11)));
+  const opciones = {
     format: 'CODE128',
-    width: Math.max(1, Math.floor(anchoTotalPx / (texto.length * 11))),
+    width: moduloPx,
     height: chico ? 36 : 60,
     displayValue: !chico,
     fontSize: 14,
     margin: chico ? 2 : 4
-  });
+  };
+  if (zonaBlanca) {
+    const papelPuntos = anchoTotalPx <= 240 ? 384 : 576;
+    const nucleoPx = ((texto.length + 2) * 11 + 13) * moduloPx;
+    const lateralPx = Math.max(4, Math.min(10 * moduloPx, Math.floor((papelPuntos - nucleoPx) / 2) - 2));
+    opciones.marginLeft = lateralPx;
+    opciones.marginRight = lateralPx;
+  }
+  JsBarcode(canvas, texto, opciones);
   return canvas;
+}
+
+// Código de barras para el ticket en HTML (impresora de Windows / navegador).
+// Antes era una imagen que el navegador encogía a un tamaño "quebrado": las barras salían de grosor
+// desigual y pegadas a las orillas del papel, y el lector no las leía. Ahora se dibuja como imagen
+// vectorial donde cada módulo mide un número ENTERO de puntos de la impresora (3 en 80 mm), con
+// 10 módulos de zona blanca a cada lado. Se mide con las mismas cuentas que usa la app de escritorio
+// al convertir el ticket a puntos (576 puntos en 80 mm, 384 en 58 mm).
+// El atributo data-barras lleva el patrón (1 = barra, 0 = espacio) para que la app de escritorio
+// lo vuelva a dibujar exacto sobre la imagen final.
+function htmlBarrasTicket(texto, opciones) {
+  const { chico = false, e58 = false } = opciones || {};
+  const puntos = e58 ? 384 : 576;
+  const anchoPx = Math.round((e58 ? 58 : 80) * 96 / 25.4);
+  const canvas = document.createElement('canvas');
+  JsBarcode(canvas, String(texto), {
+    format: 'CODE128', width: 1, height: 1, displayValue: false,
+    margin: 0, marginLeft: 10, marginRight: 10
+  });
+  const M = canvas.width;
+  const px = canvas.getContext('2d').getImageData(0, 0, M, 1).data;
+  let patron = '', trazo = '';
+  for (let x = 0; x < M; x++) patron += px[x * 4] < 128 ? '1' : '0';
+  for (let x = 0; x < M; ) {
+    if (patron[x] !== '1') { x++; continue; }
+    let f = x;
+    while (f < M && patron[f] === '1') f++;
+    trazo += `M${x} 0h${f - x}v1h-${f - x}z`;
+    x = f;
+  }
+  const k = Math.max(1, Math.min(3, Math.floor((puntos - 16) / M))); // puntos de impresora por módulo
+  const anchoCss = (M * k * anchoPx / puntos).toFixed(4);
+  const altoCss = chico ? 26 : 44;
+  let html = `<svg class="barras" data-barras="${patron}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${M} 1" preserveAspectRatio="none" shape-rendering="crispEdges" style="display:block;margin:4px auto;width:${anchoCss}px;height:${altoCss}px;max-width:none;"><path d="${trazo}" fill="#000"/></svg>`;
+  if (!chico) html += `<div class="c" style="letter-spacing:.08em;">${escaparHtmlTicket(texto)}</div>`;
+  return html;
 }
 
 function bytesJuntos(listaDeArrays) {
@@ -1183,7 +1253,7 @@ async function construirBytesTicketBLE(datosTicket) {
       partesCodigo.push(canvasAComandosRaster(await generarCanvasQR(d.folio, anchoPx)), salto);
     }
     if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
-      partesCodigo.push(canvasAComandosRaster(generarCanvasBarras(d.folio, anchoPx)), salto);
+      partesCodigo.push(canvasAComandosRaster(generarCanvasBarras(d.folio, anchoPx, false, true)), salto);
     }
     if (partesCodigo.length) partes.push(ESCPOS_CENTRAR, ...partesCodigo, ESCPOS_IZQUIERDA);
   } catch (err) {
@@ -1223,7 +1293,7 @@ async function construirBytesTicketBLE(datosTicket) {
     try {
       const anchoBarrasPx = d.ancho_ticket === '58mm' ? 240 : 350;
       const chico = !!(d.pedido && d.pedido.formato && d.pedido.formato.barras === 'chico');
-      partes.push(ESCPOS_CENTRAR, canvasAComandosRaster(generarCanvasBarras(d.folio, anchoBarrasPx, chico)), salto, ESCPOS_IZQUIERDA);
+      partes.push(ESCPOS_CENTRAR, canvasAComandosRaster(generarCanvasBarras(d.folio, anchoBarrasPx, chico, true)), salto, ESCPOS_IZQUIERDA);
     } catch (err) {
       console.error('No se pudo generar el código de barras, se imprime solo el folio en texto:', err.message);
     }
@@ -1358,7 +1428,7 @@ async function construirHtmlTicket(datosTicket) {
       partes.push(`<img src="${(await generarCanvasQR(d.folio, 240)).toDataURL()}" style="width:55%;">`);
     }
     if ((tipoCodigo === 'barras' || tipoCodigo === 'ambos') && typeof JsBarcode !== 'undefined') {
-      partes.push(`<img src="${generarCanvasBarras(d.folio, 350).toDataURL()}">`);
+      partes.push(htmlBarrasTicket(d.folio, { e58 }));
     }
   } catch (err) {
     console.error('No se pudo generar el código escaneable:', err.message);
@@ -1383,7 +1453,7 @@ async function construirHtmlTicket(datosTicket) {
   if (d.codigoAlFinal && d.folio && typeof JsBarcode !== 'undefined') {
     try {
       const chico = !!(d.pedido && d.pedido.formato && d.pedido.formato.barras === 'chico');
-      partes.push(`<img src="${generarCanvasBarras(d.folio, 350, chico).toDataURL()}">`);
+      partes.push(htmlBarrasTicket(d.folio, { chico, e58 }));
     } catch (err) {
       console.error('No se pudo generar el código de barras:', err.message);
     }
