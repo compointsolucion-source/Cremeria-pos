@@ -531,6 +531,7 @@ async function cargarCatalogoAvanzada() {
       if (local.productos.length > 0) {
         catalogoAvanzada = local.productos;
         kitsAvanzada = local.kits;
+        window.__catalogoLocalEnUso = true; // al despertar la nube se vuelve a cargar el catálogo al día
         const fecha = local.fecha_guardado ? new Date(local.fecha_guardado).toLocaleString() : 'fecha desconocida';
         mostrarToast(`Sin conexión — usando el catálogo guardado del ${fecha}`, 'error');
         renderVistaMostrador();
@@ -2023,6 +2024,10 @@ document.addEventListener('keydown', (e) => {
 
 renderPestanas();
 cargarCatalogoAvanzada();
+// Si se estuvo trabajando con el catálogo guardado (nube dormida o sin internet), al despertar se carga el catálogo al día.
+window.addEventListener('nube-despierta', () => {
+  if (window.__catalogoLocalEnUso) { window.__catalogoLocalEnUso = false; cargarCatalogoAvanzada(); }
+});
 actualizarPanelUltimaVenta();
 </script>
 <script src="js/caja-avanzada-mostrador.js"></script>

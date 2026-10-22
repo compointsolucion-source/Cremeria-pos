@@ -38,6 +38,7 @@ async function cargarDatos() {
         categorias = local.categorias;
         renderCategorias();
         renderProductos();
+        window.__catalogoLocalEnUso = true; // al despertar la nube se vuelve a cargar el catálogo al día
         const fecha = local.fecha_guardado ? new Date(local.fecha_guardado).toLocaleString() : 'fecha desconocida';
         mostrarToast(`Sin conexión — usando el catálogo guardado del ${fecha}`, 'error');
         return;
@@ -999,4 +1000,8 @@ setInterval(actualizarContadorFichas, 15000);
 setInterval(actualizarFichaActual, 15000);
 
 cargarDatos();
+// Si se estuvo trabajando con el catálogo guardado (nube dormida o sin internet), al despertar se carga el catálogo al día.
+window.addEventListener('nube-despierta', () => {
+  if (window.__catalogoLocalEnUso) { window.__catalogoLocalEnUso = false; cargarDatos(); }
+});
 aplicarLayoutMostrador();

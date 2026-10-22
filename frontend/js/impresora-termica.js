@@ -403,21 +403,40 @@ async function imprimirEtiquetaPeso({ nombreProducto, peso, precioUnitario, subt
 // Dentro del programa de escritorio de Compoint Punto se puede imprimir DIRECTO
 // (sin diálogo) en cualquier impresora instalada en Windows. La elección se
 // guarda por equipo: 'impresora_windows_ticket' / 'impresora_windows_ficha'
-// = nombre exacto de la impresora, o '__predeterminada__'. Sin elección =
-// se abre el diálogo de impresión como siempre.
+// = nombre exacto de la impresora, '__predeterminada__' (la predeterminada de
+// Windows) o '__preguntar__' (abrir el diálogo de impresión cada vez).
+// Sin elección guardada = '__predeterminada__': en el programa de escritorio
+// YA NO pregunta por defecto, imprime directo en la predeterminada de Windows.
+// (Un navegador normal no puede imprimir sin diálogo: ver Configuración →
+// Impresión → "Imprimir sin que pregunte" para Chrome/Edge.)
 function escritorioDisponible() {
   return typeof window !== 'undefined' && !!(window.compointDesktop && window.compointDesktop.esEscritorio);
 }
+function eleccionImpresoraWindows(canal) {
+  let v = null;
+  try { v = localStorage.getItem('impresora_windows_' + canal); } catch (e) { /* sin almacenamiento */ }
+  return (v === null || v === '') ? '__predeterminada__' : v;
+}
 function usaImpresionSilenciosa(canal) {
-  try { return escritorioDisponible() && localStorage.getItem('impresora_windows_' + canal) !== null; } catch (e) { return false; }
+  return escritorioDisponible() && eleccionImpresoraWindows(canal) !== '__preguntar__';
 }
 async function imprimirHtmlSilencioso(html, canal, anchoMM) {
-  const nombre = localStorage.getItem('impresora_windows_' + canal);
+  const nombre = eleccionImpresoraWindows(canal);
   await window.compointDesktop.imprimirHTML(html, {
     impresora: nombre === '__predeterminada__' ? '' : nombre,
     anchoMM: parseInt(anchoMM, 10) === 58 ? 58 : 80
   });
 }
+// Programa de escritorio sin nada configurado todavía (nadie eligió cómo imprimir ni
+// conectó Bluetooth/USB): imprime por Windows, directo y sin preguntar.
+(function modoInicialEscritorio() {
+  try {
+    if (escritorioDisponible() && localStorage.getItem('modo_impresion') === null
+        && localStorage.getItem('impresora_transporte_ticket') === null) {
+      localStorage.setItem('modo_impresion', 'sistema');
+    }
+  } catch (e) { /* sin almacenamiento */ }
+})();
 // Abre el diálogo de impresión del navegador con el HTML (método de siempre).
 function abrirVentanaImpresion(html) {
   const ventana = window.open('', '_blank');

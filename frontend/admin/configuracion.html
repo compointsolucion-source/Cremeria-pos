@@ -341,7 +341,19 @@
                 <select id="impresoraWindowsFicha"></select>
               </label>
               <div class="botones"><button class="btn btn-secondary" onclick="guardarImpresorasWindows()">Guardar impresoras de Windows</button></div>
-              <p class="nota">Funciona con el modo "Impresora instalada en Windows/Mac". Si eliges una impresora, imprime directo, sin abrir el diálogo. Si dejas "Preguntar cada vez", se abre el diálogo de siempre.</p>
+              <p class="nota">Funciona con el modo "Impresora de Windows/Mac". Con una impresora (o la predeterminada de Windows) imprime directo, sin abrir ninguna ventana para elegir. Solo si eliges "Preguntar cada vez" se abre el diálogo de impresión.</p>
+            </div>
+
+            <div id="bloqueChromeSinPreguntar" class="imp-caja punteada" style="display:none;">
+              <div class="sub">🌐 Imprimir sin que pregunte (Chrome o Edge)</div>
+              <p class="nota">Un navegador normal siempre abre una ventana para elegir la impresora; por seguridad no se puede quitar desde la página. Para que imprima solo en tu impresora de Windows:</p>
+              <ol class="nota" style="margin:6px 0 8px 18px; padding:0">
+                <li>En Windows, deja tu impresora de tickets como <b>predeterminada</b> (Configuración de Windows → Impresoras).</li>
+                <li>Descarga el acceso directo de abajo y <b>abre Compoint Punto siempre desde ahí</b>.</li>
+                <li>Entra con tu usuario y, en esa ventana, elige <b>Impresora de Windows/Mac</b> y guarda.</li>
+              </ol>
+              <div class="botones"><button class="btn btn-secondary" onclick="descargarAccesoDirectoImpresion()">⬇️ Descargar acceso directo (Windows)</button></div>
+              <p class="nota">Si Chrome avisa que es un archivo .bat, es normal: elige "Conservar". Se abre en una ventana propia con su perfil: la primera vez tendrás que entrar con tu usuario y repetir el paso 3. Si prefieres no hacerlo, el programa de escritorio de Compoint Punto imprime directo sin nada de esto.</p>
             </div>
 
             <div class="imp-caja">
@@ -1880,24 +1892,68 @@ async function cargarImpresorasWindows() {
   document.getElementById('bloqueImpresoraWindows').style.display = 'block';
   let lista = [];
   try { lista = await window.compointDesktop.listarImpresoras(); } catch (err) { console.error(err); }
-  const opciones = ['<option value="">Preguntar cada vez (abre el diálogo)</option>', '<option value="__predeterminada__">Impresora predeterminada de Windows</option>']
-    .concat(lista.map(p => `<option value="${escaparHtmlTicket(p.nombre)}">${escaparHtmlTicket(p.nombre)}${p.predeterminada ? ' (predeterminada)' : ''}</option>`)).join('');
+  // Lo normal (y lo que queda si nadie elige) es imprimir directo en la predeterminada de Windows.
+  const opciones = ['<option value="__predeterminada__">Impresora predeterminada de Windows (imprime sin preguntar)</option>']
+    .concat(lista.map(p => `<option value="${escaparHtmlTicket(p.nombre)}">${escaparHtmlTicket(p.nombre)}${p.predeterminada ? ' (predeterminada)' : ''}</option>`))
+    .concat(['<option value="__preguntar__">Preguntar cada vez (abre el diálogo)</option>']).join('');
   [['impresoraWindowsTicket', 'ticket'], ['impresoraWindowsFicha', 'ficha']].forEach(([id, canal]) => {
     const sel = document.getElementById(id);
     sel.innerHTML = opciones;
-    const guardada = localStorage.getItem('impresora_windows_' + canal);
-    sel.value = guardada === null ? '' : guardada;
-    if (sel.value !== (guardada === null ? '' : guardada)) sel.value = ''; // la impresora guardada ya no existe
+    const quiero = eleccionImpresoraWindows(canal);
+    sel.value = quiero;
+    if (sel.value !== quiero) sel.value = '__predeterminada__'; // la impresora guardada ya no existe
   });
   if (!lista.length) mostrarToast('Windows no reporta impresoras instaladas en esta computadora.', 'info');
 }
 
 function guardarImpresorasWindows() {
   [['impresoraWindowsTicket', 'ticket'], ['impresoraWindowsFicha', 'ficha']].forEach(([id, canal]) => {
-    const v = document.getElementById(id).value;
-    if (v === '') localStorage.removeItem('impresora_windows_' + canal); else localStorage.setItem('impresora_windows_' + canal, v);
+    localStorage.setItem('impresora_windows_' + canal, document.getElementById(id).value || '__predeterminada__');
   });
+  // Elegir una impresora de Windows para los tickets significa que se imprime por Windows:
+  // se pasa solo al modo "Impresora de Windows/Mac" para que no intente Bluetooth/USB primero.
+  const selModo = document.getElementById('modoImpresion');
+  if (document.getElementById('impresoraWindowsTicket').value !== '__preguntar__' && selModo.value !== 'sistema') {
+    selModo.value = 'sistema';
+    localStorage.setItem('modo_impresion', 'sistema');
+    selModo.dispatchEvent(new Event('change', { bubbles: true }));
+    sincronizarSegmentados();
+    actualizarResumenes();
+  }
   mostrarToast('Impresoras de Windows guardadas en este equipo. Prueba con "Probar impresión".', 'exito');
+}
+
+// Para Chrome/Edge (sin el programa de escritorio): baja un acceso directo (.bat) que abre el sistema en una
+// ventana con --kiosk-printing, que hace que el navegador imprima en la predeterminada de Windows sin preguntar.
+function descargarAccesoDirectoImpresion() {
+  const url = location.origin + '/login.html';
+  const lineas = [
+    '@echo off',
+    'rem Abre Compoint Punto en una ventana que IMPRIME SIN PREGUNTAR en la impresora predeterminada de Windows.',
+    'set "URL=' + url + '"',
+    'set "PERFIL=%LOCALAPPDATA%\\CompointPunto\\perfil-impresion"',
+    'set "NAV="',
+    'if exist "%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe" set "NAV=%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe"',
+    'if not defined NAV if exist "%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe" set "NAV=%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe"',
+    'if not defined NAV if exist "%LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe" set "NAV=%LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe"',
+    'if not defined NAV if exist "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" set "NAV=%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"',
+    'if not defined NAV if exist "%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe" set "NAV=%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe"',
+    'if not defined NAV (',
+    '  echo No se encontro Google Chrome ni Microsoft Edge en esta computadora.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'start "" "%NAV%" --kiosk-printing --user-data-dir="%PERFIL%" --app="%URL%"'
+  ];
+  const blob = new Blob([lineas.join('\r\n') + '\r\n'], { type: 'application/octet-stream' });
+  const enlace = document.createElement('a');
+  enlace.href = URL.createObjectURL(blob);
+  enlace.download = 'Compoint-Punto-imprimir-sin-preguntar.bat';
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(enlace.href), 5000);
+  mostrarToast('Listo. Abre Compoint Punto desde ese archivo y repite el paso 3 en esa ventana.', 'exito', 6000);
 }
 
 
@@ -1981,11 +2037,18 @@ function sincronizarSegmentados() {
     seg.querySelectorAll('button').forEach(b => b.classList.toggle('activo', !!sel && sel.value === b.dataset.valor));
   });
   const nota = document.getElementById('notaModoImpresion');
+  const esSistema = document.getElementById('modoImpresion').value === 'sistema';
+  const esEscritorio = typeof escritorioDisponible === 'function' && escritorioDisponible();
   if (nota) {
-    nota.textContent = document.getElementById('modoImpresion').value === 'sistema'
-      ? 'Usa una impresora instalada en este equipo: abre el diálogo de impresión (o imprime directo si eliges una impresora abajo).'
-      : 'Imprime solo y corta el papel.';
+    nota.textContent = !esSistema
+      ? 'Imprime solo y corta el papel.'
+      : (esEscritorio
+        ? 'Usa una impresora instalada en este equipo y imprime directo, sin preguntar (elige cuál abajo).'
+        : 'Usa una impresora instalada en este equipo. En el navegador se abre la ventana de impresión; para que imprima sin preguntar mira "Imprimir sin que pregunte" abajo.');
   }
+  // La guía para imprimir sin preguntar solo sirve en Chrome/Edge (en el programa de escritorio no hace falta).
+  const bloqueChrome = document.getElementById('bloqueChromeSinPreguntar');
+  if (bloqueChrome) bloqueChrome.style.display = (esSistema && !esEscritorio) ? 'block' : 'none';
 }
 document.addEventListener('click', (e) => {
   const boton = e.target.closest('.segmentado[data-para] button');

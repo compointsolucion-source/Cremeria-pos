@@ -224,6 +224,124 @@ function bloquearPorLicencia(mensaje) {
   if (document.body) poner(); else document.addEventListener('DOMContentLoaded', poner);
 }
 
+// ---------------------------------------------------------------------------
+// NUBE DORMIDA (plan gratis de Render: el servidor se duerme tras 15 min sin uso
+// y tarda hasta ~1 minuto en despertar). En vez de dejar la pantalla esperando:
+//  1) Si hace rato que el servidor no contesta (la nube probablemente se durmió),
+//     antes de mandar una solicitud se le pregunta (/health) con máximo 6 segundos.
+//  2) Si no contesta: se activa el MODO SIN CONEXIÓN. Las solicitudes fallan al
+//     instante con el mismo error de «sin internet» que ya entienden Mostrador y
+//     Caja Avanzada (guardan la venta en la computadora), y en segundo plano se
+//     despierta al servidor.
+//  3) Cuando despierta: se suben solas las ventas guardadas y se avisa.
+// ---------------------------------------------------------------------------
+const NUBE_FRESCA_MS = 8 * 60 * 1000;     // Render la duerme a los 15 min sin uso; con 8 min de margen se da por despierta
+const NUBE_SONDEO_MS = 6000;              // lo máximo que se espera a /health antes de pasar a modo sin conexión
+const NUBE_ESPERA_DESPERTAR_MS = 90000;   // espera de cada intento de despertarla (en segundo plano)
+const MENSAJE_SIN_CONEXION = 'No se pudo conectar con el servidor. Puede estar iniciando (tarda hasta 50s si estaba inactivo) o no tienes conexión a internet. Intenta de nuevo en unos segundos.';
+const MENSAJE_NUBE_DORMIDA = 'No se pudo conectar con el servidor: la nube está dormida y despierta sola en menos de un minuto. Mientras tanto se trabaja sin conexión.';
+
+const NubeEstado = (function () {
+  let dormida = false;
+  let despertando = false;
+  let sondeoEnCurso = null;
+
+  function urlSalud() {
+    const u = String(API_URL);
+    return /\/api\/?$/.test(u) ? u.replace(/\/api\/?$/, '/health') : u.replace('/api', '/health');
+  }
+
+  // Última vez que el servidor contestó bien (se comparte entre pestañas y pantallas).
+  function ultimoOk() { try { return Number(localStorage.getItem('nube_ultimo_ok')) || 0; } catch (e) { return 0; } }
+  function anotarOk() { try { localStorage.setItem('nube_ultimo_ok', String(Date.now())); } catch (e) { /* nada */ } }
+
+  // Pregunta a /health y espera máximo limiteMs. true = el servidor y su base de datos contestaron.
+  async function sondear(limiteMs) {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const reloj = ctl ? setTimeout(() => ctl.abort(), limiteMs) : null;
+    try {
+      const r = await fetch(urlSalud(), { cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+      return r.ok; // 502/503 = el servidor sigue despertando
+    } catch (e) {
+      return false;
+    } finally {
+      if (reloj) clearTimeout(reloj);
+    }
+  }
+
+  // Aviso azul en pantalla mientras se trabaja sin conexión (solo en pantallas con sesión iniciada).
+  function pintar() {
+    const poner = () => {
+      let el = document.getElementById('avisoNubeDormida');
+      if (!dormida || !getToken()) { if (el) el.remove(); return; }
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'avisoNubeDormida';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'position:fixed; bottom:52px; left:52px; z-index:999; max-width:calc(100vw - 72px); padding:8px 14px; border-radius:20px; font:700 14px/1.25 sans-serif; background:#1565C0; color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.25);';
+        el.textContent = '☁️ Nube dormida o sin internet: sigue vendiendo, todo se sube solo al despertar';
+        document.body.appendChild(el);
+      }
+    };
+    if (document.body) poner(); else document.addEventListener('DOMContentLoaded', poner);
+  }
+
+  function despierta() {
+    dormida = false;
+    anotarOk();
+    pintar();
+    try { window.dispatchEvent(new CustomEvent('nube-despierta')); } catch (e) { /* nada */ }
+    if (typeof mostrarToast === 'function') mostrarToast('☁️ La nube ya despertó: estás en línea otra vez', 'exito', 4000);
+    if (typeof sincronizarVentasOffline === 'function') sincronizarVentasOffline(); // sube lo que se vendió sin conexión
+  }
+
+  // Insiste en segundo plano hasta que el servidor conteste (esto además es lo que lo despierta).
+  async function despertar() {
+    if (despertando) return;
+    despertando = true;
+    let intentos = 0;
+    try {
+      while (dormida) {
+        if (await sondear(NUBE_ESPERA_DESPERTAR_MS)) { despierta(); break; }
+        intentos++;
+        await new Promise((r) => setTimeout(r, Math.min(15000, 3000 + intentos * 1000)));
+      }
+    } finally {
+      despertando = false;
+    }
+  }
+
+  function declararDormida() {
+    if (!dormida) { dormida = true; pintar(); }
+    despertar();
+  }
+
+  // ¿Se puede mandar la solicitud? Si la nube está dormida, no: se pasa a modo sin conexión.
+  async function asegurar() {
+    if (dormida) { despertar(); return false; }
+    if (Date.now() - ultimoOk() < NUBE_FRESCA_MS) return true;
+    if (!sondeoEnCurso) sondeoEnCurso = sondear(NUBE_SONDEO_MS).finally(() => { sondeoEnCurso = null; });
+    if (await sondeoEnCurso) { anotarOk(); return true; }
+    declararDormida();
+    return false;
+  }
+
+  // Una solicitud no recibió respuesta: se revisa si es la nube (o el internet) y no solo esa solicitud.
+  async function alFallar() {
+    if (dormida) return;
+    if (await sondear(NUBE_SONDEO_MS)) { anotarOk(); return; }
+    declararDormida();
+  }
+
+  // Para quien ya sabe que el servidor contestó (o no): estado-conexion.js.
+  function contesto() { anotarOk(); if (dormida) despierta(); }
+  function sinRespuesta() { declararDormida(); }
+
+  window.addEventListener('online', () => { if (dormida) despertar(); });
+
+  return { estaDormida: () => dormida, asegurar, alFallar, contesto, sinRespuesta, anotarOk, sondear };
+})();
+
 async function apiFetch(endpoint, options = {}) {
   const token = getToken();
   const usuario = getUsuario();
@@ -234,6 +352,10 @@ async function apiFetch(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
+  // Iniciar sesión no se puede hacer sin conexión: ahí sí se espera a que la nube despierte.
+  const esLogin = String(endpoint).startsWith('/auth/login');
+  if (!esLogin && !(await NubeEstado.asegurar())) throw new Error(MENSAJE_NUBE_DORMIDA);
+
   let response;
   try {
     response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
@@ -241,8 +363,21 @@ async function apiFetch(endpoint, options = {}) {
     // Esto captura específicamente "Failed to fetch": la solicitud nunca llegó
     // a recibir respuesta (servidor dormido, sin internet, o CORS). Es distinto
     // de un error que el servidor sí devolvió (ver más abajo).
-    throw new Error('No se pudo conectar con el servidor. Puede estar iniciando (tarda hasta 50s si estaba inactivo) o no tienes conexión a internet. Intenta de nuevo en unos segundos.');
+    if (!esLogin) await NubeEstado.alFallar();
+    throw new Error(MENSAJE_SIN_CONEXION);
   }
+
+  // Mientras Render despierta el servidor, su propia página contesta 502/503 (no es JSON de nuestro servidor).
+  // Se trata como «sin conexión». Un 504 solo en lecturas: en una venta pudo haberse guardado ya.
+  if (!esLogin) {
+    const tipo = response.headers.get('content-type') || '';
+    const metodo = String(options.method || 'GET').toUpperCase();
+    const proxyCaido = response.status === 502 ||
+      (response.status === 503 && !tipo.includes('json')) ||
+      (response.status === 504 && (metodo === 'GET' || metodo === 'HEAD'));
+    if (proxyCaido) { NubeEstado.sinRespuesta(); throw new Error(MENSAJE_NUBE_DORMIDA); }
+  }
+  if (response.status < 500) NubeEstado.anotarOk();
 
   const mensajesPorCodigo = {
     400: 'La información enviada no es válida.',

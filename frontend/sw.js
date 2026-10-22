@@ -7,7 +7,7 @@
 // versión más nueva (y se actualiza la copia de respaldo de paso) — la
 // copia guardada solo se usa cuando de verdad no hay conexión. Esto evita
 // quedarse con una versión vieja por olvidar subir CACHE_VERSION.
-const CACHE_VERSION = 'compoint-punto-v62';
+const CACHE_VERSION = 'compoint-punto-v64';
 
 const ARCHIVOS_A_GUARDAR = [
   '/mostrador.html',
@@ -81,6 +81,10 @@ self.addEventListener('fetch', (evento) => {
   // Nunca se cachean aquí — evita servir datos de ventas/inventario
   // desactualizados sin que la app se dé cuenta.
   if (url.pathname.startsWith('/api/')) return;
+
+  // /health tampoco: es la pregunta «¿el servidor contesta?». Si se contestara con una copia
+  // guardada, un servidor caído o dormido parecería estar bien.
+  if (url.pathname === '/health') return;
 
   // Solo nos interesa cachear archivos de nuestro propio sitio (no CDNs
   // externos como jsQR o JsBarcode — esos se piden normal a la red).
