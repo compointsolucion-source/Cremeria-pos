@@ -115,7 +115,7 @@ def leer_clientes(cur):
                cr.tiene_credito, cr.limite_credito, cr.saldo_actual
         from clientesv2 c
         left join clientesv2_credito cr on cr.clientesv2_id = c.id and cr.eliminado_en is null
-        where c.de_sistema = 0 and c.activo = 1
+        where coalesce(c.de_sistema, 0) = 0 and coalesce(c.activo, 1) = 1
         order by c.nombres, c.apellidos
     """)
     filas = []
