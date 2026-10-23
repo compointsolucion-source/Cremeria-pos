@@ -26,6 +26,23 @@
   .banner .der { text-align: right; flex: none; }
   .banner .der b { display: block; font-size: 28px; line-height: 1.1; }
 
+  /* Aviso: turno que empezó otro día y sigue abierto */
+  .aviso-turno { background: rgba(249,168,37,.2); color: var(--text, #1F2023); border: 1px solid rgba(249,168,37,.55); border-radius: 12px; padding: 11px 14px; font-size: 14px; font-weight: 600; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .aviso-turno .ico { font-size: 18px; line-height: 1.2; }
+
+  /* Ventas del turno */
+  .ventas-turno { padding: 16px 18px; margin-bottom: 14px; }
+  .ventas-turno .cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .ventas-turno .cab h3 { font-size: 16px; margin: 0; }
+  .ventas-turno .cab .n { color: var(--muted, #7A7D83); font-size: 13px; font-weight: 700; }
+  .ventas-turno .total { font-size: 34px; line-height: 1.15; font-weight: 800; margin: 6px 0 2px; }
+  .ventas-turno .total-l { color: var(--muted, #7A7D83); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .ventas-turno .formas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .ventas-turno .forma { background: rgba(128,128,128,.14); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; min-width: 120px; }
+  .ventas-turno .forma small { color: var(--muted, #7A7D83); font-size: 12px; font-weight: 700; }
+  .ventas-turno .forma b { font-size: 17px; }
+  .ventas-turno .vacio-v { color: var(--muted, #7A7D83); font-size: 14px; margin-top: 6px; }
+
   /* Cifras */
   .kpi .ic.verde { background: rgba(95,174,70,.18); }
   .kpi .ic.rojo { background: rgba(198,40,40,.14); }
@@ -112,14 +129,16 @@
 
   <div class="contenido">
     <div class="banner cerrado oculto" id="banner"></div>
+    <div class="aviso-turno oculto" id="avisoTurno"></div>
 
     <div class="columnas una" id="columnas">
       <div>
         <!-- Solo con turno abierto -->
         <div id="colTurno" class="oculto">
+          <div class="caja ventas-turno oculto" id="ventasTurno"></div>
           <div class="kpis tres" id="kpis"></div>
           <div class="caja recorta separa">
-            <div class="caja-titulo"><h3>Movimientos del turno</h3></div>
+            <div class="caja-titulo"><h3>Movimientos de efectivo del turno</h3></div>
             <div id="listaMovimientos"></div>
           </div>
         </div>
@@ -175,6 +194,7 @@ requiereLogin();
 let turnoActual;              // undefined = aún no se sabe (o falló), null = no hay turno abierto
 let tipoMovimiento = 'ingreso';
 let movimientos = [];
+let resumenVentas = null;     // resumen del turno abierto (ventas por forma de pago); null = no disponible
 let guardando = false;
 const esAngosto = window.matchMedia('(max-width: 1000px)');
 const CONCEPTOS = {
@@ -223,8 +243,37 @@ async function cargarTurno() {
     turnoActual = undefined;
     mostrarToast(err.message, 'error');
   }
-  if (turnoActual) await cargarMovimientos(); else movimientos = [];
+  if (turnoActual) { await cargarMovimientos(); await cargarResumenVentas(); } else { movimientos = []; resumenVentas = null; }
   pintarTodo();
+}
+
+// Ventas ya cobradas en este turno (el mismo resumen que se imprime en el corte parcial).
+async function cargarResumenVentas() {
+  resumenVentas = null;
+  if (!turnoActual) return;
+  try { resumenVentas = await apiFetch(`/turnos/${turnoActual.id}/resumen`); } catch (err) { console.error(err); }
+}
+
+function pintarVentas() {
+  const el = document.getElementById('ventasTurno');
+  if (!turnoActual || !resumenVentas) { el.classList.add('oculto'); el.innerHTML = ''; return; }
+  const r = resumenVentas, f = r.formas || {}, n = (r.cuentas || {}).normales || 0;
+  const formas = [['💵', 'Efectivo', f.efectivo, true], ['💳', 'Tarjeta', f.tarjeta, true], ['🏦', 'Transferencia', f.transferencia],
+    ['📒', 'Fiado', f.credito], ['💲', 'Dólares', f.dolares], ['🧾', 'Cheque', f.cheque], ['🎟️', 'Vales', f.vales]]
+    .filter((x) => x[3] || x[2] > 0);
+  el.classList.remove('oculto');
+  el.innerHTML = `<div class="cab"><h3>🛒 Ventas de este turno</h3><span class="n">${n} venta${n === 1 ? '' : 's'}</span></div>
+    <div class="total num">${dinero(r.ventas.venta_neta)}</div><div class="total-l">Total vendido</div>
+    ${n ? `<div class="formas">${formas.map((x) => `<div class="forma"><small>${x[0]} ${x[1]}</small><b class="num">${dinero(x[2])}</b></div>`).join('')}</div>`
+        : '<div class="vacio-v">Todavía no hay ventas cobradas en este turno.</div>'}`;
+}
+
+// Si el turno empezó otro día y sigue abierto, se avisa que falta el corte.
+function pintarAvisoTurno() {
+  const av = document.getElementById('avisoTurno');
+  if (!turnoActual || new Date(turnoActual.fecha_apertura).toDateString() === new Date().toDateString()) { av.classList.add('oculto'); av.innerHTML = ''; return; }
+  av.classList.remove('oculto');
+  av.innerHTML = `<span class="ico">⚠️</span><span>Este turno empezó ${escapar(desdeTexto(turnoActual.fecha_apertura).replace(/^Desde /, '').replace(', ', ' a las '))} y sigue abierto. Si ya terminó tu jornada, haz tu corte con el botón rojo <b>🔒</b>.</span>`;
 }
 
 function pintarBanner() {
@@ -250,6 +299,8 @@ function pintarTodo() {
   const hay = !!turnoActual;
   document.body.classList.toggle('barra-fija', hay);
   pintarBanner();
+  pintarAvisoTurno();
+  pintarVentas();
   document.getElementById('colTurno').classList.toggle('oculto', !hay);
   document.getElementById('panelForm').classList.toggle('oculto', !hay);
   document.getElementById('columnas').classList.toggle('una', !hay);
@@ -331,11 +382,11 @@ function pintarMovimientos() {
   if (!turnoActual) { kp.innerHTML = ''; lista.innerHTML = ''; return; }
   const suma = (tipo) => movimientos.filter((m) => m.tipo === tipo).reduce((s, m) => s + parseFloat(m.monto || 0), 0);
   kp.innerHTML = `
-    <div class="caja kpi"><div class="ic verde">➕</div><div><div class="v num verde-t">+${dinero(suma('ingreso'))}</div><div class="l">Ingresos del turno</div></div></div>
-    <div class="caja kpi"><div class="ic rojo">➖</div><div><div class="v num rojo-t">−${dinero(suma('egreso'))}</div><div class="l">Egresos del turno</div></div></div>
+    <div class="caja kpi"><div class="ic verde">➕</div><div><div class="v num verde-t">+${dinero(suma('ingreso'))}</div><div class="l">Entradas de efectivo</div></div></div>
+    <div class="caja kpi"><div class="ic rojo">➖</div><div><div class="v num rojo-t">−${dinero(suma('egreso'))}</div><div class="l">Salidas de efectivo</div></div></div>
     <div class="caja kpi"><div class="ic azul">🧾</div><div><div class="v num">${movimientos.length}</div><div class="l">Movimientos</div></div></div>`;
   if (!movimientos.length) {
-    lista.innerHTML = '<div class="vacio">Todavía no hay movimientos en este turno.<br>Registra aquí el dinero que entra o sale de la caja.</div>';
+    lista.innerHTML = '<div class="vacio">Todavía no hay entradas ni salidas de efectivo en este turno.<br>Registra aquí el dinero que entra o sale de la caja (cambio, compras, retiros). Las ventas se ven arriba.</div>';
     return;
   }
   lista.innerHTML = movimientos.map((m) => {

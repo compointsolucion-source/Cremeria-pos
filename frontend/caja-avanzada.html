@@ -49,6 +49,10 @@
   .tabla-venta tbody tr:nth-child(even) td { background: #F5FAF3; background: color-mix(in srgb, var(--primary, #5FAE46) 6%, var(--surface, #fff)); }
   .tabla-venta tbody tr:hover td { background: var(--fila-hover, #FAFAFA); }
   .tabla-venta tbody tr.fila-seleccionada td { background: #DCEFD5 !important; background: color-mix(in srgb, var(--primary, #5FAE46) 24%, var(--surface, #fff)) !important; }
+  .tabla-venta tbody tr.fila-seleccionada td:first-child { box-shadow: inset 5px 0 0 var(--primary, #5FAE46); }
+  .pista-teclas { margin-top: 5px; color: var(--muted, #666); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .pista-teclas kbd { display: inline-block; min-width: 20px; text-align: center; padding: 1px 6px; margin: 0 1px; border: 1px solid var(--border, #CFD3D8); border-bottom-width: 2px; border-radius: 6px; background: var(--surface, #fff); color: var(--text, #1F2023); font-weight: 700; font-size: 12px; line-height: 1.4; font-family: inherit; }
+  @media (max-width: 900px) { .pista-teclas { display: none; } }
   .tabla-venta tbody tr.fila-nueva td { animation: destello-fila 1s ease-out; }
   @keyframes destello-fila { 0% { background: color-mix(in srgb, var(--primary, #5FAE46) 55%, var(--surface, #fff)); } 100% { background: transparent; } }
   .tabla-venta td.vacio { text-align: center; color: var(--muted, #888); font-size: 16px; padding: 28px 14px; border-right: none; }
@@ -297,6 +301,7 @@
     <div class="zona-total">
       <div>
         <div class="contador-articulos"><b id="contadorArticulosAvanzada">0</b> productos en la venta actual</div>
+        <div class="pista-teclas" title="Funcionan con la barra de código vacía">⌨️ <kbd>↑</kbd><kbd>↓</kbd> elegir renglón · <kbd>+</kbd><kbd>−</kbd> cantidad · <kbd>Supr</kbd> borrar</div>
       </div>
       <div class="total-bloque">
         <span class="total-etiqueta">TOTAL</span>
@@ -1156,6 +1161,8 @@ function escaparNombreAv(t) {
 function renderTablaVentaAvanzada() {
   const tbody = document.getElementById('tablaVentaAvanzada');
   let total = 0;
+  // El renglón que se acaba de agregar o sumar queda elegido: + − y Supr actúan sobre él sin tocar nada.
+  if (filaTocadaAv !== null && filaTocadaAv >= 0 && filaTocadaAv < carritoActivo().length) filaSeleccionadaIndex = filaTocadaAv;
 
   tbody.innerHTML = carritoActivo().map((item, idx) => {
     const importe = GRANEL.subtotal(item);
@@ -1197,6 +1204,33 @@ function borrarFilaSeleccionadaAvanzada() {
   carritoActivo().splice(filaSeleccionadaIndex, 1);
   filaSeleccionadaIndex = null;
   renderTablaVentaAvanzada();
+}
+
+// + / − sobre un renglón (solo teclado). Solo piezas enteras; mínimo 1 (para quitarlo: Supr).
+function renglonPorPiezasAv(item) { return !!item && item.tipo_venta !== 'peso' && !(item.importe > 0); }
+function cambiarCantidadRenglonAv(idx, delta) {
+  const pest = pestanas[pestanaActivaIndex];
+  if (pest.ticketIdExistente) { mostrarToast('No se puede modificar un ticket ya guardado desde aquí', 'error'); return; }
+  const item = carritoActivo()[idx];
+  if (!item) { mostrarToast('Elige primero un renglón (con ↑ ↓ o tocándolo)', 'error'); return; }
+  if (!renglonPorPiezasAv(item)) { mostrarToast('Este producto se vende por peso o por importe: bórralo y vuelve a pesarlo', 'error'); return; }
+  const nueva = Math.round(parseFloat(item.cantidad) || 0) + delta;
+  if (nueva < 1) { mostrarToast('La cantidad mínima es 1. Para quitar el producto usa Supr', 'error'); return; }
+  escaneoAutoAv = null; // la cantidad ya se tocó a propósito
+  item.cantidad = nueva;
+  filaSeleccionadaIndex = idx;
+  filaTocadaAv = idx;
+  renderTablaVentaAvanzada();
+}
+
+// ↑ ↓ cambian el renglón elegido de la tabla.
+function moverSeleccionRenglonAv(delta) {
+  const n = carritoActivo().length;
+  if (!n) return;
+  let i = filaSeleccionadaIndex === null ? (delta > 0 ? 0 : n - 1) : filaSeleccionadaIndex + delta;
+  filaSeleccionadaIndex = Math.max(0, Math.min(n - 1, i));
+  renderTablaVentaAvanzada();
+  document.querySelectorAll('tr.fila-seleccionada').forEach(tr => { if (tr.offsetParent) tr.scrollIntoView({ block: 'nearest' }); });
 }
 
 // "Varios": para cuando llevas varias piezas del mismo producto y no quieres
@@ -2264,6 +2298,36 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Teclas sobre los renglones: ↑ ↓ eligen, + − cambian la cantidad y Supr borra.
+// Funcionan aunque el cursor esté en la barra de código (siempre lo está, por el lector), siempre que la barra esté VACÍA:
+// si ya hay texto, la tecla es del texto (borrar una letra, escribir un nombre o un código).
+// El lector manda los caracteres en ráfaga (menos de 40 ms entre uno y otro): un "−" o "+" dentro de una ráfaga no cuenta.
+let ultimaTeclaGlobalAv = 0;
+document.addEventListener('keydown', (e) => {
+  const ahora = Date.now();
+  const rafaga = ahora - ultimaTeclaGlobalAv < 40;
+  ultimaTeclaGlobalAv = ahora;
+  const k = e.key;
+  if (k !== '+' && k !== '-' && k !== 'Delete' && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+  if (e.ctrlKey || e.metaKey || e.altKey || hayVentanaAbiertaAv()) return;
+  const tabla = document.getElementById('tablaVentaAvanzada');
+  if (!tabla || !tabla.offsetParent) return; // solo en la vista Clásica
+  const campo = document.getElementById('campoCodigoProducto');
+  const a = document.activeElement;
+  const enBuscador = a === campo;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !enBuscador) return; // escribiendo en otro campo
+  if (enBuscador && campo.value !== '') return;                                  // escribiendo o escaneando
+  const sug = document.getElementById('sugerenciasAvanzada');
+  if ((k === 'ArrowUp' || k === 'ArrowDown') && sug && sug.style.display === 'block') return; // flechas de las sugerencias
+  if ((k === '+' || k === '-') && rafaga) return;                                // viene del lector
+  if (!carritoActivo().length) return;
+  e.preventDefault(); e.stopPropagation();
+  if (k === 'Delete') borrarFilaSeleccionadaAvanzada();
+  else if (k === 'ArrowUp') moverSeleccionRenglonAv(-1);
+  else if (k === 'ArrowDown') moverSeleccionRenglonAv(1);
+  else cambiarCantidadRenglonAv(filaSeleccionadaIndex === null ? carritoActivo().length - 1 : filaSeleccionadaIndex, k === '+' ? 1 : -1);
+}, true);
+
 // Atajos de teclado: INS abre "Varios", DEL borra el renglón seleccionado.
 // Se ignoran si el foco está en un campo de texto (para no interferir con
 // escribir normal, ej. borrar texto con la tecla Delete).
@@ -2294,8 +2358,9 @@ function hayVentanaAbiertaAv() {
     m.classList.contains('modal-confirm-overlay') ? m.classList.contains('abierto') : getComputedStyle(m).display !== 'none');
 }
 
-function enfocarBuscadorAv() {
-  if (!equipoConTecladoAv || document.hidden || hayVentanaAbiertaAv()) return;
+// porTeclaFisica: llegó una tecla de verdad (teclado o lector). Aunque la pantalla sea táctil, ahí sí se manda el cursor a la barra.
+function enfocarBuscadorAv(porTeclaFisica) {
+  if ((!equipoConTecladoAv && porTeclaFisica !== true) || document.hidden || hayVentanaAbiertaAv()) return;
   const campo = document.getElementById('campoCodigoProducto');
   if (!campo || !campo.offsetParent) return;
   const a = document.activeElement;
@@ -2310,7 +2375,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
   const a = document.activeElement;
   if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
-  enfocarBuscadorAv(); // la tecla (o el primer número del código) se escribe ya dentro de la barra
+  enfocarBuscadorAv(true); // la tecla (o el primer número del código) se escribe ya dentro de la barra
 }, true);
 document.addEventListener('click', (e) => {
   if (e.target.closest && e.target.closest('input, textarea, select, a, label')) return;
