@@ -246,6 +246,14 @@ function guardarConfiguracionRedEtiqueta(urlIntermediario, ipImpresora, puertoIm
   localStorage.setItem('intermediario_puerto_impresora_etiqueta', puertoImpresora || 9100);
 }
 
+// ¿Este cobro lleva dinero en efectivo? Fiado, tarjeta y transferencia NO abren el cajón.
+// Pago mixto lo abre solo si una parte se paga en efectivo. Efectivo, dólares, cheque y vale sí.
+function cobroAbreCajon(metodo, montoEfectivo) {
+  if (metodo === 'credito' || metodo === 'tarjeta' || metodo === 'transferencia') return false;
+  if (metodo === 'mixto') return (parseFloat(montoEfectivo) || 0) > 0;
+  return true;
+}
+
 // Abre el cajón de dinero conectado a la impresora (puerto RJ11/RJ12) con el comando
 // ESC/POS estándar. Hay dos caminos, según cómo imprime ESTE equipo:
 //  1) Impresora directa (Bluetooth/USB): se manda el comando por la conexión.

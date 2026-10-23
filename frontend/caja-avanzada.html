@@ -383,6 +383,7 @@
         <button type="button" onmousedown="event.preventDefault()" onclick="cambiarCantidadUnidadAv(1)">+</button>
       </div>
       <div id="subtotalUnidadAvPreview" style="color:#555; margin-top:8px;">Subtotal: $0.00</div>
+      <div id="avisoEscaneoUnidadAv" style="display:none; margin-top:8px; font-size:12.5px; font-weight:700; color:var(--primary-dark, #4C9439);">Ya escaneaste 1 pieza: la cantidad que pongas aquí será el total.</div>
       <div class="ayuda-teclado">⌨ También con el teclado: escribe la cantidad · + / − · Enter agrega · Esc cancela</div>
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalUnidadAvanzada()">Cancelar</button>
@@ -418,7 +419,7 @@
             <button class="btn btn-primary" style="flex:1;" onclick="confirmarCobroAvanzada()">✅ Confirmar Pago</button>
             <button class="btn btn-secondary" style="flex:1;" onclick="cerrarModalCobrarAvanzada()">Cancelar</button>
           </div>
-          <button type="button" id="btnCobrarSinTicket" class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="confirmarCobroAvanzada(true)" title="Cobra, abre el cajón y no imprime el ticket">🧾 Cobrar sin ticket (abre cajón)</button>
+          <button type="button" id="btnCobrarSinTicket" class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="confirmarCobroAvanzada(true)" title="Cobra y no imprime el ticket. El cajón se abre solo si se paga con efectivo">🧾 Cobrar sin ticket</button>
         </div>
 
         <div class="teclado-cobro" id="tecladoCobro" style="display:none;">
@@ -813,10 +814,37 @@ function agregarConDecisionDeTipo(producto, opciones) {
   if (producto.tipo_venta === 'peso') {
     abrirModalPesoAvanzada(producto);
   } else if (op.directo) {
-    agregarProductoAvanzada(producto, 1);
+    agregarProductoAvanzada(producto, 1, { escaneo: true });
   } else {
     abrirModalUnidadAvanzada(producto, op.alConfirmar);
   }
+}
+
+// ---------- Lo que escanea el lector vs. la cantidad que se elige ----------
+// El lector agrega 1 pieza al instante. Si enseguida se abre la ventana de cantidad de ESE mismo
+// producto (ej. tocar su foto) y se elige 5, el ticket debe quedar con 5 — no con 6.
+// Por eso se recuerda "el renglón que el lector acaba de crear con 1 pieza" y esa cantidad
+// elegida lo reemplaza. Cualquier otra acción (otro producto, otro escaneo, cambiar la cantidad) lo olvida.
+let escaneoAutoAv = null;
+
+function escaneoAutoVigenteAv(producto) {
+  const it = escaneoAutoAv;
+  if (!it || !producto || it.producto_id !== producto.id) return null;
+  const pest = pestanas[pestanaActivaIndex];
+  if (!pest || pest.ticketIdExistente) return null;
+  if (!pest.carrito.includes(it) || parseFloat(it.cantidad) !== 1) return null;
+  return it;
+}
+
+// Devuelve true si la cantidad elegida reemplazó al 1 del lector (ya no hay nada más que agregar).
+function reemplazarEscaneoAv(producto, cantidad) {
+  const it = escaneoAutoVigenteAv(producto);
+  escaneoAutoAv = null;
+  if (!it) return false;
+  it.cantidad = cantidad;
+  filaTocadaAv = pestanas[pestanaActivaIndex].carrito.indexOf(it);
+  renderTablaVentaAvanzada();
+  return true;
 }
 
 // ---------- Ventana de cantidad (piezas) ----------
@@ -832,6 +860,8 @@ function abrirModalUnidadAvanzada(producto, alConfirmar) {
   cantidadUnidadAv = 1;
   unidadFrescaAv = true;
   document.getElementById('modalUnidadAvNombre').textContent = producto.nombre;
+  const avisoEscaneo = document.getElementById('avisoEscaneoUnidadAv');
+  if (avisoEscaneo) avisoEscaneo.style.display = escaneoAutoVigenteAv(producto) ? 'block' : 'none';
   actualizarDisplayUnidadAv();
   document.getElementById('modalUnidadAvanzada').style.display = 'flex';
   // Se suelta el buscador para que los números tecleados sean para la cantidad y no para el texto de atrás.
@@ -864,6 +894,7 @@ function confirmarUnidadAvanzada() {
   const alConfirmar = alConfirmarUnidadAv;
   cerrarModalUnidadAvanzada();
   if (!p) return;
+  if (reemplazarEscaneoAv(p, cantidad)) return; // el 1 que ya puso el lector se cambia por la cantidad elegida
   if (alConfirmar) alConfirmar(p, cantidad);
   else agregarProductoAvanzada(p, cantidad);
 }
@@ -1036,6 +1067,7 @@ function buscarRenglonIgualAv(producto) {
 
 // extra.importe = venta a granel POR IMPORTE: ese importe se cobra exacto (ver js/granel.js).
 async function agregarProductoAvanzada(producto, cantidad, extra) {
+  if (!(extra && extra.escaneo)) escaneoAutoAv = null; // solo el lector deja un "1 automático" pendiente
   const nuevoItem = {
     tipo: 'producto',
     producto_id: producto.id,
@@ -1055,6 +1087,7 @@ async function agregarProductoAvanzada(producto, cantidad, extra) {
       const renglon = carritoActivo()[iguales];
       renglon.cantidad = Math.round(((parseFloat(renglon.cantidad) || 0) + cantidad) * 1000) / 1000;
       filaTocadaAv = iguales;
+      escaneoAutoAv = null; // ya son 2 o más: esa cantidad fue a propósito
       renderTablaVentaAvanzada();
       return;
     }
@@ -1079,10 +1112,12 @@ async function agregarProductoAvanzada(producto, cantidad, extra) {
 
   carritoActivo().push(nuevoItem);
   filaTocadaAv = carritoActivo().length - 1;
+  if (extra && extra.escaneo && cantidad === 1) escaneoAutoAv = nuevoItem; // recuerda el renglón que acaba de crear el lector
   renderTablaVentaAvanzada();
 }
 
 async function agregarKitAvanzada(kit) {
+  escaneoAutoAv = null;
   const nuevoItem = {
     tipo: 'kit',
     kit_id: kit.id,
@@ -2049,7 +2084,7 @@ async function abrirCajonManualAvanzada() {
   }
 }
 
-// sinTicket = true: cobra igual, abre el cajón y NO imprime el ticket.
+// sinTicket = true: cobra igual y NO imprime el ticket (el cajón se abre solo si hay efectivo).
 async function confirmarCobroAvanzada(sinTicket = false) {
   // Si viene de un clic con el evento, no cuenta como "sin ticket"
   sinTicket = sinTicket === true;
@@ -2105,6 +2140,7 @@ async function confirmarCobroAvanzada(sinTicket = false) {
       cliente_id = clienteCobrarAvanzada.id;
     }
 
+    const efectivoDeEsteCobro = montoEfectivo; // lo que el cliente da en efectivo (antes del reparto por anticipo)
     // Pedido con anticipo: el ticket se registra por el TOTAL (lo que falta + el anticipo).
     let metodoParaGuardar = metodoPagoCobrarAvanzada;
     if (dAnt.hay) {
@@ -2133,7 +2169,8 @@ async function confirmarCobroAvanzada(sinTicket = false) {
     if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
       mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')}`, 'error');
     }
-    if (sinTicket || (configuracionCobrarAvanzada || {}).cajon_abrir_automatico) {
+    // El cajón solo se abre si hay efectivo: con tarjeta, transferencia o fiado se queda cerrado (también sin ticket).
+    if (cobroAbreCajon(metodoPagoCobrarAvanzada, efectivoDeEsteCobro) && (sinTicket || (configuracionCobrarAvanzada || {}).cajon_abrir_automatico)) {
       try { await abrirCajonDinero(); } catch (err) {
         console.error('No se pudo abrir el cajón automáticamente:', err.message);
         if (sinTicket) mostrarToast('No se pudo abrir el cajón: ' + err.message, 'error');

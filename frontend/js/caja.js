@@ -794,6 +794,7 @@ async function cobrar() {
       cliente_id = clienteSeleccionado.id;
     }
 
+    const efectivoDeEsteCobro = montoEfectivo; // lo que el cliente da en efectivo (antes del reparto por anticipo)
     // Pedido con anticipo: el ticket se registra por el TOTAL (lo que falta + el anticipo).
     let metodoParaGuardar = metodoPago;
     if (dAnt.hay) {
@@ -825,7 +826,8 @@ async function cobrar() {
     if (resultadoPago.productos_agotados && resultadoPago.productos_agotados.length > 0) {
       mostrarToast(`⚠️ Se agotó el inventario de: ${resultadoPago.productos_agotados.join(', ')} — registra reabastecimiento en Inventario`, 'error');
     }
-    if ((configuracionNegocioCaja || {}).cajon_abrir_automatico) {
+    // El cajón solo se abre si hay efectivo: con tarjeta, transferencia o fiado se queda cerrado.
+    if (cobroAbreCajon(metodoPago, efectivoDeEsteCobro) && (configuracionNegocioCaja || {}).cajon_abrir_automatico) {
       try { await abrirCajonDinero(); } catch (err) { console.error('No se pudo abrir el cajón automáticamente:', err.message); }
     }
     await imprimirComprobante(ticketActual, metodoParaTicket, recibidoEfectivoParaTicket, cambioParaTicket);
