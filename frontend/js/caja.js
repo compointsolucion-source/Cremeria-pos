@@ -272,6 +272,17 @@ async function quitarItem(itemId) {
   }
 }
 
+// Referencia de pago: comentario opcional (solo control interno) para tarjeta, transferencia y pago mixto.
+function htmlReferenciaPago() {
+  return `<div class="ref-pago">
+      <label for="refPagoCaja">💬 Referencia <small>opcional</small></label>
+      <input type="text" id="refPagoCaja" maxlength="100" autocomplete="off" placeholder="Escribe aquí tu referencia o comentario">
+    </div>`;
+}
+function escaparRefCaja(t) {
+  return String(t === null || t === undefined ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function setMetodo(m) {
   metodoPago = m;
   ['Efectivo','Tarjeta','Transferencia','Mixto','Credito','Dolares','Cheque','Vale'].forEach(nombre => {
@@ -295,6 +306,7 @@ function setMetodo(m) {
     camposDiv.innerHTML = `
       <input type="text" class="campo-num" inputmode="${modo}" autocomplete="off" id="montoEfectivo" placeholder="Monto en efectivo" style="margin-bottom:8px;" oninput="calcularFaltanteMixto()">
       <input type="text" class="campo-num" inputmode="${modo}" autocomplete="off" id="montoTarjeta" placeholder="Monto en tarjeta" oninput="calcularFaltanteMixto()">
+      ${htmlReferenciaPago()}
       <div id="faltanteMixtoTexto" class="cambio-grande" style="margin-top:12px;"></div>
     `;
     calcularFaltanteMixto();
@@ -337,6 +349,11 @@ function setMetodo(m) {
     } else {
       camposDiv.innerHTML = '';
     }
+    camposDiv.innerHTML += htmlReferenciaPago();
+    if (!pantallaAngosta()) idCampoPrincipal = 'refPagoCaja'; // en tablet/celular no, para no abrir el teclado solo
+  } else if (m === 'transferencia') {
+    camposDiv.innerHTML = htmlReferenciaPago();
+    if (!pantallaAngosta()) idCampoPrincipal = 'refPagoCaja';
   } else {
     camposDiv.innerHTML = '';
   }
@@ -368,6 +385,8 @@ let campoNumericoCobro = null;
   // Enter del teclado físico = ENTER del teclado en pantalla
   panel.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('campo-num')) { e.preventDefault(); tecladoCobro('enter'); }
+    // Enter en la referencia: cobra (en pago mixto, ahí ya se escribieron los dos montos)
+    else if (e.key === 'Enter' && e.target.id === 'refPagoCaja') { e.preventDefault(); cobrar(); }
   });
 })();
 
@@ -700,6 +719,7 @@ async function verTicketHistorialCaja(fila) {
     document.getElementById('detalleHistorialCaja').innerHTML = `
       <h4>Folio: ${t.folio}</h4>
       <p style="font-size:13px; color:#666;">Estado: ${t.estado} — Método: ${t.metodo_pago || '—'}</p>
+      ${t.referencia_pago ? `<div class="ref-pago-historial">💬 Referencia: <b>${escaparRefCaja(t.referencia_pago)}</b></div>` : ''}
       ${t.items.map(i => `<div class="detalle-item"><span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${i.tipo_venta === 'peso' ? GRANEL.detalle(i, '×') : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`}</small></span></span><span>$${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}
       <p style="text-align:right; font-weight:700; margin:10px 0;">Total: $${totalNetoDeTicket(t).toFixed(2)}</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -796,7 +816,8 @@ async function cobrar() {
         monto_tarjeta: montoTarjeta,
         turno_id: turno.id,
         cliente_id,
-        efectivo_recibido: recibidoEfectivoParaTicket
+        efectivo_recibido: recibidoEfectivoParaTicket,
+        referencia_pago: (document.getElementById('refPagoCaja') || { value: '' }).value.trim()
       })
     });
 

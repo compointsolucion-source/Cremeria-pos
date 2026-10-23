@@ -391,3 +391,11 @@ body.hoja-abierta #indicadorConexion { display: none !important; }
 .modal-confirm-caja p { font-size: 15px; margin: 0 0 18px; }
 .modal-confirm-botones { display: flex; gap: 10px; }
 .modal-confirm-botones .btn { flex: 1; }
+
+/* ===== Referencia de pago (Caja) =====
+   Comentario opcional que escribe el cajero al cobrar con tarjeta, transferencia o pago mixto.
+   Es solo para control interno: no sale en el ticket del cliente. */
+.ref-pago { margin-top: 12px; }
+.ref-pago label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+.ref-pago label small { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--tabla-cab); border: 1px solid var(--border); border-radius: 99px; padding: 1px 9px; }
+.ref-pago-historial { margin: 8px 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--tabla-cab); border: 1px solid var(--border); font-size: 14px; }

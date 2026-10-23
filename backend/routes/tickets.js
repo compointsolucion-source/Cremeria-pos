@@ -19,6 +19,15 @@ function generarFolio(sucursalId) {
   return `S${sucursalId}${base}`;
 }
 
+// Referencia de pago: comentario libre que escribe el cajero al cobrar con tarjeta o transferencia
+// (también en pago mixto). Solo para control interno. Se guarda recortada y sin espacios de sobra;
+// si viene vacía, o el método no es de los que la llevan, no se guarda nada.
+function referenciaPago(metodo, texto) {
+  if (!['tarjeta', 'transferencia', 'mixto'].includes(metodo)) return null;
+  const limpia = String(texto == null ? '' : texto).replace(/\s+/g, ' ').trim().slice(0, 100);
+  return limpia || null;
+}
+
 // Crear ticket desde mostrador
 router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
   const cliente = await pool.connect();
@@ -121,10 +130,11 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
     await conexion.query('BEGIN');
     const tk = (await conexion.query(
       `INSERT INTO tickets (folio, sucursal_id, mostrador_usuario_id, cajero_usuario_id, turno_id, estado, total,
-         metodo_pago, monto_efectivo, monto_tarjeta, fecha_creacion, fecha_pago, descuento_monto, descuento_motivo, efectivo_recibido)
-       VALUES ($1,$2,$3,$3,$4,'pagado',$5,$6,$7,$8,$9::timestamptz,$9::timestamptz,$10,$11,$12) RETURNING *`,
+         metodo_pago, monto_efectivo, monto_tarjeta, fecha_creacion, fecha_pago, descuento_monto, descuento_motivo, efectivo_recibido, referencia_pago)
+       VALUES ($1,$2,$3,$3,$4,'pagado',$5,$6,$7,$8,$9::timestamptz,$9::timestamptz,$10,$11,$12,$13) RETURNING *`,
       [folio, req.sucursalId, req.usuario.id, turnoId, bruto, b.metodo_pago, montoEfectivo, montoTarjeta, fecha.toISOString(),
-       descTicket, descTicket > 0 ? String(b.descuento_motivo || 'Descuento (venta sin internet)').slice(0, 255) : null, efectivoRecibido]
+       descTicket, descTicket > 0 ? String(b.descuento_motivo || 'Descuento (venta sin internet)').slice(0, 255) : null, efectivoRecibido,
+       referenciaPago(b.metodo_pago, b.referencia_pago)]
     )).rows[0];
     for (const l of lineas) {
       await conexion.query(
@@ -327,7 +337,7 @@ router.get('/historial-dia', verificarToken, async (req, res) => {
     const fechaConsulta = fecha || new Date().toISOString().split('T')[0];
 
     const result = await pool.query(
-      `SELECT t.id, t.folio, t.total, t.estado, t.metodo_pago, t.fecha_pago, t.fecha_creacion,
+      `SELECT t.id, t.folio, t.total, t.estado, t.metodo_pago, t.referencia_pago, t.fecha_pago, t.fecha_creacion,
               u.nombre AS cajero_nombre,
               (SELECT COUNT(*) FROM ticket_detalle WHERE ticket_id = t.id) AS num_articulos
        FROM tickets t
@@ -559,6 +569,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
   const conexion = await pool.connect();
   try {
     const { metodo_pago, monto_efectivo, monto_tarjeta, turno_id, cliente_id, efectivo_recibido } = req.body;
+    const referencia = referenciaPago(metodo_pago, req.body.referencia_pago);
 
     if (metodo_pago === 'credito' && !cliente_id) {
       return res.status(400).json({ error: 'Selecciona un cliente para autorizar el fiado' });
@@ -610,9 +621,10 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
         turno_id = $5,
         cliente_id = $6,
         fecha_pago = NOW(),
-        efectivo_recibido = $8
+        efectivo_recibido = $8,
+        referencia_pago = $9
        WHERE id = $7 AND estado = 'pendiente' RETURNING *`,
-      [req.usuario.id, metodo_pago, monto_efectivo || 0, monto_tarjeta || 0, turno_id || null, metodo_pago === 'credito' ? cliente_id : null, req.params.id, efectivo_recibido || null]
+      [req.usuario.id, metodo_pago, monto_efectivo || 0, monto_tarjeta || 0, turno_id || null, metodo_pago === 'credito' ? cliente_id : null, req.params.id, efectivo_recibido || null, referencia]
     );
     if (result.rows.length === 0) {
       await conexion.query('ROLLBACK');

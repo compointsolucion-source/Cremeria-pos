@@ -1426,6 +1426,7 @@ async function seleccionarTicketHistorial(id) {
     document.getElementById('detalleTicketHistorial').innerHTML = `
       <h4>Folio: ${ticketCompleto.folio}</h4>
       <p style="font-size:13px; color:#666;">Estado: ${ticketCompleto.estado} — Método: ${ticketCompleto.metodo_pago || '—'}</p>
+      ${ticketCompleto.referencia_pago ? `<div class="ref-pago-historial">💬 Referencia: <b>${escaparNombreAv(ticketCompleto.referencia_pago)}</b></div>` : ''}
       <table class="tabla-venta" style="margin-bottom:10px;">
         <thead><tr><th>Producto</th><th class="numero">Cant.</th><th class="numero">Importe</th></tr></thead>
         <tbody>
@@ -1573,7 +1574,7 @@ async function registrarVentaOfflineAv(ticket, pago) {
   await guardarVentaOffline({
     folio: ticket.folio, fecha: new Date().toISOString(),
     metodo_pago: pago.metodo_pago, monto_efectivo: pago.monto_efectivo, monto_tarjeta: pago.monto_tarjeta,
-    efectivo_recibido: pago.efectivo_recibido, turno_id: pago.turno_id,
+    efectivo_recibido: pago.efectivo_recibido, turno_id: pago.turno_id, referencia_pago: pago.referencia_pago,
     descuento_monto: ticket.descuento_monto, descuento_motivo: ticket.descuento_motivo,
     items: ticket.items.map(i => ({
       tipo: i.tipo, producto_id: i.producto_id, kit_id: i.kit_id, nombre_producto: i.nombre_producto,
@@ -1707,6 +1708,14 @@ function renderMetodosPagoModalCobrar() {
   setMetodoCobrarAvanzada('efectivo');
 }
 
+// Referencia de pago: comentario opcional (solo control interno) para tarjeta, transferencia y pago mixto.
+function htmlReferenciaPagoAv() {
+  return `<div class="ref-pago">
+      <label for="refPagoCobrarAv">💬 Referencia <small>opcional</small></label>
+      <input type="text" id="refPagoCobrarAv" maxlength="100" autocomplete="off" placeholder="Escribe aquí tu referencia o comentario">
+    </div>`;
+}
+
 function setMetodoCobrarAvanzada(m) {
   metodoPagoCobrarAvanzada = m;
   document.querySelectorAll('#metodosPagoModalCobrar button').forEach(btn => {
@@ -1728,6 +1737,7 @@ function setMetodoCobrarAvanzada(m) {
     campos.innerHTML = `
       <input type="text" inputmode="decimal" autocomplete="off" id="montoEfectivoCobrarAv" placeholder="Monto en efectivo" style="margin-bottom:8px;" oninput="calcularFaltanteMixtoAv()">
       <input type="text" inputmode="decimal" autocomplete="off" id="montoTarjetaCobrarAv" placeholder="Monto en tarjeta" oninput="calcularFaltanteMixtoAv()">
+      ${htmlReferenciaPagoAv()}
       <div id="faltanteMixtoAvTexto" class="cambio-grande" style="margin-top:12px;"></div>
     `;
   } else if (m === 'credito') {
@@ -1753,6 +1763,9 @@ function setMetodoCobrarAvanzada(m) {
         <div style="display:flex; justify-content:space-between; font-weight:700; border-top:1px solid #DDD; margin-top:6px; padding-top:6px;"><span>Total a cobrar</span><span>$${(total * (1 + comision / 100)).toFixed(2)}</span></div>
       </div>
     ` : '';
+    campos.innerHTML += htmlReferenciaPagoAv();
+  } else if (m === 'transferencia') {
+    campos.innerHTML = htmlReferenciaPagoAv();
   } else {
     campos.innerHTML = '';
   }
@@ -1767,7 +1780,9 @@ function setMetodoCobrarAvanzada(m) {
   if (m === 'efectivo' && !sinCobro) pintarCambioAv('cambioCobrarAvTexto', 0, 0, '');
   if (m === 'mixto' && !sinCobro) calcularFaltanteMixtoAv();
   if (m === 'dolares' && !sinCobro) pintarCambioAv('cambioDolaresCobrarAvTexto', 0, 0, ' USD');
-  const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv' }[m];
+  const idCampoPrincipal = { efectivo: 'montoRecibidoCobrarAv', mixto: 'montoEfectivoCobrarAv', credito: 'buscarClienteCobrarAv', dolares: 'dolaresRecibidosCobrarAv',
+    tarjeta: window.innerWidth >= 900 && !desgloseCobrarAv().pagoTodo ? 'refPagoCobrarAv' : null,
+    transferencia: window.innerWidth >= 900 && !desgloseCobrarAv().pagoTodo ? 'refPagoCobrarAv' : null }[m];
   if (idCampoPrincipal) {
     setTimeout(() => {
       const campo = document.getElementById(idCampoPrincipal);
@@ -1796,6 +1811,8 @@ let campoNumericoCobroAv = null;
   // Enter del teclado físico = ENTER del teclado en pantalla
   cont.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.inputMode === 'decimal') { e.preventDefault(); tecladoCobroAv('enter'); }
+    // Enter en la referencia: cobra (en pago mixto, ahí ya se escribieron los dos montos)
+    else if (e.key === 'Enter' && e.target.id === 'refPagoCobrarAv') { e.preventDefault(); confirmarCobroAvanzada(); }
   });
 })();
 
@@ -1993,7 +2010,9 @@ async function confirmarCobroAvanzada(sinTicket = false) {
     }
     // Lo que se imprime como "forma de pago" es lo que el cliente usó ahora (o el método del anticipo si ya pagó todo).
     const metodoParaTicket = dAnt.pagoTodo ? dAnt.metodo : metodoPagoCobrarAvanzada;
-    const datosPago = { metodo_pago: metodoParaGuardar, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket };
+    const campoRef = document.getElementById('refPagoCobrarAv');
+    const datosPago = { metodo_pago: metodoParaGuardar, monto_efectivo: montoEfectivo, monto_tarjeta: montoTarjeta, turno_id: turno.id, cliente_id, efectivo_recibido: recibidoEfectivoParaTicket,
+      referencia_pago: campoRef ? campoRef.value.trim() : '' };
     let resultadoPago;
     if (ticketParaCobrarAvanzada.offline) {
       if (metodoPagoCobrarAvanzada === 'credito') { mostrarToast('El fiado necesita internet', 'error'); return; }
