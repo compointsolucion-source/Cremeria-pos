@@ -95,6 +95,12 @@
   }
   .categoria-tab.activa { background: #5FAE46; color: white; }
   .categoria-tab.kits { background: #F9A825; color: white; }
+  /* Modo oscuro: las pestañas de categoría se veían como letra clara sobre gris claro */
+  [data-tema="oscuro"] .categoria-tab { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  [data-tema="oscuro"] .categoria-tab.activa { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  [data-tema="oscuro"] .categoria-tab.kits { background: #F9A825; border-color: #F9A825; color: #fff; }
+  .barra-fichas { background: #F4F5F6; border-bottom: 1px solid #DDD; }
+  [data-tema="oscuro"] .barra-fichas { background: var(--tabla-cab); border-bottom-color: var(--border); }
   .grid-productos {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;
   }
@@ -209,7 +215,7 @@
   <div class="mp-aviso" id="avisoPedidos" style="display:none"></div>
   <div class="mp-drawer" id="drawerPedidos"></div>
 
-  <div style="background:#F4F5F6; padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #DDD;">
+  <div class="barra-fichas" style="padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
     <button class="btn btn-secondary" onclick="generarFicha()">🎫 Generar Ficha</button>
     <button class="btn btn-primary" onclick="llamarSiguienteTurno()">▶️ Llamar Siguiente</button>
     <button class="btn btn-secondary" onclick="reimprimirUltimaFicha()">🔁 Reimprimir Última</button>

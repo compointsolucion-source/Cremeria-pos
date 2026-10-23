@@ -24,28 +24,66 @@
   .barra-superior-avanzada input { flex: 1; font-size: 16px; }
   .sugerencias-avanzada {
     position: absolute; top: calc(100% + 4px); left: 0;
-    background: white; border: 1px solid #DDD; border-radius: 10px;
-    max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    width: 100%; max-width: 500px; display: none;
+    background: var(--surface, white); color: var(--text); border: 1px solid var(--border, #DDD); border-radius: 10px;
+    max-height: 260px; overflow-y: auto; z-index: 50; box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    width: 100%; max-width: 560px; display: none;
   }
-  .sugerencia-avanzada-item { padding: 10px 14px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #F0F0F0; }
-  .sugerencia-avanzada-item:hover { background: #F4F5F6; }
-  .sugerencia-avanzada-item.sugerencia-resaltada { background: #E8F5E9; }
-  .barra-atajos { background: white; border-radius: 12px; padding: 8px; margin-bottom: 10px; box-shadow: var(--shadow); display: flex; gap: 6px; flex-wrap: wrap; }
+  .sugerencia-avanzada-item { padding: 11px 14px; cursor: pointer; font-size: 15px; display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fila-borde, #F0F0F0); color: var(--text); }
+  .sugerencia-avanzada-item:hover { background: var(--fila-hover, #F4F5F6); }
+  .sugerencia-avanzada-item.sugerencia-resaltada { background: #E8F5E9; background: color-mix(in srgb, var(--primary, #5FAE46) 18%, var(--surface, #fff)); }
+  .barra-atajos { background: var(--surface, white); border-radius: 12px; padding: 8px; margin-bottom: 10px; box-shadow: var(--shadow); display: flex; gap: 6px; flex-wrap: wrap; }
   .barra-atajos button { font-size: 13px; padding: 8px 12px; }
-  .tabla-venta { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-  .tabla-venta th, .tabla-venta td { padding: 10px; text-align: left; border-bottom: 1px solid #EEE; font-size: 14px; }
-  .tabla-venta th { background: #F4F5F6; }
-  .tabla-venta td.numero { text-align: right; }
-  .tabla-venta tbody tr:hover { background: #FAFAFA; }
-  .fila-seleccionada { background: #E3F2FD !important; }
-  .zona-total { background: var(--surface, white); border-radius: 12px; padding: 16px; margin-top: 10px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; }
-  .zona-total .total-grande { font-size: 40px; font-weight: 800; color: var(--primary, #5FAE46); }
-  .contador-articulos { font-size: 13px; color: var(--muted, #666); margin-top: 6px; }
-  .zona-inferior-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+  /* Tabla de la venta: encabezado de color, columnas separadas y renglones alternados */
+  .tabla-venta-wrap { background: var(--surface, white); border: 1px solid var(--border, #E4E6E9); border-radius: 12px; overflow: auto; box-shadow: var(--shadow); }
+  .tabla-venta { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface, white); }
+  .tabla-venta th, .tabla-venta td { padding: 12px 14px; text-align: left; font-size: 16px; border-bottom: 1px solid var(--fila-borde, #EEE); border-right: 1px solid var(--fila-borde, #EEE); }
+  .tabla-venta th:last-child, .tabla-venta td:last-child { border-right: none; }
+  .tabla-venta thead th { position: sticky; top: 0; z-index: 1; background: var(--primary, #5FAE46); color: var(--on-primary, #fff); font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: none; border-right-color: rgba(255,255,255,0.25); }
+  .tabla-venta td.numero, .tabla-venta th.numero { text-align: right; }
+  .tabla-venta td.col-codigo { font-size: 14px; color: var(--muted, #666); font-variant-numeric: tabular-nums; width: 150px; }
+  .tabla-venta td.col-desc { font-weight: 700; font-size: 17px; }
+  .tabla-venta td.col-cant { text-align: center; font-weight: 800; font-size: 18px; width: 90px; }
+  .tabla-venta td.col-importe { font-weight: 800; font-size: 18px; width: 130px; }
+  .tabla-venta td.col-exist { color: var(--muted, #666); width: 110px; }
+  .tabla-venta tbody tr:nth-child(even) td { background: #F5FAF3; background: color-mix(in srgb, var(--primary, #5FAE46) 6%, var(--surface, #fff)); }
+  .tabla-venta tbody tr:hover td { background: var(--fila-hover, #FAFAFA); }
+  .tabla-venta tbody tr.fila-seleccionada td { background: #DCEFD5 !important; background: color-mix(in srgb, var(--primary, #5FAE46) 24%, var(--surface, #fff)) !important; }
+  .tabla-venta tbody tr.fila-nueva td { animation: destello-fila 1s ease-out; }
+  @keyframes destello-fila { 0% { background: color-mix(in srgb, var(--primary, #5FAE46) 55%, var(--surface, #fff)); } 100% { background: transparent; } }
+  .tabla-venta td.vacio { text-align: center; color: var(--muted, #888); font-size: 16px; padding: 28px 14px; border-right: none; }
+  .zona-total { background: color-mix(in srgb, var(--primary, #5FAE46) 10%, var(--surface, #fff)); border: 2px solid var(--primary, #5FAE46); border-radius: 14px; padding: 10px 18px; margin-top: 10px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex: 0 0 auto; }
+  .zona-total .total-bloque { display: flex; align-items: center; gap: 18px; }
+  .zona-total .total-etiqueta { font-size: 18px; font-weight: 800; letter-spacing: 0.08em; color: var(--muted, #666); }
+  .zona-total .total-grande { font-size: 54px; font-weight: 800; line-height: 1; color: var(--primary, #5FAE46); font-variant-numeric: tabular-nums; }
+  .zona-total .btn-cobrar-grande { font-size: 22px; min-height: 60px; padding: 0 34px; border-radius: 12px; }
+  .contador-articulos { font-size: 15px; color: var(--muted, #666); }
+  .contador-articulos b { font-size: 22px; color: var(--text); }
+  .zona-inferior-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; flex: 0 0 auto; }
+  .contenido-avanzada .zona-inferior-btns .btn { min-height: 38px; padding: 7px 14px; font-size: 13.5px; }
+  .contenido-avanzada #panelUltimaVenta { padding: 8px 14px !important; margin-top: 8px !important; flex: 0 0 auto; border-radius: 10px; }
+  .contenido-avanzada #panelUltimaVenta > b, .contenido-avanzada #contenidoUltimaVenta { display: inline; }
+  .contenido-avanzada #contenidoUltimaVenta { margin: 0 0 0 8px !important; }
   #metodosPagoModalCobrar button.activo { background: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
   .resultado-cliente { background: var(--background, #F4F5F6); border-radius: 8px; padding: 8px 12px; margin-top: 4px; cursor: pointer; font-size: 13px; }
-  .resultado-cliente:hover { background: #E8F5E9; }
+  .resultado-cliente:hover { background: #E8F5E9; background: color-mix(in srgb, var(--primary, #5FAE46) 16%, var(--surface, #fff)); }
+
+  /* Pantalla completa: la venta se ve sin bajar la página; solo la lista de productos se desplaza por dentro */
+  @media (min-width: 901px) {
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body:not(.vista-mostrador) .top-bar { padding: 8px 22px; flex: 0 0 auto; }
+    .contenido-avanzada { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: none; margin: 0; padding: 10px 16px 12px; }
+    .contenido-avanzada .barra-pestanas { flex: 0 0 auto; margin-bottom: 8px !important; }
+    .contenido-avanzada .barra-superior-avanzada, .contenido-avanzada .barra-atajos { flex: 0 0 auto; margin-bottom: 8px; padding: 8px 10px; }
+    .contenido-avanzada .tabla-venta-wrap { flex: 1 1 auto; min-height: 120px; }
+  }
+  @media (max-width: 900px) {
+    .tabla-venta th, .tabla-venta td { padding: 9px 8px; font-size: 14px; }
+    .tabla-venta td.col-desc { font-size: 15px; }
+    .zona-total .total-grande { font-size: 38px; }
+    .zona-total .btn-cobrar-grande { min-height: 52px; padding: 0 20px; font-size: 18px; }
+    .zona-total .total-etiqueta { display: none; }
+  }
 
   .pestana-ticket {
     background: var(--surface, white); border: 2px solid var(--border, #DDD); border-radius: 10px 10px 0 0;
@@ -139,7 +177,11 @@
   .vm-totales { font-size: 13px; margin-top: 6px; }
   .vm-totales > div { display: flex; justify-content: space-between; padding: 2px 0; }
   .vm-t-desc { color: #C62828; }
-  .vm-gran { font-size: 28px; font-weight: 800; color: var(--primary, #5FAE46); margin-top: 4px; }
+  /* Total más grande (solo la letra; el recuadro del ticket queda del mismo tamaño) */
+  .vm-totales .vm-gran { align-items: baseline; gap: 8px; margin-top: 4px; font-weight: 800; color: var(--primary, #5FAE46); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .vm-gran span:first-child { font-size: 22px; }
+  .vm-gran span:last-child { font-size: clamp(34px, 3.4vw, 46px); line-height: 1.05; }
+  @media (max-width: 900px) { .vm-gran span:last-child { font-size: 40px; } }
   .vm-cobrar { margin-top: 10px; width: 100%; padding: 16px; font-size: 18px; }
   body.vista-mostrador .barra-atajos, body.vista-mostrador .zona-inferior-btns { margin-top: 8px; margin-bottom: 0; flex: 0 0 auto; }
   body.vista-mostrador #vmSlotArriba .barra-superior-avanzada { margin-bottom: 10px; }
@@ -150,6 +192,38 @@
     .vm-grid { max-height: 50vh; }
     .selector-vista button { padding: 8px 10px; font-size: 13px; }
   }
+
+  /* ---- Modo oscuro de Caja Mostrador: solo cambian los colores fijos que se veían blancos con letra clara ---- */
+  [data-tema="oscuro"] .vm-cat { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  [data-tema="oscuro"] .vm-cat.activa { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  [data-tema="oscuro"] .vm-cat.kits { background: #F9A825; border-color: #F9A825; color: #fff; }
+  /* ---- Ventana de cobro y de peso en modo oscuro (teclado y cuadro de cambio se veían claros) ---- */
+  [data-tema="oscuro"] .teclado-cobro button { background: var(--fila-hover); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+  [data-tema="oscuro"] .teclado-cobro button:active { background: var(--primary); color: var(--on-primary); }
+  [data-tema="oscuro"] .teclado-cobro .tc-borrar { background: #4A3414; color: #FFD08A; }
+  [data-tema="oscuro"] .teclado-cobro .tc-exacto { background: #16283D; color: #9CCBFF; }
+  [data-tema="oscuro"] .teclado-cobro .tc-enter { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  [data-tema="oscuro"] .cambio-grande.vacio { background: var(--tabla-cab); color: var(--muted); border-color: var(--border); }
+  [data-tema="oscuro"] .cambio-grande.ok { background: #16301A; color: #8FE08A; border-color: #5FAE46; }
+  [data-tema="oscuro"] .cambio-grande.falta { background: #3A1A1A; color: #FF9A94; border-color: #E53935; }
+  [data-tema="oscuro"] .peso-rapidos .q { color: var(--muted); }
+  [data-tema="oscuro"] .peso-chip { background: var(--fila-hover); border-color: var(--border); color: var(--text); }
+  [data-tema="oscuro"] .peso-chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  [data-tema="oscuro"] .peso-aviso-exacto { background: #16301A; color: #8FE08A; }
+  [data-tema="oscuro"] .stepper-av button { background: var(--primary); color: var(--on-primary); }
+  [data-tema="oscuro"] .vm-card { background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+  [data-tema="oscuro"] .vm-card:active { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
+  [data-tema="oscuro"] .vm-card img, [data-tema="oscuro"] .vm-sinfoto { background: color-mix(in srgb, var(--primary) 10%, var(--surface)); }
+  [data-tema="oscuro"] .vm-nombre { color: var(--text); }
+  [data-tema="oscuro"] .vm-precio { color: var(--primary); font-weight: 600; }
+  [data-tema="oscuro"] .vm-ticket { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  [data-tema="oscuro"] .vm-ticket h3 small { color: var(--muted); }
+  [data-tema="oscuro"] .vm-cliente { background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+  [data-tema="oscuro"] .vm-fila { border-bottom-color: var(--fila-borde); }
+  [data-tema="oscuro"] .vm-fila.sel { background: color-mix(in srgb, var(--primary) 22%, var(--surface)); }
+  [data-tema="oscuro"] .vm-fila-b button { background: var(--secondary); color: var(--text); }
+  [data-tema="oscuro"] .vm-fila-b button.vm-x { background: transparent; color: #EF7B7B; }
+  [data-tema="oscuro"] .vm-desc, [data-tema="oscuro"] .vm-desc a, [data-tema="oscuro"] .vm-t-desc, [data-tema="oscuro"] .vm-t-desc a { color: #EF7B7B; }
 </style>
 </head>
 <body>
@@ -189,6 +263,7 @@
       <button class="btn btn-secondary" onclick="abrirVerificadorPrecios()">🔍 F9 - Verificador</button>
     </div>
 
+    <div class="tabla-venta-wrap">
     <table class="tabla-venta">
       <thead>
         <tr>
@@ -202,6 +277,7 @@
       </thead>
       <tbody id="tablaVentaAvanzada"></tbody>
     </table>
+    </div>
 
     <div class="zona-inferior-btns">
       <button class="btn btn-secondary" onclick="cambiarPestanaSiguiente()">🔄 F5 - Cambiar</button>
@@ -222,9 +298,10 @@
       <div>
         <div class="contador-articulos"><b id="contadorArticulosAvanzada">0</b> productos en la venta actual</div>
       </div>
-      <div style="text-align:right;">
+      <div class="total-bloque">
+        <span class="total-etiqueta">TOTAL</span>
         <div class="total-grande" id="totalVentaAvanzada">$0.00</div>
-        <button class="btn btn-primary" style="margin-top:6px; width:100%;" onclick="irACobrarAvanzada()">💰 Cobrar</button>
+        <button class="btn btn-primary btn-cobrar-grande" onclick="irACobrarAvanzada()">💰 Cobrar</button>
       </div>
     </div>
   </div>
@@ -940,7 +1017,21 @@ async function cargarTicketMostradorEnPestana(folio) {
     mostrarToast(`Ticket ${ticket.folio} (de Mostrador) cargado — listo para cobrar`, 'exito');
   } catch (err) {
     mostrarToast('No se encontró ningún producto ni ticket con ese código', 'error');
+    const campo = document.getElementById('campoCodigoProducto');
+    if (campo) { campo.focus(); campo.select(); } // el siguiente escaneo reemplaza el código fallido
   }
+}
+
+// Renglón que se acaba de agregar o sumar (para el destello y el desplazamiento).
+let filaTocadaAv = null;
+
+// Si el mismo producto (por pieza, sin descuento propio y al mismo precio) ya está en el ticket,
+// se suma a ese renglón en vez de repetirlo. A granel cada pesada sigue siendo su renglón.
+function buscarRenglonIgualAv(producto) {
+  if (producto.tipo_venta === 'peso') return -1;
+  return carritoActivo().findIndex(it => it.tipo === 'producto' && it.producto_id === producto.id && !it.descuento
+    && !(parseFloat(it.descuento_monto) > 0) && it.importe === undefined
+    && it.precio_unitario === parseFloat(producto.precio));
 }
 
 // extra.importe = venta a granel POR IMPORTE: ese importe se cobra exacto (ver js/granel.js).
@@ -958,6 +1049,16 @@ async function agregarProductoAvanzada(producto, cantidad, extra) {
   if (extra && extra.importe > 0) nuevoItem.importe = extra.importe;
 
   const pestanaActual = pestanas[pestanaActivaIndex];
+  if (!pestanaActual.ticketIdExistente && !(extra && extra.importe > 0)) {
+    const iguales = buscarRenglonIgualAv(producto);
+    if (iguales >= 0) {
+      const renglon = carritoActivo()[iguales];
+      renglon.cantidad = Math.round(((parseFloat(renglon.cantidad) || 0) + cantidad) * 1000) / 1000;
+      filaTocadaAv = iguales;
+      renderTablaVentaAvanzada();
+      return;
+    }
+  }
   if (pestanaActual.ticketIdExistente) {
     // Esta pestaña es un ticket real que ya vive en el servidor (vino de
     // Mostrador) — el producto se manda de inmediato al ticket real, no
@@ -977,6 +1078,7 @@ async function agregarProductoAvanzada(producto, cantidad, extra) {
   }
 
   carritoActivo().push(nuevoItem);
+  filaTocadaAv = carritoActivo().length - 1;
   renderTablaVentaAvanzada();
 }
 
@@ -1024,23 +1126,29 @@ function renderTablaVentaAvanzada() {
     const importe = GRANEL.subtotal(item);
     total += importe;
     const existenciaTexto = item.existencia_referencia !== null ? parseFloat(item.existencia_referencia).toFixed(2) : (item.tipo === 'kit' ? 'Kit' : '—');
+    const clases = [idx === filaSeleccionadaIndex ? 'fila-seleccionada' : '', idx === filaTocadaAv ? 'fila-nueva' : ''].join(' ').trim();
     return `
-      <tr class="${idx === filaSeleccionadaIndex ? 'fila-seleccionada' : ''}" onclick="seleccionarFilaAvanzada(${idx})">
-        <td>${item.codigo_barras || '—'}</td>
-        <td>${escaparNombreAv(item.nombre_producto)}</td>
+      <tr class="${clases}" onclick="seleccionarFilaAvanzada(${idx})">
+        <td class="col-codigo">${escaparNombreAv(item.codigo_barras || '—')}</td>
+        <td class="col-desc">${escaparNombreAv(item.nombre_producto)}</td>
         <td class="numero">$${item.precio_unitario.toFixed(2)}</td>
-        <td class="numero">${item.cantidad}</td>
-        <td class="numero">$${importe.toFixed(2)}</td>
-        <td class="numero">${existenciaTexto}</td>
+        <td class="col-cant">${item.cantidad}</td>
+        <td class="numero col-importe">$${importe.toFixed(2)}</td>
+        <td class="numero col-exist">${existenciaTexto}</td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="6" style="text-align:center; color:#888;">Sin productos en la venta actual</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="vacio">Sin productos en la venta actual — escanea o escribe un código</td></tr>';
 
   const totalesVenta = totalesPestanaAv(pestanas[pestanaActivaIndex]);
   document.getElementById('totalVentaAvanzada').textContent = `$${totalesVenta.neto.toFixed(2)}`;
   document.getElementById('contadorArticulosAvanzada').textContent = carritoActivo().length;
   renderPestanas();
   renderVistaMostrador();
+  // El renglón que se acaba de agregar o sumar se ve (destello) y se desplaza a la vista.
+  if (filaTocadaAv !== null) {
+    document.querySelectorAll('tr.fila-nueva').forEach(tr => { if (tr.offsetParent) tr.scrollIntoView({ block: 'nearest' }); });
+    filaTocadaAv = null;
+  }
 }
 
 function seleccionarFilaAvanzada(idx) {
@@ -2135,6 +2243,43 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'F5') { e.preventDefault(); cambiarPestanaSiguiente(); }
   else if (e.key === 'F6') { e.preventDefault(); ponerPendiente(); }
 });
+
+// ---------- Escáner: la barra de captura siempre lista ----------
+// Con lector de código de barras la barra debe estar enfocada siempre: después de cerrar una ventana,
+// de tocar un botón o una foto, o si el cursor se perdió, el siguiente código escaneado cae en la barra
+// y se suma solo (sin dar clic). Tampoco deja el cursor en un botón, porque el "Enter" final del lector
+// lo pulsaría. En tablet o celular no se hace, para no abrir el teclado de la pantalla.
+const equipoConTecladoAv = !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+let ultimoTabAv = 0;
+
+function hayVentanaAbiertaAv() {
+  return [...document.querySelectorAll('.modal-overlay, .modal-confirm-overlay')].some(m =>
+    m.classList.contains('modal-confirm-overlay') ? m.classList.contains('abierto') : getComputedStyle(m).display !== 'none');
+}
+
+function enfocarBuscadorAv() {
+  if (!equipoConTecladoAv || document.hidden || hayVentanaAbiertaAv()) return;
+  const campo = document.getElementById('campoCodigoProducto');
+  if (!campo || !campo.offsetParent) return;
+  const a = document.activeElement;
+  if (a === campo) return;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; // está escribiendo en otro campo
+  if (a && a.tagName === 'BUTTON' && Date.now() - ultimoTabAv < 15000) return; // navega con Tab: se respeta
+  campo.focus({ preventScroll: true });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') { ultimoTabAv = Date.now(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+  enfocarBuscadorAv(); // la tecla (o el primer número del código) se escribe ya dentro de la barra
+}, true);
+document.addEventListener('click', (e) => {
+  if (e.target.closest && e.target.closest('input, textarea, select, a, label')) return;
+  setTimeout(enfocarBuscadorAv, 0);
+});
+setInterval(enfocarBuscadorAv, 700);
 
 renderPestanas();
 cargarCatalogoAvanzada();

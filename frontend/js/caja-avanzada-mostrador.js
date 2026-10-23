@@ -165,7 +165,7 @@ function moverNodosVista(aMostrador) {
   const pestanasBar = document.getElementById('barraPestanas');
   const buscador = q('.barra-superior-avanzada');
   const atajos = q('.barra-atajos');
-  const tabla = q('.tabla-venta');
+  const tabla = q('.tabla-venta-wrap');
   const inferior = q('.zona-inferior-btns');
   const panelUlt = document.getElementById('panelUltimaVenta');
   const total = q('.zona-total');

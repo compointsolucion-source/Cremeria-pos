@@ -199,8 +199,8 @@ tbody tr:hover { background: var(--fila-hover); }
 /* ===== Temas de color — independientes de claro/oscuro, se pueden
    combinar (ej. "Azul" + oscuro). "Verde" es el color de toda la vida del
    sistema y es el que ya se ve si no se elige nada distinto.
-   Los 5 primeros solo cambian el color principal; los 4 de abajo (Cremería,
-   Carnicería, Pizarra y Menta) son TEMAS COMPLETOS: cambian también fondos,
+   Los 5 primeros solo cambian el color principal; los 5 de abajo (Cremería,
+   Carnicería, Pizarra, Menta y Girl Time) son TEMAS COMPLETOS: cambian también fondos,
    tarjetas, letras, barra de arriba y menú lateral, cada uno con su versión
    clara y su versión oscura. ===== */
 [data-color-tema="verde"] { --primary: #5FAE46; --primary-dark: #4C9439; }
@@ -296,6 +296,41 @@ html[data-tema="oscuro"][data-color-tema="menta"] {
   --sidebar-fondo: #0B1512; --sidebar-texto: #C5DAD4; --sidebar-texto-tenue: #6F8A82; --sidebar-borde: #1A2B26;
   --sidebar-hover: #12201C; --sidebar-activo-fondo: #12302A; --sidebar-activo-texto: #6FE0BE; --sidebar-activo-borde: #4FC8A4;
 }
+
+/* ---------- GIRL TIME: rosa frambuesa y lila, elegante y empresarial ---------- */
+html[data-color-tema="girltime"] {
+  --primary: #B8337E; --primary-dark: #94255F;
+  --background: #FBF3F8; --surface: #FFFFFF; --text: #2D1B2C; --muted: #8A6B82; --border: #EBD9E5; --secondary: #EBD9E5;
+  --on-primary: #FFFFFF; --topbar-fondo: #3F1A3B; --topbar-texto: #FFFFFF;
+  --campo-fondo: #FFFFFF; --tabla-cab: #FAF0F6; --fila-hover: #FCF1F7; --fila-borde: #F3E6EF;
+  --sidebar-fondo: #FFFAFD; --sidebar-texto: #5B3F56; --sidebar-texto-tenue: #AB90A5; --sidebar-borde: #F1E2EC;
+  --sidebar-hover: #FAEEF5; --sidebar-activo-fondo: #F8DCEC; --sidebar-activo-texto: #94255F; --sidebar-activo-borde: #B8337E;
+}
+html[data-tema="oscuro"][data-color-tema="girltime"] {
+  --primary: #F27DB9; --primary-dark: #DB5FA0;
+  --background: #1A1018; --surface: #261825; --text: #F9EBF4; --muted: #C4A3BA; --border: #48304A; --secondary: #48304A;
+  --on-primary: #2E0820; --topbar-fondo: #110910; --topbar-texto: #F9EBF4;
+  --campo-fondo: #1E131D; --tabla-cab: #211520; --fila-hover: #321F30; --fila-borde: #382436;
+  --sidebar-fondo: #140C13; --sidebar-texto: #E6CFDD; --sidebar-texto-tenue: #8E6F85; --sidebar-borde: #2C1B2A;
+  --sidebar-hover: #1E1220; --sidebar-activo-fondo: #381A2E; --sidebar-activo-texto: #FFA3D1; --sidebar-activo-borde: #F27DB9;
+}
+/* Toque especial: la barra de arriba pasa de ciruela a orquídea (solo claro; en oscuro queda sobria). */
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .top-bar { background: linear-gradient(100deg, #3F1A3B 0%, #6E2A66 100%); }
+/* Retoques: pantallas que traían un verde fijo en vez del color del tema (Mostrador, Caja). */
+html[data-color-tema="girltime"] .vm-cat.activa,
+html[data-color-tema="girltime"] .categoria-tab.activa,
+html[data-color-tema="girltime"] .peso-chip.on,
+html[data-color-tema="girltime"] .stepper-av button,
+html[data-color-tema="girltime"] .metodo-pago-btns button.activo,
+html[data-color-tema="girltime"] .teclado-cobro .tc-enter,
+html[data-color-tema="girltime"] .teclado-cobro button:active { background: var(--primary); color: var(--on-primary); }
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .vm-cat:not(.activa):not(.kits),
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .categoria-tab:not(.activa):not(.kits) { background: #F3E3EE; color: var(--text); }
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .barra-fichas,
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .barra-acciones { background: var(--tabla-cab); border-bottom-color: var(--border); }
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .teclado-cobro button:not(.tc-borrar):not(.tc-exacto):not(.tc-enter) { background: #F8E3EF; color: #7A1F52; }
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .hist-fila:hover,
+html[data-color-tema="girltime"]:not([data-tema="oscuro"]) .hist-fila.sel { background: var(--fila-hover); }
 
 .boton-tema-flotante {
   position: fixed;

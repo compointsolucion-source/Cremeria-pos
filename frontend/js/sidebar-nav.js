@@ -381,4 +381,49 @@ function inicializarSidebar() {
   window.addEventListener('resize', cerrarEmergentesSidebar);
 }
 
-inicializarSidebar();
+// ---------- Pantallas que no le corresponden a esta persona ----------
+// El menú ya oculta lo que no puede usar. Si aun así alguien escribe a mano la dirección de una pantalla
+// restringida (o la tenía guardada en favoritos), no se queda ahí: se le regresa a su pantalla de inicio y
+// se le avisa. (El servidor además rechaza siempre los datos de esas pantallas: esto es solo para que no las vea.)
+function todosLosModulosSidebar() {
+  return [ITEM_INICIO_SIDEBAR, ...GRUPOS_SIDEBAR.flatMap((g) => g.items)];
+}
+
+function pantallaPermitidaSidebar() {
+  const usuario = typeof getUsuario === 'function' ? getUsuario() : null;
+  if (!usuario) return true; // sin sesión: cada pantalla ya manda al inicio de sesión
+  const item = todosLosModulosSidebar().find((it) => it.href === paginaActual());
+  if (!item) return true;    // pantallas fuera del menú (ej. la del repartidor): no se tocan
+  return itemVisibleSidebar(item, usuario, permisosExtraDelToken());
+}
+
+function pantallaDeInicioSidebar(usuario) {
+  // Mismo destino que al iniciar sesión (login.html), siempre que esa pantalla sí le corresponda.
+  const porRol = { mostrador: 'mostrador.html', cajero: 'caja.html', repartidor: 'repartidor.html', jefe_general: 'sucursales.html' };
+  const extra = permisosExtraDelToken();
+  const modulos = todosLosModulosSidebar();
+  const propia = porRol[usuario.rol] || 'dashboard.html';
+  const enMenu = modulos.find((it) => it.href === propia);
+  if (!enMenu || itemVisibleSidebar(enMenu, usuario, extra)) return propia;
+  const primero = modulos.find((it) => itemVisibleSidebar(it, usuario, extra));
+  return primero ? primero.href : 'cambiar-password.html';
+}
+
+const redirigiendoSinPermisoSidebar = (function resguardarPantallaSidebar() {
+  if (pantallaPermitidaSidebar()) return false;
+  const usuario = getUsuario();
+  try { sessionStorage.setItem('aviso_sin_permiso', 'No tienes permiso para entrar a esa pantalla. Te regresamos a tu pantalla de inicio.'); } catch (e) { /* sin almacenamiento */ }
+  window.location.replace(rutaSidebar(pantallaDeInicioSidebar(usuario)));
+  return true;
+})();
+
+function mostrarAvisoSinPermisoSidebar() {
+  let aviso = null;
+  try { aviso = sessionStorage.getItem('aviso_sin_permiso'); sessionStorage.removeItem('aviso_sin_permiso'); } catch (e) { /* sin almacenamiento */ }
+  if (aviso && typeof mostrarToast === 'function') mostrarToast(aviso, 'error', 6000);
+}
+
+if (!redirigiendoSinPermisoSidebar) {
+  inicializarSidebar();
+  mostrarAvisoSinPermisoSidebar(); // el aviso sale en la pantalla a la que se le regresó, no en la que se está cerrando
+}
