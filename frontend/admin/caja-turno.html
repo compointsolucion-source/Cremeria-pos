@@ -411,13 +411,13 @@ async function imprimirCorteActual() {
 }
 
 async function realizarCorte() {
-  if (!turnoActual) return;
+  if (!turnoActual) return false;
   const declarado = await declararImportes({
     titulo: '🔒 Corte de turno — declaración de caja',
     subtitulo: 'Cuenta lo que hay en caja y captura el importe de cada forma de pago.'
   });
-  if (!declarado) return;
-  if (!(await confirmarAccion('¿Confirmas el cierre de turno con estos importes? Esta acción no se puede deshacer.'))) return;
+  if (!declarado) return false;
+  if (!(await confirmarAccion('¿Confirmas el cierre de turno con estos importes? Esta acción no se puede deshacer.'))) return false;
 
   const { dolares_usd, ...resto } = declarado;
   const declaracion = { ...resto };
@@ -439,8 +439,10 @@ async function realizarCorte() {
     cerrarHoja();
     cargarTurno();
     cargarCortes();
+    return true;
   } catch (err) {
     mostrarToast(err.message, 'error');
+    return false;
   }
 }
 
@@ -596,7 +598,16 @@ function descargarCorteCSV(c) {
 
 pintarChips();
 cargarCortes();
-cargarTurno();
+// Viene de "Salir" / "Cerrar caja" (aviso de turno abierto): se abre directo el cierre de turno y, al terminar, se sale.
+cargarTurno().then(async () => {
+  const modo = new URLSearchParams(location.search).get('cerrar');
+  if (!modo) return;
+  history.replaceState(null, '', location.pathname);
+  if (!turnoActual) return;
+  if (!(await realizarCorte())) return;
+  if (modo === 'salir') setTimeout(cerrarSesion, 1800);
+  else if (modo === 'programa' && window.compointDesktop && compointDesktop.salir) setTimeout(() => compointDesktop.salir(), 1800);
+});
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>

@@ -13,7 +13,8 @@ contextBridge.exposeInMainWorld('compointDesktop', {
   esEscritorio: true,
   listarImpresoras: () => ipcRenderer.invoke('listar-impresoras'),
   imprimirHTML: (html, opciones) => ipcRenderer.invoke('imprimir-html', html, opciones),
-  abrirCajon: (opciones) => ipcRenderer.invoke('abrir-cajon', opciones)
+  abrirCajon: (opciones) => ipcRenderer.invoke('abrir-cajon', opciones),
+  salir: () => ipcRenderer.invoke('salir-programa')
 });
 
 // Modo servidor del negocio (solo las páginas del programa, no el sistema web).

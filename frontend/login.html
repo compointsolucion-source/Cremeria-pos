@@ -69,6 +69,9 @@ async function login() {
     localStorage.setItem('token', data.token);
     localStorage.setItem('usuario', JSON.stringify(data.usuario));
 
+    // Si dejó un turno de caja abierto: continuarlo o hacer el corte (aviso).
+    if (await elegirTurnoAlEntrar() === 'cerrar') { window.location.href = '/admin/caja-turno.html?cerrar=1'; return; }
+
     // Redirigir según rol. jefe_general no tiene una sola sucursal fija —
     // entra primero a elegir con cuál va a trabajar (o ver el resumen de
     // todas), antes que a cualquier pantalla que ya asuma una sucursal.

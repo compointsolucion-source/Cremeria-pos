@@ -429,3 +429,148 @@ async function apiFetch(endpoint, options = {}) {
 function requiereLogin() {
   if (!getToken()) window.location.href = '/login.html';
 }
+
+
+// ===== Turno abierto: qué hacer al salir, al entrar y al cerrar el programa =====
+// Si la persona tiene un turno de caja abierto, antes de salir o cambiar de usuario se le pregunta si cierra caja
+// (hace su corte) o deja el turno abierto. Al volver a entrar con un turno abierto, se le pregunta si lo continúa
+// o hace el corte. Todo usa el mismo cierre de turno de la pantalla "Corte de Caja".
+(function () {
+  const estilo = document.createElement('style');
+  estilo.textContent = `
+  .tsx-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:5000;padding:12px}
+  .tsx{background:var(--surface,#fff);color:var(--text,#1F2023);border-radius:16px;width:min(440px,100%);box-shadow:0 18px 60px rgba(0,0,0,.35);overflow:hidden}
+  .tsx-cab{background:var(--primary,#5FAE46);color:#fff;padding:14px 20px;font-weight:800;font-size:17px;letter-spacing:.2px}
+  .tsx-cuerpo{padding:18px 20px 20px}
+  .tsx-sub{font-size:14.5px;margin:0 0 4px;font-weight:600}
+  .tsx-dato{font-size:13px;color:var(--muted,#7A7D83);margin:0 0 16px}
+  .tsx-btn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px solid var(--border,#E4E6E9);background:var(--surface,#fff);color:inherit;border-radius:12px;padding:13px 14px;margin-bottom:10px;font:inherit;cursor:pointer}
+  .tsx-btn:focus-visible{outline:3px solid color-mix(in srgb,var(--primary,#5FAE46) 45%,transparent);outline-offset:1px}
+  .tsx-btn .ic{font-size:24px;line-height:1}
+  .tsx-btn b{display:block;font-size:15.5px}
+  .tsx-btn small{display:block;font-size:12.5px;color:var(--muted,#7A7D83);margin-top:2px;font-weight:500}
+  .tsx-btn.rojo{border-color:#C62828}
+  .tsx-btn.rojo b{color:#C62828}
+  .tsx-btn.verde{background:var(--primary,#5FAE46);border-color:var(--primary,#5FAE46);color:#fff}
+  .tsx-btn.verde small{color:rgba(255,255,255,.9)}
+  .tsx-cancel{display:block;width:100%;text-align:center;border:none;background:transparent;color:var(--muted,#7A7D83);font:inherit;font-weight:700;padding:8px;cursor:pointer;margin-top:2px}
+  .tsx-nota{background:#FFF6D6;border:1px solid #E6D48A;color:#6B5A12;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-top:6px}
+  [data-tema="oscuro"] .tsx-nota{background:#3A3420;border-color:#6B5A12;color:#F0DE9A}
+  `;
+  document.head.appendChild(estilo);
+})();
+
+// Turno abierto de quien está usando el sistema (o null si no tiene, no aplica a su rol o no se pudo consultar).
+async function turnoAbiertoDelUsuario() {
+  try {
+    const u = getUsuario();
+    if (!getToken() || !u || u.rol === 'repartidor' || u.rol === 'jefe_general') return null;
+    const t = await apiFetch('/turnos/actual');
+    return t && t.estado !== 'cerrado' ? t : null;
+  } catch (e) { return null; }
+}
+
+// "Turno abierto hoy a las 10:47 a.m. · 3 ventas · $52.50"
+async function textoResumenTurno(t) {
+  const d = new Date(t.fecha_apertura), ayer = new Date(Date.now() - 86400000);
+  const hora = d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
+  let dia;
+  if (d.toDateString() === new Date().toDateString()) dia = 'hoy';
+  else if (d.toDateString() === ayer.toDateString()) dia = 'ayer';
+  else dia = 'el ' + d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '');
+  let texto = `${dia} a las ${hora}`;
+  try {
+    const r = await apiFetch(`/turnos/${t.id}/resumen`);
+    const n = (r.cuentas || {}).normales || 0;
+    texto += ` · ${n} venta${n === 1 ? '' : 's'} · $` + Number(r.ventas.venta_neta || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch (e) { /* sin resumen: solo la hora */ }
+  return texto;
+}
+
+// Aviso con botones grandes. Devuelve la clave del botón elegido ('cancelar' con Esc o con el botón Cancelar).
+function avisoTurno({ titulo, sub, dato, botones, nota, cancelar }) {
+  const esc = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const previo = document.getElementById('avisoTurnoSalida');
+  if (previo) previo.remove();
+  return new Promise((resolve) => {
+    const ov = document.createElement('div');
+    ov.id = 'avisoTurnoSalida';
+    ov.className = 'tsx-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = `<div class="tsx"><div class="tsx-cab">${esc(titulo)}</div><div class="tsx-cuerpo">
+      <p class="tsx-sub">${esc(sub)}</p><p class="tsx-dato">${esc(dato)}</p>
+      ${botones.map((b) => `<button type="button" class="tsx-btn ${b.clase || ''}" data-k="${esc(b.k)}"><span class="ic">${b.icono}</span><span><b>${esc(b.texto)}</b><small>${esc(b.detalle)}</small></span></button>`).join('')}
+      ${cancelar ? `<button type="button" class="tsx-cancel" data-k="cancelar">${esc(cancelar)}</button>` : ''}
+      ${nota ? `<div class="tsx-nota">${esc(nota)}</div>` : ''}</div></div>`;
+    const terminar = (k) => { document.removeEventListener('keydown', teclas, true); ov.remove(); resolve(k); };
+    const teclas = (e) => { if (e.key === 'Escape' && cancelar) { e.preventDefault(); e.stopPropagation(); terminar('cancelar'); } };
+    ov.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) terminar(b.dataset.k); });
+    document.addEventListener('keydown', teclas, true);
+    document.body.appendChild(ov);
+    const primero = ov.querySelector('.tsx-btn.verde') || ov.querySelector('.tsx-btn');
+    if (primero) primero.focus();
+  });
+}
+
+// Botón "Salir" / cambio de usuario.
+async function salirConTurno() {
+  const t = await turnoAbiertoDelUsuario();
+  if (!t) { cerrarSesion(); return; }
+  const r = await avisoTurno({
+    titulo: '🔒 Tu turno de caja sigue abierto',
+    sub: '¿Qué quieres hacer antes de salir?',
+    dato: 'Turno abierto ' + await textoResumenTurno(t),
+    botones: [
+      { k: 'cerrar', icono: '🔒', clase: 'rojo', texto: 'Cerrar caja y salir', detalle: 'Haces tu corte ahora (declaras el dinero)' },
+      { k: 'dejar', icono: '🚪', texto: 'Dejar turno abierto y salir', detalle: 'Al volver a entrar podrás continuar tu turno' }
+    ],
+    cancelar: 'Cancelar',
+    nota: '⚠️ Si dejas el turno abierto, solo tú o un administrador podrán continuarlo.'
+  });
+  if (r === 'cerrar') window.location.href = '/admin/caja-turno.html?cerrar=salir';
+  else if (r === 'dejar') cerrarSesion();
+}
+
+// Al entrar con un turno abierto: continuar o hacer el corte. Devuelve 'continuar' o 'cerrar'.
+async function elegirTurnoAlEntrar() {
+  const t = await turnoAbiertoDelUsuario();
+  if (!t) return 'continuar';
+  const r = await avisoTurno({
+    titulo: '👋 Tienes un turno abierto',
+    sub: new Date(t.fecha_apertura).toDateString() === new Date().toDateString() ? 'Sigue abierto desde hoy.' : 'Quedó abierto de un día anterior y no se ha cerrado.',
+    dato: 'Turno abierto ' + await textoResumenTurno(t),
+    botones: [
+      { k: 'continuar', icono: '▶️', clase: 'verde', texto: 'Continuar mi turno', detalle: 'Sigues vendiendo con el mismo turno y la misma caja' },
+      { k: 'cerrar', icono: '🔒', clase: 'rojo', texto: 'Cerrar caja (hacer corte)', detalle: 'Declaras el dinero y se cierra este turno; después abres uno nuevo' }
+    ],
+    nota: '💡 Si ya terminó tu jornada anterior, lo correcto es hacer el corte antes de empezar a vender.'
+  });
+  return r === 'cerrar' ? 'cerrar' : 'continuar';
+}
+
+// Lo llama el programa de escritorio al elegir "Salir por completo". Devuelve 'salir' o 'cancelar'.
+async function preguntarSalidaPrograma() {
+  const t = await turnoAbiertoDelUsuario();
+  if (!t) return 'salir';
+  const r = await avisoTurno({
+    titulo: 'Salir de Compoint Punto',
+    sub: 'Tu turno de caja sigue abierto. Elige la opción que deseas.',
+    dato: 'Turno abierto ' + await textoResumenTurno(t),
+    botones: [
+      { k: 'cerrar', icono: '🔒', clase: 'rojo', texto: 'Cerrar caja…', detalle: 'Haces el corte y después se cierra el programa' },
+      { k: 'dejar', icono: '🚪', texto: 'Dejar turno abierto y salir…', detalle: 'Al abrir el programa podrás continuar tu turno' }
+    ],
+    cancelar: 'Cancelar',
+    nota: '⚠️ Si dejas el turno abierto, solo tú o un administrador podrán continuarlo.'
+  });
+  if (r === 'cerrar') { window.location.href = '/admin/caja-turno.html?cerrar=programa'; return 'cancelar'; }
+  if (r === 'dejar') {
+    // Se cierra la sesión para que, al abrir el programa, vuelva a preguntar si continúa el turno.
+    try { await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } }); } catch (e) { /* sin red: igual se sale */ }
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    return 'salir';
+  }
+  return 'cancelar';
+}

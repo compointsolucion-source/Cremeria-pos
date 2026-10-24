@@ -301,7 +301,7 @@ function construirSidebar() {
             <div class="sg-rol">${escaparSidebar(rolUsuario)}</div>
           </div>
           <button type="button" class="sg-tema" onclick="alternarTemaGlobal()" title="${escaparSidebar(typeof textoTemaGlobal === 'function' ? textoTemaGlobal() : 'Cambiar entre claro y oscuro')}" aria-label="Cambiar entre claro y oscuro">${typeof iconoTemaGlobal === 'function' ? iconoTemaGlobal() : '☀️'}</button>
-          <button type="button" class="sg-salir" onclick="cerrarSesion()" title="Cerrar sesión" aria-label="Cerrar sesión">${svgIcono('salir', 18)}</button>
+          <button type="button" class="sg-salir" onclick="salirConTurno()" title="Cerrar sesión" aria-label="Cerrar sesión">${svgIcono('salir', 18)}</button>
         </div>
       </div>
     </aside>

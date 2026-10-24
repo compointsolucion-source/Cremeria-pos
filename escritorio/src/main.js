@@ -227,10 +227,25 @@ function crearBandeja() {
     ] : [{ label: 'Cambiar dirección o usuario…', click: () => abrirConfig() }]),
     { label: 'Ayuda y soporte', click: () => { crearVentana(); try { const u = new URL('/admin/ayuda.html', configuracion().url); if (ventana) ventana.loadURL(u.href); } catch (e) {} } },
     { type: 'separator' },
-    { label: 'Salir por completo (guarda un respaldo)', click: () => { saliendo = true; app.quit(); } }
+    { label: 'Salir por completo (guarda un respaldo)', click: () => salirPorCompleto() }
   ]);
   tray.setContextMenu(menuBandeja());
   tray.on('click', () => crearVentana());
+}
+
+// Salir por completo: si quien está usando el sistema tiene un turno de caja abierto, el propio sistema pregunta
+// si cierra caja o deja el turno abierto (preguntarSalidaPrograma, en js/api.js). Si no hay ventana, sesión o respuesta, sale como siempre.
+async function salirPorCompleto() {
+  try {
+    if (ventana && !ventana.isDestroyed() && !ventana.webContents.isLoading() && origenEsDelSistema(new URL(ventana.webContents.getURL()).origin)) {
+      if (!ventana.isVisible()) ventana.show();
+      if (ventana.isMinimized()) ventana.restore();
+      ventana.focus();
+      const r = await ventana.webContents.executeJavaScript("typeof preguntarSalidaPrograma === 'function' ? preguntarSalidaPrograma() : 'salir'");
+      if (r === 'cancelar') return;
+    }
+  } catch (e) { log('Aviso de turno al salir: ' + e.message); }
+  saliendo = true; app.quit();
 }
 
 // ------------------------------------------------------------ permisos y dispositivos
@@ -340,6 +355,9 @@ const esDelSistema = (evento) => {
   try { if (origenEsDelSistema(evento.senderFrame.url)) return true; log('Pedido rechazado desde ' + evento.senderFrame.url + ' (esperado ' + origenConfigurado() + ')'); } catch (e) { /* sin origen */ }
   return false;
 };
+
+// El sistema pide salir del programa cuando termina de hacer el corte de caja.
+ipcMain.handle('salir-programa', (e) => { if (!esDelSistema(e)) return false; saliendo = true; app.quit(); return true; });
 
 ipcMain.handle('listar-impresoras', async (e) => {
   if (!esDelSistema(e)) return [];
