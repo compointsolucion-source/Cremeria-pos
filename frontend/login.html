@@ -10,50 +10,202 @@
 <link rel="stylesheet" href="css/app-theme.css">
 <script src="js/tema.js"></script>
 <style>
-  body { display: flex; align-items: center; justify-content: center; height: 100vh; }
-  .login-box { width: 320px; }
-  .login-marca { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 24px; }
-  .login-marca-wordmark { display: flex; align-items: baseline; gap: 6px; }
-  .login-marca-compoint { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: var(--text); }
-  .login-marca-punto { font-size: 20px; font-weight: 800; letter-spacing: 1.5px; color: #5FAE46; }
-  .login-box input { margin-bottom: 12px; }
-  #error { color: #C62828; text-align: center; font-size: 14px; min-height: 18px; }
+  html, body { height: 100%; margin: 0; }
+  body { display: block; background: var(--background); color: var(--text); }
+  .pantalla { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
+
+  /* ---------- lado izquierdo: marca, logo 3D e información ---------- */
+  .izq { position: relative; overflow: hidden; color: #fff; padding: 44px 52px; display: flex; flex-direction: column;
+         background: linear-gradient(150deg, #14290f 0%, #21451a 55%, #2f6a22 100%); }
+  .izq::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+         background: radial-gradient(circle at 80% 15%, rgba(95,174,70,.35), transparent 45%), radial-gradient(circle at 10% 90%, rgba(95,174,70,.2), transparent 40%); }
+  .izq > * { position: relative; }
+  .marca { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .marca b { display: block; font-size: 24px; letter-spacing: 2px; font-weight: 800; }
+  .marca b i { font-style: normal; color: #8be06d; }
+  .marca small { letter-spacing: 3px; font-size: 11px; opacity: .72; }
+  .reloj { text-align: right; }
+  .reloj b { display: block; font-size: 34px; font-weight: 200; line-height: 1; letter-spacing: 0; }
+  .reloj span { font-size: 12px; opacity: .72; letter-spacing: 1px; }
+  .escena { position: relative; flex: 1; min-height: 240px; }
+  #escena3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .datos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dato { background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; padding: 13px 16px; backdrop-filter: blur(4px); min-width: 0; }
+  .dato small { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; opacity: .68; }
+  .dato b { display: block; margin-top: 4px; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dato[hidden] { display: none; }
+  .punto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #8be06d; margin-right: 7px; animation: latido 1.8s infinite; }
+  .punto.off { background: #f2b35a; animation: none; }
+  @keyframes latido { 50% { opacity: .35; } }
+  .consejo { margin-top: 12px; background: rgba(139,224,109,.14); border: 1px solid rgba(139,224,109,.35); border-radius: 14px; padding: 13px 16px;
+             font-size: 14px; line-height: 1.5; min-height: 70px; transition: opacity .4s ease; }
+  .consejo.oculto { opacity: 0; }
+  .consejo em { font-style: normal; font-weight: 700; color: #b6f19e; }
+  .pie { margin-top: 14px; font-size: 13px; opacity: .8; display: flex; gap: 18px; flex-wrap: wrap; }
+  .pie a { color: inherit; text-decoration: none; }
+
+  /* ---------- lado derecho: formulario ---------- */
+  .der { display: flex; align-items: center; justify-content: center; padding: 32px; }
+  .caja { width: 100%; max-width: 390px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 34px 32px; box-shadow: 0 18px 50px rgba(30,60,20,.10); }
+  .caja h2 { font-size: 24px; margin: 0; }
+  .caja p.sub { color: var(--muted); font-size: 14px; margin: 6px 0 20px; line-height: 1.45; }
+  .caja label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  .caja input { margin-bottom: 14px; }
+  .vista[hidden] { display: none; }
+  .error { color: var(--danger); text-align: center; font-size: 14px; min-height: 18px; margin: 0 0 10px; line-height: 1.4; }
+  .olvido { text-align: right; margin: -4px 0 14px; }
+  .enlace { background: none; border: 0; padding: 0; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--primary-dark); cursor: pointer; }
+  [data-tema="oscuro"] .enlace { color: var(--primary); }
+  .enlace:disabled { color: var(--muted); cursor: default; }
+  .btn-grande { width: 100%; min-height: 46px; font-size: 16px; font-weight: 700; }
+  .btn + .btn { margin-top: 10px; }
+  .separador { height: 1px; background: var(--border); margin: 20px 0; }
+  .ayuda { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.55; }
+  .ayuda a { color: var(--primary-dark); font-weight: 700; text-decoration: none; }
+  [data-tema="oscuro"] .ayuda a { color: var(--primary); }
+  .pasos { display: flex; gap: 6px; margin-bottom: 20px; }
+  .pasos i { flex: 1; height: 5px; border-radius: 3px; background: var(--border); }
+  .pasos i.on { background: var(--primary); }
+  .codigo { display: flex; gap: 8px; margin: 6px 0 16px; }
+  .codigo input { margin: 0; flex: 1; min-width: 0; height: 54px; text-align: center; font-size: 24px; font-weight: 700; padding: 0; }
+  .nota { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: 10px;
+          padding: 11px 13px; font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+  .fuerza { height: 6px; border-radius: 3px; background: var(--border); margin: -6px 0 14px; overflow: hidden; }
+  .fuerza i { display: block; height: 100%; width: 0; background: #E53935; transition: width .2s, background .2s; }
+  .listo { width: 64px; height: 64px; border-radius: 50%; background: color-mix(in srgb, var(--primary) 18%, var(--surface)); color: var(--primary-dark);
+           font-size: 34px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+
+  @media (max-width: 860px) {
+    .pantalla { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .izq { padding: 22px 22px 60px; }
+    .reloj, .datos, .consejo, .pie { display: none; }
+    .escena { flex: none; height: 210px; min-height: 210px; }
+    .marca b { font-size: 21px; }
+    .der { padding: 18px; margin-top: -36px; align-items: flex-start; position: relative; z-index: 3; }
+    .caja { padding: 26px 22px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .punto { animation: none; } .consejo { transition: none; } }
 </style>
 </head>
 <body>
-  <div class="card login-box">
-    <div class="login-marca">
-      <svg width="46" height="46" viewBox="0 0 200 200" fill="none">
-        <g stroke="#1A1A1A" stroke-width="4.5" opacity="0.9">
-          <path d="M100 15 150 31 181 74 181 126 150 169 100 185 50 169 19 126 19 74 50 31 100 15" fill="none"/>
-          <path d="M100 15 90 105 M181 74 90 105 M150 169 90 105 M50 169 90 105 M19 74 90 105"/>
-          <path d="M100 15 181 126 M150 31 150 169 M100 185 19 74 M50 169 50 31 M181 74 19 126"/>
-        </g>
-        <g fill="#1A1A1A">
-          <circle cx="100" cy="15" r="7"/><circle cx="150" cy="31" r="7"/><circle cx="181" cy="74" r="7"/>
-          <circle cx="181" cy="126" r="7"/><circle cx="150" cy="169" r="7"/><circle cx="100" cy="185" r="7"/>
-          <circle cx="50" cy="169" r="7"/><circle cx="19" cy="126" r="7"/><circle cx="19" cy="74" r="7"/><circle cx="50" cy="31" r="7"/>
-        </g>
-        <circle cx="90" cy="105" r="13" fill="#5FAE46"/>
-      </svg>
-      <div class="login-marca-wordmark">
-        <span class="login-marca-compoint">COMPOINT</span><span class="login-marca-punto">PUNTO</span>
+<div class="pantalla">
+  <section class="izq" aria-label="Compoint Punto">
+    <div class="marca">
+      <div><b>COMPOINT <i>PUNTO</i></b><small>PUNTO DE SOLUCIONES</small></div>
+      <div class="reloj" aria-hidden="true"><b id="hora">--:--</b><span id="fecha"></span></div>
+    </div>
+    <div class="escena" aria-hidden="true"><canvas id="escena3d"></canvas></div>
+    <div>
+      <div class="datos">
+        <div class="dato" id="datoNegocio"><small>Negocio</small><b id="vNegocio">Compoint Punto</b></div>
+        <div class="dato" id="datoSucursal" hidden><small>Sucursal</small><b id="vSucursal"></b></div>
+        <div class="dato" id="datoConexion"><small>Conexión</small><b><span class="punto off" id="puntoConexion"></span><span id="vConexion">Conectando…</span></b></div>
+        <div class="dato" id="datoLicencia" hidden><small>Licencia</small><b id="vLicencia"></b></div>
+      </div>
+      <div class="consejo" id="consejo" aria-live="off"></div>
+      <div class="pie">
+        <a href="https://wa.me/523325907090" target="_blank" rel="noopener">📞 33 25 90 70 90 (WhatsApp)</a>
+        <a href="mailto:contacto@compoint.com.mx">contacto@compoint.com.mx</a>
+        <span id="vVersion"></span>
       </div>
     </div>
-    <input type="text" id="usuario" placeholder="Usuario" autocomplete="username">
-    <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
-    <div id="error"></div>
-    <button class="btn btn-primary" style="width:100%" onclick="login()">Entrar</button>
-  </div>
+  </section>
+
+  <section class="der">
+    <div class="caja">
+
+      <!-- 1. Entrar -->
+      <div class="vista" id="vistaLogin">
+        <h2>Bienvenido 👋</h2>
+        <p class="sub">Entra con tu usuario para empezar a vender.</p>
+        <label for="usuario">Usuario</label>
+        <input type="text" id="usuario" placeholder="Usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+        <div class="olvido"><button type="button" class="enlace" id="btnOlvide">¿Olvidaste tu contraseña?</button></div>
+        <div class="error" id="error" role="alert"></div>
+        <button class="btn btn-primary btn-grande" id="btnEntrar" type="button" onclick="login()">Entrar</button>
+        <div class="separador"></div>
+        <div class="ayuda">¿Problemas para entrar? <a href="https://wa.me/523325907090?text=Hola%2C%20necesito%20ayuda%20para%20entrar%20a%20Compoint%20Punto" target="_blank" rel="noopener">Escríbenos por WhatsApp</a></div>
+      </div>
+
+      <!-- 2. Recuperar: usuario -->
+      <div class="vista" id="vistaRec1" hidden>
+        <div class="pasos"><i class="on"></i><i></i><i></i></div>
+        <h2>Recuperar contraseña</h2>
+        <p class="sub">Escribe tu usuario. Te enviaremos un código al correo que tienes registrado en el sistema.</p>
+        <label for="recUsuario">Usuario</label>
+        <input type="text" id="recUsuario" placeholder="Tu usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
+        <div class="error" id="errRec1" role="alert"></div>
+        <div class="nota" id="sinCorreo" hidden>
+          Este usuario no tiene un correo registrado. Pídele a tu administrador que te cambie la contraseña desde <b>Equipo</b>, o
+          <a href="https://wa.me/523325907090?text=Hola%2C%20no%20puedo%20entrar%20a%20Compoint%20Punto%20y%20necesito%20recuperar%20mi%20contrase%C3%B1a" target="_blank" rel="noopener"><b>escríbenos por WhatsApp</b></a>.
+        </div>
+        <button class="btn btn-primary btn-grande" id="btnEnviarCodigo" type="button">Enviarme el código</button>
+        <button class="btn btn-secondary btn-grande" type="button" data-volver>← Volver</button>
+        <div class="separador"></div>
+        <div class="ayuda">¿El dueño no tiene correo registrado? <a href="https://wa.me/523325907090?text=Hola%2C%20soy%20el%20due%C3%B1o%20y%20no%20puedo%20entrar%20a%20Compoint%20Punto" target="_blank" rel="noopener">Escríbenos por WhatsApp</a></div>
+      </div>
+
+      <!-- 3. Recuperar: código -->
+      <div class="vista" id="vistaRec2" hidden>
+        <div class="pasos"><i class="on"></i><i class="on"></i><i></i></div>
+        <h2>Revisa tu correo</h2>
+        <p class="sub">Enviamos un código de 6 dígitos a <b id="correoMask"></b>. Vale <span id="minVigencia">15</span> minutos.</p>
+        <label for="cod0">Código</label>
+        <div class="codigo" id="cajasCodigo">
+          <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="1" id="cod0" aria-label="Dígito 1">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 2">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 3">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 4">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 5">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 6">
+        </div>
+        <div class="error" id="errRec2" role="alert"></div>
+        <button class="btn btn-primary btn-grande" id="btnVerificar" type="button">Verificar código</button>
+        <div class="separador"></div>
+        <div class="ayuda">¿No llegó? Revisa <b>Spam</b> · <button type="button" class="enlace" id="btnReenviar" disabled>Reenviar código</button><br>
+          <button type="button" class="enlace" data-volver style="margin-top:8px">← Cancelar</button></div>
+      </div>
+
+      <!-- 4. Recuperar: contraseña nueva -->
+      <div class="vista" id="vistaRec3" hidden>
+        <div class="pasos"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <h2>Crea tu contraseña nueva</h2>
+        <p class="sub">Mínimo 6 caracteres. Úsala solo para este sistema.</p>
+        <label for="passNueva">Contraseña nueva</label>
+        <input type="password" id="passNueva" placeholder="Contraseña nueva" autocomplete="new-password">
+        <div class="fuerza" aria-hidden="true"><i id="barraFuerza"></i></div>
+        <label for="passRepite">Repite la contraseña</label>
+        <input type="password" id="passRepite" placeholder="Escríbela otra vez" autocomplete="new-password">
+        <div class="error" id="errRec3" role="alert"></div>
+        <button class="btn btn-primary btn-grande" id="btnGuardarNueva" type="button">Guardar contraseña</button>
+      </div>
+
+      <!-- 5. Listo -->
+      <div class="vista" id="vistaRec4" hidden>
+        <div class="listo" aria-hidden="true">✓</div>
+        <h2 style="text-align:center">¡Listo!</h2>
+        <p class="sub" style="text-align:center">Tu contraseña se cambió. Ya puedes entrar con tu usuario y la contraseña nueva.</p>
+        <button class="btn btn-primary btn-grande" id="btnIrLogin" type="button">Ir a iniciar sesión</button>
+      </div>
+
+    </div>
+  </section>
+</div>
 
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script src="js/estado-conexion.js"></script>
+<script src="js/logo3d.js"></script>
 <script>
+const $ = (id) => document.getElementById(id);
+
+/* ====================== Entrar ====================== */
 async function login() {
-  const usuario = document.getElementById('usuario').value.trim();
-  const password = document.getElementById('password').value;
-  const errorDiv = document.getElementById('error');
+  const usuario = $('usuario').value.trim();
+  const password = $('password').value;
+  const errorDiv = $('error');
   errorDiv.textContent = '';
 
   if (!usuario || !password) {
@@ -85,9 +237,217 @@ async function login() {
   }
 }
 
-document.getElementById('password').addEventListener('keyup', (e) => {
-  if (e.key === 'Enter') login();
+$('password').addEventListener('keyup', (e) => { if (e.key === 'Enter') login(); });
+$('usuario').addEventListener('keyup', (e) => { if (e.key === 'Enter') $('password').focus(); });
+
+/* ====================== Recuperar contraseña ====================== */
+const VISTAS = ['vistaLogin', 'vistaRec1', 'vistaRec2', 'vistaRec3', 'vistaRec4'];
+function ver(id, foco) {
+  VISTAS.forEach((v) => { $(v).hidden = (v !== id); });
+  if (foco) setTimeout(() => { const f = $(foco); if (f) f.focus(); }, 30);
+}
+const estado = { usuario: '', codigo: '', temporizador: null };
+const cajas = Array.from(document.querySelectorAll('#cajasCodigo input'));
+
+function mostrarError(id, texto) { $(id).textContent = texto || ''; }
+function ocupado(btn, si, textoOcupado) {
+  if (si) { btn.dataset.txt = btn.textContent; btn.textContent = textoOcupado || 'Un momento…'; btn.disabled = true; }
+  else { btn.textContent = btn.dataset.txt || btn.textContent; btn.disabled = false; }
+}
+
+$('btnOlvide').addEventListener('click', () => {
+  $('recUsuario').value = $('usuario').value.trim();
+  mostrarError('errRec1', ''); $('sinCorreo').hidden = true;
+  ver('vistaRec1', 'recUsuario');
 });
+document.querySelectorAll('[data-volver]').forEach((b) => b.addEventListener('click', () => {
+  clearInterval(estado.temporizador);
+  $('usuario').value = estado.usuario || $('recUsuario').value.trim() || $('usuario').value;
+  ver('vistaLogin', 'password');
+}));
+
+function arrancarEspera(segundos) {
+  const btn = $('btnReenviar');
+  clearInterval(estado.temporizador);
+  let falta = segundos;
+  const pintar = () => {
+    btn.disabled = falta > 0;
+    btn.textContent = falta > 0 ? `Reenviar código (0:${String(falta).padStart(2, '0')})` : 'Reenviar código';
+  };
+  pintar();
+  estado.temporizador = setInterval(() => { falta -= 1; pintar(); if (falta <= 0) clearInterval(estado.temporizador); }, 1000);
+}
+
+async function pedirCodigo(desdeReenvio) {
+  const usuario = (desdeReenvio ? estado.usuario : $('recUsuario').value.trim());
+  const errId = desdeReenvio ? 'errRec2' : 'errRec1';
+  mostrarError(errId, ''); $('sinCorreo').hidden = true;
+  if (!usuario) { mostrarError('errRec1', 'Escribe tu usuario'); return; }
+  const btn = desdeReenvio ? $('btnReenviar') : $('btnEnviarCodigo');
+  if (desdeReenvio) { btn.disabled = true; btn.textContent = 'Enviando…'; } else ocupado(btn, true, 'Enviando código…');
+  try {
+    const r = await apiFetch('/auth/recuperar/solicitar', { method: 'POST', body: JSON.stringify({ usuario }) });
+    if (r.sin_correo) { ver('vistaRec1'); $('sinCorreo').hidden = false; return; }
+    estado.usuario = usuario;
+    $('correoMask').textContent = r.correo || 'tu correo';
+    $('minVigencia').textContent = r.minutos || 15;
+    cajas.forEach((i) => { i.value = ''; });
+    mostrarError('errRec2', '');
+    ver('vistaRec2', 'cod0');
+    arrancarEspera(60);
+  } catch (err) {
+    mostrarError(errId, err.message);
+    if (desdeReenvio) { btn.disabled = false; btn.textContent = 'Reenviar código'; }
+  } finally {
+    if (!desdeReenvio) ocupado(btn, false);
+  }
+}
+
+$('btnEnviarCodigo').addEventListener('click', () => pedirCodigo(false));
+$('recUsuario').addEventListener('keyup', (e) => { if (e.key === 'Enter') pedirCodigo(false); });
+$('btnReenviar').addEventListener('click', () => pedirCodigo(true));
+
+/* --- las 6 cajitas del código --- */
+function codigoEscrito() { return cajas.map((c) => c.value).join(''); }
+cajas.forEach((caja, i) => {
+  caja.addEventListener('input', () => {
+    caja.value = caja.value.replace(/\D/g, '').slice(-1);
+    if (caja.value && i < cajas.length - 1) cajas[i + 1].focus();
+    if (codigoEscrito().length === 6) verificarCodigo();
+  });
+  caja.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !caja.value && i > 0) { cajas[i - 1].focus(); cajas[i - 1].value = ''; }
+    if (e.key === 'Enter') verificarCodigo();
+  });
+  caja.addEventListener('paste', (e) => {
+    const texto = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!texto) return;
+    e.preventDefault();
+    texto.split('').forEach((d, k) => { if (cajas[k]) cajas[k].value = d; });
+    (cajas[Math.min(texto.length, 5)]).focus();
+    if (texto.length === 6) verificarCodigo();
+  });
+});
+
+let verificando = false;
+async function verificarCodigo() {
+  const codigo = codigoEscrito();
+  mostrarError('errRec2', '');
+  if (codigo.length < 6) { mostrarError('errRec2', 'Escribe los 6 dígitos del código'); return; }
+  if (verificando) return;
+  verificando = true;
+  ocupado($('btnVerificar'), true, 'Comprobando…');
+  try {
+    await apiFetch('/auth/recuperar/verificar', { method: 'POST', body: JSON.stringify({ usuario: estado.usuario, codigo }) });
+    estado.codigo = codigo;
+    $('passNueva').value = ''; $('passRepite').value = ''; mostrarError('errRec3', ''); pintarFuerza();
+    ver('vistaRec3', 'passNueva');
+  } catch (err) {
+    mostrarError('errRec2', err.message);
+    cajas.forEach((c) => { c.value = ''; }); cajas[0].focus();
+  } finally {
+    verificando = false;
+    ocupado($('btnVerificar'), false);
+  }
+}
+$('btnVerificar').addEventListener('click', verificarCodigo);
+
+/* --- contraseña nueva --- */
+function pintarFuerza() {
+  const p = $('passNueva').value;
+  let n = 0;
+  if (p.length >= 6) n++;
+  if (p.length >= 10) n++;
+  if (/[A-Za-z]/.test(p) && /\d/.test(p)) n++;
+  if (p.length >= 12 || (/[A-Z]/.test(p) && /[^A-Za-z0-9]/.test(p))) n++;
+  const barra = $('barraFuerza');
+  barra.style.width = (p ? Math.max(1, n) * 25 : 0) + '%';
+  barra.style.background = ['#E53935', '#E53935', '#F9A825', '#7CB342', '#2E9E3F'][p ? Math.max(1, n) : 0];
+}
+$('passNueva').addEventListener('input', pintarFuerza);
+
+async function guardarNueva() {
+  const nueva = $('passNueva').value, repite = $('passRepite').value;
+  mostrarError('errRec3', '');
+  if (nueva.length < 6) { mostrarError('errRec3', 'La contraseña debe tener al menos 6 caracteres'); return; }
+  if (nueva !== repite) { mostrarError('errRec3', 'Las dos contraseñas no coinciden'); return; }
+  ocupado($('btnGuardarNueva'), true, 'Guardando…');
+  try {
+    await apiFetch('/auth/recuperar/restablecer', { method: 'POST', body: JSON.stringify({ usuario: estado.usuario, codigo: estado.codigo, password_nueva: nueva }) });
+    estado.codigo = '';
+    $('passNueva').value = ''; $('passRepite').value = '';
+    ver('vistaRec4', 'btnIrLogin');
+  } catch (err) {
+    mostrarError('errRec3', err.message);
+  } finally {
+    ocupado($('btnGuardarNueva'), false);
+  }
+}
+$('btnGuardarNueva').addEventListener('click', guardarNueva);
+$('passRepite').addEventListener('keyup', (e) => { if (e.key === 'Enter') guardarNueva(); });
+$('btnIrLogin').addEventListener('click', () => { $('usuario').value = estado.usuario; $('password').value = ''; $('error').textContent = ''; ver('vistaLogin', 'password'); });
+
+/* ====================== Información en vivo del lado izquierdo ====================== */
+function pintarHora() {
+  const d = new Date();
+  $('hora').textContent = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  $('fecha').textContent = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '');
+}
+pintarHora(); setInterval(pintarHora, 15000);
+
+function textoLicencia(l) {
+  if (!l) return '';
+  const d = l.dias;
+  switch (l.estado) {
+    case 'activa': return (l.tipo === 'permanente' || d == null) ? 'Permanente' : `Vigente · ${d} ${d === 1 ? 'día' : 'días'}`;
+    case 'por_vencer': return `Vence en ${d} ${d === 1 ? 'día' : 'días'}`;
+    case 'demo': return `Prueba · ${d} ${d === 1 ? 'día' : 'días'}`;
+    case 'gracia': return 'Vencida · en gracia';
+    case 'solo_consulta': return 'Solo consulta';
+    default: return '';
+  }
+}
+function ponerConexion(enLinea) {
+  $('puntoConexion').classList.toggle('off', !enLinea);
+  $('vConexion').textContent = enLinea ? 'En línea' : 'Sin conexión';
+}
+async function cargarInfo() {
+  if (!navigator.onLine) { ponerConexion(false); return; }
+  try {
+    const r = await fetch(API_URL + '/auth/info-login', { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error('x');
+    const i = await r.json();
+    ponerConexion(true);
+    if (i.negocio) $('vNegocio').textContent = i.negocio;
+    $('datoSucursal').hidden = !i.sucursal; if (i.sucursal) $('vSucursal').textContent = i.sucursal;
+    const lic = textoLicencia(i.licencia);
+    $('datoLicencia').hidden = !lic; $('vLicencia').textContent = lic;
+    if (i.version) $('vVersion').textContent = 'v' + i.version;
+  } catch (e) { ponerConexion(false); }
+}
+cargarInfo(); setInterval(cargarInfo, 60000);
+window.addEventListener('online', cargarInfo);
+window.addEventListener('offline', () => ponerConexion(false));
+
+/* Consejos que cambian solos */
+const CONSEJOS = [
+  'Si se va el <b>internet</b>, sigues vendiendo: todo se sincroniza al volver.',
+  'El <b>mostrador</b> pesa y arma el ticket; el <b>cajero</b> solo cobra.',
+  'Cambia los <b>colores</b> y el modo oscuro desde Configuración.',
+  'En <b>Pedidos</b> puedes pedir anticipo y mandar al repartidor por WhatsApp.',
+  'El <b>Corte de caja</b> muestra el resumen del turno y lo imprime.',
+  'En <b>Respaldos</b> puedes guardar una copia de tu información.'
+];
+let consejoN = Math.floor(Math.random() * CONSEJOS.length);
+function pintarConsejo() { $('consejo').innerHTML = '<em>💡 Sabías que…</em> ' + CONSEJOS[consejoN % CONSEJOS.length]; }
+pintarConsejo();
+setInterval(() => {
+  const c = $('consejo'); c.classList.add('oculto');
+  setTimeout(() => { consejoN++; pintarConsejo(); c.classList.remove('oculto'); }, 420);
+}, 9000);
+
+/* Logo 3D */
+try { Logo3D($('escena3d')); } catch (e) { /* si el navegador no puede dibujarlo, la pantalla funciona igual */ }
 </script>
 <script src="js/ojito-password.js"></script>
 </body>

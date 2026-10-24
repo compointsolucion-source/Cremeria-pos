@@ -214,7 +214,10 @@ function pintarPanel() {
       <input type="text" id="datoNombre" value="${escapar(u.nombre)}" maxlength="100" autocomplete="off" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarDato(${u.id}, 'nombre', this)"></div>
     <div class="campo"><label for="datoUsuario">Usuario para iniciar sesión</label>
       <input type="text" id="datoUsuario" value="${escapar(u.usuario)}" maxlength="30" autocomplete="off" autocapitalize="none" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarDato(${u.id}, 'usuario', this)">
-      <div class="ayuda">Si lo cambias, esa persona debe entrar con el usuario nuevo (su contraseña sigue igual).</div></div>`;
+      <div class="ayuda">Si lo cambias, esa persona debe entrar con el usuario nuevo (su contraseña sigue igual).</div></div>
+    <div class="campo"><label for="datoCorreo">Correo para recuperar la contraseña</label>
+      <input type="email" id="datoCorreo" value="${escapar(u.correo || '')}" placeholder="Ej. carlos@correo.com" maxlength="120" autocomplete="off" autocapitalize="none" onkeydown="if (event.key === 'Enter') this.blur()" onchange="guardarCorreo(${u.id}, this)">
+      <div class="ayuda">Si esa persona olvida su contraseña, en la pantalla de entrada puede pedir un código a este correo. Déjalo vacío para quitarlo.</div></div>`;
   cuerpo.innerHTML = perfil + bloqueDatos + `
     <div class="bloque blanco"><div class="interruptor-fila">
       <div><b>Cuenta activa</b><small>Si la apagas, ya no podrá entrar</small></div>
@@ -263,6 +266,7 @@ function pintarNuevo(cab, cuerpo, pie) {
     <div class="campo"><label for="nombreEmpleado">Nombre completo</label><input type="text" id="nombreEmpleado" placeholder="Ej. Carlos Mendoza" autocomplete="off"></div>
     <div class="campo"><label for="usuarioEmpleado">Usuario para iniciar sesión</label><input type="text" id="usuarioEmpleado" placeholder="Ej. carlos" autocomplete="off" autocapitalize="none"></div>
     <div class="campo"><label for="passwordEmpleado">Contraseña</label><input type="password" id="passwordEmpleado" placeholder="Mínimo 6 caracteres" autocomplete="new-password" onkeydown="if (event.key === 'Enter') crearEmpleado()"></div>
+    <div class="campo"><label for="correoEmpleado">Correo para recuperar la contraseña <small style="font-weight:400;color:var(--muted)">(opcional)</small></label><input type="email" id="correoEmpleado" placeholder="Ej. carlos@correo.com" maxlength="120" autocomplete="off" autocapitalize="none"></div>
     <div class="campo"><label>Rol</label>
       <div class="seg">${ROLES_EDITABLES.map((r) => `<button class="${rolNuevo === r ? 'activo' : ''}" onclick="elegirRolNuevo('${r}', this)">${rolNombres[r]}</button>`).join('')}</div></div>
     <div class="campo" id="campoTelefonoNuevo" style="display:${rolNuevo === 'repartidor' ? '' : 'none'}"><label for="telefonoEmpleado">Teléfono del repartidor</label>
@@ -292,6 +296,22 @@ async function guardarTelefono(id, campo) {
   } catch (err) {
     mostrarToast(err.message, 'error');
     campo.value = (u && u.telefono) || '';
+  }
+}
+
+// Correo para recuperar la contraseña. Se guarda al salir del campo (vacío = quitarlo).
+async function guardarCorreo(id, campo) {
+  const u = buscar(id);
+  const nuevo = campo.value.trim();
+  if (u && (u.correo || '') === nuevo.toLowerCase()) { campo.value = u.correo || ''; return; }
+  try {
+    const r = await apiFetch(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify({ correo: nuevo }) });
+    if (u) u.correo = (r && r.correo) || null;
+    campo.value = (u && u.correo) || '';
+    mostrarToast(nuevo ? 'Correo guardado' : 'Correo quitado', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    campo.value = (u && u.correo) || '';
   }
 }
 
@@ -353,6 +373,8 @@ async function crearEmpleado() {
   btn.disabled = true;
   try {
     const cuerpoNuevo = { nombre, usuario, password, rol: rolNuevo };
+    const correoNuevo = (document.getElementById('correoEmpleado').value || '').trim();
+    if (correoNuevo) cuerpoNuevo.correo = correoNuevo;
     if (rolNuevo === 'repartidor') cuerpoNuevo.telefono = (document.getElementById('telefonoEmpleado').value || '').trim();
     const creado = await apiFetch('/usuarios', { method: 'POST', body: JSON.stringify(cuerpoNuevo) });
     mostrarToast('Empleado guardado', 'exito');

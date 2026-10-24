@@ -410,7 +410,9 @@ async function apiFetch(endpoint, options = {}) {
   // que el usuario SÍ está autenticado pero no tiene permiso para esta acción
   // específica — cerrar su sesión ahí sería un error (lo sacaría de su turno
   // de trabajo sin motivo).
-  if (response.status === 401) {
+  // (Al iniciar sesión, un 401 es solo «usuario o contraseña incorrectos»: se muestra el aviso del
+  // servidor en la pantalla de entrada, sin recargarla.)
+  if (response.status === 401 && !esLogin) {
     cerrarSesion();
     throw new Error(mensajesPorCodigo[401]);
   }

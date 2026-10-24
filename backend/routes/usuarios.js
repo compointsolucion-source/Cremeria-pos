@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { verificarToken, requiereRol, tienePermiso, TODOS_LOS_PERMISOS, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+const { correoValido } = require('../utils/recuperacion');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
@@ -17,7 +18,7 @@ router.use(verificarToken, requiereSucursalId);
 router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador, telefono
+      `SELECT id, nombre, usuario, rol, permisos, activo, creado_en, nombre_mostrador, telefono, correo
        FROM usuarios WHERE sucursal_id = $1 AND eliminado_en IS NULL ORDER BY creado_en ASC`,
       [req.sucursalId]
     );
@@ -38,6 +39,8 @@ router.get('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'),
 router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { nombre, usuario, password, rol, telefono } = req.body;
+    const correo = String(req.body.correo || '').trim().toLowerCase();
+    if (correo && !correoValido(correo)) return res.status(400).json({ error: 'Ese correo no parece válido (ejemplo: nombre@correo.com)' });
     if (!nombre || !usuario || !password || !rol) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
@@ -51,10 +54,10 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo, telefono)
-       VALUES ($1, $2, $3, $4, $5, true, $6)
-       RETURNING id, nombre, usuario, rol, activo, creado_en, telefono`,
-      [req.sucursalId, nombre, usuario, passwordHash, rol, telefono ? String(telefono).slice(0, 20) : null]
+      `INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo, telefono, correo)
+       VALUES ($1, $2, $3, $4, $5, true, $6, $7)
+       RETURNING id, nombre, usuario, rol, activo, creado_en, telefono, correo`,
+      [req.sucursalId, nombre, usuario, passwordHash, rol, telefono ? String(telefono).slice(0, 20) : null, correo || null]
     );
 
     await registrarBitacora(pool, {
@@ -79,6 +82,13 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
     const { rol, activo, permisos, nombre_mostrador, telefono } = req.body;
     if (rol && !['gerente', 'cajero', 'mostrador', 'repartidor'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
+    }
+
+    // Correo para recuperar la contraseña (vacío = quitarlo).
+    let correoNuevo;
+    if (req.body.correo !== undefined) {
+      correoNuevo = String(req.body.correo || '').trim().toLowerCase();
+      if (correoNuevo && !correoValido(correoNuevo)) return res.status(400).json({ error: 'Ese correo no parece válido (ejemplo: nombre@correo.com)' });
     }
 
     // Nombre y usuario: si vienen, no pueden quedar vacíos. El usuario no lleva espacios.
@@ -110,11 +120,13 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
         permisos = COALESCE(permisos, '{}'::jsonb) || COALESCE($4::jsonb, '{}'::jsonb),
         nombre_mostrador = CASE WHEN $7::boolean THEN $8 ELSE nombre_mostrador END,
         telefono = CASE WHEN $9::boolean THEN $10 ELSE telefono END,
-        usuario = COALESCE($11, usuario)
+        usuario = COALESCE($11, usuario),
+        correo = CASE WHEN $12::boolean THEN $13 ELSE correo END
        WHERE id = $5 AND sucursal_id = $6
-       RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador, telefono`,
+       RETURNING id, nombre, usuario, rol, activo, permisos, nombre_mostrador, telefono, correo`,
       [nombre, rol, activo, permisos ? JSON.stringify(permisos) : null, req.params.id, req.sucursalId, nombre_mostrador !== undefined, nombre_mostrador || null,
-       telefono !== undefined, telefono ? String(telefono).slice(0, 20) : null, usuario]
+       telefono !== undefined, telefono ? String(telefono).slice(0, 20) : null, usuario,
+       correoNuevo !== undefined, correoNuevo || null]
     );
 
     await registrarBitacora(pool, {
