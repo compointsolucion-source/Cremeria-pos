@@ -90,3 +90,21 @@ QUITAR EL CONTROL
 CLIENTE NUEVO: alta-cliente.js crea la licencia de 12 meses automaticamente.
   --licencia-meses N  otra duracion (con 0 queda sin control)
   --demo              crea el sistema como PRUEBA de 30 dias
+
+LICENCIA CENTRAL (clientes en la nube, desde el panel de compoint.com.mx)
+  En vez de tocar la base de cada cliente, el panel (admin -> Licencias Punto -> pestana Nube) manda:
+    - "Renovar 12 m"  -> el cliente queda vigente 12 meses mas
+    - "Suspender"     -> el cliente queda en solo consulta
+  Como se conecta un cliente:
+    1) En el panel, su ficha de nube debe existir (pestana Nube) y tener fecha de vencimiento.
+    2) Boton "Render" del cliente -> copia COMPOINT_LICENCIA_TOKEN=... y pegala en Render
+       (servicio del SERVIDOR del cliente -> Environment). Render reinicia solo.
+    3) Desde ahi, cada hora el sistema le pregunta a https://www.compoint.com.mx/punto/licencia.php.
+       Las respuestas vienen firmadas (HMAC con el token + un numero al azar), asi nadie puede falsificarlas.
+  Cosas que conviene saber:
+    - Lo que diga el panel MANDA: sustituye la fecha o el codigo que tuviera guardado el cliente.
+    - Sin internet, o si compoint.com.mx no contesta, se queda con lo ultimo que se supo (no se bloquea a nadie por eso).
+    - Si en el panel el cliente no tiene fecha capturada, el sistema NO cambia nada.
+    - Estado "Sistema propio" o "Demo" en el panel = sin control de licencia.
+    - Los servidores locales (PC del cliente) no preguntan solos: toman la licencia de su nube al conectarse.
+    - Variables opcionales: COMPOINT_LICENCIA_URL (otra direccion, para pruebas).

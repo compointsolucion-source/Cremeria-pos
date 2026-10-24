@@ -149,6 +149,9 @@ function mensajeEstado(est) {
   if (!est.control) return '';
   const cuando = (d) => (d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`);
   const contacto = ' Para continuar comunícate con Compoint: ' + CONTACTO;
+  if (est.suspendida) {
+    return 'Tu servicio de Compoint Punto está suspendido. El sistema está en modo solo consulta: puedes ver tus reportes y respaldar tu información, pero no registrar ventas ni cambios.' + contacto;
+  }
   if (est.codigo_invalido) {
     return 'El código de activación guardado no corresponde a este equipo. Estás en modo solo consulta: puedes ver tus reportes y respaldar tu información, pero no registrar ventas.' + contacto;
   }
@@ -241,6 +244,7 @@ async function calcular() {
     serial: lic.serial || (fila.serial != null ? Number(fila.serial) : null),
     con_codigo: lic.origen === 'codigo',
     desde_nube: fila.desde_nube || null,
+    suspendida: fila.desde_nube === 'central_suspendida',
     id_equipo: eq.texto,
     local,
     tiene_llave: !!llavePublica,

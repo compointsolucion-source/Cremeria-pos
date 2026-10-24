@@ -131,6 +131,8 @@ migrar()
     console.log(`Servidor corriendo en puerto ${PORT}`);
     // Solicitudes de licencia que no se pudieron mandar por falta de internet: se reintentan solas.
     require('./utils/licenciaEnvio').iniciarReintentos(process.env.COMPOINT_ID_EQUIPO ? 'local' : 'nube');
+    // Licencia central (solo en la nube y solo si Compoint puso COMPOINT_LICENCIA_TOKEN): consulta cada hora a compoint.com.mx.
+    require('./utils/licenciaCentral').iniciar();
     // Pedidos programados que ya toca preparar y pedidos fijos de tiendas (cada minuto).
     rutaPedidos.iniciarTemporizador(io);
   }));
