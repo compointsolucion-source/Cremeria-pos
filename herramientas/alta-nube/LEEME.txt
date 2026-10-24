@@ -1,0 +1,51 @@
+ALTA AUTOMATICA DE CLIENTES EN LA NUBE
+======================================
+Un boton en el panel (compoint.com.mx -> admin -> Licencias Punto -> pestana Nube -> "Crear en la nube")
+manda una orden a GitHub; GitHub corre alta-nube.js y crea TODO el cliente:
+   1) proyecto en Neon (base vacia)               4) servidor en Render  NOMBRE-pos      (rama estable)
+   2) estructura + usuario dueno + licencia       5) pagina en Render    NOMBRE-pos-web  (rama estable)
+   3) contrasena inicial al azar                  6) avisa al panel: direcciones, usuario, contrasena y token de licencia
+Si algo falla, lo que alcanzo a crear se borra solo y el panel muestra el motivo.
+Las claves de Neon y Render viven SOLO en GitHub (secrets); el hosting solo guarda un token de GitHub que unicamente
+puede disparar workflows de este repositorio.
+
+PREPARACION (una sola vez)
+
+A) GitHub -> repositorio Cremeria-pos -> Settings -> Secrets and variables -> Actions -> "New repository secret".
+   Crea estos 6 secrets (nombre exacto):
+     NEON_API_KEY       Neon: console.neon.tech -> tu cuenta (arriba a la derecha) -> Account settings -> API keys -> Create.
+     NEON_ORG_ID        org-rapid-field-61589005
+     RENDER_API_KEY     Render: dashboard.render.com -> Account Settings -> API Keys -> Create API Key.
+     RENDER_OWNER_ID    tea-d9tmuf65djic73a86n60
+     ALTA_SECRET        una frase larga inventada por ti (20+ caracteres, letras y numeros, sin espacios). ANOTALA: va tambien en el hosting.
+     ALTA_CALLBACK_URL  https://www.compoint.com.mx/punto/alta_resultado.php
+
+B) Token para que el panel pueda mandar la orden:
+   GitHub -> tu foto -> Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens -> Generate new token.
+     - Repository access: "Only select repositories" -> Cremeria-pos
+     - Permissions -> Repository permissions -> Actions: "Read and write"
+     - Expiration: la mas larga que te dejen (cuando caduque, el boton avisara y creas otro)
+   Copialo (solo se ve una vez).
+
+C) Hosting (cPanel / FileZilla): en public_html/punto/ copia alta_config.ejemplo.php como alta_config.php y escribe:
+     'secreto'      = la misma frase de ALTA_SECRET
+     'github_token' = el token del paso B
+   Ese archivo nunca se sube a GitHub.
+
+PROBARLO CON CUIDADO
+   Crea primero un cliente de PRUEBA ("Prueba Alta"). Tarda unos 5 minutos. Cuando termine, borra sus servicios
+   en Render y su proyecto en Neon si no lo vas a usar (el Static Site es gratis; el Web Service gratis se duerme).
+
+SI ALGO SALE MAL
+   GitHub -> Actions -> "Alta de cliente en la nube" -> abre la ejecucion: ahi se ve paso a paso (nunca se imprimen claves).
+   Tambien se puede lanzar a mano desde ahi con "Run workflow".
+
+LIMITES A CONOCER
+   - El plan gratis de Neon tiene tope de proyectos; si se llena, el alta fallara con el motivo de Neon.
+   - Los servicios nuevos usan el plan "free" de Render (igual que los demas clientes). Para cambiar de plan, hazlo en Render.
+   - Si Render pone una direccion distinta a NOMBRE-pos / NOMBRE-pos-web (porque el nombre ya estaba tomado en todo Render),
+     el panel lo avisa: hay que editar frontend/js/config.js para ese cliente.
+
+PRUEBAS (para programadores)
+   cd herramientas/alta-nube && TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:5432/prueba" node --test alta-nube.test.js
+   Usan Neon, Render y el panel FALSOS; la estructura de la base si corre de verdad en una base local.

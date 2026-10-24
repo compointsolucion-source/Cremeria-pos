@@ -19,3 +19,6 @@ POR CADA CLIENTE:
      Con el mismo NOMBRE, la pagina encuentra sola a su servidor: ya NO se edita config.js.
 
 Para actualizar a todos los clientes despues, ver ACTUALIZAR-CLIENTES.txt.
+
+ALTA AUTOMATICA (recomendada): desde el panel de compoint.com.mx (Licencias Punto -> Nube -> "Crear en la nube")
+se hacen solos los pasos 1 a 4 de arriba. Ver herramientas/alta-nube/LEEME.txt (preparacion de una sola vez).

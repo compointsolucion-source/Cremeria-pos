@@ -1,0 +1,84 @@
+name: Alta de cliente en la nube (Neon + Render)
+
+# Lo dispara el botón «Crear en la nube» del panel (compoint.com.mx -> admin -> Licencias Punto -> Nube),
+# o a mano desde GitHub: Actions -> «Alta de cliente en la nube» -> Run workflow.
+# Crea el proyecto en Neon, el usuario dueño, los 2 servicios de Render (rama estable) y avisa al panel.
+# Las claves viven en Settings -> Secrets and variables -> Actions (ver herramientas/alta-nube/LEEME.txt).
+on:
+  workflow_dispatch:
+    inputs:
+      cliente_id:
+        description: 'Número del cliente en el panel'
+        required: true
+      negocio:
+        description: 'Nombre del negocio (ej. Cremería La Vaquita)'
+        required: true
+      slug:
+        description: 'Nombre corto para las direcciones, solo minúsculas, números y guiones (ej. lavaquita)'
+        required: true
+      dueno:
+        description: 'Nombre del dueño'
+        required: true
+      usuario:
+        description: 'Usuario del dueño para entrar al sistema'
+        required: true
+        default: 'admin'
+      giro:
+        description: 'Giro: cremeria, carniceria, abarrotes, fruteria, polleria, tortilleria, panaderia, dulceria o rosticeria'
+        required: true
+        default: 'cremeria'
+      sucursales:
+        description: 'Número de sucursales contratadas'
+        required: true
+        default: '1'
+      telefono:
+        description: 'Teléfono del negocio (opcional)'
+        required: false
+        default: ''
+      direccion:
+        description: 'Dirección del negocio (opcional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# Un solo alta a la vez por nombre corto (evita crear dos veces lo mismo si se pulsa dos veces).
+concurrency:
+  group: alta-${{ github.event.inputs.slug }}
+  cancel-in-progress: false
+
+jobs:
+  alta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Instalar dependencias del servidor
+        working-directory: backend
+        run: npm ci
+      - name: Crear el cliente
+        env:
+          ALTA_CLIENTE_ID: ${{ github.event.inputs.cliente_id }}
+          ALTA_NEGOCIO: ${{ github.event.inputs.negocio }}
+          ALTA_SLUG: ${{ github.event.inputs.slug }}
+          ALTA_DUENO: ${{ github.event.inputs.dueno }}
+          ALTA_USUARIO: ${{ github.event.inputs.usuario }}
+          ALTA_GIRO: ${{ github.event.inputs.giro }}
+          ALTA_SUCURSALES: ${{ github.event.inputs.sucursales }}
+          ALTA_TELEFONO: ${{ github.event.inputs.telefono }}
+          ALTA_DIRECCION: ${{ github.event.inputs.direccion }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_ORG_ID: ${{ secrets.NEON_ORG_ID }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_OWNER_ID: ${{ secrets.RENDER_OWNER_ID }}
+          ALTA_SECRET: ${{ secrets.ALTA_SECRET }}
+          ALTA_CALLBACK_URL: ${{ secrets.ALTA_CALLBACK_URL }}
+        run: node herramientas/alta-nube/alta-nube.js
