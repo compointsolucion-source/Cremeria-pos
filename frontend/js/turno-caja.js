@@ -181,7 +181,7 @@ function columnasCorte(ancho) {
 
 // Arma el texto del corte (X si el turno sigue abierto, Z si ya cerró) con la
 // declaración del cajero y el sobrante/faltante cuando existe.
-function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
+function lineasCorteCaja(c, { columnas = 48, negocio = '', ganancia = false } = {}) {
   const L = [];
   const igual = '='.repeat(columnas), guion = '-'.repeat(columnas);
   const centrar = (t) => { t = String(t); return ' '.repeat(Math.max(0, Math.floor((columnas - t.length) / 2))) + t; };
@@ -206,8 +206,11 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
   L.push('CAJA');
   L.push(fila(t('+EFECTIVO INICIAL:', '+EFEC. INICIAL:'), m(c.caja.fondo_inicial)));
   L.push(fila(t('+VENTAS EN EFECTIVO:', '+VTA EFECTIVO:'), m(c.caja.efectivo_ventas)));
+  const cajaNueva = c.caja.devoluciones_efectivo !== undefined; // el servidor ya separa abonos, salidas y devoluciones
+  if (cajaNueva && c.caja.abonos_efectivo) L.push(fila(t('+ABONOS EFECTIVO:', '+ABONOS:'), m(c.caja.abonos_efectivo)));
   L.push(fila(t('+DEPOSITOS EFECTIVO:', '+DEPOSITOS:'), m(c.caja.depositos)));
-  L.push(fila(t('-RETIROS EFECTIVO:', '-RETIROS:'), m(c.caja.retiros)));
+  L.push(fila(t('-RETIROS EFECTIVO:', '-RETIROS:'), m(cajaNueva ? c.caja.salidas : c.caja.retiros)));
+  if (cajaNueva && c.caja.devoluciones_efectivo) L.push(fila(t('-DEVOLUCIONES EFVO:', '-DEVOLUC.:'), m(c.caja.devoluciones_efectivo)));
   L.push('_'.repeat(Math.min(columnas, 14)));
   L.push(fila(t('=SALDO EFECTIVO:', '=SALDO EFEC.:'), m(c.caja.saldo_efectivo)));
   L.push(igual);
@@ -217,6 +220,7 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
   const nombres = { efectivo: 'EFECTIVO', tarjeta: 'TARJETA', transferencia: t('TRANSFERENCIA', 'TRANSFER.'), dolares: 'DOLARES', cheque: 'CHEQUE', vales: 'VALES', credito: t('CREDITO (FIADO)', 'FIADO') };
   Object.keys(nombres).forEach(k => { if (k === 'efectivo' || k === 'tarjeta' || (c.formas[k] || 0) !== 0) L.push(fila(nombres[k] + ':', m(c.formas[k]))); });
   L.push(fila(t('TOTAL FORMAS DE PAGO', 'TOTAL:'), m(c.total_formas)));
+  if (c.ventas.devoluciones) L.push(fila(t('-DEVOLUCIONES DE VENTAS:', '-DEVOLUC. VTAS:'), m(c.ventas.devoluciones)));
   L.push(igual);
 
   L.push(t('VENTA POR DEPARTAMENTO', 'POR DEPARTAMENTO'));
@@ -226,6 +230,7 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
   L.push(fila('SUBTOTAL:', m(c.ventas.subtotal)));
   L.push(fila('-DESCUENTOS:', m(c.ventas.descuentos)));
   L.push(fila('VENTA NETA:', m(c.ventas.venta_neta)));
+  if (ganancia && c.ventas.ganancia !== undefined) L.push(fila('GANANCIA:', m(c.ventas.ganancia)));
   L.push(igual);
 
   L.push(fila(t('TICKETS PAGADOS:', 'PAGADOS:'), c.cuentas.normales));
@@ -239,6 +244,12 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
     L.push(igual);
     L.push('MOVIMIENTOS DE CAJA');
     c.movimientos.forEach(mv => L.push(fila((mv.tipo === 'ingreso' ? '+' : '-') + (mv.concepto || (mv.tipo === 'ingreso' ? 'Ingreso' : 'Egreso')).slice(0, columnas - 14), m(mv.monto))));
+  }
+
+  if ((c.pagos_creditos || []).length) {
+    L.push(igual);
+    L.push(t('PAGOS DE CREDITOS', 'PAGOS CREDITOS'));
+    c.pagos_creditos.forEach(p => L.push(fila(String(p.cliente || '').slice(0, columnas - 14), m(p.monto))));
   }
 
   const d = c.declaracion;
@@ -276,11 +287,21 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '' } = {}) {
 
 // Imprime el corte de un turno (abierto o cerrado). Lanza error si falla la impresión.
 async function imprimirCorteTurno(turnoId, opts = {}) {
-  const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${turnoId}/resumen`), configNegocioTurno()]);
+  const corte = await apiFetch(`/turnos/${turnoId}/resumen`);
+  await imprimirCorteDatos(corte, opts);
+  return corte;
+}
+
+// Imprime un corte que ya se tiene en pantalla (un turno o el corte del día completo).
+// La ganancia solo sale en el papel cuando imprime dueño, gerente o jefe general.
+async function imprimirCorteDatos(corte, opts = {}) {
+  const cfg = await configNegocioTurno();
+  const u = getUsuario();
+  const verGanancia = !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol);
   // opts.columnas (buscador de cortes) fuerza el ancho en columnas; si no, el del dispositivo.
   const ancho = opts.columnas ? (opts.columnas <= 34 ? '58mm' : '80mm') : obtenerAnchoTicketDispositivo(cfg);
   const columnas = opts.columnas || columnasCorte(ancho);
-  const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '' });
-  await imprimirTextoPlanoTicket(lineas, { titulo: `Corte de caja - turno ${corte.turno.id}`, ancho_ticket: ancho });
+  const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '', ganancia: verGanancia });
+  await imprimirTextoPlanoTicket(lineas, { titulo: corte.turno.dia ? `Corte del dia ${corte.turno.dia}` : `Corte de caja - turno ${corte.turno.id}`, ancho_ticket: ancho });
   return corte;
 }

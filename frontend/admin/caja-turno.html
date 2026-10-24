@@ -122,7 +122,8 @@
       </button>
       <h1>📊 Corte de Caja</h1></div>
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <a class="btn btn-primary" href="cortes.html">📊 Reporte de cortes</a>
+      <a class="btn btn-primary" href="cortes-dia.html">📅 Cortes por día</a>
+      <a class="btn btn-secondary" href="cortes.html">📊 Reporte de cortes</a>
       <button class="btn btn-secondary" onclick="abrirBuscadorCortes()">🔍 Buscar corte</button>
     </div>
   </div>
@@ -437,6 +438,8 @@ async function realizarCorte() {
       mostrarToast('El corte se guardó, pero no se pudo imprimir: ' + err.message + ' — puedes reimprimirlo abajo en "Cortes anteriores".', 'error', 8000);
     }
     cerrarHoja();
+    // Corte normal: se muestra el corte desglosado (con opción de imprimir). Si viene de "Salir", se sale como antes.
+    if (!window.__saliendoTrasCorte) { window.location.href = 'corte-detalle.html?turno=' + encodeURIComponent(resultado.id); return true; }
     cargarTurno();
     cargarCortes();
     return true;
@@ -469,6 +472,7 @@ async function cargarCortes() {
         <div class="cuadro">🔒</div>
         <div class="info"><b>Turno ${escapar(t.id)} · ${t.fecha_cierre ? fechaCorta(t.fecha_cierre) : ''}</b><small>${escapar(t.usuario_nombre)}</small></div>
         ${pill}
+        <button class="mini" title="Ver el corte completo" onclick="window.location.href='corte-detalle.html?turno=${Number(t.id)}'">📋</button>
         <button class="mini" title="Reimprimir" onclick="reimprimirCorte(${Number(t.id)})">🖨️</button>
       </div>`;
     }).join('');
@@ -603,6 +607,7 @@ cargarTurno().then(async () => {
   const modo = new URLSearchParams(location.search).get('cerrar');
   if (!modo) return;
   history.replaceState(null, '', location.pathname);
+  if (modo === 'salir' || modo === 'programa') window.__saliendoTrasCorte = true;
   if (!turnoActual) return;
   if (!(await realizarCorte())) return;
   if (modo === 'salir') setTimeout(cerrarSesion, 1800);

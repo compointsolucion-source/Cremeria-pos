@@ -72,6 +72,58 @@ async function construirResumenTurno(db, turno) {
   let depositos = 0, retiros = 0;
   movs.rows.forEach(m => { if (m.tipo === 'ingreso') depositos += parseFloat(m.monto); else retiros += parseFloat(m.monto); });
 
+  // Devoluciones del turno (el reembolso en efectivo ya está dentro de los retiros: sale como movimiento de caja).
+  const devs = await db.query(
+    `SELECT COALESCE(SUM(monto_total), 0) AS total,
+            COALESCE(SUM(CASE WHEN metodo_reembolso = 'efectivo' THEN monto_total ELSE 0 END), 0) AS efectivo
+     FROM devoluciones WHERE turno_id = $1`,
+    [turnoId]
+  );
+  const devolucionesTotal = redondear(devs.rows[0].total);
+  const devolucionesEfectivo = redondear(devs.rows[0].efectivo);
+
+  // Pagos de créditos (abonos de clientes) recibidos en este turno. Los de efectivo entran a la caja.
+  const abonos = await db.query(
+    `SELECT cl.nombre AS cliente, a.monto, a.metodo_pago, a.fecha
+     FROM creditos_abono a JOIN clientes cl ON cl.id = a.cliente_id
+     WHERE a.turno_id = $1 ORDER BY a.fecha ASC`,
+    [turnoId]
+  );
+  const abonosEfectivo = redondear(abonos.rows.filter(a => (a.metodo_pago || 'efectivo') === 'efectivo').reduce((x, a) => x + parseFloat(a.monto), 0));
+
+  // Ganancia = lo vendido menos el costo de los productos (los que no tienen costo capturado no suman ganancia).
+  const gan = await db.query(
+    `SELECT COALESCE(SUM(CASE WHEN p.precio_costo IS NOT NULL AND p.precio_costo > 0
+                              THEN (d.subtotal - d.descuento_monto) - p.precio_costo * d.cantidad ELSE 0 END), 0) AS ganancia,
+            COUNT(*) FILTER (WHERE p.precio_costo IS NULL OR p.precio_costo <= 0) AS sin_costo
+     FROM ticket_detalle d
+     JOIN tickets t ON t.id = d.ticket_id
+     LEFT JOIN productos p ON p.id = d.producto_id
+     WHERE t.turno_id = $1 AND t.estado = 'pagado'`,
+    [turnoId]
+  );
+  const ganDev = await db.query(
+    `SELECT COALESCE(SUM(dd.monto_devuelto - CASE WHEN p.precio_costo IS NOT NULL AND p.precio_costo > 0 THEN p.precio_costo * dd.cantidad_devuelta ELSE dd.monto_devuelto END), 0) AS perdida
+     FROM devolucion_detalle dd
+     JOIN devoluciones dv ON dv.id = dd.devolucion_id
+     JOIN ticket_detalle d ON d.id = dd.ticket_detalle_id
+     LEFT JOIN productos p ON p.id = d.producto_id
+     WHERE dv.turno_id = $1`,
+    [turnoId]
+  );
+  const descGlobal = tickets.rows.reduce((x, t) => x + parseFloat(t.descuento_monto || 0), 0);
+  const ganancia = redondear(parseFloat(gan.rows[0].ganancia) - descGlobal - parseFloat(ganDev.rows[0].perdida));
+
+  const clientesTop = await db.query(
+    `SELECT c.nombre, COUNT(*) AS ventas,
+            COALESCE(SUM(t.total - COALESCE(t.descuento_monto, 0)
+              - COALESCE((SELECT SUM(d.descuento_monto) FROM ticket_detalle d WHERE d.ticket_id = t.id), 0)), 0) AS monto
+     FROM tickets t JOIN clientes c ON c.id = t.cliente_id
+     WHERE t.turno_id = $1 AND t.estado = 'pagado'
+     GROUP BY c.id, c.nombre ORDER BY 3 DESC LIMIT 5`,
+    [turnoId]
+  );
+
   const cancel = await db.query(
     `SELECT COUNT(*) AS n FROM tickets
      WHERE sucursal_id = $1 AND estado = 'cancelado' AND fecha_creacion >= $2 AND fecha_creacion <= COALESCE($3, NOW())`,
@@ -85,7 +137,7 @@ async function construirResumenTurno(db, turno) {
   const nombreDe = (id) => (nombres.rows.find(u => u.id === id) || {}).nombre || null;
 
   const fondo = parseFloat(turno.fondo_inicial);
-  const saldoEfectivo = redondear(fondo + formas.efectivo + depositos - retiros);
+  const saldoEfectivo = redondear(fondo + formas.efectivo + depositos - retiros + abonosEfectivo);
   const n = tickets.rows.length;
 
   return {
@@ -102,6 +154,9 @@ async function construirResumenTurno(db, turno) {
       efectivo_ventas: formas.efectivo,
       depositos: redondear(depositos),
       retiros: redondear(retiros),
+      abonos_efectivo: abonosEfectivo,
+      devoluciones_efectivo: devolucionesEfectivo,
+      salidas: redondear(Math.max(0, retiros - devolucionesEfectivo)),
       saldo_efectivo: saldoEfectivo
     },
     formas,
@@ -110,6 +165,9 @@ async function construirResumenTurno(db, turno) {
       subtotal: redondear(bruto),
       descuentos: redondear(descuentos),
       venta_neta: ventaNeta,
+      devoluciones: devolucionesTotal,
+      ganancia,
+      ganancia_sin_costo: parseInt(gan.rows[0].sin_costo, 10) || 0,
       por_departamento: deptos.rows.map(r => ({ nombre: r.depto, monto: redondear(r.monto) }))
     },
     cuentas: {
@@ -120,17 +178,21 @@ async function construirResumenTurno(db, turno) {
       folio_inicial: n ? tickets.rows[0].folio : null,
       folio_final: n ? tickets.rows[n - 1].folio : null
     },
-    movimientos: movs.rows.map(m => ({ tipo: m.tipo, monto: redondear(m.monto), concepto: m.concepto, fecha: m.fecha })),
+    movimientos: movs.rows.map(m => ({ tipo: m.tipo, monto: redondear(m.monto), concepto: m.concepto, fecha: m.fecha, es_devolucion: m.tipo === 'egreso' && /^Devolución ticket /.test(m.concepto || '') })),
+    pagos_creditos: abonos.rows.map(a => ({ cliente: a.cliente, monto: redondear(a.monto), metodo: a.metodo_pago || 'efectivo', fecha: a.fecha })),
+    clientes_top: clientesTop.rows.map(c => ({ nombre: c.nombre, ventas: parseInt(c.ventas, 10), monto: redondear(c.monto) })),
     declaracion: turno.declaracion || null
   };
 }
 
 // Lo que "debería haber" por cada forma de pago al cerrar (efectivo = saldo de caja).
 function esperadoPorForma(resumen) {
+  // Los pagos de créditos recibidos con tarjeta o transferencia también deben estar en el corte de esa forma de pago.
+  const abonoPor = (forma) => redondear((resumen.pagos_creditos || []).filter(a => a.metodo === forma).reduce((x, a) => x + a.monto, 0));
   return {
     efectivo: resumen.caja.saldo_efectivo,
-    tarjeta: resumen.formas.tarjeta,
-    transferencia: resumen.formas.transferencia,
+    tarjeta: redondear(resumen.formas.tarjeta + abonoPor('tarjeta')),
+    transferencia: redondear(resumen.formas.transferencia + abonoPor('transferencia')),
     dolares: resumen.formas.dolares,
     cheque: resumen.formas.cheque,
     vales: resumen.formas.vales
@@ -425,6 +487,110 @@ router.get('/reporte', verificarToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener el reporte de cortes' });
+  }
+});
+
+// Suma los cortes de varios turnos en uno solo con la misma forma que el de un turno (corte del día).
+function combinarResumenes(lista, fecha) {
+  const suma = (f) => redondear(lista.reduce((x, r) => x + Number(f(r) || 0), 0));
+  const formas = {};
+  Object.keys(lista[0] ? lista[0].formas : { efectivo: 0, tarjeta: 0, transferencia: 0, dolares: 0, cheque: 0, vales: 0, credito: 0 })
+    .forEach(k => { formas[k] = suma(r => r.formas[k]); });
+  const deptos = {};
+  lista.forEach(r => r.ventas.por_departamento.forEach(d => { deptos[d.nombre] = redondear((deptos[d.nombre] || 0) + d.monto); }));
+  const clientes = {};
+  lista.forEach(r => (r.clientes_top || []).forEach(c => {
+    const x = clientes[c.nombre] || (clientes[c.nombre] = { nombre: c.nombre, ventas: 0, monto: 0 });
+    x.ventas += c.ventas; x.monto = redondear(x.monto + c.monto);
+  }));
+  const normales = lista.reduce((x, r) => x + r.cuentas.normales, 0);
+  const ventaNeta = suma(r => r.ventas.venta_neta);
+  const conFolio = lista.filter(r => r.cuentas.folio_inicial);
+  const todosCerrados = lista.length > 0 && lista.every(r => r.turno.estado === 'cerrado');
+  const decls = lista.map(r => r.declaracion).filter(Boolean);
+  const cajeros = [...new Set(lista.map(r => r.turno.cajero).filter(Boolean))];
+  const fechas = lista.map(r => r.turno.fecha_apertura).sort();
+  const cierres = lista.map(r => r.turno.fecha_cierre).filter(Boolean).sort();
+  return {
+    turno: {
+      id: 'DIA ' + fecha, dia: fecha, turnos: lista.length,
+      estado: todosCerrados ? 'cerrado' : 'abierto',
+      fecha_apertura: fechas[0] || null,
+      fecha_cierre: todosCerrados ? cierres[cierres.length - 1] : null,
+      cajero: cajeros.length === 1 ? cajeros[0] : 'Todos los cajeros', cerrado_por: null
+    },
+    caja: {
+      fondo_inicial: suma(r => r.caja.fondo_inicial), efectivo_ventas: suma(r => r.caja.efectivo_ventas),
+      depositos: suma(r => r.caja.depositos), retiros: suma(r => r.caja.retiros),
+      abonos_efectivo: suma(r => r.caja.abonos_efectivo), devoluciones_efectivo: suma(r => r.caja.devoluciones_efectivo),
+      salidas: suma(r => r.caja.salidas), saldo_efectivo: suma(r => r.caja.saldo_efectivo)
+    },
+    formas,
+    total_formas: suma(r => r.total_formas),
+    ventas: {
+      subtotal: suma(r => r.ventas.subtotal), descuentos: suma(r => r.ventas.descuentos), venta_neta: ventaNeta,
+      devoluciones: suma(r => r.ventas.devoluciones), ganancia: suma(r => r.ventas.ganancia),
+      ganancia_sin_costo: lista.reduce((x, r) => x + (r.ventas.ganancia_sin_costo || 0), 0),
+      por_departamento: Object.keys(deptos).map(n => ({ nombre: n, monto: deptos[n] })).sort((a, b) => b.monto - a.monto)
+    },
+    cuentas: {
+      normales, canceladas: lista.reduce((x, r) => x + r.cuentas.canceladas, 0),
+      con_descuento: lista.reduce((x, r) => x + r.cuentas.con_descuento, 0),
+      promedio: normales ? redondear(ventaNeta / normales) : 0,
+      folio_inicial: conFolio.length ? conFolio[0].cuentas.folio_inicial : null,
+      folio_final: conFolio.length ? conFolio[conFolio.length - 1].cuentas.folio_final : null
+    },
+    movimientos: lista.flatMap(r => r.movimientos.map(m => ({ ...m, cajero: r.turno.cajero }))).sort((a, b) => new Date(a.fecha) - new Date(b.fecha)),
+    pagos_creditos: lista.flatMap(r => r.pagos_creditos.map(p => ({ ...p, cajero: r.turno.cajero }))),
+    clientes_top: Object.values(clientes).sort((a, b) => b.monto - a.monto).slice(0, 5),
+    declaracion: todosCerrados && decls.length === lista.length ? {
+      total_declarado: suma(r => r.declaracion.total_declarado), total_esperado: suma(r => r.declaracion.total_esperado),
+      diferencia: suma(r => r.declaracion.diferencia), importes: {}, esperado: {}, diferencias: {}
+    } : null
+  };
+}
+
+// Cortes de UN día (el día local en que se abrió cada turno): lista de turnos con su total y su diferencia.
+// Dueño, gerente y jefe general reciben además el corte del día completo (todos los cajeros sumados);
+// el cajero solo ve sus propios turnos.
+router.get('/dia', verificarToken, async (req, res) => {
+  try {
+    const esFecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+    const hoyLocal = (await pool.query("SELECT to_char(NOW() AT TIME ZONE $1::text, 'YYYY-MM-DD') AS hoy", [TZ_NEGOCIO])).rows[0].hoy;
+    const fecha = esFecha(req.query.fecha) ? req.query.fecha : hoyLocal;
+    const params = [req.sucursalId, TZ_NEGOCIO, fecha];
+    let filtroUsuario = '';
+    if (!esSupervisor(req.usuario)) { params.push(req.usuario.id); filtroUsuario = `AND t.usuario_id = $${params.length}`; }
+    const turnos = await pool.query(
+      `SELECT t.* FROM turnos t
+       WHERE t.sucursal_id = $1 AND ${sqlHoraLocal('t.fecha_apertura', '$2')}::date = $3::date ${filtroUsuario}
+       ORDER BY t.fecha_apertura ASC LIMIT 100`,
+      params
+    );
+    const resumenes = [];
+    for (const t of turnos.rows) resumenes.push(await construirResumenTurno(pool, t));
+    const filas = resumenes.map((r) => ({
+      id: r.turno.id, cajero: r.turno.cajero, estado: r.turno.estado,
+      fecha_apertura: r.turno.fecha_apertura, fecha_cierre: r.turno.fecha_cierre,
+      ventas: r.cuentas.normales,
+      total_vendido: redondear(r.total_formas - r.ventas.devoluciones),
+      diferencia: r.declaracion && r.declaracion.diferencia !== undefined ? redondear(r.declaracion.diferencia) : null
+    }));
+    const dia = esSupervisor(req.usuario) && resumenes.length ? combinarResumenes(resumenes, fecha) : null;
+    res.json({
+      fecha, turnos: filas,
+      totales: {
+        turnos: filas.length, abiertos: filas.filter(f => f.estado === 'abierto').length,
+        ventas: filas.reduce((x, f) => x + f.ventas, 0),
+        total_vendido: redondear(filas.reduce((x, f) => x + f.total_vendido, 0)),
+        ganancia: esSupervisor(req.usuario) ? redondear(resumenes.reduce((x, r) => x + r.ventas.ganancia, 0)) : null,
+        diferencia: redondear(filas.reduce((x, f) => x + (f.diferencia || 0), 0))
+      },
+      dia
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener los cortes del día' });
   }
 });
 

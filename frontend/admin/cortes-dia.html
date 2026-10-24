@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Cortes por día - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
+<script src="../js/tema.js"></script>
+<style>
+  .oculto { display: none !important; }
+  .cd-msg { padding: 30px 20px; text-align: center; color: var(--muted, #7A7D83); }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>📊 Cortes por día</h1></div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <a class="btn btn-secondary" href="cortes.html">📊 Reporte de cortes</a>
+      <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
+    </div>
+  </div>
+
+  <div class="contenido">
+    <div class="cd">
+      <div class="caja cdd-fil">
+        <button type="button" class="cp" data-rel="0">Hoy</button>
+        <button type="button" class="cp" data-rel="1">Ayer</button>
+        <span style="flex:1"></span>
+        <label for="fechaDia" style="font-weight:700">📅 Día:</label>
+        <input type="date" id="fechaDia">
+        <button type="button" class="btn btn-secondary" onclick="buscar()">🔍 Buscar</button>
+      </div>
+      <div id="resultado"><div class="cd-msg">Cargando…</div></div>
+    </div>
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/impresora-termica.js"></script>
+<script src="../js/turno-caja.js"></script>
+<script src="../js/corte-detalle.js"></script>
+<script>
+requiereLogin();
+
+let datos = null;
+const p2 = (n) => String(n).padStart(2, '0');
+const isoLocal = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+const diaRel = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return isoLocal(d); };
+
+function pintarChips() {
+  const f = document.getElementById('fechaDia').value;
+  document.querySelectorAll('.cdd-fil .cp').forEach((b) => b.classList.toggle('on', diaRel(Number(b.dataset.rel)) === f));
+}
+
+function pillDif(dif, estado) {
+  if (estado !== 'cerrado') return '<span class="ab">abierto</span>';
+  if (dif === null || dif === undefined) return '<span class="ab">sin declarar</span>';
+  if (Math.abs(dif) < 0.005) return `<span class="ok">${cdDin(0)}</span>`;
+  return `<span class="mal">${cdDin(dif)}</span>`;
+}
+
+async function buscar() {
+  const fecha = document.getElementById('fechaDia').value;
+  const cont = document.getElementById('resultado');
+  if (!fecha) { cont.innerHTML = '<div class="cd-msg caja">Elige un día.</div>'; return; }
+  history.replaceState(null, '', '?fecha=' + fecha);
+  pintarChips();
+  cont.innerHTML = '<div class="cd-msg">Buscando…</div>';
+  try {
+    datos = await apiFetch('/turnos/dia?fecha=' + encodeURIComponent(fecha));
+    const sup = cdEsSupervisor();
+    if (!datos.turnos.length) { cont.innerHTML = `<div class="caja cd-msg">No hubo turnos el ${cdEsc(cdFechaLarga(fecha))}.</div>`; return; }
+    const t = datos.totales;
+    cont.innerHTML = `<div class="cd">
+      <div class="caja cdd-banner"><div><b style="font-size:17px">Cortes del ${cdEsc(cdFechaLarga(fecha))}</b>
+          <small>${t.turnos} turno${t.turnos === 1 ? '' : 's'}${t.abiertos ? ` · ${t.abiertos} sin cerrar` : ' · todos cerrados'}</small></div>
+        <div class="tot"><div><small>Ventas totales</small><b class="g">${cdDin(t.total_vendido)}</b></div>
+          ${sup && t.ganancia !== null ? `<div><small>Ganancia</small><b class="g">${cdDin(t.ganancia)}</b></div>` : ''}
+          <div><small>Diferencia</small><b class="g" style="color:${Math.abs(t.diferencia) < 0.005 ? '#2E7D32' : '#C62828'}">${cdDin(t.diferencia)}</b></div></div>
+        ${sup && datos.dia ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="verDia()">📋 Ver corte del día (todos los cajeros)</button><button class="btn btn-secondary" onclick="imprimirDia()">🖨️ Imprimir</button></div>` : ''}</div>
+      <div class="caja cdd-scroll"><table class="cdd-tb"><thead><tr><th>Turno</th><th>Cajero</th><th>Horario</th><th class="n">Ventas</th><th class="n">Total vendido</th><th class="n">Diferencia</th><th></th></tr></thead><tbody>
+      ${datos.turnos.map((x) => `<tr><td>#${cdEsc(x.id)}</td><td>${cdEsc(x.cajero)}</td>
+        <td>${cdHora(x.fecha_apertura)} – ${x.fecha_cierre ? cdHora(x.fecha_cierre) : 'abierto'}</td>
+        <td class="n">${x.ventas}</td><td class="n">${cdDin(x.total_vendido)}</td><td class="n">${pillDif(x.diferencia, x.estado)}</td>
+        <td class="n"><span class="bt"><button type="button" onclick="verTurno(${Number(x.id)})">📋 Ver corte</button><button type="button" title="Imprimir" onclick="imprimirTurno(${Number(x.id)})">🖨️</button></span></td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  } catch (err) {
+    cont.innerHTML = `<div class="caja cd-msg">${cdEsc(err.message || 'No se pudieron cargar los cortes')}</div>`;
+  }
+}
+
+function verTurno(id) { window.location.href = 'corte-detalle.html?turno=' + id; }
+function verDia() { window.location.href = 'corte-detalle.html?dia=' + encodeURIComponent(datos.fecha); }
+async function imprimirTurno(id) { try { await imprimirCorteTurno(id); mostrarToast('Corte enviado a la impresora', 'exito'); } catch (err) { mostrarToast(err.message, 'error'); } }
+async function imprimirDia() { try { await imprimirCorteDatos(datos.dia); mostrarToast('Corte del día enviado a la impresora', 'exito'); } catch (err) { mostrarToast(err.message, 'error'); } }
+
+document.querySelectorAll('.cdd-fil .cp').forEach((b) => b.addEventListener('click', () => { document.getElementById('fechaDia').value = diaRel(Number(b.dataset.rel)); buscar(); }));
+document.getElementById('fechaDia').addEventListener('change', buscar);
+document.getElementById('fechaDia').value = new URLSearchParams(location.search).get('fecha') || diaRel(0);
+buscar();
+</script>
+<script src="../js/sidebar-nav.js"></script>
+</body>
+</html>

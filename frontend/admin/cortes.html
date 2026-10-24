@@ -113,6 +113,7 @@
       </button>
       <h1>📊 Cortes de caja</h1></div>
     <div class="acciones-top">
+      <a class="btn btn-secondary" href="cortes-dia.html">📅 Cortes por día</a>
       <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
       <div class="menu-mas">
         <button type="button" class="btn btn-primary" onclick="alternarMenuMas(this)" aria-haspopup="true" aria-expanded="false">⬇️ Descargar Excel</button>
@@ -416,25 +417,7 @@ document.getElementById('cuerpo').addEventListener('click', (e) => {
 // ---------- Ver un corte completo en pantalla ----------
 function cerrarDetalle() { const ov = document.getElementById('ovDetalle'); if (ov) ov.remove(); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarDetalle(); });
-async function verCorte(id) {
-  try {
-    const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${id}/resumen`), configNegocioTurno()]);
-    const texto = lineasCorteCaja(corte, { columnas: 40, negocio: (cfg && cfg.nombre_negocio) || '' })
-      .map((l) => (typeof l === 'string' ? l : l.t)).join('\n');
-    cerrarDetalle();
-    const ov = document.createElement('div');
-    ov.id = 'ovDetalle'; ov.className = 'ov-det';
-    ov.addEventListener('mousedown', (e) => { if (e.target === ov) cerrarDetalle(); });
-    const caja = document.createElement('div'); caja.className = 'caja-det';
-    const pre = document.createElement('pre'); pre.textContent = texto;
-    const botones = document.createElement('div'); botones.className = 'botones-det';
-    const imprimir = document.createElement('button'); imprimir.className = 'btn btn-secondary'; imprimir.textContent = '🖨️ Imprimir';
-    imprimir.onclick = async () => { try { await imprimirCorteTurno(id); } catch (err) { mostrarToast(err.message, 'error'); } };
-    const cerrar = document.createElement('button'); cerrar.className = 'btn btn-primary'; cerrar.textContent = 'Cerrar';
-    cerrar.onclick = cerrarDetalle;
-    botones.append(imprimir, cerrar); caja.append(pre, botones); ov.appendChild(caja); document.body.appendChild(ov);
-  } catch (err) { mostrarToast(err.message || 'No se pudo abrir el corte', 'error'); }
-}
+function verCorte(id) { window.location.href = 'corte-detalle.html?turno=' + encodeURIComponent(id); }
 
 // ---------- Descargas ----------
 function nombreArchivo(ext) { return `cortes_${S.desde}_a_${S.hasta}.${ext}`; }

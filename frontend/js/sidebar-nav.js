@@ -113,6 +113,7 @@ const GRUPOS_SIDEBAR = [
     items: [
       { icono: 'tendencia', texto: 'Reportes', href: 'reportes.html', permiso: 'REPORTES_VER' },
       { icono: 'calculadora', texto: 'Cortes de caja', href: 'cortes.html', permiso: ['CAJA_ABRIR', 'CAJA_CERRAR'] },
+      { icono: 'calculadora', texto: 'Cortes por día', href: 'cortes-dia.html', permiso: ['CAJA_ABRIR', 'CAJA_CERRAR'] },
       { icono: 'portapapeles', texto: 'Bitácora', href: 'bitacora.html', roles: ROLES_ADMIN_SIDEBAR }
     ]
   },

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Corte de caja detallado - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
+<script src="../js/tema.js"></script>
+<style>
+  .oculto { display: none !important; }
+  .cd-msg { padding: 40px 20px; text-align: center; color: var(--muted, #7A7D83); }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>📊 Corte de caja</h1></div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <a class="btn btn-secondary" href="cortes-dia.html">📅 Cortes por día</a>
+      <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
+    </div>
+  </div>
+
+  <div class="contenido">
+    <div id="cuerpo"><div class="cd-msg">Cargando el corte…</div></div>
+  </div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/impresora-termica.js"></script>
+<script src="../js/turno-caja.js"></script>
+<script src="../js/corte-detalle.js"></script>
+<script>
+requiereLogin();
+
+const params = new URLSearchParams(location.search);
+let corteActual = null;
+
+function volver() {
+  const dia = params.get('dia') || (corteActual && corteActual.turno && corteActual.turno.fecha_apertura ? null : null);
+  if (document.referrer && /cortes|caja-turno/.test(document.referrer)) history.back();
+  else window.location.href = params.get('dia') ? 'cortes-dia.html?fecha=' + encodeURIComponent(params.get('dia')) : 'caja-turno.html';
+}
+
+async function imprimirActual() {
+  try { await imprimirCorteDatos(corteActual); mostrarToast('Corte enviado a la impresora', 'exito'); }
+  catch (err) { mostrarToast(err.message || 'No se pudo imprimir', 'error'); }
+}
+
+async function cargar() {
+  const cuerpo = document.getElementById('cuerpo');
+  try {
+    if (params.get('turno')) {
+      corteActual = await apiFetch(`/turnos/${encodeURIComponent(params.get('turno'))}/resumen`);
+    } else if (params.get('dia')) {
+      const r = await apiFetch(`/turnos/dia?fecha=${encodeURIComponent(params.get('dia'))}`);
+      corteActual = r.dia;
+      if (!corteActual) {
+        cuerpo.innerHTML = `<div class="cd-msg caja">${cdEsFalso()}</div>`;
+        return;
+      }
+    } else {
+      cuerpo.innerHTML = '<div class="cd-msg caja">Elige un corte desde <a href="cortes-dia.html">Cortes por día</a> o desde <a href="caja-turno.html">Corte de Caja</a>.</div>';
+      return;
+    }
+    const ver = cdEsSupervisor();
+    cuerpo.innerHTML = corteDetalleHTML(corteActual, { ganancia: ver });
+    const acc = document.getElementById('cdAcciones');
+    acc.innerHTML = '<button class="btn btn-primary" id="bImp">🖨️ Imprimir corte</button><button class="btn btn-secondary" id="bCsv">⬇️ Excel (CSV)</button><button class="btn btn-secondary" id="bVol">← Volver</button>';
+    document.getElementById('bImp').onclick = imprimirActual;
+    document.getElementById('bCsv').onclick = () => descargarCorteDetalleCSV(corteActual, { ganancia: ver });
+    document.getElementById('bVol').onclick = volver;
+  } catch (err) {
+    cuerpo.innerHTML = `<div class="cd-msg caja">${cdEsc(err.message || 'No se pudo cargar el corte')}</div>`;
+  }
+}
+function cdEsFalso() { return 'No hay corte de ese día para mostrar (solo dueño o gerente ven el corte del día completo, y debe haber turnos ese día).'; }
+cargar();
+</script>
+<script src="../js/sidebar-nav.js"></script>
+</body>
+</html>
