@@ -1,3 +1,15 @@
+// Programa de escritorio: la sesión de la vez anterior NO se conserva. Si el programa se cerró (Salir, apagón, reinicio),
+// al abrirlo de nuevo la persona elige quién es y pone su contraseña. Dentro de la misma apertura la sesión no se pierde.
+(function () {
+  try {
+    if (window.compointDesktop && compointDesktop.arranque && localStorage.getItem('arranque_id') !== compointDesktop.arranque) {
+      localStorage.setItem('arranque_id', compointDesktop.arranque);
+      localStorage.removeItem('token');
+      localStorage.removeItem('usuario');
+    }
+  } catch (e) { /* sin almacenamiento: se sigue normal */ }
+})();
+
 // API_URL ahora vive en js/config.js (que se carga antes que este archivo
 // en cada pantalla) — así, replicar el software para un negocio nuevo solo
 // requiere editar ese archivo, sin tocar api.js.
@@ -31,6 +43,33 @@ function cerrarSesion() {
   localStorage.removeItem('token');
   localStorage.removeItem('usuario');
   window.location.href = '/login.html';
+}
+
+// "Salir" (botón del usuario): termina la sesión y CIERRA el programa, para que la siguiente persona tenga que abrirlo de nuevo.
+// - Programa de escritorio: cierra la aplicación completa (hace su respaldo normal al cerrar).
+// - Navegador / acceso directo web: intenta cerrar la ventana; si el navegador no lo permite, deja la pantalla de entrada.
+// (Una sesión vencida por sí sola NO cierra el programa: eso lo hace cerrarSesion() y solo regresa a la pantalla de entrada.)
+async function salirDelSistema() {
+  const token = getToken();
+  try {
+    if (token) {
+      const ctl = new AbortController();
+      const tope = setTimeout(() => ctl.abort(), 1500);
+      await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, signal: ctl.signal }).catch(() => {});
+      clearTimeout(tope);
+    }
+  } catch (e) { /* si no responde, igual se sale */ }
+  localStorage.removeItem('token');
+  localStorage.removeItem('usuario');
+  try {
+    if (document.body) document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f3d2e;color:#fff;font:600 18px system-ui,sans-serif;text-align:center;padding:24px">Cerrando Compoint Punto…<br>Hasta pronto 👋</div>';
+  } catch (e) { /* nada */ }
+  if (window.compointDesktop && compointDesktop.salir) {
+    try { if (await compointDesktop.salir()) return; } catch (e) { /* cae a la pantalla de entrada */ }
+  } else {
+    try { window.close(); } catch (e) { /* el navegador no lo permite */ }
+  }
+  setTimeout(() => { window.location.href = '/login.html'; }, 400);
 }
 
 // Para jefe_general (sucursal_id NULL: ve/opera TODAS las sucursales), cada
@@ -518,7 +557,7 @@ function avisoTurno({ titulo, sub, dato, botones, nota, cancelar }) {
 // Botón "Salir" / cambio de usuario.
 async function salirConTurno() {
   const t = await turnoAbiertoDelUsuario();
-  if (!t) { cerrarSesion(); return; }
+  if (!t) { salirDelSistema(); return; }
   const r = await avisoTurno({
     titulo: '🔒 Tu turno de caja sigue abierto',
     sub: '¿Qué quieres hacer antes de salir?',
@@ -531,7 +570,7 @@ async function salirConTurno() {
     nota: '⚠️ Si dejas el turno abierto, solo tú o un administrador podrán continuarlo.'
   });
   if (r === 'cerrar') window.location.href = '/admin/caja-turno.html?cerrar=salir';
-  else if (r === 'dejar') cerrarSesion();
+  else if (r === 'dejar') salirDelSistema();
 }
 
 // Al entrar con un turno abierto: continuar o hacer el corte. Devuelve 'continuar' o 'cerrar'.

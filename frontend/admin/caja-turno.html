@@ -610,7 +610,7 @@ cargarTurno().then(async () => {
   if (modo === 'salir' || modo === 'programa') window.__saliendoTrasCorte = true;
   if (!turnoActual) return;
   if (!(await realizarCorte())) return;
-  if (modo === 'salir') setTimeout(cerrarSesion, 1800);
+  if (modo === 'salir') setTimeout(salirDelSistema, 1800);
   else if (modo === 'programa' && window.compointDesktop && compointDesktop.salir) setTimeout(() => compointDesktop.salir(), 1800);
 });
 </script>

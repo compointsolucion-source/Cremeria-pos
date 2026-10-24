@@ -51,6 +51,23 @@
   .caja p.sub { color: var(--muted); font-size: 14px; margin: 6px 0 20px; line-height: 1.45; }
   .caja label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
   .caja input { margin-bottom: 14px; }
+  /* ---------- ¿Quién va a entrar? (usuarios guardados en este equipo) ---------- */
+  .quien { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
+  .quien[hidden], #filaUsuario[hidden], #chipUsuario[hidden], #bloqueClave[hidden] { display: none; }
+  .persona { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px 12px; background: var(--background); border: 1.5px solid var(--border);
+             border-radius: 14px; cursor: pointer; font: inherit; color: var(--text); text-align: center; transition: border-color .15s, transform .15s, box-shadow .15s; }
+  .persona:hover, .persona:focus-visible { border-color: var(--primary); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(30,60,20,.10); outline: none; }
+  .persona .av { width: 46px; height: 46px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 19px; }
+  .persona b { font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .persona small { color: var(--muted); font-size: 12px; }
+  .persona.otro .av { background: transparent; color: var(--primary-dark); border: 2px dashed var(--border); }
+  .persona .quitar { position: absolute; top: 4px; right: 6px; border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+  .persona .quitar:hover { color: var(--danger); }
+  .chip-usuario { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 0 14px; background: var(--background); border: 1.5px solid var(--border); border-radius: 14px; }
+  .chip-usuario .av { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 17px; flex: none; }
+  .chip-usuario .dat { flex: 1; min-width: 0; line-height: 1.25; }
+  .chip-usuario .dat b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-usuario .dat small { color: var(--muted); }
   .vista[hidden] { display: none; }
   .error { color: var(--danger); text-align: center; font-size: 14px; min-height: 18px; margin: 0 0 10px; line-height: 1.4; }
   .olvido { text-align: right; margin: -4px 0 14px; }
@@ -117,14 +134,25 @@
       <!-- 1. Entrar -->
       <div class="vista" id="vistaLogin">
         <h2>Bienvenido 👋</h2>
-        <p class="sub">Entra con tu usuario para empezar a vender.</p>
-        <label for="usuario">Usuario</label>
-        <input type="text" id="usuario" placeholder="Usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+        <p class="sub" id="subLogin">Entra con tu usuario para empezar a vender.</p>
+        <div class="quien" id="listaQuien" hidden></div>
+        <div id="bloqueClave">
+          <div class="chip-usuario" id="chipUsuario" hidden>
+            <div class="av" id="chipAv"></div>
+            <div class="dat"><b id="chipNombre"></b><small id="chipRol"></small></div>
+            <button type="button" class="enlace" id="btnCambiarUsuario">Cambiar</button>
+          </div>
+          <div id="filaUsuario">
+            <label for="usuario">Usuario</label>
+            <input type="text" id="usuario" placeholder="Usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
+            <div class="olvido" style="text-align:left;margin-top:-6px"><button type="button" class="enlace" id="btnVerLista" hidden>← Elegir de la lista</button></div>
+          </div>
+          <label for="password">Contraseña</label>
+          <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
         <div class="olvido"><button type="button" class="enlace" id="btnOlvide">¿Olvidaste tu contraseña?</button></div>
         <div class="error" id="error" role="alert"></div>
         <button class="btn btn-primary btn-grande" id="btnEntrar" type="button" onclick="login()">Entrar</button>
+        </div>
         <div class="separador"></div>
         <div class="ayuda">¿Problemas para entrar? <a href="https://wa.me/523325907090?text=Hola%2C%20necesito%20ayuda%20para%20entrar%20a%20Compoint%20Punto" target="_blank" rel="noopener">Escríbenos por WhatsApp</a></div>
       </div>
@@ -133,12 +161,13 @@
       <div class="vista" id="vistaRec1" hidden>
         <div class="pasos"><i class="on"></i><i></i><i></i></div>
         <h2>Recuperar contraseña</h2>
-        <p class="sub">Escribe tu usuario. Te enviaremos un código al correo que tienes registrado en el sistema.</p>
+        <p class="sub"><b>Solo el dueño</b> puede recuperar su contraseña por correo. Escribe tu usuario y te enviaremos un código al correo que registraste.</p>
         <label for="recUsuario">Usuario</label>
         <input type="text" id="recUsuario" placeholder="Tu usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
         <div class="error" id="errRec1" role="alert"></div>
         <div class="nota" id="sinCorreo" hidden>
-          Este usuario no tiene un correo registrado. Pídele a tu administrador que te cambie la contraseña desde <b>Equipo</b>, o
+          No se puede recuperar la contraseña de este usuario por correo. Si eres el dueño, revisa que escribiste bien tu usuario y que registraste tu correo.
+          Si eres empleado, pídele al dueño que te cambie la contraseña desde <b>Equipo</b>, o
           <a href="https://wa.me/523325907090?text=Hola%2C%20no%20puedo%20entrar%20a%20Compoint%20Punto%20y%20necesito%20recuperar%20mi%20contrase%C3%B1a" target="_blank" rel="noopener"><b>escríbenos por WhatsApp</b></a>.
         </div>
         <button class="btn btn-primary btn-grande" id="btnEnviarCodigo" type="button">Enviarme el código</button>
@@ -220,6 +249,7 @@ async function login() {
     });
     localStorage.setItem('token', data.token);
     localStorage.setItem('usuario', JSON.stringify(data.usuario));
+    guardarPersona(usuario, data.usuario);
 
     // Si dejó un turno de caja abierto: continuarlo o hacer el corte (aviso).
     if (await elegirTurnoAlEntrar() === 'cerrar') { window.location.href = '/admin/caja-turno.html?cerrar=1'; return; }
@@ -239,6 +269,62 @@ async function login() {
 
 $('password').addEventListener('keyup', (e) => { if (e.key === 'Enter') login(); });
 $('usuario').addEventListener('keyup', (e) => { if (e.key === 'Enter') $('password').focus(); });
+
+
+/* ====================== ¿Quién va a entrar? ====================== */
+// Los usuarios que ya entraron en ESTE equipo quedan guardados aquí (solo usuario, nombre y puesto; nunca la contraseña).
+const ROLES = { dueno: 'Dueño', jefe_general: 'Jefe general', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador', repartidor: 'Repartidor' };
+// La lista de usuarios SOLO existe en el programa de escritorio (Compoint Punto.exe). En la web se entra escribiendo el usuario.
+const ES_ESCRITORIO = !!(window.compointDesktop && compointDesktop.esEscritorio);
+function leerPersonas() { if (!ES_ESCRITORIO) return []; try { const l = JSON.parse(localStorage.getItem('usuarios_guardados') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+function escribirPersonas(l) { if (!ES_ESCRITORIO) return; try { localStorage.setItem('usuarios_guardados', JSON.stringify(l.slice(0, 12))); } catch (e) { /* sin almacenamiento */ } }
+function guardarPersona(usuario, datos) {
+  if (!ES_ESCRITORIO) return;
+  const l = leerPersonas().filter((p) => p.usuario !== usuario);
+  l.unshift({ usuario, nombre: datos.nombre || usuario, rol: datos.rol || '' });
+  escribirPersonas(l);
+}
+const esc = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inicial = (n) => (String(n || '?').trim()[0] || '?').toUpperCase();
+function rolBonito(r) { return ROLES[r] || (r ? String(r).replace(/_/g, ' ') : ''); }
+
+function mostrarLista() {
+  const l = leerPersonas();
+  $('error').textContent = ''; $('password').value = '';
+  if (!l.length) { elegirOtro(); return; }
+  $('subLogin').textContent = '¿Quién va a entrar?';
+  $('listaQuien').innerHTML = l.map((p, i) => `<div class="persona" role="button" tabindex="0" data-i="${i}">
+      <button type="button" class="quitar" data-q="${i}" title="Quitar de la lista" aria-label="Quitar a ${esc(p.nombre)} de la lista">×</button>
+      <div class="av">${esc(inicial(p.nombre))}</div><b>${esc(p.nombre)}</b><small>${esc(rolBonito(p.rol))}</small></div>`).join('')
+    + '<div class="persona otro" role="button" tabindex="0" data-otro="1"><div class="av">+</div><b>Otro usuario</b><small>Escribir usuario</small></div>';
+  $('listaQuien').hidden = false; $('bloqueClave').hidden = true;
+}
+function elegirPersona(p) {
+  $('usuario').value = p.usuario;
+  $('chipAv').textContent = inicial(p.nombre); $('chipNombre').textContent = p.nombre; $('chipRol').textContent = rolBonito(p.rol);
+  $('subLogin').textContent = 'Escribe tu contraseña para entrar.';
+  $('listaQuien').hidden = true; $('bloqueClave').hidden = false;
+  $('chipUsuario').hidden = false; $('filaUsuario').hidden = true;
+  setTimeout(() => $('password').focus(), 30);
+}
+function elegirOtro() {
+  $('usuario').value = '';
+  $('subLogin').textContent = 'Entra con tu usuario para empezar a vender.';
+  $('listaQuien').hidden = true; $('bloqueClave').hidden = false;
+  $('chipUsuario').hidden = true; $('filaUsuario').hidden = false;
+  $('btnVerLista').hidden = !leerPersonas().length;
+  setTimeout(() => $('usuario').focus(), 30);
+}
+$('listaQuien').addEventListener('click', (e) => {
+  const q = e.target.closest('[data-q]');
+  if (q) { e.stopPropagation(); const l = leerPersonas(); l.splice(Number(q.dataset.q), 1); escribirPersonas(l); mostrarLista(); return; }
+  const t = e.target.closest('.persona'); if (!t) return;
+  if (t.dataset.otro) elegirOtro(); else { const p = leerPersonas()[Number(t.dataset.i)]; if (p) elegirPersona(p); }
+});
+$('listaQuien').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('persona')) { e.preventDefault(); e.target.click(); } });
+$('btnCambiarUsuario').addEventListener('click', mostrarLista);
+$('btnVerLista').addEventListener('click', mostrarLista);
+mostrarLista();
 
 /* ====================== Recuperar contraseña ====================== */
 const VISTAS = ['vistaLogin', 'vistaRec1', 'vistaRec2', 'vistaRec3', 'vistaRec4'];
@@ -262,8 +348,9 @@ $('btnOlvide').addEventListener('click', () => {
 });
 document.querySelectorAll('[data-volver]').forEach((b) => b.addEventListener('click', () => {
   clearInterval(estado.temporizador);
-  $('usuario').value = estado.usuario || $('recUsuario').value.trim() || $('usuario').value;
-  ver('vistaLogin', 'password');
+  ver('vistaLogin');
+  if (!$('filaUsuario').hidden && !$('usuario').value) $('usuario').value = estado.usuario || $('recUsuario').value.trim();
+  if ($('listaQuien').hidden) setTimeout(() => { const f = $('filaUsuario').hidden ? $('password') : $('usuario'); f.focus(); }, 30);
 }));
 
 function arrancarEspera(segundos) {
@@ -385,7 +472,11 @@ async function guardarNueva() {
 }
 $('btnGuardarNueva').addEventListener('click', guardarNueva);
 $('passRepite').addEventListener('keyup', (e) => { if (e.key === 'Enter') guardarNueva(); });
-$('btnIrLogin').addEventListener('click', () => { $('usuario').value = estado.usuario; $('password').value = ''; $('error').textContent = ''; ver('vistaLogin', 'password'); });
+$('btnIrLogin').addEventListener('click', () => {
+  $('password').value = ''; $('error').textContent = ''; ver('vistaLogin');
+  const p = leerPersonas().find((x) => x.usuario === estado.usuario);
+  if (p) elegirPersona(p); else { elegirOtro(); $('usuario').value = estado.usuario; setTimeout(() => $('password').focus(), 40); }
+});
 
 /* ====================== Información en vivo del lado izquierdo ====================== */
 function pintarHora() {

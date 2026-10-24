@@ -27,6 +27,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const lic = require('../utils/licencia');
 const pool = require('../db');
+const recuperacion = require('../utils/recuperacion');
 
 let base, servidor, correoSrv, sucursalId;
 const correos = [];            // lo que "recibió" el servicio de correo
@@ -89,8 +90,10 @@ test.before(async () => {
   };
   await usuario('Rosa Dueña', 'rosa', 'dueno', 'rosa@abarrotesesperanza.com');
   await usuario('Cajera Sin Correo', 'cajera', 'cajero', null);
-  await usuario('Gerente', 'gerente', 'gerente', 'gerente@ejemplo.com');
-  await usuario('Mostrador', 'mostrador', 'mostrador', 'mostrador@ejemplo.com');
+  // Solo el dueño recupera por correo; estos dos son «dueños» extra solo para poder probar varios casos con usuarios distintos.
+  await usuario('Dueño B', 'gerente', 'dueno', 'gerente@ejemplo.com');
+  await usuario('Dueño C', 'mostrador', 'dueno', 'mostrador@ejemplo.com');
+  await usuario('Empleado Con Correo', 'empleado', 'gerente', 'empleado@ejemplo.com');
 });
 
 test.after(async () => {
@@ -241,29 +244,52 @@ test('frena el abuso: más de 5 códigos por IP en 15 minutos se rechazan', asyn
 });
 
 // ---------------------------------------------------------------- correo en Equipo y en "mi correo"
-test('Equipo: el dueño pone, valida y quita el correo de un empleado', async () => {
-  const bad = await api('rosa', 'PUT', `/api/usuarios/${U.cajera}`, { correo: 'esto-no-es-correo' });
-  assert.equal(bad.status, 400);
-  const ok = await api('rosa', 'PUT', `/api/usuarios/${U.cajera}`, { correo: '  Cajera@Ejemplo.COM ' });
-  assert.equal(ok.status, 200, JSON.stringify(ok.json));
-  assert.equal(ok.json.correo, 'cajera@ejemplo.com');
-  const lista = (await api('rosa', 'GET', '/api/usuarios')).json;
-  assert.equal(lista.find((u) => u.id === U.cajera).correo, 'cajera@ejemplo.com');
-  const solo = await api('rosa', 'PUT', `/api/usuarios/${U.cajera}`, { telefono: '33 1111 2222' });
-  assert.equal(solo.json.correo, 'cajera@ejemplo.com', 'editar otra cosa no borra el correo');
-  const quitar = await api('rosa', 'PUT', `/api/usuarios/${U.cajera}`, { correo: '' });
-  assert.equal(quitar.json.correo, null);
-});
-
-test('Equipo: se puede crear un empleado con correo (y se valida)', async () => {
-  const mal = await api('rosa', 'POST', '/api/usuarios', { nombre: 'Nuevo', usuario: 'nuevo1', password: 'Clave-Nueva-1', rol: 'cajero', correo: 'xx' });
-  assert.equal(mal.status, 400);
+test('Equipo: ya no se guarda correo de empleados (solo el dueño recupera por correo)', async () => {
   const ok = await api('rosa', 'POST', '/api/usuarios', { nombre: 'Nuevo', usuario: 'nuevo1', password: 'Clave-Nueva-1', rol: 'cajero', correo: 'nuevo@ejemplo.com' });
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
-  assert.equal(ok.json.correo, 'nuevo@ejemplo.com');
+  assert.equal(ok.json.correo, undefined);
+  const fila = (await pool.query('SELECT correo FROM usuarios WHERE usuario = $1', ['nuevo1'])).rows[0];
+  assert.equal(fila.correo, null);
+  const mod = await api('rosa', 'PUT', `/api/usuarios/${U.cajera}`, { correo: 'cajera@ejemplo.com', telefono: '33 1111 2222' });
+  assert.equal(mod.status, 200, JSON.stringify(mod.json));
+  assert.equal((await pool.query('SELECT correo FROM usuarios WHERE id = $1', [U.cajera])).rows[0].correo, null);
 });
 
-test('mi correo: cada usuario guarda el suyo con su contraseña actual (el dueño también)', async () => {
+test('un empleado (no dueño) NO puede recuperar su contraseña por correo, aunque tenga correo guardado', async () => {
+  const antes = correos.length;
+  const a = await pedir('empleado');
+  assert.equal(a.status, 200);
+  assert.deepEqual(a.json, { ok: true, sin_correo: true }, 'misma respuesta que un usuario que no existe');
+  assert.equal(correos.length, antes, 'no se mandó ningún correo');
+  // aunque alguien meta un código válido a mano en la base, no sirve para un empleado
+  const codigo = '123456';
+  await pool.query('INSERT INTO recuperacion_codigos (usuario_id, codigo_hash, expira_en) VALUES ($1,$2, NOW() + interval \'10 minutes\')', [U.empleado, recuperacion.huella(codigo, U.empleado)]);
+  const v = await api(null, 'POST', '/api/auth/recuperar/verificar', { usuario: 'empleado', codigo });
+  assert.equal(v.status, 400);
+  const r = await api(null, 'POST', '/api/auth/recuperar/restablecer', { usuario: 'empleado', codigo, password_nueva: 'Otra-Clave-77' });
+  assert.equal(r.status, 400);
+  const sigue = await api(null, 'POST', '/api/auth/login', { usuario: 'empleado', password: 'Clave-Vieja-1' });
+  assert.equal(sigue.status, 200, 'su contraseña no cambió');
+});
+
+test('sesión: dura un año (no se vence sola) y deja de servir si desactivan al usuario', async () => {
+  const login = await api(null, 'POST', '/api/auth/login', { usuario: 'empleado', password: 'Clave-Vieja-1' });
+  const d = JSON.parse(Buffer.from(login.json.token.split('.')[1], 'base64').toString());
+  assert.ok((d.exp - d.iat) / 86400 >= 364, 'sesión de ~365 días');
+  const uid = U.empleado;
+  const tok = login.json.token;
+  T.empleado_sesion = tok;
+  const llamar = () => api('empleado_sesion', 'GET', '/api/auth/mi-correo');
+  assert.notEqual((await llamar()).status, 401, 'activo: la sesión sirve (403 por no ser dueño, pero no 401)');
+  await pool.query('UPDATE usuarios SET activo = false WHERE id = $1', [uid]);
+  const mw = require('../middleware/auth');
+  mw._limpiarMemoriaActivos && mw._limpiarMemoriaActivos();
+  assert.equal((await llamar()).status, 401, 'desactivado: ya no entra');
+  await pool.query('UPDATE usuarios SET activo = true WHERE id = $1', [uid]);
+  mw._limpiarMemoriaActivos && mw._limpiarMemoriaActivos();
+});
+
+test('mi correo: el dueño guarda el suyo con su contraseña actual; los demás no pueden', async () => {
   const sinPass = await api('rosa', 'PUT', '/api/auth/mi-correo', { correo: 'rosa2@ejemplo.com' });
   assert.equal(sinPass.status, 400);
   const mal = await api('rosa', 'PUT', '/api/auth/mi-correo', { correo: 'rosa2@ejemplo.com', password_actual: 'incorrecta' });
@@ -274,4 +300,6 @@ test('mi correo: cada usuario guarda el suyo con su contraseña actual (el dueñ
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
   assert.equal((await api('rosa', 'GET', '/api/auth/mi-correo')).json.correo, 'rosa2@ejemplo.com');
   assert.equal((await api(null, 'GET', '/api/auth/mi-correo')).status, 401, 'sin sesión no se puede');
+  assert.equal((await api('cajera', 'GET', '/api/auth/mi-correo')).status, 403, 'un empleado no');
+  assert.equal((await api('cajera', 'PUT', '/api/auth/mi-correo', { correo: 'x@ejemplo.com', password_actual: 'Clave-Vieja-1' })).status, 403);
 });

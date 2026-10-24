@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('compoint', {
 // Funciones del programa de escritorio para el sistema web (solo el sitio configurado puede usarlas).
 contextBridge.exposeInMainWorld('compointDesktop', {
   esEscritorio: true,
+  arranque: (() => { try { return ipcRenderer.sendSync('arranque-id'); } catch (e) { return ''; } })(),
   listarImpresoras: () => ipcRenderer.invoke('listar-impresoras'),
   imprimirHTML: (html, opciones) => ipcRenderer.invoke('imprimir-html', html, opciones),
   abrirCajon: (opciones) => ipcRenderer.invoke('abrir-cajon', opciones),

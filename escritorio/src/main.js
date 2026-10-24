@@ -21,6 +21,9 @@ app.setAppUserModelId('mx.com.compoint.punto');
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
 let ventana = null, ventanaConfig = null, tray = null;
+// Identifica ESTA vez que se abrió el programa. El sistema lo usa para no conservar la sesión de la vez anterior
+// (si se fue la luz o alguien cerró el programa, al abrirlo se elige quién entra y se pone su contraseña).
+const ARRANQUE_ID = require('crypto').randomUUID();
 let saliendo = false, avisoBandejaMostrado = false, autoLoginPendiente = true;
 // Modo servidor del negocio (base de datos + sistema dentro de esta app)
 let servidorLocal = null, ventanaPanel = null, ventanaAlta = null, ventanaEstado = null;
@@ -357,6 +360,7 @@ const esDelSistema = (evento) => {
 };
 
 // El sistema pide salir del programa cuando termina de hacer el corte de caja.
+ipcMain.on('arranque-id', (e) => { e.returnValue = ARRANQUE_ID; });
 ipcMain.handle('salir-programa', (e) => { if (!esDelSistema(e)) return false; saliendo = true; app.quit(); return true; });
 
 ipcMain.handle('listar-impresoras', async (e) => {

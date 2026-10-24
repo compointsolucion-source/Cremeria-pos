@@ -362,7 +362,7 @@ const REP = (function () {
       <button class="rp-btn rp-sec-btn" onclick="REP.refrescar()">↻ Actualizar mis entregas</button>
       <button class="rp-btn rp-sec-btn" onclick="var b=document.getElementById('botonTema'); if(b) b.click();">🌓 Cambiar tema (claro / oscuro / automático)</button>
       <div class="rp-nota azul" style="margin-top:14px">📱 <div><b>Tip:</b> en el menú de tu navegador elige <b>"Agregar a pantalla de inicio"</b> y esta pantalla se abre como una app.</div></div>
-      <button class="rp-btn rp-peligro" style="margin-top:14px" onclick="cerrarSesion()">Cerrar sesión</button>`;
+      <button class="rp-btn rp-peligro" style="margin-top:14px" onclick="salirDelSistema()">Cerrar sesión</button>`;
   }
 
   // ------------------------------------------------------------------ navegación

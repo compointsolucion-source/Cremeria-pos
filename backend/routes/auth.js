@@ -64,7 +64,9 @@ router.post('/login', limitadorLogin, async (req, res) => {
         permisos: user.permisos
       },
       process.env.JWT_SECRET,
-      { expiresIn: '12h' }
+      // La sesión no se vence sola mientras trabajan: solo termina al dar «Salir» (o si el dueño desactiva al usuario,
+      // lo que se revisa en cada solicitud en middleware/auth.js).
+      { expiresIn: '365d' }
     );
 
     await registrarBitacora(pool, {
@@ -184,8 +186,10 @@ router.post('/recuperar/solicitar', limitadorPedirCodigo, async (req, res) => {
     if (!usuario || usuario.length > 50) return res.status(400).json({ error: 'Escribe tu usuario' });
 
     const r = await pool.query(
-      `SELECT id, nombre, correo FROM usuarios WHERE usuario = $1 AND activo = true AND eliminado_en IS NULL`, [usuario]);
+      `SELECT id, nombre, correo FROM usuarios WHERE usuario = $1 AND rol = 'dueno' AND activo = true AND eliminado_en IS NULL`, [usuario]);
     const u = r.rows[0];
+    // Solo el DUEÑO puede recuperar su contraseña por correo. Para cualquier otro usuario (o uno que no existe)
+    // la respuesta es la misma, así nadie averigua quién es quién.
     if (!u || !u.correo || !recuperacion.correoValido(u.correo)) return res.json({ ok: true, sin_correo: true });
 
     // Un código nuevo como máximo cada minuto por usuario.
@@ -225,7 +229,7 @@ router.post('/recuperar/solicitar', limitadorPedirCodigo, async (req, res) => {
 // Devuelve { fila, usuario } si es correcto, o null.
 async function comprobarCodigo(usuario, codigo) {
   const u = (await pool.query(
-    `SELECT id FROM usuarios WHERE usuario = $1 AND activo = true AND eliminado_en IS NULL`, [usuario])).rows[0];
+    `SELECT id FROM usuarios WHERE usuario = $1 AND rol = 'dueno' AND activo = true AND eliminado_en IS NULL`, [usuario])).rows[0];
   if (!u || !/^\d{6}$/.test(String(codigo || '').trim())) return null;
   const fila = (await pool.query(
     `SELECT * FROM recuperacion_codigos WHERE usuario_id = $1 AND usado = false AND expira_en > NOW()
@@ -274,8 +278,12 @@ router.post('/recuperar/restablecer', limitadorCodigo, async (req, res) => {
   }
 });
 
-// Correo propio para recuperar la contraseña (cada quien el suyo; pide la contraseña actual).
-router.get('/mi-correo', verificarToken, async (req, res) => {
+// Correo para recuperar la contraseña: SOLO el dueño lo tiene (pide la contraseña actual para cambiarlo).
+const soloDueno = (req, res, next) => (req.usuario && req.usuario.rol === 'dueno')
+  ? next()
+  : res.status(403).json({ error: 'Solo el dueño puede recuperar su contraseña por correo. Si olvidaste la tuya, pídele al dueño que te la cambie en Equipo.' });
+
+router.get('/mi-correo', verificarToken, soloDueno, async (req, res) => {
   try {
     const r = await pool.query('SELECT correo FROM usuarios WHERE id = $1', [req.usuario.id]);
     res.json({ correo: (r.rows[0] && r.rows[0].correo) || '' });
@@ -285,7 +293,7 @@ router.get('/mi-correo', verificarToken, async (req, res) => {
   }
 });
 
-router.put('/mi-correo', verificarToken, async (req, res) => {
+router.put('/mi-correo', verificarToken, soloDueno, async (req, res) => {
   try {
     const { password_actual } = req.body || {};
     const correo = String((req.body && req.body.correo) || '').trim().toLowerCase();

@@ -1,4 +1,24 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../db');
+
+// La sesión ya no se vence por tiempo, así que se comprueba que el usuario siga ACTIVO.
+// Si el dueño lo desactiva o lo elimina, su sesión deja de servir de inmediato (máx. 30 s por la memoria rápida).
+const _activos = new Map();
+const VIGENCIA_CONSULTA_MS = 30 * 1000;
+async function usuarioSigueActivo(id) {
+  const hoy = Date.now();
+  const previo = _activos.get(id);
+  if (previo && hoy - previo.t < VIGENCIA_CONSULTA_MS) return previo.activo;
+  try {
+    const r = await pool.query('SELECT activo FROM usuarios WHERE id = $1', [id]);
+    const activo = r.rows.length > 0 && r.rows[0].activo !== false;
+    _activos.set(id, { activo, t: hoy });
+    if (_activos.size > 500) _activos.clear();
+    return activo;
+  } catch (e) {
+    return true; // si la base no responde un instante, no se saca a nadie de su venta
+  }
+}
 
 // El repartidor SOLO puede usar su propio módulo (sus entregas y su corte) y lo
 // básico de la sesión (cambiar su contraseña, cerrar sesión). Se corta aquí, en un
@@ -21,8 +41,11 @@ function verificarToken(req, res, next) {
     if (usuario.rol === 'repartidor' && !rutaPermitidaParaRepartidor(req.originalUrl)) {
       return res.status(403).json({ error: 'Tu usuario de repartidor solo puede usar el módulo de entregas' });
     }
-    req.usuario = usuario;
-    next();
+    usuarioSigueActivo(usuario.id).then((activo) => {
+      if (!activo) return res.status(401).json({ error: 'Tu usuario ya no está activo' });
+      req.usuario = usuario;
+      next();
+    });
   });
 }
 
@@ -100,4 +123,5 @@ function requierePermiso(permiso) {
   };
 }
 
-module.exports = { verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };
+module.exports = {
+  _limpiarMemoriaActivos: () => _activos.clear(), verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };
