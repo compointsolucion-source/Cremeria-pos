@@ -1,0 +1,60 @@
+name: Baja de cliente en la nube (Neon + Render)
+
+# Lo dispara el botón «Eliminar» del panel (compoint.com.mx -> admin -> Licencias Punto -> Nube),
+# o a mano desde GitHub: Actions -> «Baja de cliente en la nube» -> Run workflow.
+# BORRA POR COMPLETO: la página y el servidor del cliente en Render y su base de datos en Neon. No se puede deshacer.
+# Usa los mismos secrets que el alta (ver herramientas/alta-nube/LEEME.txt).
+on:
+  workflow_dispatch:
+    inputs:
+      cliente_id:
+        description: 'Número del cliente en el panel'
+        required: true
+      negocio:
+        description: 'Nombre del negocio (solo para el registro)'
+        required: true
+      neon_proyecto:
+        description: 'Proyecto de Neon (ej. noisy-wildflower-09680800). Vacío si no tiene.'
+        required: false
+        default: ''
+      render_api:
+        description: 'Servidor en Render (ej. lavaquita-pos). Vacío si no tiene.'
+        required: false
+        default: ''
+      render_web:
+        description: 'Página en Render (ej. lavaquita-pos-web). Vacío si no tiene.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baja-${{ github.event.inputs.cliente_id }}
+  cancel-in-progress: false
+
+jobs:
+  baja:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Eliminar el cliente
+        env:
+          BAJA_CLIENTE_ID: ${{ github.event.inputs.cliente_id }}
+          BAJA_NEGOCIO: ${{ github.event.inputs.negocio }}
+          BAJA_NEON: ${{ github.event.inputs.neon_proyecto }}
+          BAJA_RENDER_API: ${{ github.event.inputs.render_api }}
+          BAJA_RENDER_WEB: ${{ github.event.inputs.render_web }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_ORG_ID: ${{ secrets.NEON_ORG_ID }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_OWNER_ID: ${{ secrets.RENDER_OWNER_ID }}
+          ALTA_SECRET: ${{ secrets.ALTA_SECRET }}
+          ALTA_CALLBACK_URL: ${{ secrets.ALTA_CALLBACK_URL }}
+        run: node herramientas/alta-nube/baja-nube.js

@@ -49,3 +49,30 @@ LIMITES A CONOCER
 PRUEBAS (para programadores)
    cd herramientas/alta-nube && TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:5432/prueba" node --test alta-nube.test.js
    Usan Neon, Render y el panel FALSOS; la estructura de la base si corre de verdad en una base local.
+
+
+==================================================================
+BAJA: ELIMINAR UN CLIENTE POR COMPLETO  (baja-cliente-nube.yml + baja-nube.js)
+==================================================================
+Boton «🗑 Eliminar» de cada cliente en el panel (Licencias Punto -> Nube). Pide escribir el nombre exacto del negocio.
+Manda la orden a GitHub y GitHub borra, en este orden:
+   1) la pagina del cliente en Render      2) el servidor del cliente en Render
+   3) su base de datos en Neon (TODA su informacion)      4) avisa al panel, que quita su ficha y su licencia
+NO SE PUEDE DESHACER. Si algo falla (por ejemplo Neon no contesta), el panel muestra que parte fallo y se puede
+volver a pulsar Eliminar: lo que ya estaba borrado se da por borrado.
+
+Seguridad: tu sistema propio y el demo estan protegidos (el programa se niega a borrarlos), solo borra servicios de
+Render de ESTE repositorio y de TU cuenta, y solo proyectos de Neon de TU organizacion. Los clientes que no tienen
+nada en la nube (sin Neon ni Render) se quitan solo del panel, sin llamar a GitHub.
+
+Instalacion (una sola vez):
+   1) Mueve  herramientas/alta-nube/baja-cliente-nube.yml  a  .github/workflows/  (junto a alta-cliente-nube.yml).
+   2) Commit + Sync. Usa los mismos 6 secrets y el mismo token del alta; no hay nada nuevo que configurar.
+   3) Prueba con un cliente de prueba (no con uno real).
+Si el boton dice «GitHub no encuentra ... baja-cliente-nube.yml», falta el paso 1 o el commit.
+
+Pruebas:  cd herramientas/alta-nube && node --test baja-nube.test.js     (Neon y Render FALSOS; no borra nada real)
+
+BIENVENIDA (solo en el sitio compoint.com.mx, no en este repositorio)
+   Boton «✉ Bienvenida» del panel: correo desde contacto@compoint.com.mx con la guia ilustrada, y WhatsApp con
+   el link de descarga (compoint.com.mx/descargas/CompointPunto.exe) y de la guia (compoint.com.mx/guia-punto.php).
