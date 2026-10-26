@@ -13,6 +13,16 @@ ventana, con el icono de Compoint, sin barra de direcciones. Ademas:
   sistema -> Impresion de este dispositivo -> Impresoras de Windows).
 - Como carga el sistema desde internet, SIEMPRE esta en la ultima version que
   publiques en "estable": no hay que reinstalar para actualizar.
+- ACTUALIZACIONES AUTOMATICAS DEL PROGRAMA (para corregir fallas o vulnerabilidades):
+  cuando publicas en "estable" (publicar-a-clientes.bat), GitHub construye solo el
+  programa con numero de version nuevo (1.1.<n>) y lo publica en Releases
+  (flujo "Publicar actualizacion (Windows)", pestana Actions). Cada programa instalado
+  revisa a los ~45 segundos de abrir y despues cada 4 horas; si hay version nueva la
+  baja en segundo plano y avisa: "Hay una actualizacion nueva... Reiniciar ahora /
+  Despues". Con "Despues" se instala sola al cerrar el programa. Tambien esta en el
+  menu junto al reloj: "Buscar actualizaciones". Sin internet no molesta.
+  Importante: los programas que ya estan instalados SIN esta funcion necesitan
+  instalarse UNA vez mas con el instalador nuevo; de ahi en adelante se actualizan solos.
 
 COMO GENERAR EL INSTALADOR DE UN CLIENTE (lo haces tu, en GitHub)
 1. Entra a tu repositorio en GitHub -> pestana "Actions".

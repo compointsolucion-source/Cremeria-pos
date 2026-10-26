@@ -9,6 +9,8 @@ const instalacion = require('./instalacion');
 const { dibujarBarras, MEDIR_BARRAS } = require('./barras');
 const { COMANDO_CAJON, resolverImpresoraCajon } = require('./cajon');
 const { rutasPrevistas } = require('./servidor/rutas');
+const actualizador = require('./actualizador');
+const configCliente = require('./config-cliente');
 
 const PUERTO_INTERMEDIARIO = 3500;
 
@@ -37,7 +39,9 @@ const archivoCliente = () => app.isPackaged
 
 function leerJson(ruta) { try { return JSON.parse(fs.readFileSync(ruta, 'utf8')); } catch (e) { return {}; } }
 function configuracion() {
-  const c = { nombre: 'Compoint Punto', intermediario: true, iniciarConWindows: true, ...leerJson(archivoCliente()), ...leerJson(archivoUsuario()) };
+  // La dirección y el nombre de ESTE cliente se guardan aparte la primera vez (conservarConfigCliente): así una
+  // actualización automática, que trae el archivo genérico, no le quita su sistema.
+  const c = configCliente.combinar({ nombre: 'Compoint Punto', intermediario: true, iniciarConWindows: true }, leerJson(archivoCliente()), leerJson(archivoUsuario()));
   if (c.modo === 'servidor') c.url = servidorLocal ? servidorLocal.urlLocal + '/login.html' : '';
   return c;
 }
@@ -45,6 +49,13 @@ function guardarUsuario(cambios) {
   const actual = leerJson(archivoUsuario());
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
   fs.writeFileSync(archivoUsuario(), JSON.stringify({ ...actual, ...cambios }, null, 2));
+}
+// Guarda la dirección del cliente que venía dentro del instalador (si trae una distinta a la ya guardada).
+function conservarConfigCliente() {
+  try {
+    const cambios = configCliente.cambiosAConservar(leerJson(archivoCliente()), leerJson(archivoUsuario()));
+    if (cambios) guardarUsuario(cambios);
+  } catch (e) { log('No se pudo guardar la dirección del cliente: ' + e.message); }
 }
 function log(texto) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'log.txt'), new Date().toISOString() + ' ' + texto + '\n'); } catch (e) { /* sin log */ }
@@ -228,6 +239,7 @@ function crearBandeja() {
       { label: 'Panel del servidor y respaldos…', click: () => abrirPanel() },
       { label: 'Respaldar ahora', click: () => respaldarAhora() }
     ] : [{ label: 'Cambiar dirección o usuario…', click: () => abrirConfig() }]),
+    { label: 'Buscar actualizaciones (versión ' + app.getVersion() + ')', click: () => buscarActualizaciones() },
     { label: 'Ayuda y soporte', click: () => { crearVentana(); try { const u = new URL('/admin/ayuda.html', configuracion().url); if (ventana) ventana.loadURL(u.href); } catch (e) {} } },
     { type: 'separator' },
     { label: 'Salir por completo (guarda un respaldo)', click: () => salirPorCompleto() }
@@ -924,6 +936,30 @@ ipcMain.handle('srv-restaurar', async (e) => {
   return { ok: true };
 });
 
+// ------------------------------------------------------------ actualizaciones automáticas
+let actualizaciones = null;
+function iniciarActualizaciones() {
+  if (!app.isPackaged || process.env.COMPOINT_SIN_ACTUALIZAR === '1') return; // en desarrollo no hay de dónde bajar
+  try {
+    const { autoUpdater } = require('electron-updater');
+    actualizaciones = actualizador.crear({
+      autoUpdater, dialog, app, log,
+      ventana: () => ventana,
+      prepararSalida: async () => {
+        // Modo servidor: la base de datos se cierra con respaldo antes de que el instalador cambie los archivos.
+        if (servidorLocal && !cierreListo) { cerrandoServidor = true; await cerrarServidorConRespaldo(); cierreListo = true; }
+        intermediario.detener();
+        saliendo = true;
+      }
+    });
+    actualizaciones.iniciar();
+  } catch (e) { log('No se pudo iniciar el actualizador: ' + e.message); }
+}
+function buscarActualizaciones() {
+  if (!actualizaciones) { dialog.showMessageBox({ type: 'info', message: 'Las actualizaciones automáticas solo funcionan en el programa instalado.', buttons: ['Aceptar'] }); return; }
+  actualizaciones.buscarAhora();
+}
+
 // ------------------------------------------------------------ arranque
 app.on('second-instance', () => { if (ventana) { if (ventana.isMinimized()) ventana.restore(); ventana.show(); ventana.focus(); } else crearVentana(); });
 app.on('before-quit', (e) => {
@@ -940,10 +976,12 @@ app.on('before-quit', (e) => {
 app.on('window-all-closed', () => { /* se queda en la bandeja */ });
 
 app.whenReady().then(async () => {
+  conservarConfigCliente();
   aplicarInstalacion();
   configurarPermisos();
   crearBandeja();
   aplicarInicioConWindows();
+  iniciarActualizaciones();
   if (configuracion().intermediario !== false) intermediario.iniciar(PUERTO_INTERMEDIARIO, log);
   if (configuracion().modo === 'servidor') { await iniciarModoServidor(); return; }
   crearVentana();

@@ -17,6 +17,7 @@
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "electron-updater": "^6.3.9",
     "embedded-postgres": "17.10.0-beta.17",
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
@@ -75,6 +76,14 @@
       "language": "3082"
     },
     "artifactName": "Payload-CompointPunto.${ext}",
-    "asar": false
+    "asar": false,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "compointsolucion-source",
+        "repo": "Cremeria-pos",
+        "releaseType": "release"
+      }
+    ]
   }
 }
