@@ -1,0 +1,47 @@
+name: Publicar actualización (Windows)
+
+on:
+  push:
+    branches: [estable]
+  workflow_dispatch:
+
+concurrency:
+  group: publicar-actualizacion
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: escritorio
+        run: npm ci
+
+      - name: Probar la lógica del escritorio (informativo)
+        working-directory: escritorio
+        continue-on-error: true
+        run: npm test
+
+      - name: Poner el número de versión
+        working-directory: escritorio
+        shell: bash
+        run: npm version "1.1.${{ github.run_number }}" --no-git-tag-version
+
+      - name: Construir y publicar en GitHub Releases
+        working-directory: escritorio
+        run: node scripts/construir.js
+        env:
+          CLIENTE_URL: ''
+          CLIENTE_NOMBRE: 'Compoint Punto'
+          PUBLICAR_ACTUALIZACION: '1'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
