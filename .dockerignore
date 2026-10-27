@@ -1,0 +1,12 @@
+.git
+.github
+**/node_modules
+escritorio
+Intermediario-Impresion
+intermediario-impresion-red
+herramientas
+backend/pruebas
+**/.env
+**/*.log
+*.bat
+*.yml

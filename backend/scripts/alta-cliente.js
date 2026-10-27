@@ -48,7 +48,9 @@ const schemaPath = path.join(__dirname, 'schema.sql');
 if (!fs.existsSync(schemaPath)) { console.error('No existe scripts/schema.sql. Primero corre exportar-esquema.js contra tu base actual.'); process.exit(1); }
 
 const totalSucursales = Math.max(1, parseInt(a.sucursales, 10) || 1);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL) ? false : { rejectUnauthorized: false } });
+// SSL: igual que db.js — se puede forzar con DB_SSL=true / DB_SSL=false (en el servidor Compoint va sin SSL: la base está en la red interna).
+const usarSsl = process.env.DB_SSL ? process.env.DB_SSL === 'true' : !/localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: usarSsl ? { rejectUnauthorized: false } : false });
 
 (async () => {
   const c = await pool.connect();
