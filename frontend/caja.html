@@ -112,6 +112,22 @@
   [data-tema="oscuro"] .teclado-cobro .tc-enter { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
   [data-tema="oscuro"] .chip-turno { background: #16301A; color: #8FE08A; }
   [data-tema="oscuro"] .chip-turno.cerrado { background: #3A1A1A; color: #FF9A94; }
+
+  /* ---- Acomodo más limpio (oct 2026) ---- */
+  .tx-c { display: none; }
+  .cobro-vacio { text-align: center; color: var(--muted, #8a8f98); padding: 70px 24px; max-width: 420px; margin: 0 auto; }
+  .cobro-vacio .cv-icono { font-size: 46px; margin-bottom: 10px; opacity: .75; }
+  .cobro-vacio .cv-titulo { font-size: 18px; font-weight: 700; color: var(--text, #333); margin-bottom: 6px; }
+  .cobro-vacio .cv-ayuda { font-size: 14px; line-height: 1.45; }
+  /* Celular: los 5 botones de arriba caben completos (sin barra para moverlos de lado). */
+  @media (max-width: 640px) {
+    .tx-l { display: none; }
+    .tx-c { display: inline; }
+    .barra-acciones { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 8px 10px; overflow: visible; white-space: normal; }
+    .barra-acciones .btn { flex-direction: column; gap: 2px; padding: 6px 2px; min-height: 52px; font-size: 11.5px; line-height: 1.15; text-align: center; }
+    .chip-turno { grid-column: 1 / -1; order: -1; margin: 0; text-align: center; }
+    .banner-impresora { padding: 6px 10px !important; font-size: 12.5px !important; }
+  }
 </style>
 </head>
 <body>
@@ -126,13 +142,13 @@
     <button class="btn btn-secondary" onclick="abrirCajonManual()">🗄️ Cajón</button>
     <button class="btn btn-secondary" onclick="registrarMovimientoRapido('ingreso')">💰 Entrada</button>
     <button class="btn btn-secondary" onclick="registrarMovimientoRapido('egreso')">💸 Salida</button>
-    <button class="btn btn-secondary" onclick="abrirHistorialCaja()">📜 Historial / Devoluciones</button>
-    <button class="btn btn-secondary" onclick="reimprimirUltimoTicketCaja()">🖨️ Reimprimir último</button>
+    <button class="btn btn-secondary" onclick="abrirHistorialCaja()" title="Historial y devoluciones">📜 Historial<span class="tx-l">&nbsp;/ Devoluciones</span></button>
+    <button class="btn btn-secondary" onclick="reimprimirUltimoTicketCaja()" title="Reimprimir el último ticket">🖨️ Reimprimir<span class="tx-l">&nbsp;último</span></button>
     <span class="chip-turno cerrado" id="chipTurno">Turno: …</span>
   </div>
 
-  <div id="bannerImpresoraCaja" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
-    🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraCaja(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraCajaUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
+  <div id="bannerImpresoraCaja" class="banner-impresora" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
+    🖨 <span class="tx-l">Impresora no conectada en este dispositivo</span><span class="tx-c">Sin impresora</span> — <a href="#" onclick="conectarImpresoraCaja(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraCajaUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
   </div>
 
   <div class="layout">
@@ -147,7 +163,7 @@
     </div>
 
     <div class="panel-cobro card" id="panelCobro">
-      <p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>
+      <div class="cobro-vacio"><div class="cv-icono">🧾</div><div class="cv-titulo">Selecciona o escanea un ticket para cobrar</div><div class="cv-ayuda">Pasa el código del ticket por el lector, escribe el folio o tócalo en la lista de la izquierda.</div></div>
     </div>
   </div>
 

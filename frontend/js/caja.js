@@ -14,7 +14,7 @@ const pantallaAngosta = () => window.innerWidth < 900;
 function limpiarPanelCobro() {
   const panel = document.getElementById('panelCobro');
   panel.classList.remove('abierto');
-  panel.innerHTML = '<p style="color:#888; text-align:center;">Selecciona o escanea un ticket para cobrar</p>';
+  panel.innerHTML = '<div class="cobro-vacio"><div class="cv-icono">🧾</div><div class="cv-titulo">Selecciona o escanea un ticket para cobrar</div><div class="cv-ayuda">Pasa el código del ticket por el lector, escribe el folio o tócalo en la lista de la izquierda.</div></div>';
   document.querySelectorAll('.ticket-pendiente.sel').forEach(el => el.classList.remove('sel'));
 }
 
@@ -81,6 +81,16 @@ async function confirmarMotivoCancelacion(motivo) {
   }
 }
 
+// "Hace 5 min", "Hace 2 h", "Hace 3 días" — más fácil de leer que "Hace 4523 min".
+function textoTiempoEspera(min) {
+  if (min <= 0) return 'Hace un momento';
+  if (min < 60) return `Hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'Desde ayer' : `Hace ${d} días`;
+}
+
 async function cargarBandeja() {
   try {
     const pendientes = await apiFetch('/tickets/pendientes');
@@ -92,7 +102,7 @@ async function cargarBandeja() {
       if (minutosEspera >= 5) claseEspera = 'espera-larga';
       else if (minutosEspera >= 2) claseEspera = 'espera-media';
 
-      const textoEspera = minutosEspera <= 0 ? 'Hace un momento' : `Hace ${minutosEspera} min`;
+      const textoEspera = textoTiempoEspera(minutosEspera);
 
       // Si el ticket viene de un pedido (para recoger o a domicilio), se marca para que el cajero lo distinga.
       const quien = String(t.pedido_contacto || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
