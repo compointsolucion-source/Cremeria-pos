@@ -334,7 +334,7 @@ ipcMain.handle('guardar-config', (e, datos) => {
   try {
     const url = new URL(String(datos.url || '').trim());
     if (!/^https?:$/.test(url.protocol)) throw new Error('x');
-  } catch (err) { return { error: 'La dirección no es válida. Ejemplo: https://minegocio.onrender.com' }; }
+  } catch (err) { return { error: 'La dirección no es válida. Ejemplo: https://cp1000.compoint.com.mx' }; }
 
   const cambios = { url: String(datos.url).trim(), modo: 'cliente' };
   if (datos.nombre) cambios.nombre = String(datos.nombre).trim();
@@ -883,7 +883,7 @@ ipcMain.handle('srv-cambiar-a-cliente', async (e, urlTexto) => {
     if (t && !/^https?:\/\//i.test(t)) t = 'https://' + t;
     url = new URL(t);
     if (!/^https?:$/.test(url.protocol)) throw new Error('x');
-  } catch (err) { return { error: 'La dirección no es válida. Ejemplo: https://minegocio.onrender.com' }; }
+  } catch (err) { return { error: 'La dirección no es válida. Ejemplo: https://cp1000.compoint.com.mx' }; }
   const conf = await dialog.showMessageBox(ventanaPanel || undefined, {
     type: 'warning', buttons: ['Cambiar a la nube', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Dejar de ser servidor',
     message: 'Esta computadora dejará de ser el servidor del negocio.',

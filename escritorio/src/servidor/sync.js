@@ -22,7 +22,7 @@ const CADA_MS = 30 * 1000;
 const q = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 
 // ---------------------------------------------------------------- dirección de la nube
-// Acepta la dirección de la página (https://xxx.onrender.com) o la del servidor (…/api).
+// Acepta la dirección de la página (https://cpXXXX.compoint.com.mx o https://xxx.onrender.com) o la del servidor (…/api).
 async function resolverApi(texto) {
   let t = String(texto || '').trim();
   if (!t) throw new Error('Escribe la dirección de tu sistema en la nube.');
