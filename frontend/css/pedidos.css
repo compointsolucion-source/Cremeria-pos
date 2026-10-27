@@ -374,3 +374,37 @@ body.mp-abierto { overflow: hidden; }
   .mp-wcab h2 { font-size: 18px; } .mp-hora .g { font-size: 21px; }
   .mp-pie .btn { flex: 1 1 100%; }
 }
+
+/* ---------- Pedidos: que el tablero quepa en computadora y se lea fácil en celular ---------- */
+.pt-tablero { grid-template-columns: repeat(5, minmax(146px, 1fr)) minmax(215px, .95fr); }
+.pt-herramientas input[type="search"] { width: auto; flex: 1 1 260px; max-width: 420px; }
+.pd-c { display: none; }
+.pt-col h3 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pt-col h3 .n { flex: none; margin-left: 6px; }
+@media (max-width: 760px) {
+  .top-bar .pd-acciones { width: 100%; flex-wrap: nowrap !important; }
+  .top-bar .pd-acciones > .btn { flex: 1; }
+  .top-bar .pd-acciones .btn { padding: 9px 10px; font-size: 14px; white-space: nowrap; justify-content: center; }
+  .pd-l { display: none; }
+  .pd-c { display: inline; }
+  .pt-barra { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .pt-barra::-webkit-scrollbar { display: none; }
+  .pt-barra { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .pt-tab { white-space: nowrap; padding: 8px 13px; flex: none; }
+  .pt-barra .pt-espacio { display: none; }
+  .pt-vivo { font-size: 0; flex: none; }
+  .pt-vivo::before { font-size: 14px; margin: 0 2px; }
+  #vistaHoy .pt-herramientas { flex-wrap: nowrap; }
+  #vistaHoy .pt-herramientas input[type="search"] { flex: 1 1 auto; min-width: 0; width: auto; }
+  #vistaHoy .pt-herramientas select { max-width: 42%; }
+  .pt-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .pt-kpi { padding: 8px 10px; border-radius: 11px; }
+  .pt-kpi b { font-size: 17px; }
+  .pt-kpi span { font-size: 11px; display: block; line-height: 1.25; }
+  /* En celular: una columna debajo de otra; las que están vacías quedan como una barrita */
+  .pt-tablero { grid-template-columns: 1fr; overflow-x: visible; scroll-snap-type: none; }
+  .pt-col { min-height: 0; }
+  .pt-col:has(.pt-vacia) { padding: 6px 10px; }
+  .pt-col:has(.pt-vacia) h3 { margin: 2px 4px; color: var(--muted, #7A7D83); }
+  .pt-col .pt-vacia { display: none; }
+}

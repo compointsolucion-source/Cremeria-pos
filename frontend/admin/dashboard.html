@@ -29,6 +29,7 @@
   [data-tema="oscuro"] .kpi .v.verde-t { color: #8BD97A; }
   [data-tema="oscuro"] .kpi .v.naranja-t { color: #F2B14C; }
   .kpi.alerta { background: rgba(198,40,40,.08); }
+  .kpi .kpi-uni { font-size: 13px; font-weight: 600; color: var(--muted, #7A7D83); }
 
   .tablero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; align-items: start; }
   .tablero > div { display: grid; gap: 14px; min-width: 0; }
@@ -98,9 +99,9 @@
   @media (max-width: 1000px) {
     .kpis { grid-template-columns: 1fr 1fr; }
     .tablero { grid-template-columns: 1fr; }
-    /* En celular lo más importante va primero: ventas, atención, accesos y al final la actividad */
+    /* En celular lo más importante va primero: avisos y accesos rápidos, luego pedidos, ventas y al final la actividad */
     .tablero > div { display: contents; }
-    #cardPedidos { order: 1; } #cardHora { order: 2; } #cardAtencion { order: 3; } .accesos { order: 4; } #cardActividad { order: 5; }
+    #cardAtencion { order: 1; } .accesos { order: 2; } #cardPedidos { order: 3; } #cardHora { order: 4; } #cardActividad { order: 5; }
   }
   @media (max-width: 600px) {
     .saludo h2 { font-size: 21px; }
@@ -312,7 +313,7 @@ function renderTarjetas(data, ped) {
   const usaPedidos = !!(ped && ped.usa);
   const nTickets = Number(data.ventas_hoy.num_tickets);
   const ventas = `<div class="caja kpi"><div class="ic verde">💰</div><div><div class="v num">${dinero(data.ventas_hoy.total)}</div><div class="l">Ventas de hoy · ${nTickets} ${nTickets === 1 ? 'ticket' : 'tickets'}</div>${usaPedidos ? `<div class="l sec" title="Ganancia estimada con el costo registrado en cada producto">Utilidad estimada ${dinero(data.utilidad_hoy.ganancia)}</div>` : ''}</div></div>`;
-  const stock = `<div class="caja kpi ${bajos + agot > 0 ? 'alerta' : ''}"><div class="ic ${bajos + agot > 0 ? 'rojo' : 'azul'}">📦</div><div><div class="v num">${bajos} · ${agot}</div><div class="l">Stock bajo · Agotados</div></div></div>`;
+  const stock = `<a class="caja kpi ${bajos + agot > 0 ? 'alerta' : ''}" href="inventario.html"><div class="ic ${bajos + agot > 0 ? 'rojo' : 'azul'}">📦</div><div><div class="v num">${bajos} <small class="kpi-uni">${bajos === 1 ? 'bajo' : 'bajos'}</small> · ${agot} <small class="kpi-uni">${agot === 1 ? 'agotado' : 'agotados'}</small></div><div class="l">Productos por surtir</div></div></a>`;
   let medio;
   if (usaPedidos) {
     const r = ped.resumen;
