@@ -100,7 +100,13 @@
     .barra-acciones .btn { padding: 11px 4px; font-weight: 800; }
     .contenido { padding-bottom: 100px; }
   }
+  .ct-c { display: none; }
   @media (max-width: 600px) {
+    /* Los 3 botones de arriba en una sola fila */
+    .ct-acciones { width: 100%; flex-wrap: nowrap !important; }
+    .ct-acciones .btn { flex: 1; padding: 9px 6px; font-size: 14px; white-space: nowrap; justify-content: center; }
+    .ct-l { display: none; }
+    .ct-c { display: inline; }
     .kpis.tres { grid-template-columns: 1fr 1fr; }
     .kpis.tres .kpi:last-child { display: none; }
     .kpi { padding: 12px; gap: 10px; }
@@ -121,10 +127,10 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📊 Corte de Caja</h1></div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <a class="btn btn-primary" href="cortes-dia.html">📅 Cortes por día</a>
-      <a class="btn btn-secondary" href="cortes.html">📊 Reporte de cortes</a>
-      <button class="btn btn-secondary" onclick="abrirBuscadorCortes()">🔍 Buscar corte</button>
+    <div class="ct-acciones" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <a class="btn btn-primary" href="cortes-dia.html">📅&nbsp;<span class="ct-l">Cortes por día</span><span class="ct-c">Por día</span></a>
+      <a class="btn btn-secondary" href="cortes.html">📊&nbsp;<span class="ct-l">Reporte de cortes</span><span class="ct-c">Reporte</span></a>
+      <button class="btn btn-secondary" onclick="abrirBuscadorCortes()">🔍&nbsp;<span class="ct-l">Buscar corte</span><span class="ct-c">Buscar</span></button>
     </div>
   </div>
 

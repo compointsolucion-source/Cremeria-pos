@@ -131,7 +131,12 @@
   .peso-aviso-exacto { display: none; background: #E8F5E9; color: #2E6B1F; border-radius: 8px; padding: 6px 10px; margin: 6px 0; font-size: 13px; text-align: left; }
   .peso-aviso-exacto.visible { display: block; }
   .teclado-cobro .tc-enter { grid-column: 2 / span 2; background: #5FAE46; color: white; font-size: 22px; }
+  .ca-c { display: none; }
   @media (max-width: 700px) {
+    /* En celular el campo de código gana espacio y el botón queda corto */
+    .ca-l { display: none; }
+    .ca-c { display: inline; }
+    .btn-agregar-cod { flex: none; white-space: nowrap; padding-left: 12px; padding-right: 12px; }
     .cobro-cols { flex-direction: column; }
     .teclado-cobro { width: 100%; flex-basis: auto; }
   }
@@ -254,7 +259,7 @@
                oninput="buscarProductoAvanzada()" onkeydown="manejarTecladoCampoCodigo(event)">
         <div id="sugerenciasAvanzada" class="sugerencias-avanzada"></div>
       </div>
-      <button class="btn btn-primary" onclick="manejarEnterCampoCodigo()">ENTER - Agregar Producto</button>
+      <button class="btn btn-primary btn-agregar-cod" onclick="manejarEnterCampoCodigo()"><span class="ca-l">ENTER - Agregar Producto</span><span class="ca-c">＋ Agregar</span></button>
     </div>
 
     <div class="barra-atajos">
