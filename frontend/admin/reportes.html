@@ -81,6 +81,16 @@
     .pestanas { padding: 0 4px; }
     .pestanas button { padding: 12px 9px; font-size: 13px; }
   }
+  /* ---- Acomodo más limpio (oct 2026) ---- */
+  @media (max-width: 640px) {
+    .tx-l { display: none; }
+    .top-bar { flex-wrap: nowrap; padding: 10px 12px; }
+    .top-bar > .btn { padding: 7px 12px; min-height: 38px; font-size: 13.5px; }
+    /* Las 4 pestañas y los rangos de fecha se ven completos, sin quedar cortados a la derecha */
+    #tabs { padding: 0 2px; }
+    #tabs button { flex: 1; padding: 11px 2px; font-size: 12.5px; text-align: center; }
+    #chipsRapidos { flex-wrap: wrap; overflow: visible; }
+  }
 </style>
 </head>
 <body>
@@ -89,7 +99,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📈 Reportes</h1></div>
-    <button class="btn btn-secondary" id="btnCsv" onclick="exportarCSV()">⬇️ Exportar CSV</button>
+    <button class="btn btn-secondary" id="btnCsv" onclick="exportarCSV()" title="Exportar a Excel (CSV)">⬇️&nbsp;<span class="tx-l">Exportar&nbsp;</span>CSV</button>
   </div>
 
   <div class="contenido">
@@ -124,6 +134,8 @@ requiereLogin();
 const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dinero = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dineroCorto = (n) => '$' + Math.round(Number(n || 0)).toLocaleString('en-US');
+// Unidad de lo vendido: kg (a granel), pzas o kits — "6.75 kg vendidos" en vez de "6.75 vendidos".
+const unidadVendida = (p) => p.tipo === 'kit' ? (Number(p.cantidad_total) === 1 ? 'kit' : 'kits') : (p.tipo_venta === 'peso' ? 'kg' : (Number(p.cantidad_total) === 1 ? 'pza' : 'pzas'));
 const cant = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const PALETA = ['#5FAE46', '#1565C0', '#8E24AA', '#EF6C00', '#00838F', '#C62828', '#8D6E63', '#F9A825'];
@@ -274,7 +286,7 @@ function renderResumen(data) {
 
   const productos = data.top_productos.length ? data.top_productos.map((p, i) => `<div class="rank">
       <div class="no">${i + 1}</div>
-      <div class="info"><b>${escapar(p.nombre_producto)}</b><small>${cant(p.cantidad_total)} vendidos</small></div>
+      <div class="info"><b>${escapar(p.nombre_producto)}</b><small>${cant(p.cantidad_total)} ${unidadVendida(p)} vendidos</small></div>
       <div class="monto num">${dinero(p.monto_total)}</div></div>`).join('')
     : '<div class="vacio">Sin ventas en este rango</div>';
 

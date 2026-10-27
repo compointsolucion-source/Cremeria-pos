@@ -113,6 +113,14 @@
   [data-tema="oscuro"] .estado.bajo { color: #FFC857; }
   [data-tema="oscuro"] .estado.orden { color: #8BD97A; }
   [data-tema="oscuro"] .mini.merma { color: #FF8A80; }
+  /* ---- Acomodo más limpio (oct 2026) ---- */
+  .tarjeta-prod .grande .uni { font-size: 12px; font-weight: 600; color: var(--muted, #7A7D83); }
+  @media (max-width: 640px) {
+    .tx-l { display: none; }
+    .top-bar { flex-wrap: nowrap; padding: 10px 12px; }
+    .top-bar > .btn { padding: 7px 12px; min-height: 38px; font-size: 13.5px; }
+    .tarjetas { padding-bottom: 70px; } /* que el botón «+ Movimiento» no tape el último producto */
+  }
 </style>
 </head>
 <body>
@@ -121,7 +129,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📊 Inventario</h1></div>
-    <a class="btn btn-secondary" href="reporte-inventario.html">📋 Reporte Completo</a>
+    <a class="btn btn-secondary" href="reporte-inventario.html" title="Reporte completo de inventario">📋 Reporte<span class="tx-l">&nbsp;Completo</span></a>
   </div>
 
   <div class="contenido">
@@ -300,7 +308,7 @@ function renderLista(lista) {
     document.getElementById('tarjetasInventario').innerHTML = lista.map(p => `
       <div class="tarjeta-prod ${p.producto_id === selId ? 'sel' : ''}">
         <div class="nom">${escapar(p.nombre)}</div>
-        <div class="grande" style="color:${COLOR_TEXTO[p._estado]}">${parseFloat(p.existencia_actual).toFixed(2)}</div>
+        <div class="grande" style="color:${COLOR_TEXTO[p._estado]}">${parseFloat(p.existencia_actual).toFixed(2)} <small class="uni">${unidadDe(p)}</small></div>
         <div class="sub"><span class="cod">${escapar(p.codigo_barras || '—')}</span><span class="estado ${p._estado}">${ROTULO[p._estado]}</span><span>Mín ${parseFloat(p.stock_minimo).toFixed(2)} ${unidadDe(p)}</span></div>
         <div class="acciones-fila">
           <button class="mini entrada" onclick="abrirMovimiento('entrada', ${p.producto_id})">＋ Entrada</button>

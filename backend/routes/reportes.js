@@ -55,11 +55,13 @@ router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (re
 
     // Productos más vendidos (por monto)
     const topProductos = await pool.query(
-      `SELECT nombre_producto, COALESCE(SUM(cantidad),0) AS cantidad_total, COALESCE(SUM(subtotal),0) AS monto_total
+      `SELECT td.nombre_producto, COALESCE(SUM(td.cantidad),0) AS cantidad_total, COALESCE(SUM(td.subtotal),0) AS monto_total,
+              MAX(td.tipo) AS tipo, MAX(p.tipo_venta) AS tipo_venta
        FROM ticket_detalle td
        JOIN tickets t ON td.ticket_id = t.id
+       LEFT JOIN productos p ON p.id = td.producto_id
        WHERE t.estado = 'pagado' AND t.sucursal_id = $1 AND t.fecha_pago BETWEEN $2 AND $3
-       GROUP BY nombre_producto
+       GROUP BY td.nombre_producto
        ORDER BY monto_total DESC
        LIMIT 10`,
       [sucursalId, desde, hasta]
