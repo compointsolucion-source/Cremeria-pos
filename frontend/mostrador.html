@@ -195,6 +195,37 @@
     color: white; font-size: 28px; cursor: pointer;
   }
   .stepper .cantidad-num { font-size: 32px; font-weight: 700; min-width: 60px; text-align: center; }
+  /* ---- Acomodo más limpio (oct 2026) ----
+     Categorías sin la barra gris de desplazamiento (se siguen deslizando con el dedo o la rueda)
+     y con un desvanecido a la derecha que avisa que hay más. */
+  .tx-c { display: none; }
+  .categorias { scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); padding-right: 24px; }
+  .categorias::-webkit-scrollbar { display: none; }
+  /* Ticket vacío: en vez de un espacio en blanco, una indicación de qué hacer. */
+  #carritoItems:empty::before {
+    content: "🧾\A Toca un producto o escanea su código\A para empezar el ticket";
+    white-space: pre-line; display: block; text-align: center; color: var(--muted, #8a8f98);
+    font-size: 14px; line-height: 1.5; padding: 48px 12px;
+  }
+  /* Celular: menos botones arriba para que los productos se vean desde el principio. */
+  @media (max-width: 640px) {
+    .top-bar { padding: 10px 12px; }
+    .mp-btn { padding: 7px 11px; }
+    .tx-l { display: none; }
+    .tx-c { display: inline; }
+    .barra-fichas { padding: 8px 10px !important; gap: 6px !important; flex-wrap: nowrap !important; }
+    .barra-fichas .btn { min-height: 38px; padding: 7px 11px; font-size: 13.5px; white-space: nowrap; }
+    .barra-fichas .btn { padding: 7px 10px; }
+    .contador-fichas { font-size: 12px !important; white-space: nowrap; }
+    /* Si hay ficha en atención, su número ocupa ese lugar (el contador se ve en la pantalla de turnos). */
+    .barra-fichas:has(#panelFichaActual[style*="flex"]) .contador-fichas { display: none; }
+    #panelFichaActual { flex-shrink: 0; }
+    #panelFichaActual { padding: 2px 4px 2px 10px !important; gap: 6px !important; margin-left: auto; }
+    #panelFichaActual .btn { min-height: 32px; padding: 4px 8px; }
+    #numeroFichaActual { font-size: 17px !important; }
+    .banner-impresora { padding: 6px 10px !important; font-size: 12.5px !important; }
+    .pestana-movil { padding: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -208,7 +239,7 @@
       <button type="button" data-modo="domicilio">🛵 A domicilio</button>
       <button type="button" data-modo="recoger">🏪 Para recoger</button>
     </div>
-    <button type="button" class="mp-btn" id="btnPedidosPrep" title="Pedidos que se enviaron a preparar">📦 Pedidos por preparar <b class="mp-n" style="display:none">0</b></button>
+    <button type="button" class="mp-btn" id="btnPedidosPrep" title="Pedidos que se enviaron a preparar">📦 <span class="tx-l">Pedidos por preparar</span> <b class="mp-n" style="display:none">0</b></button>
   </div>
 
   <!-- Aviso de pedido nuevo por preparar y lista (los llena js/mostrador-pedidos.js) -->
@@ -216,21 +247,21 @@
   <div class="mp-drawer" id="drawerPedidos"></div>
 
   <div class="barra-fichas" style="padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-    <button class="btn btn-secondary" onclick="generarFicha()">🎫 Generar Ficha</button>
-    <button class="btn btn-primary" onclick="llamarSiguienteTurno()">▶️ Llamar Siguiente</button>
-    <button class="btn btn-secondary" onclick="reimprimirUltimaFicha()">🔁 Reimprimir Última</button>
-    <span id="contadorFichasPendientes" style="font-size:13px; color:#666;"></span>
+    <button class="btn btn-secondary" onclick="generarFicha()" title="Generar ficha">🎫&nbsp;<span class="tx-l">Generar&nbsp;</span>Ficha</button>
+    <button class="btn btn-primary" onclick="llamarSiguienteTurno()" title="Llamar siguiente">▶️&nbsp;<span class="tx-l">Llamar&nbsp;</span>Siguiente</button>
+    <button class="btn btn-secondary" onclick="reimprimirUltimaFicha()" title="Reimprimir última ficha">🔁<span class="tx-l">&nbsp;Reimprimir Última</span></button>
+    <span id="contadorFichasPendientes" class="contador-fichas" style="font-size:13px; color:#666;"></span>
 
     <div id="panelFichaActual" style="display:none; background:white; border:2px solid var(--primary,#5FAE46); border-radius:10px; padding:6px 14px; align-items:center; gap:10px;">
-      <span style="font-size:13px; color:#666;">Atendiendo:</span>
+      <span class="tx-l" style="font-size:13px; color:#666;">Atendiendo:</span>
       <span id="numeroFichaActual" style="font-size:20px; font-weight:800; color:var(--primary,#5FAE46);"></span>
-      <span style="font-size:13px; color:#666;">→ <b id="nombreMostradorFichaActual"></b></span>
-      <button class="btn btn-secondary" onclick="sonarCampanitaFicha()" title="Anunciar en voz alta esta ficha y el mostrador">🔔 Campanita</button>
+      <span class="tx-l" style="font-size:13px; color:#666;">→ <b id="nombreMostradorFichaActual"></b></span>
+      <button class="btn btn-secondary" onclick="sonarCampanitaFicha()" title="Anunciar en voz alta esta ficha y el mostrador">🔔<span class="tx-l">&nbsp;Campanita</span></button>
     </div>
   </div>
 
-  <div id="bannerImpresora" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
-    🖨 Impresora no conectada en este dispositivo — <a href="#" onclick="conectarImpresoraMostrador(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraMostradorUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
+  <div id="bannerImpresora" class="banner-impresora" style="display:none; background:#FFF3CD; color:#7A5B00; padding:10px 14px; text-align:center; font-size:14px;">
+    🖨 <span class="tx-l">Impresora no conectada en este dispositivo</span><span class="tx-c">Sin impresora</span> — <a href="#" onclick="conectarImpresoraMostrador(); return false;" style="color:#7A5B00; font-weight:700;">Conectar Bluetooth</a> · <a href="#" onclick="conectarImpresoraMostradorUSB(); return false;" style="color:#7A5B00; font-weight:700;">Conectar USB</a>
   </div>
 
   <div class="pestanas-movil-mostrador" id="pestanasMovilMostrador">
