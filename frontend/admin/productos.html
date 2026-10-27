@@ -30,10 +30,15 @@
 
   .tabla-scroll { max-height: calc(100vh - 270px); min-height: 300px; overflow: auto; border-top: 1px solid var(--border, #E4E6E9); }
   .tabla-prod { width: 100%; border-collapse: collapse; }
-  .tabla-prod th { position: sticky; top: 0; z-index: 2; background: var(--surface, #fff); box-shadow: inset 0 -1px 0 var(--border, #E4E6E9); text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, #7A7D83); padding: 9px 12px; white-space: nowrap; }
-  .tabla-prod td { padding: 8px 12px; border-bottom: 1px solid var(--border, #E4E6E9); vertical-align: middle; font-size: 14px; }
+  .tabla-prod th { position: sticky; top: 0; z-index: 2; background: var(--surface, #fff); box-shadow: inset 0 -1px 0 var(--border, #E4E6E9); text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, #7A7D83); padding: 9px 8px; white-space: nowrap; }
+  .tabla-prod td { padding: 8px 8px; border-bottom: 1px solid var(--border, #E4E6E9); vertical-align: middle; font-size: 14px; }
   .tabla-prod th.numero, .tabla-prod td.numero { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabla-prod td.numero { white-space: nowrap; }
+  .tabla-prod tbody tr { cursor: pointer; }
+  .tabla-prod tbody tr:hover td { background: rgba(128,128,128,0.06); }
   .tabla-prod tr.sel td { background: rgba(95,174,70,0.14); }
+  .tabla-prod .sub { color: var(--muted, #7A7D83); font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  .tabla-prod .sub .tipo-tag { font-size: 10px; padding: 1px 7px; margin-right: 4px; }
   .nom { font-weight: 600; }
   .cod { color: var(--muted, #7A7D83); font-size: 12px; font-family: Consolas, monospace; }
   .foto { width: 42px; height: 42px; border-radius: 9px; background: rgba(128,128,128,0.14); display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden; flex: none; }
@@ -46,6 +51,7 @@
   .gan.nula { color: var(--muted, #7A7D83); font-weight: 600; }
   .acciones-fila { display: flex; gap: 6px; justify-content: flex-end; }
   .mini { border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 8px; padding: 6px 10px; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .tabla-prod .mini { padding: 6px 9px; }
   .mini:hover { background: rgba(128,128,128,0.12); }
   .tarjetas { display: none; }
   .vacio { text-align: center; color: #888; padding: 24px; }
@@ -101,14 +107,20 @@
     .columnas { grid-template-columns: 1fr; }
     .tabla-scroll { display: none; }
     .tarjetas { display: block; border-top: 1px solid var(--border, #E4E6E9); }
-    .tarjeta-prod { padding: 11px 12px; border-bottom: 1px solid var(--border, #E4E6E9); display: flex; align-items: center; gap: 11px; }
+    .tarjetas { padding-bottom: 70px; }
+    .tarjeta-prod { padding: 11px 12px; border-bottom: 1px solid var(--border, #E4E6E9); display: flex; align-items: center; gap: 9px; cursor: pointer; }
     .tarjeta-prod.sel { background: rgba(95,174,70,0.14); }
     .tarjeta-prod .info { flex: 1; min-width: 0; }
     .tarjeta-prod .info b { display: block; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tarjeta-prod .info small { color: var(--muted, #7A7D83); font-size: 12px; }
-    .tarjeta-prod .precio { text-align: right; font-size: 18px; font-weight: 800; white-space: nowrap; }
+    .tarjeta-prod .info small { display: block; color: var(--muted, #7A7D83); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tarjeta-prod .precio { text-align: right; font-size: 17px; font-weight: 800; white-space: nowrap; }
     .tarjeta-prod .precio small { display: block; font-size: 11px; font-weight: 700; }
-    .tarjeta-prod .botones { display: grid; gap: 4px; }
+    .tarjeta-prod .lapiz { border: 1px solid var(--border, #E4E6E9); background: var(--surface, #fff); border-radius: 10px; width: 40px; height: 40px; font-size: 16px; flex: none; cursor: pointer; }
+    .barra-busqueda { flex-wrap: nowrap; }
+    .barra-busqueda .buscar { flex: 1 1 auto; min-width: 0; }
+    .barra-busqueda select { max-width: 44%; font-size: 14px; }
+    .barra-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+    .barra-chips::-webkit-scrollbar { display: none; }
     .panel-form { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: 24px; z-index: 90; border-radius: 18px 18px 0 0; max-height: none; box-shadow: 0 -8px 24px rgba(0,0,0,0.35); }
     .panel-form.abierto { display: flex; }
     .panel-cuerpo { flex: 1; }
@@ -135,11 +147,11 @@
 
       <!-- ================= Catálogo ================= -->
       <div class="caja">
-        <div class="barra">
-          <div class="buscar"><input type="text" id="buscadorCatalogo" placeholder="Buscar por nombre o código…" oninput="aplicarFiltros()"></div>
-          <select id="filtroDepto" onchange="aplicarFiltros()"><option value="">Todos los departamentos</option></select>
+        <div class="barra barra-busqueda">
+          <div class="buscar"><input type="text" id="buscadorCatalogo" placeholder="Buscar producto o código…" oninput="aplicarFiltros()"></div>
+          <select id="filtroDepto" onchange="aplicarFiltros()"><option value="">Todos los deptos.</option></select>
         </div>
-        <div class="barra">
+        <div class="barra barra-chips">
           <span class="chip activo" data-filtro="todos" onclick="elegirFiltro('todos')">Todos<i id="cntTodos"></i></span>
           <span class="chip" data-filtro="favoritos" onclick="elegirFiltro('favoritos')">⭐ Favoritos<i id="cntFavoritos"></i></span>
           <span class="chip" data-filtro="granel" onclick="elegirFiltro('granel')">⚖️ A granel<i id="cntGranel"></i></span>
@@ -148,7 +160,7 @@
         </div>
         <div class="tabla-scroll">
           <table class="tabla-prod">
-            <thead><tr><th></th><th>Producto</th><th>Departamento</th><th>Tipo</th><th class="numero">Costo</th><th class="numero">Precio</th><th class="numero">Ganancia</th><th></th></tr></thead>
+            <thead><tr><th></th><th>Producto</th><th class="numero">Costo</th><th class="numero">Precio</th><th class="numero">Ganancia</th><th></th></tr></thead>
             <tbody id="tablaBody"></tbody>
           </table>
         </div>
@@ -366,32 +378,27 @@ function renderLista() {
       const g = gananciaDe(p);
       const unidad = p.tipo_venta === 'unidad' ? '/pza' : '/kg';
       return `
-      <div class="tarjeta-prod ${p.id === productoEditandoId ? 'sel' : ''}">
+      <div class="tarjeta-prod ${p.id === productoEditandoId ? 'sel' : ''}" onclick="abrirEdicion(${p.id})">
         ${fotoHtml(p)}
         <div class="info"><b>${escapar(p.nombre)}${p.favorito ? ' ⭐' : ''}</b><small>${escapar(p.categoria_nombre || 'Sin departamento')} · ${p.tipo_venta === 'unidad' ? 'Pieza' : 'Granel'}${p.codigo_barras ? ' · ' + escapar(String(p.codigo_barras).slice(-6)) : ''}</small></div>
         <div class="precio">${dinero(p.precio)}<small style="color:var(--muted,#7A7D83)">${unidad}</small>${g !== null ? `<small class="gan ${g < 15 ? 'baja' : ''}">+${g.toFixed(0)}%</small>` : ''}</div>
-        <div class="botones">
-          <button class="mini" onclick="abrirEdicion(${p.id})">✏️</button>
-          <button class="mini" onclick="abrirPromocionesDe(${p.id})">🏷️</button>
-        </div>
+        <button class="lapiz" title="Editar">✏️</button>
       </div>`;
     }).join('') || '<div class="vacio">Sin productos que coincidan</div>';
     document.getElementById('tablaBody').innerHTML = '';
   } else {
     document.getElementById('tablaBody').innerHTML = mostrar.map(p => `
-      <tr class="${p.id === productoEditandoId ? 'sel' : ''}">
+      <tr class="${p.id === productoEditandoId ? 'sel' : ''}" onclick="abrirEdicion(${p.id})">
         <td style="width:58px;">${fotoHtml(p)}</td>
-        <td><div class="nom">${escapar(p.nombre)}${p.favorito ? ' ⭐' : ''}</div><div class="cod">${escapar(p.codigo_barras || '—')}</div></td>
-        <td>${escapar(p.categoria_nombre || '—')}</td>
-        <td>${p.tipo_venta === 'unidad' ? '<span class="tipo-tag tag-unidad">Pieza</span>' : '<span class="tipo-tag tag-peso">Granel</span>'}</td>
+        <td><div class="nom">${escapar(p.nombre)}${p.favorito ? ' ⭐' : ''}</div><div class="sub">${p.tipo_venta === 'unidad' ? '<span class="tipo-tag tag-unidad">Pieza</span>' : '<span class="tipo-tag tag-peso">Granel</span>'}${escapar(p.categoria_nombre || 'Sin departamento')} · <span class="cod">${escapar(p.codigo_barras || '—')}</span></div></td>
         <td class="numero">${parseFloat(p.precio_costo) > 0 ? dinero(p.precio_costo) : '—'}</td>
         <td class="numero"><b>${dinero(p.precio)}</b> <span class="cod">${p.tipo_venta === 'unidad' ? '/pza' : '/kg'}</span></td>
         <td class="numero">${gananciaHtml(p)}</td>
         <td><div class="acciones-fila">
-          <button class="mini" onclick="abrirEdicion(${p.id})">✏️ Editar</button>
-          <button class="mini" title="Promociones por cantidad" onclick="abrirPromocionesDe(${p.id})">🏷️</button>
+          <button class="mini">✏️ Editar</button>
+          <button class="mini" title="Promociones por cantidad" onclick="event.stopPropagation(); abrirPromocionesDe(${p.id})">🏷️</button>
         </div></td>
-      </tr>`).join('') || '<tr><td colspan="8" class="vacio">Sin productos que coincidan</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="6" class="vacio">Sin productos que coincidan</td></tr>';
     document.getElementById('tarjetasProductos').innerHTML = '';
   }
   document.getElementById('pieLista').textContent = `Mostrando ${mostrar.length.toLocaleString('en-US')} de ${filtrados.length.toLocaleString('en-US')} productos`;
@@ -620,7 +627,7 @@ document.getElementById('imagenInputCamara').addEventListener('change', manejarS
 async function cargarCategorias() {
   const cats = await apiFetch('/departamentos');
   document.getElementById('categoriaId').innerHTML = '<option value="">Sin departamento</option>' + cats.map(c => `<option value="${c.id}">${escapar(c.nombre)}</option>`).join('');
-  document.getElementById('filtroDepto').innerHTML = '<option value="">Todos los departamentos</option>' + cats.map(c => `<option value="${c.id}">${escapar(c.nombre)}</option>`).join('');
+  document.getElementById('filtroDepto').innerHTML = '<option value="">Todos los deptos.</option>' + cats.map(c => `<option value="${c.id}">${escapar(c.nombre)}</option>`).join('');
   if (!productoEditandoId) aplicarUltimoDepartamento();
 }
 
