@@ -22,6 +22,24 @@ const { validarTurno } = require('../utils/seguridadCaja');
 const { AHORA_LOCAL, TRANSICIONES, r2, textoOnull, soloDigitos, normalizarDireccion, calcularEnvio, numeroPedido } = U;
 
 router.use(verificarToken, requiereSucursalId);
+
+// Paquete contratado: el servicio a domicilio y la app del repartidor solo van en Negocio y Pro.
+// (Pedidos para RECOGER en el negocio sí se pueden usar en cualquier paquete.)
+const paquete = require('../utils/paquete');
+const RUTAS_DE_DOMICILIO = /^\/(repartidor|liquidar|liquidacion|liquidaciones|ruta|zonas|cotizar-envio|repartidores|reporte-repartidores)(\/|$)/;
+router.use(async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    // Un pedido nuevo es "a domicilio" salvo que diga "recoger".
+    const pedidoNuevo = req.method === 'POST' && (req.path === '/' || req.path === '/fijos');
+    const esDomicilio = RUTAS_DE_DOMICILIO.test(req.path) ||
+      (req.method !== 'GET' && (b.tipo === 'domicilio' || (pedidoNuevo && b.tipo !== 'recoger') || /\/asignar$/.test(req.path)));
+    if (esDomicilio && !(req.method === 'GET' && /^\/(zonas|repartidores)/.test(req.path))) await paquete.revisarDomicilio();
+    next();
+  } catch (e) {
+    res.status(e.status || 403).json({ error: e.error || 'Tu paquete no incluye esta función' });
+  }
+});
 router.param('id', (req, res, next, v) => (/^\d+$/.test(v) ? next() : next('route')));
 router.param('repartidorId', (req, res, next, v) => (/^\d+$/.test(v) ? next() : next('route')));
 

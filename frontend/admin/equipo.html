@@ -135,9 +135,15 @@ function cerrarHoja() {
 }
 
 // ---------- Lista ----------
+// Paquete contratado: cuántos usuarios incluye (lo pone Compoint). Sin paquete = sin límite.
+let paqueteEquipo = null;
+async function cargarPaqueteEquipo() {
+  try { paqueteEquipo = (await apiFetch('/licencia')).paquete || null; } catch (e) { paqueteEquipo = null; }
+}
+
 async function cargarEquipo() {
   try {
-    equipo = await apiFetch('/usuarios');
+    [equipo] = await Promise.all([apiFetch('/usuarios'), cargarPaqueteEquipo()]);
     pintarLista();
     pintarPanel();
   } catch (err) {
@@ -150,7 +156,11 @@ function pintarLista() {
   const q = sinAcentos(document.getElementById('buscador').value.trim());
   const visibles = equipo.filter((u) => !q || sinAcentos([u.nombre, u.usuario, u.nombre_mostrador, rolNombres[u.rol]].join(' ')).includes(q));
   const activos = equipo.filter((u) => u.activo).length;
-  document.getElementById('conteo').textContent = `${equipo.length} ${equipo.length === 1 ? 'persona' : 'personas'} · ${activos} ${activos === 1 ? 'activa' : 'activas'}`;
+  let textoConteo = `${equipo.length} ${equipo.length === 1 ? 'persona' : 'personas'} · ${activos} ${activos === 1 ? 'activa' : 'activas'}`;
+  if (paqueteEquipo && paqueteEquipo.paquete && paqueteEquipo.max_usuarios) {
+    textoConteo += ` · paquete ${paqueteEquipo.nombre}: ${paqueteEquipo.usuarios_activos != null ? paqueteEquipo.usuarios_activos : activos} de ${paqueteEquipo.max_usuarios} usuarios`;
+  }
+  document.getElementById('conteo').textContent = textoConteo;
   const cont = document.getElementById('listaEquipo');
   if (!visibles.length) { cont.innerHTML = `<div class="vacio">${equipo.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay empleados.'}</div>`; return; }
   cont.innerHTML = visibles.map((u) => {

@@ -8,6 +8,7 @@ const licencia = require('../utils/licencia');
 const sol = require('../utils/licenciaSolicitud');
 const envio = require('../utils/licenciaEnvio');
 const precios = require('../utils/precios');
+const paquete = require('../utils/paquete');
 
 const ROLES_NEGOCIO = ['dueno', 'jefe_general', 'gerente'];
 const WHATSAPP_COMPOINT = '523325907090';
@@ -20,7 +21,11 @@ router.get('/', verificarToken, async (req, res) => {
     const est = await licencia.estado();
     const limite = await licencia.limiteSucursales();
     const { serial, ...publico } = est;
-    res.json({ ...publico, limite_sucursales: limite, contacto: licencia.CONTACTO });
+    // Paquete contratado y cuánto se usa (para mostrarlo en Licencia y en Equipo).
+    const pq = await paquete.limites();
+    let usuarios = null;
+    try { usuarios = await paquete.usuariosActivos(); } catch (e) { /* sin dato */ }
+    res.json({ ...publico, limite_sucursales: limite, contacto: licencia.CONTACTO, paquete: { ...pq, usuarios_activos: usuarios } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo consultar la licencia' });

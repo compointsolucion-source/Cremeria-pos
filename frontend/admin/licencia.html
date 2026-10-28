@@ -237,6 +237,15 @@ function pintarEstado(l) {
     ['ID de este equipo', `<span class="codigo">${esc(l.id_equipo)}</span><button class="lic-mini" id="btnCopiarId2">Copiar</button>`]
   ];
   if (l.control && l.cliente) filas.splice(1, 0, ['Cliente', esc(l.cliente)]);
+  // Paquete contratado (Básico / Negocio / Pro): lo pone Compoint y el sistema respeta sus límites.
+  const pq = l.paquete || {};
+  if (pq.paquete) {
+    const usados = pq.usuarios_activos != null ? pq.usuarios_activos : '—';
+    filas.splice(1, 0,
+      ['Paquete', `<b>${esc(pq.nombre)}</b>`],
+      ['Usuarios', pq.max_usuarios ? `${esc(usados)} de ${esc(pq.max_usuarios)}` : `${esc(usados)} (ilimitados)`],
+      ['Servicio a domicilio y app del repartidor', pq.con_domicilio ? 'Incluido' : '🔒 No incluido (paquete Negocio o Pro)']);
+  }
   if (l.control) filas.push(['Activada con código', l.con_codigo ? 'Sí' : (l.tipo === 'demo' ? 'No (es la prueba)' : 'No')]);
   datos.innerHTML = filas.map(([a, b]) => `<div class="lic-fila"><span>${a}</span><span>${b}</span></div>`).join('');
   const copiar2 = document.getElementById('btnCopiarId2');

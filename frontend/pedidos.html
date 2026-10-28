@@ -37,6 +37,7 @@
   </div>
 
   <div class="pt-pagina">
+    <div id="avisoPaquete" class="aviso amarillo" hidden style="margin:10px 0; padding:10px 14px; border-radius:12px; background:#FFF6E0; border:1px solid #F0C36D; font-size:14px;"></div>
     <div class="pt-barra">
       <button class="pt-tab activo" data-tab="hoy" onclick="PT.tab('hoy')" id="tabHoy">📅 Hoy</button>
       <button class="pt-tab" data-tab="manana" onclick="PT.tab('manana')">Mañana</button>
@@ -104,5 +105,19 @@
 <script src="js/pedidos-extra.js"></script>
 <script src="js/registrar-sw.js"></script>
 <script src="js/sidebar-nav.js"></script>
+<script>
+// Paquete contratado: si no incluye servicio a domicilio, se avisa y se ocultan los botones de domicilio.
+(async function () {
+  try {
+    const l = await apiFetch('/licencia');
+    const pq = l && l.paquete;
+    if (!pq || !pq.paquete || pq.con_domicilio) return;
+    const av = document.getElementById('avisoPaquete');
+    av.innerHTML = '🔒 <b>Tu paquete ' + escHtml(pq.nombre) + ' no incluye servicio a domicilio ni la app del repartidor.</b> Puedes usar pedidos <b>para recoger</b>. Para entregas a domicilio, mejora a Negocio: WhatsApp 33 2590 7090.';
+    av.hidden = false;
+    document.querySelectorAll('a[href="mostrador.html?modo=domicilio"]').forEach((a) => { a.style.display = 'none'; });
+  } catch (e) { /* sin dato: no se oculta nada */ }
+})();
+</script>
 </body>
 </html>

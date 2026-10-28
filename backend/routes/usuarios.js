@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { verificarToken, requiereRol, tienePermiso, TODOS_LOS_PERMISOS, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+const paquete = require('../utils/paquete');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
@@ -47,6 +48,8 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     if (rol === 'gerente' && req.usuario.rol === 'gerente') {
       return res.status(403).json({ error: 'Solo el dueño puede crear gerentes' });
     }
+    // Límite del paquete contratado (usuarios y app del repartidor).
+    try { await paquete.revisarUsuarioNuevo(rol); } catch (e) { return res.status(e.status || 403).json({ error: e.error }); }
     if (password.length < 6) {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
@@ -116,6 +119,13 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
       return res.status(403).json({ error: 'Solo el dueño puede modificar o nombrar a un gerente' });
     }
     const valorAnterior = objetivo.rows[0];
+    // Volver a activar a alguien, o cambiarlo a repartidor, cuenta contra el paquete contratado.
+    try {
+      const reactiva = activo === true && valorAnterior.activo === false;
+      const aRepartidor = rol === 'repartidor' && valorAnterior.rol !== 'repartidor';
+      if (reactiva) await paquete.revisarUsuarioNuevo(rol || valorAnterior.rol);
+      else if (aRepartidor) await paquete.revisarDomicilio();
+    } catch (e) { return res.status(e.status || 403).json({ error: e.error }); }
 
     const result = await pool.query(
       `UPDATE usuarios SET

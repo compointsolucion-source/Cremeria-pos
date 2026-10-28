@@ -39,6 +39,22 @@ function firmaEsperada(r, nonce, tk) {
   return crypto.createHmac('sha256', tk).update(canonico).digest('hex');
 }
 
+// Segunda firma (versión nueva de licencia.php): el PAQUETE contratado. Va encadenada a la primera firma,
+// así también queda atada al número al azar y a la hora. Si no viene (página vieja), no se aplica ningún límite.
+function datosPaquete(r) {
+  const paquete = ['basico', 'negocio', 'pro'].includes(r.paquete) ? r.paquete : '';
+  const maxU = Number(r.max_usuarios) > 0 ? String(Math.floor(Number(r.max_usuarios))) : '';
+  const dom = r.con_domicilio === false ? '0' : '1';
+  return { paquete, maxU, dom };
+}
+function firmaPaqueteValida(r, tk) {
+  if (!r || typeof r.firma2 !== 'string' || !/^[0-9a-f]{64}$/.test(r.firma2) || typeof r.firma !== 'string') return false;
+  const d = datosPaquete(r);
+  const esperada = crypto.createHmac('sha256', tk).update([r.firma, d.paquete, d.maxU, d.dom].join('|')).digest();
+  const b = Buffer.from(r.firma2, 'hex');
+  return esperada.length === b.length && crypto.timingSafeEqual(esperada, b);
+}
+
 function firmaValida(r, nonce, tk) {
   if (!r || typeof r.firma !== 'string' || !/^[0-9a-f]{64}$/.test(r.firma)) return false;
   if (typeof r.tipo !== 'string' || typeof r.plan !== 'string' || typeof r.cliente !== 'string' || typeof r.emitido !== 'string') return false;
@@ -85,7 +101,7 @@ async function aplicar(r) {
 
   if (!r.control) {
     // Sistema propio / demo de Compoint: sin control. Solo se quita lo que puso la consulta central.
-    if (esCentral) { await pool.query('DELETE FROM licencia WHERE id = 1'); licencia.invalidarCache(); return { cambio: 'sin_control' }; }
+    if (esCentral) { await pool.query('DELETE FROM licencia WHERE id = 1'); require('./paquete').invalidar(); licencia.invalidarCache(); return { cambio: 'sin_control' }; }
     return { cambio: 'sin_control_nada' };
   }
 
@@ -114,6 +130,13 @@ async function aplicar(r) {
        max_sucursales = EXCLUDED.max_sucursales, codigo_activacion = NULL, serial = NULL,
        desde_nube = EXCLUDED.desde_nube, nube_id_equipo = NULL, actualizado_en = NOW()`,
     [cliente, hoy, vence, tipo, plan, maxSuc, origen]);
+  // Paquete (Básico / Negocio / Pro): solo si viene con su firma. Sin firma = sin límites.
+  try {
+    const d = firmaPaqueteValida(r, token()) ? datosPaquete(r) : { paquete: '', maxU: '', dom: '1' };
+    await pool.query('UPDATE licencia SET paquete = $1, max_usuarios = $2, con_domicilio = $3 WHERE id = 1',
+      [d.paquete || null, d.paquete && d.maxU ? Number(d.maxU) : null, d.paquete ? d.dom === '1' : null]);
+  } catch (e) { /* base sin la columna todavía (se agrega sola al arrancar) */ }
+  require('./paquete').invalidar();
   licencia.invalidarCache();
   return { cambio: origen };
 }
@@ -152,4 +175,4 @@ function iniciar() {
 function detener() { if (reloj) { clearInterval(reloj); reloj = null; } }
 const ultimaConsulta = () => ({ ...ultimo, configurada: configurada() });
 
-module.exports = { URL_POR_DEFECTO, configurada, firmaEsperada, firmaValida, preguntar, aplicar, actualizar, iniciar, detener, ultimaConsulta };
+module.exports = { URL_POR_DEFECTO, configurada, firmaEsperada, firmaValida, firmaPaqueteValida, datosPaquete, preguntar, aplicar, actualizar, iniciar, detener, ultimaConsulta };
