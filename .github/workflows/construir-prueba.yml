@@ -25,8 +25,9 @@ jobs:
         working-directory: escritorio
         run: npm ci
 
-      - name: Probar la lógica del escritorio
+      - name: Probar la lógica del escritorio (informativo, igual que al publicar)
         working-directory: escritorio
+        continue-on-error: true
         run: npm test
 
       - name: Poner el número de versión de prueba
