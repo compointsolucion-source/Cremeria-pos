@@ -204,24 +204,24 @@ test('abono: cliente de esta sucursal, forma de pago válida, monto > 0 y no may
   assert.equal((await abono('dueno', cA, { monto: -5, metodo_pago: 'tarjeta' })).status, 400);
   assert.equal((await abono('dueno', cA, { monto: 'abc', metodo_pago: 'tarjeta' })).status, 400);
   assert.equal((await abono('dueno', cA, { monto: 150, metodo_pago: 'tarjeta' })).status, 400);
-  // Efectivo sin turno abierto (el dueño no tiene uno) → no se acepta.
-  assert.equal((await abono('dueno', cA, { monto: 10, metodo_pago: 'efectivo' })).status, 400);
+  // El dueño puede recibir efectivo aunque no tenga turno de caja (el cajero no: ver abajo).
+  assert.equal((await abono('dueno', cA, { monto: 10, metodo_pago: 'efectivo' })).status, 200);
   // Turno de otra cajera → no.
   assert.equal((await abono('cajera', cA, { monto: 10, metodo_pago: 'efectivo', turno_id: TU.cajera2 })).status, 403);
 
   // Tarjeta sin turno: sí.
   const t = await abono('dueno', cA, { monto: 30, metodo_pago: 'tarjeta' });
   assert.equal(t.status, 200, t.texto);
-  assert.equal(Number(t.json.saldo_actual), 70);
+  assert.equal(Number(t.json.saldo_actual), 60);
   // Efectivo sin mandar turno: se usa el turno abierto de la propia cajera.
   const e = await abono('cajera', cA, { monto: 20 });
   assert.equal(e.status, 200, e.texto);
   const ab = await uno("SELECT turno_id, metodo_pago FROM creditos_abono WHERE cliente_id = $1 AND monto = 20", [cA]);
   assert.equal(ab.turno_id, TU.cajera);
   assert.equal(ab.metodo_pago, 'efectivo');
-  // Ya debe $50: abonar $50.01 no se puede; $50 sí y queda en $0.
-  assert.equal((await abono('dueno', cA, { monto: 50.01, metodo_pago: 'transferencia' })).status, 400);
-  const fin = await abono('dueno', cA, { monto: 50, metodo_pago: 'transferencia' });
+  // Ya debe $40: abonar $40.01 no se puede; $40 sí y queda en $0.
+  assert.equal((await abono('dueno', cA, { monto: 40.01, metodo_pago: 'transferencia' })).status, 400);
+  const fin = await abono('dueno', cA, { monto: 40, metodo_pago: 'transferencia' });
   assert.equal(fin.status, 200);
   assert.equal(Number(fin.json.saldo_actual), 0);
 });

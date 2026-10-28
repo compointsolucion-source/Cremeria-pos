@@ -17,6 +17,8 @@ const { registrarBitacora } = require('../utils/bitacora');
 const { subtotalRenglon } = require('../utils/importeExacto');
 const { descontarInventarioVenta } = require('../utils/inventarioVenta');
 const U = require('../utils/pedidosUtil');
+const { revisarRenglones } = require('../utils/renglones');
+const { validarTurno } = require('../utils/seguridadCaja');
 const { AHORA_LOCAL, TRANSICIONES, r2, textoOnull, soloDigitos, normalizarDireccion, calcularEnvio, numeroPedido } = U;
 
 router.use(verificarToken, requiereSucursalId);
@@ -33,6 +35,7 @@ class ErrorHttp extends Error {
 }
 function responderError(res, err, mensajeGeneral) {
   if (err instanceof ErrorHttp) return res.status(err.status).json({ error: err.message });
+  if (err && err.status && err.error) return res.status(err.status).json({ error: err.error });
   console.error(err);
   return res.status(500).json({ error: mensajeGeneral || 'Error en pedidos' });
 }
@@ -820,8 +823,10 @@ router.post('/liquidar', requierePermiso('CAJA_MOVIMIENTO'), async (req, res) =>
     if (!Number.isFinite(entregado) || entregado < 0) throw new ErrorHttp(400, 'Escribe cuánto efectivo entregó el repartidor');
 
     await conexion.query('BEGIN');
-    const turno = await conexion.query("SELECT id FROM turnos WHERE id = $1 AND sucursal_id = $2 AND estado = 'abierto'", [turnoId, req.sucursalId]);
-    if (!turno.rows.length) throw new ErrorHttp(400, 'El turno de caja no está abierto');
+    // El dinero se recibe en el turno ABIERTO del propio cajero (dueño/gerente: cualquiera de la sucursal).
+    try {
+      await validarTurno(conexion, { turnoId, sucursalId: req.sucursalId, usuario: req.usuario, obligatorio: true });
+    } catch (e) { throw new ErrorHttp(e.status || 400, e.error || 'El turno de caja no está abierto'); }
     const rep = await conexion.query("SELECT id, nombre FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND rol = 'repartidor'", [repartidorId, req.sucursalId]);
     if (!rep.rows.length) throw new ErrorHttp(404, 'Repartidor no encontrado');
 
@@ -1114,6 +1119,8 @@ router.post('/', requierePermiso('VENTAS_CREAR'), async (req, res) => {
   try {
     const b = req.body || {};
     validarItems(b.items);
+    // Mismas reglas que un ticket: productos de esta sucursal, nombre del catálogo y precio no menor al del catálogo.
+    b.items = await revisarRenglones(conexion, b.items, req.sucursalId, req.usuario, { max: 200 });
     const tipo = b.tipo === 'recoger' ? 'recoger' : 'domicilio';
     const pagoModo = PAGO_MODOS.includes(b.pago_modo) ? b.pago_modo : 'al_recibir';
     const fh = validarFechaHora(b.programado_para);
@@ -1149,7 +1156,9 @@ router.post('/', requierePermiso('VENTAS_CREAR'), async (req, res) => {
     });
     await registrarBitacora(conexion, {
       usuario_id: req.usuario.id, accion: 'crear_pedido', modulo: 'pedidos', referencia_id: c.pedido_id,
-      valor_nuevo: { folio: c.folio, tipo, total: c.total, estado: c.estado, cliente: nombre }
+      valor_nuevo: { folio: c.folio, tipo, total: c.total, estado: c.estado, cliente: nombre,
+        // Quién dijo que el cliente ya dejó dinero (para revisar anticipos en la bitácora).
+        anticipo: Number(b.anticipo) || (b.ya_pago_todo === true ? 'todo' : 0), anticipo_metodo: b.anticipo_metodo || null }
     });
     await conexion.query('COMMIT');
     creado = c;
@@ -1261,9 +1270,9 @@ router.put('/:id', requierePermiso('VENTAS_CREAR'), async (req, res) => {
           quedan.set(id, cant);
         }
       }
-      const nuevos = b.agregar === undefined ? [] : b.agregar;
+      let nuevos = b.agregar === undefined ? [] : b.agregar;
       if (!Array.isArray(nuevos)) throw new ErrorHttp(400, 'La lista de productos nuevos no es válida');
-      if (nuevos.length) validarItems(nuevos);
+      if (nuevos.length) { validarItems(nuevos); nuevos = await revisarRenglones(conexion, nuevos, req.sucursalId, req.usuario, { max: 200 }); }
       if (quedan.size + nuevos.length === 0) throw new ErrorHttp(400, 'El pedido necesita al menos un producto');
       if (quedan.size + nuevos.length > 200) throw new ErrorHttp(400, 'El pedido tiene demasiados renglones');
 
@@ -1304,7 +1313,7 @@ router.put('/:id', requierePermiso('VENTAS_CREAR'), async (req, res) => {
                 paga_con = CASE WHEN $3::varchar = 'al_recibir' THEN paga_con ELSE NULL END WHERE id = $4`,
         [an.anticipo, an.anticipo_metodo, an.pago_modo, ped.id]);
     }
-    await registrarBitacora(conexion, { usuario_id: req.usuario.id, accion: 'editar_pedido', modulo: 'pedidos', referencia_id: ped.id, valor_nuevo: { campos: Object.keys(b) } });
+    await registrarBitacora(conexion, { usuario_id: req.usuario.id, accion: 'editar_pedido', modulo: 'pedidos', referencia_id: ped.id, valor_nuevo: { campos: Object.keys(b), anticipo: b.anticipo, anticipo_metodo: b.anticipo_metodo, ya_pago_todo: b.ya_pago_todo === true || undefined } });
     await conexion.query('COMMIT');
     const completo = await cargarPedido(pool, ped.id, req.sucursalId);
     emitir(req.app.get('io'), req.sucursalId, 'pedido_actualizado', { id: ped.id, estado: completo.estado, repartidor_id: completo.repartidor_id });

@@ -20,38 +20,8 @@ function generarFolio(sucursalId) {
   return `S${sucursalId}${base}`;
 }
 
-// Revisa y limpia los renglones que manda una pantalla (mostrador, caja) ANTES de guardarlos:
-//  - cantidad > 0 y precio >= 0 (sin negativos que funcionen como descuento escondido);
-//  - si el renglón es de un producto o kit, debe ser de ESTA sucursal y el nombre se toma
-//    del catálogo (no del que mande la pantalla);
-//  - el nombre libre se limpia de caracteres que podrían esconder código (<, >, comillas).
-// Devuelve los renglones listos o lanza {status, error}.
-function nombreLimpio(t) {
-  return String(t == null ? '' : t).replace(/[<>"'`\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 150);
-}
-async function revisarRenglones(db, items, sucursalId) {
-  if (!Array.isArray(items) || !items.length) throw { status: 400, error: 'El ticket necesita al menos un producto' };
-  if (items.length > 500) throw { status: 400, error: 'Demasiados renglones en un solo ticket' };
-  const salida = [];
-  for (const it of items) {
-    const cantidad = Number(it && it.cantidad);
-    const precio = Number(it && it.precio_unitario);
-    if (!(Number.isFinite(cantidad) && cantidad > 0 && cantidad < 1e6)) throw { status: 400, error: 'Cantidad inválida en un renglón' };
-    if (!(Number.isFinite(precio) && precio >= 0 && precio < 1e7)) throw { status: 400, error: 'Precio inválido en un renglón' };
-    const tipo = it.tipo === 'kit' ? 'kit' : 'producto';
-    let nombre = nombreLimpio(it.nombre_producto);
-    const id = tipo === 'kit' ? it.kit_id : it.producto_id;
-    if (id) {
-      const r = await db.query(`SELECT nombre FROM ${tipo === 'kit' ? 'kits' : 'productos'} WHERE id = $1 AND sucursal_id = $2`, [id, sucursalId]);
-      if (!r.rows.length) throw { status: 400, error: 'Uno de los productos no es de esta sucursal' };
-      nombre = nombreLimpio(r.rows[0].nombre) || nombre;
-    }
-    if (!nombre) throw { status: 400, error: 'Falta el nombre de un producto' };
-    salida.push({ ...it, tipo, cantidad, precio_unitario: precio, nombre_producto: nombre,
-      producto_id: tipo === 'producto' ? (it.producto_id || null) : null, kit_id: tipo === 'kit' ? (it.kit_id || null) : null });
-  }
-  return salida;
-}
+// Revisión de renglones (catálogo, precios mínimos, nombres limpios): utils/renglones.js
+const { revisarRenglones: revisarConUsuario } = require('../utils/renglones');
 
 // Referencia de pago: comentario libre que escribe el cajero al cobrar con tarjeta o transferencia
 // (también en pago mixto). Solo para control interno. Se guarda recortada y sin espacios de sobra;
@@ -67,7 +37,7 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
   const cliente = await pool.connect();
   try {
     // [{tipo, producto_id|kit_id, nombre_producto, cantidad, precio_unitario}]
-    const items = await revisarRenglones(cliente, req.body && req.body.items, req.sucursalId);
+    const items = await revisarConUsuario(cliente, req.body && req.body.items, req.sucursalId, req.usuario);
 
     await cliente.query('BEGIN');
 
@@ -131,11 +101,10 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
       return res.json({ ...previo.rows[0], duplicado: true });
     }
     let items;
-    try { items = await revisarRenglones(conexion, b.items, req.sucursalId); } catch (e) { return res.status(e.status || 400).json({ error: e.error || 'Renglón de venta inválido' }); }
-    // Descuentos en una venta sin internet: solo quien tiene permiso de aplicar descuentos.
-    const hayDescuento = Number(b.descuento_monto) > 0 || items.some((it) => Number(it.descuento_monto) > 0);
-    if (hayDescuento && !tienePermiso(req.usuario, 'DESCUENTO_APLICAR')) {
-      return res.status(403).json({ error: 'Esta venta trae descuento y tu usuario no tiene permiso de aplicar descuentos' });
+    try { items = await revisarConUsuario(conexion, b.items, req.sucursalId, req.usuario); } catch (e) { return res.status(e.status || 400).json({ error: e.error || 'Renglón de venta inválido' }); }
+    // Una venta cobrada solo la sube alguien de caja (no el mostrador).
+    if (!tienePermiso(req.usuario, 'CAJA_ABRIR')) {
+      return res.status(403).json({ error: 'Solo un usuario de caja puede registrar ventas cobradas' });
     }
 
     // Fecha real de la venta (la de la caja), sin permitir futuro ni más de 60 días atrás.
@@ -154,15 +123,21 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
     const descItems = r2(lineas.reduce((s, l) => s + l.desc, 0));
     const descTicket = Math.min(Math.max(r2(Number(b.descuento_monto) || 0), 0), r2(bruto - descItems));
     const neto = r2(bruto - descItems - descTicket);
+    // Descuentos sin internet: hasta 15% lo puede dar la caja (igual que la pantalla); más, solo con permiso de descuentos.
+    if (descItems + descTicket > r2(bruto * 0.15) + 0.01 && !tienePermiso(req.usuario, 'DESCUENTO_APLICAR')) {
+      return res.status(403).json({ error: 'Esta venta trae un descuento mayor al 15% y tu usuario no tiene permiso de descuentos' });
+    }
 
     const montoEfectivo = Math.max(Number(b.monto_efectivo) || 0, 0);
     const montoTarjeta = Math.max(Number(b.monto_tarjeta) || 0, 0);
     const efectivoRecibido = b.efectivo_recibido ? Math.max(Number(b.efectivo_recibido) || 0, 0) : null;
 
-    // El turno debe ser de esta sucursal y del propio cajero (puede ya estar cerrado: la venta se hizo sin internet).
     let turnoId = null;
     try {
-      const t = await validarTurno(conexion, { turnoId: b.turno_id, sucursalId: req.sucursalId, usuario: req.usuario, exigirAbierto: false });
+      // La cola de ventas sin internet es de la computadora (puede subirla otra sesión de la misma caja):
+      // basta que el turno sea de esta sucursal. Si la venta fue en efectivo, el turno es obligatorio.
+      const t = await validarTurno(conexion, { turnoId: b.turno_id, sucursalId: req.sucursalId, usuario: req.usuario,
+        exigirAbierto: false, propio: false, obligatorio: ['efectivo', 'mixto'].includes(b.metodo_pago) });
       turnoId = t ? t.id : null;
     } catch (e) { return res.status(e.status || 400).json({ error: e.error }); }
     if (montoEfectivo + montoTarjeta + 0.05 < neto) {
@@ -225,7 +200,7 @@ router.post('/pendiente-offline', verificarToken, requierePermiso('VENTAS_CREAR'
       return res.json({ ...previo.rows[0], duplicado: true });
     }
     let items;
-    try { items = await revisarRenglones(conexion, b.items, req.sucursalId); } catch (e) { return res.status(e.status || 400).json({ error: e.error || 'Renglón de ticket inválido' }); }
+    try { items = await revisarConUsuario(conexion, b.items, req.sucursalId, req.usuario); } catch (e) { return res.status(e.status || 400).json({ error: e.error || 'Renglón de ticket inválido' }); }
 
     let fecha = new Date(b.fecha);
     const ahora = new Date();
@@ -408,7 +383,7 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
   const cliente = await pool.connect();
   try {
     if (!req.body || !req.body.nombre_producto) return res.status(400).json({ error: 'Faltan datos del producto a agregar' });
-    const [renglon] = await revisarRenglones(cliente, [req.body], req.sucursalId);
+    const [renglon] = await revisarConUsuario(cliente, [req.body], req.sucursalId, req.usuario);
     const { tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario } = renglon;
 
     await cliente.query('BEGIN');
@@ -556,7 +531,7 @@ router.put('/:id/descuento', verificarToken, requierePermiso('DESCUENTO_APLICAR'
     const ticket = ticketResult.rows[0];
 
     const descuentoMonto = porcentaje ? (parseFloat(ticket.total) * (parseFloat(porcentaje) / 100)) : parseFloat(monto);
-    if (descuentoMonto <= 0 || descuentoMonto > parseFloat(ticket.total)) {
+    if (!Number.isFinite(descuentoMonto) || descuentoMonto <= 0 || descuentoMonto > parseFloat(ticket.total)) {
       return res.status(400).json({ error: 'El descuento debe ser mayor a 0 y no puede superar el total del ticket' });
     }
 
@@ -602,7 +577,7 @@ router.put('/item/:itemId/descuento', verificarToken, requierePermiso('DESCUENTO
     if (item.estado !== 'pendiente') return res.status(400).json({ error: 'El ticket ya no está pendiente' });
 
     const descuentoMonto = porcentaje ? (parseFloat(item.subtotal) * (parseFloat(porcentaje) / 100)) : parseFloat(monto);
-    if (descuentoMonto <= 0 || descuentoMonto > parseFloat(item.subtotal)) {
+    if (!Number.isFinite(descuentoMonto) || descuentoMonto <= 0 || descuentoMonto > parseFloat(item.subtotal)) {
       return res.status(400).json({ error: 'El descuento debe ser mayor a 0 y no puede superar el subtotal de ese producto' });
     }
 
@@ -675,7 +650,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     );
     const descuentoItems = parseFloat(itemsDescuentoResult.rows[0].total);
     const totalNeto = parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0) - descuentoItems;
-    if (totalNeto < -0.005) {
+    if (!Number.isFinite(totalNeto) || totalNeto < -0.005) {
       await conexion.query('ROLLBACK');
       return res.status(400).json({ error: 'El descuento es mayor que el total. Quita o ajusta el descuento antes de cobrar.' });
     }
@@ -685,6 +660,8 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Lo cobrado no cubre el total del ticket' });
     }
 
+    // A crédito se carga a la cuenta del cliente solo lo que NO pagó ya (p. ej. el anticipo de un pedido).
+    const cargoCredito = metodo_pago === 'credito' ? Math.max(0, Math.round((totalNeto - monto_efectivo - monto_tarjeta) * 100) / 100) : 0;
     // Validar límite de crédito si aplica
     if (metodo_pago === 'credito') {
       const clienteResult = await conexion.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2 FOR UPDATE', [cliente_id, req.sucursalId]);
@@ -693,7 +670,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
         return res.status(404).json({ error: 'Cliente no encontrado' });
       }
       const c = clienteResult.rows[0];
-      const nuevoSaldo = parseFloat(c.saldo_actual) + totalNeto;
+      const nuevoSaldo = parseFloat(c.saldo_actual) + cargoCredito;
       if (nuevoSaldo > parseFloat(c.limite_credito)) {
         await conexion.query('ROLLBACK');
         return res.status(400).json({ error: `Límite de crédito excedido. Saldo actual: $${c.saldo_actual}, límite: $${c.limite_credito}` });
@@ -726,9 +703,9 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     if (metodo_pago === 'credito') {
       await conexion.query(
         `INSERT INTO creditos_cargo (cliente_id, ticket_id, monto, autorizado_por) VALUES ($1, $2, $3, $4)`,
-        [cliente_id, ticketPagado.id, totalNeto, req.usuario.id]
+        [cliente_id, ticketPagado.id, cargoCredito, req.usuario.id]
       );
-      await conexion.query('UPDATE clientes SET saldo_actual = saldo_actual + $1 WHERE id = $2', [totalNeto, cliente_id]);
+      await conexion.query('UPDATE clientes SET saldo_actual = saldo_actual + $1 WHERE id = $2', [cargoCredito, cliente_id]);
     }
 
     const productosAgotados = await descontarInventarioVenta(conexion, ticketPagado.id, req.usuario.id);

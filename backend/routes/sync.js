@@ -143,7 +143,7 @@ router.post('/vincular', verificarToken, requiereRol('dueno', 'jefe_general'), a
     // Solo con una sesión RECIÉN abierta (el panel del servidor entra con usuario y contraseña justo antes).
     // Así una sesión vieja o robada no sirve para vincular otra computadora y copiar toda la información.
     const edad = Date.now() / 1000 - (Number(req.usuario.iat) || 0);
-    if (!(edad >= 0 && edad < 10 * 60)) {
+    if (!(edad >= 0 && edad < 60 * 60)) { // 1 hora: alcanza para bajar toda la información antes de vincular
       return res.status(403).json({ error: 'Por seguridad, vuelve a escribir tu usuario y contraseña para vincular.' });
     }
     await asegurarTabla();

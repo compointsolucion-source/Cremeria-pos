@@ -253,7 +253,8 @@ router.post('/:id/abono', verificarToken, requierePermiso('CREDITO_ABONO'), asyn
     }
     const turno = await validarTurno(conexion, {
       turnoId: turnoPedido, sucursalId: req.sucursalId, usuario: req.usuario,
-      obligatorio: metodo === 'efectivo'
+      // El cajero necesita su turno para recibir efectivo; dueño/gerente pueden recibirlo sin turno de caja.
+      obligatorio: metodo === 'efectivo' && !esSupervisor(req.usuario)
     });
 
     await conexion.query(

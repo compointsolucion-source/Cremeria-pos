@@ -18,10 +18,11 @@ function errorCaja(status, error) {
  * Revisa que un turno de caja se pueda usar en esta operación:
  *  - que exista y sea de ESTA sucursal;
  *  - que esté abierto (salvo exigirAbierto:false, p. ej. ventas hechas sin internet que se suben después);
- *  - que sea del propio usuario (dueño, gerente y jefe general pueden usar cualquiera de la sucursal).
+ *  - que sea del propio usuario (dueño, gerente y jefe general pueden usar cualquiera de la sucursal);
+ *    con propio:false basta que sea de la sucursal (ventas sin internet que sube otra sesión de la misma caja).
  * Devuelve la fila del turno, o null si no se mandó turno y es opcional. Lanza {status, error} si no sirve.
  */
-async function validarTurno(db, { turnoId, sucursalId, usuario, exigirAbierto = true, obligatorio = false }) {
+async function validarTurno(db, { turnoId, sucursalId, usuario, exigirAbierto = true, obligatorio = false, propio = true }) {
   if (turnoId === undefined || turnoId === null || turnoId === '') {
     if (obligatorio) throw errorCaja(400, 'Abre tu turno de caja antes de hacer esta operación');
     return null;
@@ -32,7 +33,7 @@ async function validarTurno(db, { turnoId, sucursalId, usuario, exigirAbierto = 
   const t = r.rows[0];
   if (!t || Number(t.sucursal_id) !== Number(sucursalId)) throw errorCaja(400, 'Ese turno de caja no es de esta sucursal');
   if (exigirAbierto && t.estado !== 'abierto') throw errorCaja(409, 'Ese turno de caja ya está cerrado. Abre uno nuevo.');
-  if (!esSupervisor(usuario) && Number(t.usuario_id) !== Number(usuario.id)) {
+  if (propio && !esSupervisor(usuario) && Number(t.usuario_id) !== Number(usuario.id)) {
     throw errorCaja(403, 'Solo puedes usar tu propio turno de caja');
   }
   return t;

@@ -554,8 +554,9 @@ async function registrarAbono() {
   if (!(monto > 0)) { mostrarToast('Ingresa un monto válido', 'error'); return; }
   const saldo = saldoDe(cuenta.cliente);
   if (monto > saldo + 0.005) {
-    const sigue = await confirmarAccion(`El abono (${dinero(monto)}) es mayor que lo que debe (${dinero(saldo)}). ¿Registrarlo de todos modos? Quedaría saldo a favor del cliente.`);
-    if (!sigue) return;
+    // El abono no puede ser mayor que la deuda (así no se crean saldos a favor por error o a propósito).
+    mostrarToast(`El abono (${dinero(monto)}) es mayor que lo que debe (${dinero(saldo)}). Escribe ${dinero(saldo)} o menos.`, 'error', 5000);
+    return;
   }
   try {
     await apiFetch(`/clientes/${clienteId}/abono`, { method: 'POST', body: JSON.stringify({ monto, metodo_pago: metodoAbono }) });

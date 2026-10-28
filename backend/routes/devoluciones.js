@@ -64,6 +64,11 @@ router.post('/', verificarToken, requierePermiso('VENTAS_DEVOLVER'), async (req,
       await conexion.query('ROLLBACK');
       return res.status(400).json({ error: 'Solo se puede ajustar crédito si el ticket original fue Fiado' });
     }
+    // Una venta a crédito (fiado) no se pagó con dinero: no se le puede regresar efectivo, solo bajar su deuda.
+    if (ticket.metodo_pago === 'credito' && metodo_reembolso === 'efectivo') {
+      await conexion.query('ROLLBACK');
+      return res.status(400).json({ error: 'Esta venta fue a crédito: la devolución se descuenta de la cuenta del cliente, no en efectivo' });
+    }
 
     // El turno (si se manda) debe estar abierto, ser de esta sucursal y del propio cajero
     // (dueño/gerente pueden usar cualquiera). Reembolsar en efectivo SIEMPRE necesita uno.

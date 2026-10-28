@@ -20,17 +20,27 @@ const limitadorLogin = rateLimit({
   message: { error: 'Demasiados intentos de inicio de sesión. Espera unos minutos e intenta de nuevo.' }
 });
 
-// Además, por USUARIO: máximo 15 contraseñas equivocadas cada 15 minutos para el mismo nombre de
-// usuario (aunque el ataque cambie de dirección de internet). Los aciertos no cuentan.
-const limitadorLoginUsuario = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => 'u:' + String((req.body && req.body.usuario) || '').trim().toLowerCase().slice(0, 60),
-  message: { error: 'Demasiados intentos con este usuario. Espera unos minutos e intenta de nuevo.' }
-});
+// Además, por USUARIO: cada contraseña equivocada hace que la siguiente respuesta para ese usuario tarde
+// un poco más (hasta 5 segundos), aunque el ataque cambie de dirección de internet. No se bloquea a nadie
+// (así un atacante no puede dejar al dueño sin entrar), solo se vuelve muy lento adivinar.
+const _fallosLogin = new Map();
+const VENTANA_FALLOS_MS = 15 * 60 * 1000;
+function claveUsuario(u) { return String(u || '').trim().toLowerCase().slice(0, 60); }
+function fallosDe(u) {
+  const f = _fallosLogin.get(claveUsuario(u));
+  if (!f || Date.now() - f.t > VENTANA_FALLOS_MS) return 0;
+  return f.n;
+}
+function anotarFallo(u) {
+  const k = claveUsuario(u);
+  _fallosLogin.set(k, { n: fallosDe(u) + 1, t: Date.now() });
+  if (_fallosLogin.size > 5000) _fallosLogin.clear();
+}
+const pausa = (ms) => new Promise((ok) => setTimeout(ok, ms));
+async function frenarSiHaceFalta(u) {
+  const n = fallosDe(u);
+  if (n > 3) await pausa(Math.min(5000, (n - 3) * 500));
+}
 
 // Huella falsa para comparar cuando el usuario no existe: así la respuesta tarda lo mismo
 // y no se puede adivinar qué usuarios existen midiendo el tiempo.
@@ -55,7 +65,7 @@ function firmarSesion(user) {
   );
 }
 
-router.post('/login', limitadorLogin, limitadorLoginUsuario, async (req, res) => {
+router.post('/login', limitadorLogin, async (req, res) => {
   try {
     const { usuario, password } = req.body;
     if (!usuario || !password || typeof usuario !== 'string' || typeof password !== 'string') {
@@ -64,6 +74,7 @@ router.post('/login', limitadorLogin, limitadorLoginUsuario, async (req, res) =>
     if (usuario.length > 60 || password.length > 200) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
+    await frenarSiHaceFalta(usuario);
 
     const result = await pool.query(
       'SELECT * FROM usuarios WHERE usuario = $1 AND activo = true',
@@ -72,6 +83,7 @@ router.post('/login', limitadorLogin, limitadorLoginUsuario, async (req, res) =>
 
     if (result.rows.length === 0) {
       await bcrypt.compare(password, HASH_FALSO);
+      anotarFallo(usuario);
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
 
@@ -79,8 +91,10 @@ router.post('/login', limitadorLogin, limitadorLoginUsuario, async (req, res) =>
     const passwordValida = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordValida) {
+      anotarFallo(usuario);
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
+    _fallosLogin.delete(claveUsuario(usuario));
 
     // jefe_general no pertenece a una sola sucursal (sucursal_id NULL) — para
     // el resto, si la sucursal a la que pertenecen quedó desactivada, no
@@ -275,6 +289,8 @@ async function comprobarCodigo(usuario, codigo) {
     [fila.id, recuperacion.MAX_INTENTOS]);
   if (!turno.rows.length) return null;
   if (!recuperacion.huellaCoincide(fila.codigo_hash, codigo, u.id)) return null;
+  // Código correcto: el intento no cuenta (así "verificar" y luego "cambiar contraseña" siempre funcionan).
+  await pool.query('UPDATE recuperacion_codigos SET intentos = GREATEST(intentos - 1, 0), usado = false WHERE id = $1', [fila.id]);
   return { fila, usuarioId: u.id };
 }
 

@@ -111,6 +111,38 @@ test('el nombre del renglón sale del catálogo y no se aceptan negativos ni pro
   assert.equal((await api('mostrador', 'POST', '/api/tickets', { items: [renglon({ producto_id: productoOtra })] })).status, 400);
 });
 
+test('el precio no puede ser menor al del catálogo (salvo con permiso de precios)', async () => {
+  assert.equal((await api('mostrador', 'POST', '/api/tickets', { items: [renglon({ precio_unitario: 0 })] })).status, 400);
+  assert.equal((await api('mostrador', 'POST', '/api/tickets', { items: [renglon({ precio_unitario: 120 })] })).status, 200, 'más caro sí');
+  assert.equal((await api('dueno', 'POST', '/api/tickets', { items: [renglon({ precio_unitario: 50 })] })).status, 200, 'el dueño puede');
+});
+
+test('venta sin internet: solo caja, con turno de la sucursal (aunque lo suba otra sesión de la misma caja)', async () => {
+  const cuerpo = (folio, extra = {}) => ({ folio, metodo_pago: 'efectivo', monto_efectivo: 100, items: [renglon()], ...extra });
+  assert.equal((await api('mostrador', 'POST', '/api/tickets/venta-offline', cuerpo('OFFM0001', { turno_id: TURNO.cajero }))).status, 403, 'mostrador no');
+  assert.equal((await api('cajero', 'POST', '/api/tickets/venta-offline', cuerpo('OFFM0002'))).status, 400, 'efectivo sin turno no');
+  assert.equal((await api('cajero', 'POST', '/api/tickets/venta-offline', cuerpo('OFFM0003', { turno_id: TURNO.cajero2 }))).status, 200, 'turno de otro cajero de la misma caja: se acepta');
+  assert.equal((await api('cajero', 'POST', '/api/tickets/venta-offline', cuerpo('OFFM0004', { turno_id: TURNO.cajero, descuento_monto: 10, monto_efectivo: 90 }))).status, 200, 'descuento de 10% sí');
+});
+
+test('una venta a crédito no se devuelve en efectivo, y un descuento "NaN" no pasa', async () => {
+  const cl = (await pool.query("INSERT INTO clientes (sucursal_id, nombre, limite_credito, saldo_actual) VALUES ($1, 'Fiado', 5000, 0) RETURNING id", [suc1])).rows[0].id;
+  const t = await ticketNuevo();
+  const pago = await api('cajero', 'POST', `/api/tickets/${t.id}/pagar`, { metodo_pago: 'credito', cliente_id: cl, turno_id: TURNO.cajero });
+  assert.equal(pago.status, 200, JSON.stringify(pago.json));
+  const det = (await pool.query('SELECT id, cantidad FROM ticket_detalle WHERE ticket_id = $1', [t.id])).rows[0];
+  const dev = await api('cajero', 'POST', '/api/devoluciones', { ticket_id: t.id, metodo_reembolso: 'efectivo', turno_id: TURNO.cajero, items: [{ ticket_detalle_id: det.id, cantidad_devuelta: 1, regresa_inventario: false }] });
+  assert.equal(dev.status, 400);
+  const t2 = await ticketNuevo();
+  assert.equal((await api('dueno', 'PUT', `/api/tickets/${t2.id}/descuento`, { monto: 'NaN', motivo: 'x' })).status, 400);
+});
+
+test('contraseñas equivocadas con otro usuario no bloquean al dueño', async () => {
+  for (let i = 0; i < 6; i++) await api(null, 'POST', '/api/auth/login', { usuario: 'gerente2', password: 'mala' });
+  const ok = await api(null, 'POST', '/api/auth/login', { usuario: 'gerente2', password: CLAVE });
+  assert.equal(ok.status, 200, 'sigue pudiendo entrar (solo más lento)');
+});
+
 test('un ticket cobrado ya no se puede modificar, ni desde otra sucursal', async () => {
   const t = await ticketNuevo();
   const itemId = (await pool.query('SELECT id FROM ticket_detalle WHERE ticket_id = $1', [t.id])).rows[0].id;

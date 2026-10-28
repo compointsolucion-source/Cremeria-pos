@@ -47,6 +47,8 @@
       if (d.metodo === 'efectivo') return { metodo_pago: 'efectivo', monto_efectivo: d.total, monto_tarjeta: 0 };
       return { metodo_pago: d.metodo, monto_efectivo: 0, monto_tarjeta: d.total };
     }
+    // A crédito (fiado): el ticket guarda solo el anticipo como pagado; lo que falta se carga a la cuenta del cliente.
+    if (metodo === 'credito') return { metodo_pago: 'credito', monto_efectivo: redondear(aEf), monto_tarjeta: redondear(aOtro) };
     const com = Number(comisionPct) || 0;
     if (metodo === 'efectivo') { ef = d.resta; }
     else if (metodo === 'tarjeta') { tj = d.resta * (1 + com / 100); }
