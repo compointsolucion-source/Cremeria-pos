@@ -1,0 +1,52 @@
+name: Instalador de prueba (Windows, sin publicar)
+
+# Arma el .exe para que Compoint lo pruebe en su equipo ANTES de publicarlo.
+# NO crea versión en GitHub Releases: los programas de los clientes no se enteran.
+# El número queda como 1.2.0-prueba.N (más bajo que 1.2.0), así que cuando se publique
+# la versión real, el equipo de prueba recibe el aviso «Actualizar ahora» como cualquier cliente.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  construir:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: escritorio
+        run: npm ci
+
+      - name: Probar la lógica del escritorio
+        working-directory: escritorio
+        run: npm test
+
+      - name: Poner el número de versión de prueba
+        working-directory: escritorio
+        shell: bash
+        run: |
+          V=$(node -p "require('../backend/package.json').version")
+          npm version "$V-prueba.${{ github.run_number }}" --no-git-tag-version
+
+      - name: Construir (sin publicar)
+        working-directory: escritorio
+        run: node scripts/construir.js
+        env:
+          CLIENTE_URL: ''
+          CLIENTE_NOMBRE: 'Compoint Punto'
+          PUBLICAR_ACTUALIZACION: '0'
+
+      - name: Guardar el instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: CompointPunto-prueba
+          path: escritorio/dist/*.exe
+          retention-days: 14
