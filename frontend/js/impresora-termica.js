@@ -926,7 +926,7 @@ const LEYENDA_COMPOINT_BASE = [
   'WhatsApp 33 25 90 70 90',
   'www.compoint.com.mx'
 ];
-// Durante la prueba de 30 días TODOS los tickets llevan la leyenda «VERSIÓN DE PRUEBA»
+// Durante la prueba gratis TODOS los tickets llevan la leyenda «VERSIÓN DE PRUEBA»
 // (arriba, al pie y como marca de agua en la impresión del sistema). Se quita sola al activar la licencia.
 const TEXTO_VERSION_PRUEBA = '*** VERSIÓN DE PRUEBA ***';
 function ticketEsPrueba() { return typeof licenciaEsPrueba === 'function' && licenciaEsPrueba(); }

@@ -87,7 +87,7 @@ function fijarSucursalSeleccionada(id, nombre) {
 }
 
 // ---------------------------------------------------------------------------
-// LICENCIA: prueba de 30 días, aviso de vencimiento, gracia y "solo consulta".
+// LICENCIA: prueba gratis, aviso de vencimiento, gracia y "solo consulta".
 // El servidor manda en cada respuesta los encabezados X-Licencia-Estado, -Tipo,
 // -Dias y -Vence (solo cuando hay algo que avisar). Aquí se guardan y se
 // muestran en una barra arriba de todas las pantallas.

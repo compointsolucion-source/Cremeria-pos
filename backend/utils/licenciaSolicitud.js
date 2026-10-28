@@ -7,12 +7,13 @@
 //
 // Formato:   CPT-REQ-<base64url( deflate-raw( JSON ))>.<4 caracteres de control>
 //   - JSON (UTF-8):  { v:1, tipo, plan, sucursales, id_equipo, fecha, app, prueba_dias_restantes,
-//                      negocio:{...}, nota }
+//                      negocio:{...}, nota, paquete?, periodo? }   (paquete/periodo: desde 2026-10-28)
 //   - Control: primeros 4 caracteres hexadecimales de sha256 del texto base64url (detecta
 //     que el código llegó cortado o con un caracter cambiado).
 // No está firmado ni cifrado: no necesita estarlo (es una solicitud, no una licencia). Quien
 // lo vea solo ve los datos que el propio cliente decidió enviar.
 const zlib = require('zlib');
+const precios = require('./precios');
 const crypto = require('crypto');
 
 const PREFIJO = 'CPT-REQ-';
@@ -122,6 +123,8 @@ function construirCodigo(p) {
     fecha: p.fecha,
     negocio: negocioCompacto(p.datos)
   };
+  if (json.plan === 'nube' && precios.COPIA.paquetes[p.paquete]) json.paquete = p.paquete;
+  if (json.plan === 'nube' && precios.PERIODOS.includes(p.periodo)) json.periodo = p.periodo;
   if (p.app) json.app = String(p.app).slice(0, 20);
   if (p.pruebaDiasRestantes != null) json.prueba_dias_restantes = p.pruebaDiasRestantes;
   const nota = limpiarLinea(p.nota, 300);
@@ -171,6 +174,17 @@ function lineasNegocio(d, { fiscal = true } = {}) {
   return l;
 }
 
+/** "Negocio · Anual ($4,990)" según lo que eligió (vacío si no eligió paquete/periodo). */
+function detallePlan(s, lista) {
+  if (s.plan !== 'local' && !s.paquete && !s.periodo) return '';
+  const L = lista || precios.COPIA;
+  const renovarLocal = s.plan === 'local' && s.tipo === 'renovar';
+  const t = s.plan !== 'local' ? precios.textoPlan(L, s.plan, s.paquete, s.periodo) : (renovarLocal ? 'Renovación de actualizaciones y soporte' : 'Pago único');
+  const p = renovarLocal ? L.sin_nube.renovacion_anual : precios.precio(L, s.plan, s.paquete, s.periodo);
+  return t + (p != null ? ` ($${Number(p).toLocaleString('en-US')})` : '');
+}
+const planCorto = (s) => (s.plan === 'local' ? 'Sin nube' : 'Con nube') + (detallePlan(s) ? ' · ' + detallePlan(s) : '');
+
 const textoTipo = (tipo) => (tipo === 'renovar' ? 'renovar' : 'contratar');
 
 /** Mensaje de WhatsApp (corto y con el código al final). */
@@ -180,7 +194,7 @@ function mensajeWhatsApp(s) {
   const l = [`Hola Compoint, quiero ${textoTipo(s.tipo)} Compoint Punto.`];
   if (d.negocio) l.push(`Negocio: ${d.negocio}`);
   if (contacto) l.push(`Contacto: ${contacto}`);
-  l.push(`Plan: ${s.plan === 'local' ? 'Sin nube' : 'Con nube'} · ${s.sucursales} sucursal${Number(s.sucursales) === 1 ? '' : 'es'}`);
+  l.push(`Plan: ${planCorto(s)} · ${s.sucursales} sucursal${Number(s.sucursales) === 1 ? '' : 'es'}`);
   l.push(`ID de equipo: ${s.idEquipo}`);
   l.push('Código de solicitud (no lo borres):');
   l.push(s.codigo);
@@ -193,7 +207,7 @@ function textoCompleto(s) {
   return [
     `SOLICITUD PARA ${textoTipo(s.tipo).toUpperCase()} COMPOINT PUNTO`,
     `Fecha: ${s.fecha}`,
-    `Plan: ${PLANES[s.plan] || s.plan}`,
+    `Plan: ${PLANES[s.plan] || s.plan}${detallePlan(s) ? ' · ' + detallePlan(s) : ''}`,
     `Sucursales: ${s.sucursales}`,
     `ID de equipo: ${s.idEquipo}`,
     '',
@@ -210,5 +224,5 @@ function textoCompleto(s) {
 module.exports = {
   PREFIJO, VERSION_AVISO, LIMITES, CAMPOS, ETIQUETAS, PLANES,
   normalizarDatos, datosCompletos, construirCodigo, leerCodigo,
-  mensajeWhatsApp, textoCompleto, lineasNegocio, limpiarLinea
+  mensajeWhatsApp, textoCompleto, lineasNegocio, limpiarLinea, detallePlan
 };

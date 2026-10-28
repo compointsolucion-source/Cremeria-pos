@@ -216,7 +216,7 @@
       <div class="lic-modal" role="dialog" aria-modal="true" aria-labelledby="lic-bv-titulo">
         <div class="lic-modal-cab">
           <span class="lic-dias">${dias != null ? (dias === 1 ? 'Te queda 1 día' : `Te quedan ${dias} días`) : 'Versión de prueba'}</span>
-          <h2 id="lic-bv-titulo">¡Bienvenido a tu prueba de 30 días! 🎉</h2>
+          <h2 id="lic-bv-titulo">¡Bienvenido a tu prueba gratis! 🎉</h2>
           <p>Usa el sistema completo, sin límites. Cuéntanos de tu negocio: tus tickets saldrán con tu nombre desde hoy y, si decides contratar, tu registro será mucho más rápido.</p>
         </div>
         <div class="lic-modal-cuerpo" id="lic-bv-cuerpo">

@@ -91,7 +91,7 @@ function pantallaNube2() {
   let lic;
   if (l && l.control === false) lic = 'Sistema propio de Compoint: esta computadora quedará sin la versión de prueba.';
   else if (l && l.tipo && l.tipo !== 'demo') lic = 'Licencia ' + esc(l.tipo) + (l.vence ? ' · vigente hasta <b>' + fechaBonita(l.vence) + '</b>' : ' · permanente') + (l.cliente ? ' · ' + esc(l.cliente) : '') + '. Se tomará sola y se quita la versión de prueba.';
-  else lic = 'Tu nube todavía no tiene una licencia de cliente. Esta computadora empezará con la versión de prueba de 30 días y tomará tu licencia sola cuando Compoint la active.';
+  else lic = 'Tu nube todavía no tiene una licencia de cliente. Esta computadora empezará con la versión de prueba de 15 días y tomará tu licencia sola cuando Compoint la active.';
   $('#main').innerHTML =
     '<h1>Esto es lo que se traerá</h1>' +
     '<p class="s">Encontramos tu sistema en la nube:</p>' +

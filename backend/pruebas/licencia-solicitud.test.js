@@ -115,7 +115,7 @@ test('mensaje de WhatsApp: resume al cliente y termina con el código completo',
   assert.match(m, /Plan: Con nube · 2 sucursales/);
   assert.match(m, new RegExp('ID de equipo: ' + ID));
   assert.ok(m.endsWith(codigo));
-  assert.match(sol.mensajeWhatsApp({ tipo: 'renovar', plan: 'local', sucursales: 1, idEquipo: ID, datos: n.datos, codigo }), /quiero renovar[\s\S]*Sin nube · 1 sucursal\n/);
+  assert.match(sol.mensajeWhatsApp({ tipo: 'renovar', plan: 'local', sucursales: 1, idEquipo: ID, datos: n.datos, codigo }), /quiero renovar[\s\S]*Sin nube · Renovación de actualizaciones y soporte \(\$990\) · 1 sucursal\n/);
 });
 
 test('texto completo (para copiar o guardar en archivo): trae todos los datos y el código', () => {

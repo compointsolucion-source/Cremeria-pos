@@ -1,4 +1,4 @@
-// Control de licencia de ESTA instalación (prueba de 30 días, renta anual o permanente).
+// Control de licencia de ESTA instalación (prueba de 15 días, renta anual o permanente).
 // La lógica de los estados vive en utils/licencia.js; aquí solo se aplica a cada petición.
 //
 // - Sin fila en la tabla "licencia" y en la nube: NO hay control (tu sistema propio).

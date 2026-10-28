@@ -1,0 +1,68 @@
+﻿TÉRMINOS Y CONDICIONES DE COMPOINT PUNTO
+Versión 2026-10-28
+
+Lee con calma. Para instalar, elige "Acepto". El texto completo y siempre actualizado está en:
+https://www.compoint.com.mx/terminos.php
+
+1. QUIÉNES SOMOS
+"Compoint, Punto de Soluciones" es el nombre comercial de Enrique Hernández Parra, RFC HEPE590223RI3, Calle Fontaneros 527, Guadalajara, Jalisco. Teléfono 33 1597 0412, WhatsApp 33 2590 7090.
+
+2. QUÉ CONTRATAS
+Compoint Punto es un sistema de punto de venta en la nube y para computadora (Windows). Te damos una licencia de uso no exclusiva, no transferible y solo por el tiempo pagado. El programa, su código, nombre y diseño son de Compoint y están protegidos por la Ley Federal del Derecho de Autor.
+
+3. CÓMO ACEPTAS
+Aceptas al elegir "Acepto" en este instalador, al marcar la casilla dentro del sistema o al usarlo. Guardamos la fecha, la hora y la versión aceptada; esa constancia electrónica vale igual que un papel firmado (Código de Comercio, art. 89 Bis).
+
+4. PRUEBA GRATIS
+Prueba gratis de 15 días, sin tarjeta y sin cobros automáticos. Compoint puede regalarte días extra de prueba; en total, nunca pasa de 30 días. Al terminar, el sistema solo deja de registrar ventas hasta que contrates, y tu información se guarda 30 días para que la descargues.
+
+5. LO QUE LE TOCA A TU NEGOCIO
+- Dar datos verdaderos y cuidar las contraseñas de tu equipo.
+- Revisar tus precios, existencias, tickets y cortes. El sistema hace las cuentas con lo que tú capturas.
+- Cumplir tus obligaciones con el SAT (facturación y contabilidad). Puedes exportar tus reportes cuando quieras.
+- Tener tu propio aviso de privacidad para tus clientes.
+- No copiar, revender, desarmar el programa ni usarlo para algo ilegal.
+- Usar una computadora con los requisitos mínimos: Windows 10 u 11 de 64 bits, 4 GB de RAM (8 GB en la computadora que hace de servidor del negocio), 2 GB libres en disco, Windows actualizado y sin virus.
+
+6. LO QUE NOS TOCA A NOSOTROS
+- Mantener el sistema funcionando y corregir fallas en un tiempo razonable.
+- Respaldos automáticos diarios de tu información en la nube, guardados hasta 30 días.
+- Conexión segura (HTTPS) y contraseñas cifradas.
+- Soporte por WhatsApp de lunes a viernes de 10:00 a 19:00.
+- Avisarte antes de un mantenimiento programado.
+
+7. INTERRUPCIONES
+Un servicio por internet puede detenerse por causas que no controlamos: tu conexión, cortes de luz, fallas de proveedores o fuerza mayor. Si la falla es nuestra y dura más de 24 horas seguidas, te compensamos como dice la política de pagos.
+
+8. LÍMITE DE RESPONSABILIDAD
+Si te causamos un daño por una falla nuestra, respondemos por el daño directo hasta el monto que nos pagaste en los 12 meses anteriores. No respondemos por ganancias que dejaste de tener ni por errores de datos mal capturados. Este límite no aplica si hubo dolo o culpa grave de nuestra parte (Código Civil Federal, art. 2106) ni quita los derechos que la Ley Federal de Protección al Consumidor da a quien sea consumidor.
+
+9. TU INFORMACIÓN
+Los datos de tu negocio son tuyos. Puedes exportarlos mientras tengas plan y hasta 30 días después de terminar; pasado ese plazo se borran, salvo lo que una ley obligue a guardar.
+
+10. PAGOS, CANCELACIÓN Y REEMBOLSOS
+- No cobramos en automático. Cada periodo lo pagas tú cuando decides renovar.
+- Antes de pagar te enviamos por escrito el precio total en pesos, el periodo y la fecha de vencimiento.
+- Puedes cancelar cuando quieras, sin penalización; sigues usando el sistema hasta el final del periodo pagado.
+- Pago doble, cobro por error o falla grave nuestra: siempre te devolvemos el 100%.
+- Plan mensual: no hay reembolso del mes en curso.
+- Planes de 6 meses y anual: si cancelas en la primera mitad del plan, te devolvemos los meses completos que falten menos el costo de alta y configuración ($400).
+- Pago único sin nube: solo si el sistema falla por causa de Compoint y no lo arreglamos en 7 días (no aplica si la computadora no cumple los requisitos mínimos, tiene virus o necesita formatearse).
+- La instalación no es reembolsable una vez hecha.
+- Detalle completo en la Política de pagos y reembolsos:
+  https://www.compoint.com.mx/terminos.php#pagos
+- Devolvemos por el mismo medio de pago, en máximo 10 días hábiles.
+
+11. SUSPENSIÓN
+Podemos suspender el sistema por falta de pago, avisándote al menos 5 días antes, o de inmediato si se usa para algo ilegal.
+
+12. DATOS DE TUS CLIENTES (ANEXO DE TRATAMIENTO)
+Tu negocio es el responsable de los datos de sus clientes que captura en el sistema. Compoint es el encargado: solo los guarda y procesa por cuenta tuya (LFPDPPP, art. 2, fr. XII). Nos comprometemos a usarlos solo para darte el servicio, nunca para nosotros ni para publicidad, nunca venderlos; guardar confidencialidad; protegerlos con medidas de seguridad; avisarte en máximo 72 horas si hay un problema de seguridad; ayudarte con las solicitudes de tus clientes; y al terminar el servicio, darte tus datos y borrarlos en máximo 30 días. Proveedores: Contabo (servidor, St. Louis, Missouri, EUA) y Cloudflare R2 (respaldos, Norteamérica).
+
+13. CAMBIOS A ESTOS TÉRMINOS
+Si cambian, te avisamos por correo o WhatsApp al menos 15 días antes. Aplican desde tu siguiente renovación y solo si los aceptas.
+
+14. LEYES Y TRIBUNALES
+Se aplican las leyes de México. Cualquier diferencia se resuelve ante los tribunales de Guadalajara, Jalisco, sin perder el derecho de acudir a PROFECO cuando la ley lo permita.
+
+AVISO DE PRIVACIDAD: https://www.compoint.com.mx/privacidad.php

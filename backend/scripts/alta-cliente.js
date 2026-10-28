@@ -8,7 +8,7 @@
 //   DATABASE_URL="postgresql://(base NUEVA del cliente)" node scripts/alta-cliente.js \
 //     --negocio "Cremería La Esperanza" --dueno "Juan Pérez" --usuario juan \
 //     --password "Clave-segura-123" [--sucursales 2] [--giro cremeria] [--licencia-meses 12] [--demo] [--direccion "..."] [--telefono "..."]
-//   --demo  crea el sistema como PRUEBA de 30 días (en vez de la licencia de 12 meses).
+//   --demo  crea el sistema como PRUEBA de 15 días (en vez de la licencia de 12 meses).
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -85,7 +85,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: usarSsl
       for (let i = 0; i < GIROS[a.giro].length; i++) await c.query('INSERT INTO categorias (nombre, orden) VALUES ($1,$2)', [GIROS[a.giro][i], i + 1]);
     }
 
-    // Licencia: por defecto 12 meses desde hoy; con --demo es una PRUEBA de 30 días
+    // Licencia: por defecto 12 meses desde hoy; con --demo es una PRUEBA de 15 días
     // (después queda en "solo consulta" hasta que se active con un código).
     // Con --licencia-meses 0 se crea SIN control de licencia.
     const esDemo = !!a.demo;
@@ -100,7 +100,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: usarSsl
       if (esDemo) {
         await c.query(`INSERT INTO licencia (id, cliente, fecha_inicio, fecha_vencimiento, tipo, plan)
           VALUES (1, $1, (NOW() AT TIME ZONE 'America/Mexico_City')::date,
-                  (NOW() AT TIME ZONE 'America/Mexico_City')::date + 30, 'demo', 'nube')`, [a.negocio]);
+                  (NOW() AT TIME ZONE 'America/Mexico_City')::date + 15, 'demo', 'nube')`, [a.negocio]);
       } else {
         await c.query(`INSERT INTO licencia (id, cliente, fecha_inicio, fecha_vencimiento, tipo, plan)
           VALUES (1, $1, (NOW() AT TIME ZONE 'America/Mexico_City')::date,
@@ -113,7 +113,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: usarSsl
     console.log(`Negocio: ${a.negocio}  (sucursal #${sucursalId})`);
     console.log(`Usuario: ${a.usuario} (${totalSucursales > 1 ? 'jefe_general: ve todas las sucursales' : 'dueño'}) - la contraseña es la que escribiste`);
     if (totalSucursales > 1) console.log(`Sucursal #1 creada. Las otras ${totalSucursales - 1} se crean desde el sistema (Sucursales) con este usuario.`);
-    if (esDemo) console.log('Licencia: PRUEBA de 30 días desde hoy (al terminar queda en "solo consulta" hasta activarla con un código)');
+    if (esDemo) console.log('Licencia: PRUEBA de 15 días desde hoy (al terminar queda en "solo consulta" hasta activarla con un código)');
     else console.log(mesesLic > 0 ? `Licencia: ${mesesLic} meses desde hoy (avisa 7 días antes; al vencer hay 5 días de gracia y luego "solo consulta")` : 'Licencia: SIN control');
     console.log('\n--- Variables de entorno para el backend en Render ---');
     console.log('DATABASE_URL=' + process.env.DATABASE_URL);

@@ -1,10 +1,10 @@
-// Licencia de ESTA instalación: prueba de 30 días, renta anual o permanente,
+// Licencia de ESTA instalación: prueba gratis de 15 días, renta anual o permanente,
 // con o sin servicio en la nube. Todo el cálculo vive aquí; el middleware
 // (middleware/licencia.js) y las rutas (routes/licencia.js) solo lo usan.
 //
 // Cómo decide el sistema:
 //   - Sin fila en la tabla "licencia" y en la nube (Render)  → SIN CONTROL (tu sistema propio).
-//   - Sin fila y en una computadora del cliente (servidor local) → empieza la prueba de 30 días.
+//   - Sin fila y en una computadora del cliente (servidor local) → empieza la prueba gratis de 15 días.
 //   - Con fila: manda la fecha de vencimiento. Si se activó con un código firmado,
 //     los datos se toman del CÓDIGO (se comprueba la firma cada vez), no de las columnas.
 //
@@ -22,8 +22,8 @@ const clavePublicaArchivo = require('./licencia-clave-publica');
 
 const DIAS_AVISO = 7;
 const GRACIA_PAGO = 5;     // días extra, tras vencer, en que todavía se puede vender
-const GRACIA_DEMO = 0;     // la prueba termina el día 30 (después, solo consulta)
-const DEMO_DIAS = 30;
+const GRACIA_DEMO = 0;     // la prueba termina el último día (después, solo consulta)
+const DEMO_DIAS = 15;      // las pruebas que ya existían conservan su fecha guardada
 const CACHE_MS = 60 * 1000;
 const CACHE_TICKET_MS = 30 * 60 * 1000;
 const SIN_FIN = '2099-12-31';
@@ -161,7 +161,7 @@ function mensajeEstado(est) {
     case 'gracia': return `Tu licencia venció el ${fechaBonita(est.vence)}. Todavía puedes vender ${est.gracia_restante === 0 ? 'solo hoy' : `${est.gracia_restante} día${est.gracia_restante === 1 ? '' : 's'} más`}. Renueva con Compoint: ${CONTACTO}`;
     case 'solo_consulta':
       return (est.tipo === 'demo'
-        ? `Tu prueba de ${DEMO_DIAS} días terminó el ${fechaBonita(est.vence)}.`
+        ? `Tu prueba gratis terminó el ${fechaBonita(est.vence)}.`
         : `Tu licencia venció el ${fechaBonita(est.vence)}.`) +
         ' El sistema está en modo solo consulta: puedes ver tus reportes y respaldar tu información, pero no registrar ventas ni cambios.' + contacto;
     default: return '';

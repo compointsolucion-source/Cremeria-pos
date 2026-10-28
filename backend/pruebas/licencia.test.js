@@ -278,7 +278,7 @@ test('sin llave pública en el programa no se aceptan códigos, pero todo lo dem
   lic._usarClavePublica(PUBLICA_HEX);
 });
 
-// ============ SERVIDOR LOCAL DEL CLIENTE (prueba de 30 días) ============
+// ============ SERVIDOR LOCAL DEL CLIENTE (prueba de 15 días) ============
 
 function modoLocal(guid = 'GUID-PC-DEL-CLIENTE') {
   process.env.COMPOINT_ID_EQUIPO = guid;
@@ -286,7 +286,7 @@ function modoLocal(guid = 'GUID-PC-DEL-CLIENTE') {
   lic._reiniciar();
 }
 
-test('servidor local: la primera vez empieza una prueba de 30 días y deja marcas', async () => {
+test('servidor local: la primera vez empieza una prueba de 15 días y deja marcas', async () => {
   fs.rmSync(path.join(TMP, 'a'), { recursive: true, force: true });
   fs.rmSync(path.join(TMP, 'b'), { recursive: true, force: true });
   await pool.query('DELETE FROM instalacion');
@@ -295,31 +295,31 @@ test('servidor local: la primera vez empieza una prueba de 30 días y deja marca
   reloj('2026-10-16');
   const r = await api('GET', '/api/licencia', null, tokenDueno);
   const e = r.json;
-  assert.deepEqual([e.control, e.estado, e.tipo, e.dias, e.vence, e.inicio, e.local, e.puede_vender], [true, 'demo', 'demo', 30, '2026-11-15', '2026-10-16', true, true]);
-  assert.match(e.mensaje, /te quedan 30 días/);
+  assert.deepEqual([e.control, e.estado, e.tipo, e.dias, e.vence, e.inicio, e.local, e.puede_vender], [true, 'demo', 'demo', 15, '2026-10-31', '2026-10-16', true, true]);
+  assert.match(e.mensaje, /te quedan 15 días/);
   assert.equal(r.h.get('x-licencia-estado'), 'demo');
-  assert.equal(r.h.get('x-licencia-dias'), '30');
+  assert.equal(r.h.get('x-licencia-dias'), '15');
   assert.deepEqual([leerMarca(MARCA1).i, leerMarca(MARCA2).i], ['2026-10-16', '2026-10-16']);
   // El ID viene de la computadora (no de la base de datos)
   assert.equal(e.id_equipo, codigo.idEquipoDesde('GUID-PC-DEL-CLIENTE'));
 });
 
 test('la prueba es totalmente funcional y avisa con la cuenta regresiva', async () => {
-  reloj('2026-11-10');
+  reloj('2026-10-26');
   let w = await escribir();
   assert.equal(w.status, 200);
   assert.deepEqual([w.h.get('x-licencia-estado'), w.h.get('x-licencia-dias')], ['demo', '5']);
   assert.equal((await lic.estado()).por_vencer, true);
-  reloj('2026-11-15');
+  reloj('2026-10-31');
   assert.equal((await escribir()).status, 200);
   assert.match((await lic.estado()).mensaje, /último día/);
 });
 
-test('al día 31 la prueba pasa a solo consulta (sin gracia) y avisa que es la prueba', async () => {
-  reloj('2026-11-16');
+test('al día 16 la prueba pasa a solo consulta (sin gracia) y avisa que es la prueba', async () => {
+  reloj('2026-11-01');
   const w = await escribir();
   assert.equal(w.status, 402);
-  assert.match(w.json.error, /Tu prueba de 30 días terminó el 15\/11\/2026/);
+  assert.match(w.json.error, /Tu prueba gratis terminó el 31\/10\/2026/);
   assert.equal((await api('GET', '/api/configuracion', null, tokenDueno)).status, 200);
 });
 
@@ -327,9 +327,9 @@ test('desinstalar y volver a instalar NO da otra prueba: las marcas recuerdan la
   await limpiar();
   await pool.query('DELETE FROM instalacion');
   lic._reiniciar();
-  reloj('2026-11-16');
+  reloj('2026-11-01');
   const e = await lic.estado();
-  assert.deepEqual([e.estado, e.inicio, e.vence], ['solo_consulta', '2026-10-16', '2026-11-15']);
+  assert.deepEqual([e.estado, e.inicio, e.vence], ['solo_consulta', '2026-10-16', '2026-10-31']);
 
   // aunque se borre una de las dos marcas
   fs.rmSync(MARCA1);
@@ -337,7 +337,7 @@ test('desinstalar y volver a instalar NO da otra prueba: las marcas recuerdan la
   assert.equal((await lic.estado()).estado, 'solo_consulta');
 
   // una marca alterada a mano no se cree (y la buena sí)
-  const alterada = leerMarca(MARCA2); alterada.i = '2026-11-16'; alterada.v = '2026-11-16';
+  const alterada = leerMarca(MARCA2); alterada.i = '2026-11-01'; alterada.v = '2026-11-01';
   fs.writeFileSync(MARCA2, JSON.stringify(alterada));
   assert.equal((await lic.estado()).estado, 'solo_consulta');
   assert.equal(leerMarca(MARCA1).i, '2026-10-16', 'la marca borrada se vuelve a escribir sola');
@@ -351,7 +351,7 @@ test('desinstalar y volver a instalar NO da otra prueba: las marcas recuerdan la
   modoLocal('GUID-OTRA-COMPU');
   fs.writeFileSync(MARCA1, JSON.stringify({ i: '2026-01-01', v: '2026-01-02', h: 'a'.repeat(32) }));
   await limpiar();
-  assert.equal((await lic.estado()).inicio, '2026-11-16');
+  assert.equal((await lic.estado()).inicio, '2026-11-01');
 });
 
 test('atrasar el reloj no regala días (queda el avance más reciente)', async () => {
@@ -361,8 +361,8 @@ test('atrasar el reloj no regala días (queda el avance más reciente)', async (
   await limpiar();
   await pool.query('DELETE FROM instalacion');
   reloj('2026-10-16');
-  assert.equal((await lic.estado()).dias, 30);
-  reloj('2026-11-10');
+  assert.equal((await lic.estado()).dias, 15);
+  reloj('2026-10-26');
   assert.equal((await lic.estado()).dias, 5);
   reloj('2026-10-20'); // alguien regresa la fecha de la computadora
   const e = await lic.estado();

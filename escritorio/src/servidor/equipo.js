@@ -1,4 +1,4 @@
-// Identificador de ESTA computadora y marcas de la licencia (prueba de 30 días).
+// Identificador de ESTA computadora y marcas de la licencia (prueba de 15 días).
 //
 // - El identificador sale del "MachineGuid" de Windows: no cambia aunque se desinstale
 //   y se vuelva a instalar el sistema, así el mismo código de activación sigue valiendo.

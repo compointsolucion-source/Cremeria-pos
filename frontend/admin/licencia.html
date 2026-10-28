@@ -64,7 +64,15 @@
   .btn-wa { background: #25D366; color: #fff; border-color: #25D366; }
 
   @media (max-width: 900px) { .rejilla { grid-template-columns: minmax(0, 1fr); } .grande { font-size: 26px; } }
-  @media (max-width: 520px) { .planes { grid-template-columns: 1fr; } }
+  .ct-precios { margin-top: 12px; }
+  .ct-precios .sub { font-size: 13px; font-weight: 700; margin: 12px 0 6px; }
+  .ct-paq, .ct-per { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ct-paq .plan-op, .ct-per .plan-op { padding: 10px 10px 10px 38px; }
+  .ct-paq .plan-op input, .ct-per .plan-op input { left: 12px; top: 13px; margin: 0; }
+  .plan-op > span.ct-precio { display: block; font-weight: 800; font-size: 15px; color: #2E7D32; margin: 2px 0; }
+  .ct-extra { font-size: 12px; color: var(--muted, #7A7D83); margin-top: 8px; line-height: 1.45; }
+  .ct-unico { border: 1px dashed var(--border, #E4E6E9); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+  @media (max-width: 520px) { .planes { grid-template-columns: 1fr; } .ct-paq, .ct-per { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -112,6 +120,7 @@
               <label class="plan-op"><input type="radio" name="ctPlan" value="local"><b>Sin nube</b><span>Trabaja <b>sin internet</b>. Tu información vive en tu computadora, con respaldos.</span></label>
               <label class="plan-op"><input type="radio" name="ctPlan" value="nube"><b>Con nube</b><span>Además, copia tu información en la nube para consultarla <b>desde cualquier lugar</b>.</span></label>
             </div>
+            <div class="ct-precios" id="ctPrecios"></div>
             <div class="lic-error" id="ct_plan_e" hidden></div>
 
             <div class="lic-rej" style="margin-top:12px">
@@ -132,7 +141,7 @@
               <summary>🔒 Aviso de privacidad</summary>
               <div id="ctAvisoTexto"></div>
             </details>
-            <label class="lic-chk"><input type="checkbox" id="ct_acepto"> <span>Acepto el aviso de privacidad y quiero que Compoint reciba estos datos para atender mi solicitud.</span></label>
+            <label class="lic-chk"><input type="checkbox" id="ct_acepto"> <span>Leí y acepto los <a href="https://www.compoint.com.mx/terminos.php" target="_blank" rel="noopener">Términos y condiciones</a>, la <a href="https://www.compoint.com.mx/terminos.php#pagos" target="_blank" rel="noopener">Política de pagos</a> y el aviso de privacidad, y quiero que Compoint reciba estos datos para atender mi solicitud.</span></label>
             <div class="lic-error" id="ct_acepto_e" hidden></div>
 
             <div class="acciones" style="margin-top:16px">
@@ -299,7 +308,42 @@ function pintarTituloContratar() {
     : 'Deja los datos de tu negocio y elige tu plan. Compoint recibe tu solicitud, te confirma el pago y te manda tu código de activación <b>sin que tengas que capturar nada más</b>.';
 }
 
+// ----- Paquetes y precios (lista oficial de compoint.com.mx; sin internet, la copia del programa) -----
+let listaPrecios = null;
+const dinero = (n) => '$' + Number(n).toLocaleString('es-MX');
+
+function pintarPrecios() {
+  const caja = document.getElementById('ctPrecios');
+  const raiz = document.getElementById('contratar');
+  const plan = (raiz.querySelector('input[name=ctPlan]:checked') || {}).value || '';
+  const L = listaPrecios;
+  if (!L || !plan) { caja.innerHTML = ''; return; }
+  if (plan === 'local') {
+    const u = L.sin_nube;
+    caja.innerHTML = `<div class="ct-unico"><b>${esc(u.nombre)}: ${dinero(u.pago_unico)}</b><br>Para ${u.sucursales} sucursal. ${esc(u.incluye)} ${esc(u.renovacion_texto)} (${dinero(u.renovacion_anual)} al año).</div>
+      <div class="ct-extra">Instalación (opcional): ${dinero(L.instalacion.presencial)} presencial o ${dinero(L.instalacion.distancia)} a distancia. ${esc(L.nota)}</div>`;
+    return;
+  }
+  const paqSel = (raiz.querySelector('input[name=ctPaquete]:checked') || {}).value || '';
+  const perSel = (raiz.querySelector('input[name=ctPeriodo]:checked') || {}).value || '';
+  const paq = Object.entries(L.paquetes).map(([k, p]) => `<label class="plan-op"><input type="radio" name="ctPaquete" value="${esc(k)}" ${paqSel === k ? 'checked' : ''}><b>${esc(p.nombre)}</b><span>${esc(p.incluye.filter((x) => x !== 'Nube incluida').join(' · '))}</span><span class="ct-precio">${dinero(p.mensual)} al mes</span></label>`).join('');
+  const base = L.paquetes[paqSel] || null;
+  const per = Object.entries(L.periodos).map(([k, p]) => `<label class="plan-op"><input type="radio" name="ctPeriodo" value="${esc(k)}" ${perSel === k ? 'checked' : ''}><b>${esc(p.nombre)}</b>${base ? `<span class="ct-precio">${dinero(base[k])}</span>` : ''}<span>${esc(p.ahorro || 'Pagas mes con mes')}</span></label>`).join('');
+  caja.innerHTML = `<div class="sub">Paquete</div><div class="ct-paq">${paq}</div>
+    <div class="sub">¿Cada cuándo quieres pagar?</div><div class="ct-per">${per}</div>
+    <div class="ct-extra">Extras: sucursal adicional ${dinero(L.extras.sucursal_anual)} al año · usuario adicional ${dinero(L.extras.usuario_anual)} al año. Instalación (opcional): ${dinero(L.instalacion.presencial)} presencial o ${dinero(L.instalacion.distancia)} a distancia. ${esc(L.nota)}</div>`;
+}
+
+async function cargarPrecios() {
+  try { listaPrecios = await apiFetch('/licencia/precios'); } catch (e) { listaPrecios = null; }
+  pintarPrecios();
+}
+
 async function iniciarContratar() {
+  document.getElementById('contratar').addEventListener('change', (e) => {
+    if (e.target && ['ctPlan', 'ctPaquete', 'ctPeriodo'].includes(e.target.name)) pintarPrecios();
+  });
+  cargarPrecios();
   LicDatos.estilos();
   const raiz = document.getElementById('contratar');
   document.getElementById('ctDatos').innerHTML = LicDatos.formularioHTML('ct_');
@@ -346,7 +390,7 @@ function estadoSolicitudHTML(s) {
   } else {
     aviso = '<div class="aviso amarillo">⌛ <b>Pasaron varios días sin poder enviarla.</b> Mándala por WhatsApp (botón verde) o haz una solicitud nueva.</div>';
   }
-  const detalle = `${s.tipo === 'renovar' ? 'Renovación' : 'Contratación'} · ${textoPlanCorto(s.plan)} · ${plural(s.sucursales, 'sucursal', 'sucursales')}`;
+  const detalle = `${s.tipo === 'renovar' ? 'Renovación' : 'Contratación'} · ${textoPlanCorto(s.plan)}${s.plan_texto ? ' · ' + s.plan_texto : ''} · ${plural(s.sucursales, 'sucursal', 'sucursales')}`;
   return `${aviso}<p class="nota" style="margin:8px 0 0">${esc(detalle)}</p>${accionesSolicitudHTML(s)}`;
 }
 
@@ -410,8 +454,10 @@ function leerFormularioContratar() {
   const raiz = document.getElementById('contratar');
   const datos = LicDatos.leer(raiz, 'ct_');
   const plan = (raiz.querySelector('input[name=ctPlan]:checked') || {}).value || '';
+  const paquete = plan === 'nube' ? ((raiz.querySelector('input[name=ctPaquete]:checked') || {}).value || '') : '';
+  const periodo = plan === 'nube' ? ((raiz.querySelector('input[name=ctPeriodo]:checked') || {}).value || '') : '';
   const sucursales = parseInt(document.getElementById('ct_sucursales').value, 10);
-  return { raiz, datos, plan, sucursales, nota: document.getElementById('ct_nota').value.trim(), acepto: document.getElementById('ct_acepto').checked, ticket: document.getElementById('ct_ticket').checked };
+  return { raiz, datos, plan, paquete, periodo, sucursales, nota: document.getElementById('ct_nota').value.trim(), acepto: document.getElementById('ct_acepto').checked, ticket: document.getElementById('ct_ticket').checked };
 }
 
 async function enviarSolicitud() {
@@ -437,7 +483,7 @@ async function enviarSolicitud() {
   try {
     const r = await apiFetch('/licencia/solicitud', {
       method: 'POST',
-      body: JSON.stringify({ plan: f.plan, sucursales: f.sucursales, nota: f.nota, datos: f.datos, acepto_privacidad: true, aplicar_ticket: f.ticket })
+      body: JSON.stringify({ plan: f.plan, paquete: f.paquete, periodo: f.periodo, sucursales: f.sucursales, nota: f.nota, datos: f.datos, acepto_privacidad: true, aplicar_ticket: f.ticket })
     });
     solicitud = r.solicitud;
     enEdicion = false;

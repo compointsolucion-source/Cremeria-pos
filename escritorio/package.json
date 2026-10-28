@@ -73,7 +73,8 @@
       "uninstallerIcon": "build/icon.ico",
       "installerSidebar": "build/instalador-lateral.bmp",
       "uninstallerSidebar": "build/instalador-lateral.bmp",
-      "language": "3082"
+      "language": "3082",
+      "license": "build/licencia.txt"
     },
     "artifactName": "Payload-CompointPunto.${ext}",
     "asar": false,

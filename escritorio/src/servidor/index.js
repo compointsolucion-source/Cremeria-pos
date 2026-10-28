@@ -135,7 +135,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
   process.env.COMPOINT_EQUIPO = os.hostname();
   process.env.FRONTEND_DIR = path.join(dirServidor, 'frontend');
   process.env.MAX_SUCURSALES = String(cfg.max_sucursales || 1);
-  // Licencia: identificador de ESTA computadora (liga el código de activación) y marcas de la prueba de 30 días.
+  // Licencia: identificador de ESTA computadora (liga el código de activación) y marcas de la prueba de 15 días.
   process.env.COMPOINT_ID_EQUIPO = idDeEquipo({ obtenerPropio: () => cfg.id_equipo, guardarPropio: (id) => guardarCfg({ id_equipo: id }) });
   process.env.COMPOINT_MARCAS = JSON.stringify(rutasMarcas());
   const nubeActual = () => { const n = cfg.nube || {}; let secreto = ''; try { secreto = n.api_secret_cifrado ? descifrar(n.api_secret_cifrado) : (n.api_secret || ''); } catch (e) { secreto = ''; } return { cloud_name: n.cloud_name || '', api_key: n.api_key || '', api_secret: secreto }; };
@@ -163,7 +163,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
   sync.iniciar().catch((e) => log('Sincronización no pudo iniciar: ' + e.message));
 
   // Licencia del cliente: si esta computadora está conectada con la nube del cliente, toma la licencia de ahí
-  // (se quita la prueba de 30 días) y se mantiene al día cuando Compoint la renueva.
+  // (se quita la prueba de 15 días) y se mantiene al día cuando Compoint la renueva.
   const modLicencia = require(path.join(dirServidor, 'backend', 'utils', 'licencia.js'));
   async function tomarLicencia(info, origen) {
     if (!info) return null;

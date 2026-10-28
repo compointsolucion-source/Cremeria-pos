@@ -7,6 +7,7 @@ const { registrarBitacora } = require('../utils/bitacora');
 const licencia = require('../utils/licencia');
 const sol = require('../utils/licenciaSolicitud');
 const envio = require('../utils/licenciaEnvio');
+const precios = require('../utils/precios');
 
 const ROLES_NEGOCIO = ['dueno', 'jefe_general', 'gerente'];
 const WHATSAPP_COMPOINT = '523325907090';
@@ -200,12 +201,13 @@ router.post('/datos/despues', verificarToken, requiereRol(...ROLES_NEGOCIO), asy
 function armarRespuestaSolicitud(fila) {
   const lectura = sol.leerCodigo(fila.codigo);
   const d = lectura.ok ? lectura.datos : {};
-  const base = { tipo: fila.tipo, plan: fila.plan, sucursales: fila.sucursales, idEquipo: d.id_equipo || '', datos: d.negocio || {}, nota: d.nota || '', fecha: d.fecha || '', codigo: fila.codigo };
+  const base = { tipo: fila.tipo, plan: fila.plan, sucursales: fila.sucursales, paquete: d.paquete || '', periodo: d.periodo || '', idEquipo: d.id_equipo || '', datos: d.negocio || {}, nota: d.nota || '', fecha: d.fecha || '', codigo: fila.codigo };
   const mensaje = sol.mensajeWhatsApp(base);
   return {
     id: fila.id,
     estado: fila.estado,                       // pendiente | enviada | rechazada | vencida
     tipo: fila.tipo, plan: fila.plan, sucursales: fila.sucursales,
+    paquete: base.paquete || null, periodo: base.periodo || null, plan_texto: sol.detallePlan(base),
     creada_en: fila.creada_en, enviada_en: fila.enviada_en,
     intentos: fila.intentos, error: fila.ultimo_error || null,
     correo_destino: envio.CORREO_DESTINO,
@@ -239,7 +241,7 @@ router.post('/solicitud', limitadorSolicitud, verificarToken, requiereRol(...ROL
     const est = await licencia.estado();
     const tipo = est.control && est.tipo !== 'demo' ? 'renovar' : 'contratar';
     const codigo = sol.construirCodigo({
-      tipo, plan: b.plan, sucursales, idEquipo: est.id_equipo, datos, nota: b.nota,
+      tipo, plan: b.plan, sucursales, paquete: b.paquete, periodo: b.periodo, idEquipo: est.id_equipo, datos, nota: b.nota,
       fecha: licencia.hoy(), app: VERSION_APP,
       pruebaDiasRestantes: est.control && est.tipo === 'demo' && est.dias != null ? Math.max(0, est.dias) : null
     });
@@ -255,7 +257,7 @@ router.post('/solicitud', limitadorSolicitud, verificarToken, requiereRol(...ROL
     const fila = ins.rows[0];
     await registrarBitacora(pool, {
       usuario_id: req.usuario.id, accion: 'licencia_solicitud', modulo: 'licencia', referencia_id: fila.id,
-      valor_nuevo: { tipo, plan: b.plan, sucursales }
+      valor_nuevo: { tipo, plan: b.plan, sucursales, paquete: b.paquete || null, periodo: b.periodo || null }
     });
 
     // El envío ocurre aparte: la pantalla recibe la respuesta de inmediato y consulta cómo va.
@@ -266,6 +268,11 @@ router.post('/solicitud', limitadorSolicitud, verificarToken, requiereRol(...ROL
     console.error('Error al crear la solicitud de licencia:', err.message);
     res.status(500).json({ error: 'No se pudo preparar tu solicitud. Intenta de nuevo.' });
   }
+});
+
+// Lista oficial de precios (de la página de Compoint; sin internet, la copia del programa).
+router.get('/precios', verificarToken, async (req, res) => {
+  res.json(await precios.obtener());
 });
 
 // Última solicitud y cómo va su envío (si sigue pendiente, aprovecha para reintentar).

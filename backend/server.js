@@ -51,7 +51,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Licencia (prueba de 30 días / renta anual / permanente): avisa antes de vencer y, ya vencida
+// Licencia (prueba de 15 días / renta anual / permanente): avisa antes de vencer y, ya vencida
 // (y pasada la gracia), deja el sistema en "solo consulta". Sin fila en la tabla "licencia" y en la nube no hay control.
 app.use('/api', verificarLicencia);
 

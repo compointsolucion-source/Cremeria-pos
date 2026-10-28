@@ -32,6 +32,8 @@ function cargaUtil(fila, extra) {
     codigo: fila.codigo,
     tipo: d.tipo || fila.tipo,
     plan: d.plan || fila.plan,
+    paquete: d.paquete || '',
+    periodo: d.periodo || '',
     sucursales: d.sucursales || fila.sucursales,
     id_equipo: d.id_equipo || '',
     negocio: d.negocio || {},

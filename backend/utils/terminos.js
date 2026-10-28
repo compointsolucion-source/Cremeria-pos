@@ -3,7 +3,7 @@
 // les vuelve a salir la ventana una sola vez (cláusula 1.11 de los términos).
 const crypto = require('crypto');
 
-const VERSION = '2026-10-27';
+const VERSION = '2026-10-28';
 const URL_COMPLETOS = 'https://www.compoint.com.mx/terminos.php';
 const URL_PRIVACIDAD = 'https://www.compoint.com.mx/privacidad.php';
 
@@ -12,7 +12,7 @@ const RESUMEN = [
   { icono: '🆓', titulo: 'Prueba gratis de 15 días', texto: 'Sin cobros automáticos: al terminar, el sistema solo deja de vender hasta que contrates.' },
   { icono: '🧾', titulo: 'Tus precios e impuestos son tuyos', texto: 'Tú capturas precios, existencias y facturas; el sistema hace las cuentas con lo que capturas.' },
   { icono: '💾', titulo: 'Tu información es tuya', texto: 'Respaldos diarios. Si cancelas, la puedes descargar durante 30 días.' },
-  { icono: '↩️', titulo: 'Cancelas cuando quieras', texto: 'Los reembolsos siguen la política de pagos de cada plan.' },
+  { icono: '↩️', titulo: 'Cancelas cuando quieras', texto: 'Sin penalización. Si te cobramos doble o fallamos gravemente, te devolvemos el 100%; lo demás, según la política de pagos.' },
   { icono: '🔒', titulo: 'Datos de tus clientes', texto: 'Tu negocio es el responsable; nosotros solo los guardamos por ti y no los usamos para nada más.' }
 ];
 
