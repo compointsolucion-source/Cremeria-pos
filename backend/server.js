@@ -83,6 +83,7 @@ app.use('/api/fichas', require('./routes/fichas'));
 app.use('/api/sistema', require('./routes/sistema'));
 app.use('/api/sucursales', require('./routes/sucursales'));
 app.use('/api/licencia', require('./routes/licencia'));
+app.use('/api/terminos', require('./routes/terminos'));
 // Copia espejo del servidor local del negocio (apagada hasta que el dueño la vincule desde el panel del servidor, o exista SYNC_KEY).
 app.use('/api/sync', require('./routes/sync'));
 // Facturación: página pública para que el cliente pida su factura (+ administración de solicitudes).

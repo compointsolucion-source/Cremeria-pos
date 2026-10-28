@@ -17,6 +17,7 @@ const licencia = require('../utils/licencia');
 const PERMITIDAS_EN_SOLO_CONSULTA = [
   /^\/api\/auth\//,                 // iniciar y cerrar sesión, cambiar contraseña
   /^\/api\/licencia(\/|$)/,         // meter el código de activación, pedir contratar
+  /^\/api\/terminos\/aceptar$/,     // aceptar los términos y condiciones
   /^\/api\/turnos\/\d+\/cerrar$/,   // cerrar el turno que estaba abierto
   /^\/api\/facturacion\/publico\//  // la página pública para pedir factura
 ];

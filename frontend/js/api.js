@@ -615,3 +615,111 @@ async function preguntarSalidaPrograma() {
   }
   return 'cancelar';
 }
+
+// ===== Términos y condiciones: el dueño los acepta una sola vez por versión =====
+// Al entrar, si el negocio todavía no acepta la versión vigente, al dueño (o jefe general) le sale una ventana
+// obligatoria con lo más importante en 5 puntos y la casilla "Acepto". Sin aceptar no puede seguir (solo "Salir").
+// Los demás usuarios (cajeros, mostrador...) no ven nada. La constancia queda en el servidor (fecha, IP, versión, huella).
+const PAGINAS_SIN_TERMINOS = ['login.html', 'index.html', 'pantalla-turnos.html', 'kiosco-fichas.html', 'facturar.html'];
+
+function mostrarVentanaTerminos(e, clave) {
+  if (document.getElementById('cp-terminos')) return;
+  if (!document.getElementById('estilo-cp-terminos')) {
+    const st = document.createElement('style');
+    st.id = 'estilo-cp-terminos';
+    st.textContent = `
+      #cp-terminos{position:fixed;inset:0;z-index:100001;background:rgba(10,14,20,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+      #cp-terminos .ct-caja{background:var(--surface,#fff);color:var(--text,#1F2023);border-radius:18px;max-width:640px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.45);overflow:hidden}
+      #cp-terminos .ct-cab{padding:18px 22px 10px}
+      #cp-terminos .ct-cab small{color:var(--primary,#5FAE46);font-weight:800;letter-spacing:.06em;font-size:12px}
+      #cp-terminos .ct-cab h2{font-size:21px;margin:4px 0 2px}
+      #cp-terminos .ct-cab p{color:var(--muted,#7A7D83);font-size:13.5px;margin:0}
+      #cp-terminos .ct-cuerpo{padding:6px 22px 4px;overflow:auto}
+      #cp-terminos .ct-resumen{display:grid;gap:8px;margin:8px 0 12px}
+      #cp-terminos .ct-r{display:flex;gap:10px;align-items:flex-start;background:rgba(95,174,70,.09);border:1px solid rgba(95,174,70,.25);border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.35}
+      #cp-terminos .ct-r b{display:block}
+      #cp-terminos .ct-r .ct-ic{font-size:18px;line-height:1}
+      #cp-terminos .ct-ver{font-size:13.5px;font-weight:700;color:#2E7D32;text-decoration:none}
+      [data-tema="oscuro"] #cp-terminos .ct-ver{color:#8BD97A}
+      #cp-terminos .ct-pie{padding:12px 22px 16px;border-top:1px solid var(--border,#E4E6E9);display:grid;gap:10px}
+      #cp-terminos label.ct-chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;font-weight:600;cursor:pointer}
+      #cp-terminos label.ct-chk input{width:20px;height:20px;margin-top:1px;flex:none;accent-color:#5FAE46}
+      #cp-terminos .ct-ok{border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15.5px;cursor:pointer;background:var(--primary,#5FAE46);color:#fff}
+      #cp-terminos .ct-ok:disabled{opacity:.45;cursor:not-allowed}
+      #cp-terminos .ct-err{color:#C62828;font-size:13px;font-weight:600;text-align:center;min-height:0}
+      #cp-terminos .ct-err:empty{display:none}
+      #cp-terminos .ct-nota{font-size:11.5px;color:var(--muted,#7A7D83);text-align:center}
+      #cp-terminos .ct-salir{border:none;background:transparent;color:var(--muted,#7A7D83);font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline}`;
+    document.head.appendChild(st);
+  }
+  const ov = document.createElement('div');
+  ov.id = 'cp-terminos';
+  ov.innerHTML = `
+    <div class="ct-caja" role="dialog" aria-modal="true" aria-labelledby="ctTitulo">
+      <div class="ct-cab"><small>ANTES DE EMPEZAR · UNA SOLA VEZ</small><h2 id="ctTitulo">Términos y condiciones de Compoint Punto</h2>
+        <p>Lo más importante, en 5 puntos. Puedes leer el texto completo cuando quieras.</p></div>
+      <div class="ct-cuerpo"><div class="ct-resumen"></div><a class="ct-ver" target="_blank" rel="noopener"></a></div>
+      <div class="ct-pie">
+        <label class="ct-chk"><input type="checkbox" id="ctAcepto"> <span class="ct-txt"></span></label>
+        <button type="button" class="ct-ok" disabled>Aceptar y continuar</button>
+        <div class="ct-err" role="alert"></div>
+        <div class="ct-nota"></div>
+        <div style="text-align:center"><button type="button" class="ct-salir">No acepto · Salir del sistema</button></div>
+      </div>
+    </div>`;
+  const res = ov.querySelector('.ct-resumen');
+  (e.resumen || []).forEach((p) => {
+    const d = document.createElement('div'); d.className = 'ct-r';
+    const ic = document.createElement('span'); ic.className = 'ct-ic'; ic.textContent = p.icono || '•';
+    const t = document.createElement('div'); const b = document.createElement('b'); b.textContent = p.titulo;
+    t.appendChild(b); t.appendChild(document.createTextNode(p.texto)); d.appendChild(ic); d.appendChild(t); res.appendChild(d);
+  });
+  const ver = ov.querySelector('.ct-ver');
+  ver.href = e.url_completos || 'https://www.compoint.com.mx/terminos.php';
+  ver.textContent = '📄 Leer términos completos, política de pagos y aviso de privacidad →';
+  ov.querySelector('.ct-txt').textContent = e.texto_acepto || 'Leí y acepto los Términos y condiciones de Compoint.';
+  ov.querySelector('.ct-nota').textContent = `Versión ${e.version} · Se guarda la fecha, la hora y quién aceptó.`;
+  const chk = ov.querySelector('#ctAcepto');
+  const ok = ov.querySelector('.ct-ok');
+  const err = ov.querySelector('.ct-err');
+  chk.addEventListener('change', () => { ok.disabled = !chk.checked; });
+  ok.addEventListener('click', async () => {
+    if (!chk.checked) return;
+    ok.disabled = true; err.textContent = '';
+    try {
+      await apiFetch('/terminos/aceptar', { method: 'POST', body: JSON.stringify({ acepto: true, version: e.version }) });
+      try { sessionStorage.setItem(clave, '1'); } catch (x) { /* nada */ }
+      ov.remove();
+    } catch (x) {
+      if (/actualizaron/.test(x.message)) { window.location.reload(); return; }
+      err.textContent = x.message || 'No se pudo guardar. Intenta de nuevo.';
+      ok.disabled = !chk.checked;
+    }
+  });
+  ov.querySelector('.ct-salir').addEventListener('click', () => {
+    if (typeof salirDelSistema === 'function') salirDelSistema(); else cerrarSesion();
+  });
+  // Mientras esté abierta, nada de atrás se puede usar (ni con el teclado).
+  ov.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') ev.stopPropagation(); });
+  document.body.appendChild(ov);
+  setTimeout(() => { try { chk.focus(); } catch (x) { /* nada */ } }, 50);
+}
+
+async function revisarTerminos() {
+  try {
+    if (!getToken()) return;
+    const u = getUsuario();
+    if (!u || !['dueno', 'jefe_general'].includes(u.rol)) return;
+    const ruta = window.location.pathname;
+    if (ruta === '/' || PAGINAS_SIN_TERMINOS.some((p) => ruta.endsWith('/' + p))) return;
+    const clave = 'terminos_ok_' + (u.id || u.usuario || '');
+    try { if (sessionStorage.getItem(clave)) return; } catch (x) { /* sin almacenamiento: se pregunta al servidor */ }
+    const e = await apiFetch('/terminos/estado');
+    if (!e || e.aceptado || e.sin_dato) { try { sessionStorage.setItem(clave, '1'); } catch (x) { /* nada */ } return; }
+    if (!e.puede_aceptar) return;
+    mostrarVentanaTerminos(e, clave);
+  } catch (err) { /* sin conexión o servidor sin esta función: se vuelve a revisar la próxima vez */ }
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { revisarTerminos(); });
+else revisarTerminos();
