@@ -3,6 +3,10 @@
 //   la baja en segundo plano y le avisa a quien lo usa: "Hay una actualización… ¿Reiniciar ahora?".
 // - Si dice "Después", se instala sola la próxima vez que se cierre el programa.
 // - Sin internet o con cualquier error, no molesta: solo lo anota en el log y vuelve a intentar más tarde.
+// - Como cerrar la ventana solo la esconde junto al reloj, el programa casi nunca se cierra del todo. Por eso:
+//     · el aviso se vuelve a mostrar cada 4 horas mientras no se instale;
+//     · el sistema (pantalla de entrada y menú) muestra «Actualizar ahora» con lo nuevo que trae;
+//     · de madrugada (2 a 5 a. m.), si nadie está usando la computadora, se instala sola.
 // Todo se recibe por parámetro (autoUpdater, dialog…) para poder probarlo sin abrir Electron.
 
 const HORAS = 3600 * 1000;
@@ -14,10 +18,30 @@ function crear(op) {
     prepararSalida = async () => {}, // se llama antes de reiniciar (por ejemplo, cerrar la base de datos con respaldo)
     cadaHoras = 4,
     primerRevisionMs = 45 * 1000,
-    programar = { esperar: setTimeout, repetir: setInterval }
+    programar = { esperar: setTimeout, repetir: setInterval },
+    alCambiar = () => {},           // avisa a las pantallas que cambió el estado (para el botón «Actualizar ahora»)
+    ahora = () => Date.now(),
+    horaLocal = () => new Date().getHours(),
+    segundosInactivo = () => 0      // powerMonitor.getSystemIdleTime() en Electron
   } = op;
 
-  let manual = false, avisada = '', reiniciando = false, descargada = null, revisando = false;
+  let manual = false, avisada = '', avisadaEn = 0, reiniciando = false, descargada = null, revisando = false;
+  let nueva = null, notas = '', progreso = 0;
+  const RECORDAR_MS = cadaHoras * HORAS;
+  const NOCHE = { desde: 2, hasta: 5, inactivoSeg: 20 * 60 };
+
+  // Las notas de la versión llegan de GitHub (texto o HTML); se dejan en texto simple y corto.
+  function textoNotas(info) {
+    let n = info && info.releaseNotes;
+    if (Array.isArray(n)) n = n.map((x) => (x && x.note) || '').join('\n');
+    return String(n || '').replace(/<\/(p|li|h\d)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&quot;/g, "'")
+      .split('\n').map((l) => l.replace(/^[\s*#-]+/, '').trim()).filter(Boolean).slice(0, 8).join('\n').slice(0, 800);
+  }
+  const avisar = () => { try { alCambiar(estado()); } catch (e) { /* sin pantallas */ } };
+  function estado() {
+    return { actual: app.getVersion(), nueva, descargada: !!descargada, progreso, notas };
+  }
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -39,21 +63,29 @@ function crear(op) {
   }
 
   async function avisarDescargada(version) {
-    if (avisada === version && !manual) return;
-    avisada = version;
+    if (avisada === version && !manual && ahora() - avisadaEn < RECORDAR_MS) return;
+    avisada = version; avisadaEn = ahora();
     manual = false;
     const r = await cuadro({
       type: 'info',
       title: 'Actualización de Compoint Punto',
       message: 'Hay una actualización nueva (versión ' + version + ')',
-      detail: 'Ya se descargó. Trae mejoras y correcciones de seguridad.\n\n¿Quieres reiniciar ahora para usarla? Tarda unos segundos. Si eliges «Después», se instala sola la próxima vez que cierres el programa.',
+      detail: (notas ? 'Lo nuevo:\n• ' + notas.split('\n').join('\n• ') + '\n\n' : 'Ya se descargó. Trae mejoras y correcciones de seguridad.\n\n') +
+        '¿Quieres reiniciar ahora para usarla? Tarda unos segundos. Si eliges «Después», puedes instalarla cuando quieras con el botón «Actualizar ahora» de la pantalla de entrada; si no, se instala sola de madrugada.',
       buttons: ['Reiniciar ahora', 'Después'], defaultId: 0, cancelId: 1, noLink: true
     });
     if (r.response === 0) await reiniciar();
   }
 
   autoUpdater.on('checking-for-update', () => { revisando = true; });
-  autoUpdater.on('update-available', (info) => { log('Actualizador: versión nueva ' + (info && info.version) + ', descargando'); });
+  autoUpdater.on('update-available', (info) => {
+    log('Actualizador: versión nueva ' + (info && info.version) + ', descargando');
+    nueva = (info && info.version) || nueva; notas = textoNotas(info) || notas; progreso = 0; avisar();
+  });
+  autoUpdater.on('download-progress', (p) => {
+    const v = Math.round((p && p.percent) || 0);
+    if (v >= progreso + 10 || v === 100) { progreso = v; avisar(); }
+  });
   autoUpdater.on('update-not-available', async () => {
     revisando = false;
     if (manual) {
@@ -64,6 +96,7 @@ function crear(op) {
   autoUpdater.on('update-downloaded', (info) => {
     revisando = false;
     descargada = info && info.version;
+    nueva = descargada || nueva; notas = textoNotas(info) || notas; progreso = 100; avisar();
     avisarDescargada(descargada).catch((e) => log('Actualizador: ' + (e && e.message)));
   });
   autoUpdater.on('error', async (err) => {
@@ -80,11 +113,24 @@ function crear(op) {
     return Promise.resolve(autoUpdater.checkForUpdates()).catch((e) => log('Actualizador: ' + (e && e.message)));
   }
 
+  // De madrugada y sin nadie usando la computadora: se instala sola.
+  function revisarNoche() {
+    if (!descargada || reiniciando) return;
+    const h = horaLocal();
+    if (h < NOCHE.desde || h >= NOCHE.hasta) return;
+    if (segundosInactivo() < NOCHE.inactivoSeg) return;
+    log('Actualizador: instalando ' + descargada + ' de madrugada (nadie usaba la computadora)');
+    reiniciar().catch((e) => log('Actualizador: ' + (e && e.message)));
+  }
+
   return {
     iniciar() {
       programar.esperar(buscar, primerRevisionMs);
       programar.repetir(buscar, cadaHoras * HORAS);
+      programar.repetir(revisarNoche, 15 * 60 * 1000);
     },
+    estado,
+    revisarNoche,
     // Desde el menú junto al reloj: "Buscar actualizaciones".
     buscarAhora() {
       manual = true;

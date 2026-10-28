@@ -1,0 +1,4 @@
+- Nuevo botón «Recargas y servicios» en Caja: tiempo aire (Telcel, AT&T, Movistar…) y pago de luz, agua, teléfono y cable. Por ahora en modo práctica.
+- Pantalla de entrada con «¿Sabías que…?»: novedades y trucos que van cambiando.
+- Ahora ves la versión de tu sistema arriba, en el menú.
+- Aviso de actualización con botón «Actualizar ahora».

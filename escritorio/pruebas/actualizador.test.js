@@ -35,7 +35,7 @@ test('configura la descarga automática y la instalación al cerrar', () => {
 test('revisa poco después de abrir y luego cada 4 horas', () => {
   const { act, tareas } = armar();
   act.iniciar();
-  assert.deepEqual(tareas.map((t) => [t[0], t[1]]), [['esperar', 45000], ['repetir', 4 * 3600 * 1000]]);
+  assert.deepEqual(tareas.map((t) => [t[0], t[1]]), [['esperar', 45000], ['repetir', 4 * 3600 * 1000], ['repetir', 15 * 60 * 1000]]);
 });
 
 test('al bajar una versión nueva avisa y, si se acepta, prepara la salida y reinstala en silencio', async () => {
@@ -113,6 +113,54 @@ test('con la actualización ya descargada, «Buscar» a mano vuelve a ofrecer re
 test('reiniciar dos veces seguidas solo instala una vez', async () => {
   const { act, au, salida } = armar();
   await act.reiniciar(); await act.reiniciar();
+  assert.deepEqual(salida, ['preparada']);
+  assert.deepEqual(au.instalo, [true, true]);
+});
+
+test('si no la instala, vuelve a recordar la misma versión 4 horas después', async () => {
+  let t = 1000;
+  const { au, cuadros } = armar({ respuestas: [1, 1], extra: { ahora: () => t } });
+  au.emit('update-downloaded', { version: '1.2.0' });
+  await pausa(); await pausa();
+  t += 3 * 3600 * 1000;
+  au.emit('update-downloaded', { version: '1.2.0' });
+  await pausa(); await pausa();
+  assert.equal(cuadros.length, 1);
+  t += 2 * 3600 * 1000;
+  au.emit('update-downloaded', { version: '1.2.0' });
+  await pausa(); await pausa();
+  assert.equal(cuadros.length, 2);
+});
+
+test('guarda lo nuevo de la versión (notas de GitHub en texto simple) y avisa a las pantallas', async () => {
+  const cambios = [];
+  const { au, act, cuadros } = armar({ respuestas: [1], extra: { alCambiar: (e) => cambios.push(e) } });
+  au.emit('update-available', { version: '1.2.0', releaseNotes: '<ul><li>Recargas y <b>pago de servicios</b></li><li>¿Sabías que…?</li></ul><script>x</script>' });
+  au.emit('update-downloaded', { version: '1.2.0' });
+  await pausa(); await pausa();
+  const e = act.estado();
+  assert.equal(e.nueva, '1.2.0');
+  assert.equal(e.descargada, true);
+  assert.equal(e.actual, '1.1.5');
+  assert.match(e.notas, /^Recargas y pago de servicios\n¿Sabías que…\?/);
+  assert.ok(!/</.test(e.notas));
+  assert.ok(cambios.length >= 2);
+  assert.match(cuadros[0].detail, /Recargas y pago de servicios/);
+});
+
+test('de madrugada y sin nadie usando la computadora, se instala sola', async () => {
+  let hora = 14, inactivo = 3600;
+  const { au, act, salida } = armar({ respuestas: [1], extra: { horaLocal: () => hora, segundosInactivo: () => inactivo } });
+  act.revisarNoche();
+  au.emit('update-downloaded', { version: '1.2.0' });
+  await pausa(); await pausa();
+  act.revisarNoche(); await pausa();
+  assert.equal(au.instalo, undefined); // de día, no
+  hora = 3; inactivo = 60;
+  act.revisarNoche(); await pausa();
+  assert.equal(au.instalo, undefined); // alguien la está usando
+  inactivo = 30 * 60;
+  act.revisarNoche(); await pausa(); await pausa();
   assert.deepEqual(salida, ['preparada']);
   assert.deepEqual(au.instalo, [true, true]);
 });

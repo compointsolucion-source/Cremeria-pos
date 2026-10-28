@@ -375,6 +375,13 @@ function inicializarSidebar() {
   document.body.insertAdjacentHTML('afterbegin', construirSidebar());
   document.body.classList.add('con-sidebar');
   restaurarEstadoSidebar();
+  // Versión arriba, botón «Actualizar» y «Lo nuevo» (js/novedades.js), sin tener que agregarlo en cada pantalla.
+  if (!window.CompointNovedades && !document.querySelector('script[data-novedades]')) {
+    const sc = document.createElement('script');
+    sc.src = (estaEnCarpetaAdmin() ? '../' : '') + 'js/novedades.js';
+    sc.dataset.novedades = '1';
+    document.body.appendChild(sc);
+  } else if (window.CompointNovedades) window.CompointNovedades.mejorarMenu();
   // Un clic fuera de la lista flotante (menú compacto) la cierra.
   // (fase de captura: así también cierra aunque el botón que se tocó detenga el evento)
   document.addEventListener('click', (e) => { if (!e.target.closest('.sidebar-grupo.emergente')) cerrarEmergentesSidebar(); }, true);

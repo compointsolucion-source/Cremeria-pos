@@ -41,6 +41,14 @@
              font-size: 14px; line-height: 1.5; min-height: 70px; transition: opacity .4s ease; }
   .consejo.oculto { opacity: 0; }
   .consejo em { font-style: normal; font-weight: 700; color: #b6f19e; }
+  .consejo .nuevo { display: inline-block; background: #8be06d; color: #10210a; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+  .aviso-act { margin-top: 12px; background: rgba(139,224,109,.22); border: 1px solid #8be06d; border-radius: 14px; padding: 13px 16px; font-size: 14px; line-height: 1.45; }
+  .aviso-act[hidden] { display: none; }
+  .aviso-act b.t { display: block; font-size: 15px; color: #b6f19e; margin-bottom: 4px; }
+  .aviso-act ul { margin: 4px 0 10px; padding-left: 18px; }
+  .aviso-act button { background: #8be06d; color: #10210a; border: 0; border-radius: 9px; padding: 9px 14px; font-weight: 800; font-size: 14px; cursor: pointer; }
+  .aviso-act button:hover { filter: brightness(1.08); }
+  .aviso-act .despues { background: transparent; color: inherit; font-weight: 600; opacity: .8; margin-left: 6px; }
   .pie { margin-top: 14px; font-size: 13px; opacity: .8; display: flex; gap: 18px; flex-wrap: wrap; }
   .pie a { color: inherit; text-decoration: none; }
 
@@ -119,6 +127,7 @@
         <div class="dato" id="datoConexion"><small>Conexión</small><b><span class="punto off" id="puntoConexion"></span><span id="vConexion">Conectando…</span></b></div>
         <div class="dato" id="datoLicencia" hidden><small>Licencia</small><b id="vLicencia"></b></div>
       </div>
+      <div class="aviso-act" id="avisoAct" hidden aria-live="polite"></div>
       <div class="consejo" id="consejo" aria-live="off"></div>
       <div class="pie">
         <a href="https://wa.me/523325907090" target="_blank" rel="noopener">📞 33 25 90 70 90 (WhatsApp)</a>
@@ -227,6 +236,7 @@
 <script src="js/api.js"></script>
 <script src="js/estado-conexion.js"></script>
 <script src="js/logo3d.js"></script>
+<script src="js/novedades.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 
@@ -513,29 +523,44 @@ async function cargarInfo() {
     $('datoSucursal').hidden = !i.sucursal; if (i.sucursal) $('vSucursal').textContent = i.sucursal;
     const lic = textoLicencia(i.licencia);
     $('datoLicencia').hidden = !lic; $('vLicencia').textContent = lic;
-    if (i.version) $('vVersion').textContent = 'v' + i.version;
+    if (i.version && !(window.compointDesktop && window.compointDesktop.version)) $('vVersion').textContent = 'Versión ' + i.version;
   } catch (e) { ponerConexion(false); }
 }
 cargarInfo(); setInterval(cargarInfo, 60000);
 window.addEventListener('online', cargarInfo);
 window.addEventListener('offline', () => ponerConexion(false));
 
-/* Consejos que cambian solos */
-const CONSEJOS = [
-  'Si se va el <b>internet</b>, sigues vendiendo: todo se sincroniza al volver.',
-  'El <b>mostrador</b> pesa y arma el ticket; el <b>cajero</b> solo cobra.',
-  'Cambia los <b>colores</b> y el modo oscuro desde Configuración.',
-  'En <b>Pedidos</b> puedes pedir anticipo y mandar al repartidor por WhatsApp.',
-  'El <b>Corte de caja</b> muestra el resumen del turno y lo imprime.',
-  'En <b>Respaldos</b> puedes guardar una copia de tu información.'
-];
-let consejoN = Math.floor(Math.random() * CONSEJOS.length);
-function pintarConsejo() { $('consejo').innerHTML = '<em>💡 Sabías que…</em> ' + CONSEJOS[consejoN % CONSEJOS.length]; }
-pintarConsejo();
+/* ¿Sabías que…? — primero lo nuevo de esta versión y luego trucos revueltos (sin repetirse seguido) */
+const NOV = window.CompointNovedades;
+const filaConsejos = [];
+async function prepararConsejos() {
+  const v = await NOV.version();
+  if (v) $('vVersion').textContent = 'Versión ' + v;
+  const n = v ? NOV.novedadesDe(v) : null;
+  if (n) n.puntos.forEach((p) => filaConsejos.push('<span class="nuevo">NUEVO ' + v + '</span>' + p));
+}
+function pintarConsejo() {
+  const texto = filaConsejos.length ? filaConsejos.shift() : NOV.siguienteConsejo();
+  $('consejo').innerHTML = '<em>💡 Sabías que…</em> ' + texto;
+}
+prepararConsejos().then(pintarConsejo);
 setInterval(() => {
   const c = $('consejo'); c.classList.add('oculto');
-  setTimeout(() => { consejoN++; pintarConsejo(); c.classList.remove('oculto'); }, 420);
+  setTimeout(() => { pintarConsejo(); c.classList.remove('oculto'); }, 420);
 }, 9000);
+
+/* Programa de Windows: versión nueva ya descargada → «Actualizar ahora» (cada quien decide cuándo) */
+let actPospuesta = '';
+NOV.alCambiarActualizacion((e) => {
+  const caja = $('avisoAct');
+  if (!NOV.hayActualizacion(e) || actPospuesta === e.nueva) { caja.hidden = true; return; }
+  caja.innerHTML = '<b class="t">⬆️ Hay una versión nueva: ' + e.nueva.replace(/[^0-9.]/g, '') + '</b>' +
+    (NOV.notasHTML(e) || 'Trae mejoras y correcciones.') +
+    '<button type="button" id="btnActualizar">Actualizar ahora</button><button type="button" class="despues" id="btnDespues">Después</button>';
+  caja.hidden = false;
+  $('btnActualizar').onclick = () => NOV.instalar();
+  $('btnDespues').onclick = () => { actPospuesta = e.nueva; caja.hidden = true; };
+});
 
 /* Logo 3D */
 try { Logo3D($('escena3d')); } catch (e) { /* si el navegador no puede dibujarlo, la pantalla funciona igual */ }

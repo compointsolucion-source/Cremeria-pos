@@ -15,7 +15,11 @@ contextBridge.exposeInMainWorld('compointDesktop', {
   listarImpresoras: () => ipcRenderer.invoke('listar-impresoras'),
   imprimirHTML: (html, opciones) => ipcRenderer.invoke('imprimir-html', html, opciones),
   abrirCajon: (opciones) => ipcRenderer.invoke('abrir-cajon', opciones),
-  salir: () => ipcRenderer.invoke('salir-programa')
+  salir: () => ipcRenderer.invoke('salir-programa'),
+  version: (() => { try { return ipcRenderer.sendSync('app-version'); } catch (e) { return ''; } })(),
+  actualizacion: () => ipcRenderer.invoke('act-estado'),
+  instalarActualizacion: () => ipcRenderer.invoke('act-instalar'),
+  alCambiarActualizacion: (fn) => { ipcRenderer.on('act-cambio', (_e, estado) => { try { fn(estado); } catch (err) { /* pantalla */ } }); }
 });
 
 // Modo servidor del negocio (solo las páginas del programa, no el sistema web).

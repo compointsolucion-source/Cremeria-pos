@@ -1,7 +1,7 @@
 // Compoint Punto para escritorio (Windows 10/11).
 // Abre el sistema web del negocio en su propia ventana, arranca con Windows,
 // vive junto al reloj (bandeja) e incluye el intermediario de impresión por red.
-const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, session, shell, safeStorage, net, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, session, shell, safeStorage, net, nativeImage, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const intermediario = require('./intermediario');
@@ -443,6 +443,18 @@ const esDelSistema = (evento) => {
 // El sistema pide salir del programa cuando termina de hacer el corte de caja.
 ipcMain.on('arranque-id', (e) => { e.returnValue = ARRANQUE_ID; });
 ipcMain.handle('salir-programa', (e) => { if (!esDelSistema(e)) return false; saliendo = true; app.quit(); return true; });
+// Versión del programa y actualización pendiente (para «¿Sabías que…?» y el botón «Actualizar ahora»).
+ipcMain.on('app-version', (e) => { e.returnValue = app.getVersion(); });
+ipcMain.handle('act-estado', (e) => {
+  if (!esDelSistema(e)) return null;
+  return actualizaciones ? actualizaciones.estado() : { actual: app.getVersion(), nueva: null, descargada: false, progreso: 0, notas: '' };
+});
+ipcMain.handle('act-instalar', async (e) => {
+  if (!esDelSistema(e) || !actualizaciones) return false;
+  if (!actualizaciones.estado().descargada) { actualizaciones.buscarAhora(); return false; }
+  await actualizaciones.reiniciar();
+  return true;
+});
 
 ipcMain.handle('listar-impresoras', async (e) => {
   if (!esDelSistema(e)) return [];
@@ -1017,6 +1029,10 @@ function iniciarActualizaciones() {
     actualizaciones = actualizador.crear({
       autoUpdater, dialog, app, log,
       ventana: () => ventana,
+      alCambiar: (estado) => {
+        BrowserWindow.getAllWindows().forEach((w) => { try { if (!w.isDestroyed()) w.webContents.send('act-cambio', estado); } catch (e) { /* ventana cerrándose */ } });
+      },
+      segundosInactivo: () => { try { return powerMonitor.getSystemIdleTime(); } catch (e) { return 0; } },
       prepararSalida: async () => {
         // Modo servidor: la base de datos se cierra con respaldo antes de que el instalador cambie los archivos.
         if (servidorLocal && !cierreListo) { cerrandoServidor = true; await cerrarServidorConRespaldo(); cierreListo = true; }

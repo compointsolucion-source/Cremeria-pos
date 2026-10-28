@@ -133,6 +133,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
   process.env.PORT = String(puertoWeb);
   process.env.HOST = '0.0.0.0';
   process.env.COMPOINT_EQUIPO = os.hostname();
+  try { process.env.COMPOINT_VERSION = require('../../package.json').version; } catch (e) { /* sin versión */ }
   process.env.FRONTEND_DIR = path.join(dirServidor, 'frontend');
   process.env.MAX_SUCURSALES = String(cfg.max_sucursales || 1);
   // Licencia: identificador de ESTA computadora (liga el código de activación) y marcas de la prueba de 15 días.
