@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+const { montoNoNegativo } = require('../utils/seguridadCaja');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
@@ -220,7 +221,9 @@ router.get('/actual', verificarToken, async (req, res) => {
 // Abrir turno
 router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req, res) => {
   try {
-    const { fondo_inicial } = req.body;
+    // El fondo inicial es dinero que se pone en la caja: nunca negativo.
+    const fondo_inicial = montoNoNegativo(req.body.fondo_inicial);
+    if (fondo_inicial === null) return res.status(400).json({ error: 'El fondo inicial debe ser un número de $0 en adelante' });
 
     const abierto = await pool.query(
       `SELECT * FROM turnos WHERE sucursal_id = $1 AND usuario_id = $2 AND estado = 'abierto'`,
@@ -232,7 +235,7 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
 
     const result = await pool.query(
       `INSERT INTO turnos (sucursal_id, usuario_id, fondo_inicial) VALUES ($1, $2, $3) RETURNING *`,
-      [req.sucursalId, req.usuario.id, fondo_inicial || 0]
+      [req.sucursalId, req.usuario.id, fondo_inicial]
     );
 
     await registrarBitacora(pool, {
@@ -240,7 +243,7 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
       accion: 'abrir_turno',
       modulo: 'turnos',
       referencia_id: result.rows[0].id,
-      valor_nuevo: { fondo_inicial: fondo_inicial || 0 }
+      valor_nuevo: { fondo_inicial }
     });
 
     res.json(result.rows[0]);

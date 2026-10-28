@@ -9,7 +9,6 @@
 //   Se hace la primera vez, y después de restaurar un respaldo.
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 const { Pool } = require('pg');
 const { leerJson, guardarJson } = require('./rutas');
 
@@ -22,6 +21,60 @@ const CADA_MS = 30 * 1000;
 const q = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 
 // ---------------------------------------------------------------- dirección de la nube
+// Solo se aceptan nubes de Compoint: compoint.com.mx (y sus subdominios, ej. cp1000.compoint.com.mx) y,
+// para los clientes que siguen en el hospedaje anterior, *.onrender.com. Siempre con https.
+// localhost / 127.0.0.1 solo en pruebas o desarrollo (variable COMPOINT_DEV=1).
+const modoDesarrollo = () => process.env.COMPOINT_DEV === '1';
+function hostDeNubePermitido(hostname) {
+  const h = String(hostname || '').toLowerCase().replace(/\.$/, '');
+  return h === 'compoint.com.mx' || h.endsWith('.compoint.com.mx') || h.endsWith('.onrender.com');
+}
+// Devuelve el URL si es una nube permitida; si no, lanza un error entendible.
+function validarNube(u) {
+  const local = /^(localhost|127\.0\.0\.1)$/.test(u.hostname);
+  if (local) {
+    if (modoDesarrollo() && /^https?:$/.test(u.protocol)) return u;
+    throw new Error('Esa dirección no es de tu sistema en la nube. Debe ser la de Compoint, ej. https://cp1000.compoint.com.mx');
+  }
+  if (u.protocol !== 'https:') throw new Error('La dirección de la nube debe empezar con https://');
+  if (u.username || u.password || !hostDeNubePermitido(u.hostname)) {
+    throw new Error('Esa dirección no es de tu sistema en la nube. Debe ser la de Compoint, ej. https://cp1000.compoint.com.mx');
+  }
+  return u;
+}
+
+// Lee la dirección del servidor (API_URL) del archivo config.js de la página, SIN ejecutarlo.
+// Entiende las formas que usa Compoint Punto:
+//   const API_URL = location.origin + '/api';                 (página servida por el mismo servidor)
+//   const API_URL = 'https://xxx/api';                        (dirección escrita)
+//   API_POR_DIRECCION / NOMBRE-web.onrender.com / API_PRODUCCION (frontend/js/config.js)
+function apiDeConfigJs(texto, u) {
+  const t = String(texto || '').replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const cadena = "'([^'\\\\\\s]{1,300})'|\"([^\"\\\\\\s]{1,300})\"";
+  const valor = (m) => (m ? (m[1] !== undefined ? m[1] : m[2]) : null);
+  if (/\bAPI_URL\s*=\s*location\.origin\s*\+\s*(['"])\/api\/?\1\s*;?/.test(t)) return u.origin + '/api';
+  const directo = new RegExp('\\bAPI_URL\\s*=\\s*(?:' + cadena + ')\\s*;?').exec(t);
+  if (directo) return valor(directo);
+  // Forma de frontend/js/config.js
+  const mapa = /\bAPI_POR_DIRECCION\s*=\s*\{([\s\S]{0,20000}?)\}/.exec(t);
+  if (mapa) {
+    const par = new RegExp('(?:' + cadena + ')\\s*:\\s*(?:' + cadena + ')', 'g');
+    let m;
+    while ((m = par.exec(mapa[1]))) {
+      const host = m[1] !== undefined ? m[1] : m[2];
+      const api = m[3] !== undefined ? m[3] : m[4];
+      if (String(host).toLowerCase() === u.hostname.toLowerCase()) return api;
+    }
+  }
+  if (/\(\.\+\)-web\\\.onrender\\\.com/.test(t)) { // la regla NOMBRE-web.onrender.com → NOMBRE.onrender.com/api
+    const m = /^(.+)-web\.onrender\.com$/i.exec(u.hostname);
+    if (m) return 'https://' + m[1] + '.onrender.com/api';
+  }
+  const prod = new RegExp('\\bAPI_PRODUCCION\\s*=\\s*(?:' + cadena + ')').exec(t);
+  if (prod) return valor(prod);
+  return null;
+}
+
 // Acepta la dirección de la página (https://cpXXXX.compoint.com.mx o https://xxx.onrender.com) o la del servidor (…/api).
 async function resolverApi(texto) {
   let t = String(texto || '').trim();
@@ -29,18 +82,22 @@ async function resolverApi(texto) {
   if (!/^https?:\/\//i.test(t)) t = 'https://' + t;
   let u;
   try { u = new URL(t); } catch (e) { throw new Error('La dirección no es válida.'); }
-  const local = /^(localhost|127\.0\.0\.1)$/.test(u.hostname);
-  if (u.protocol !== 'https:' && !local) throw new Error('La dirección de la nube debe empezar con https://');
+  validarNube(u);
   if (/\/api\/?$/.test(u.pathname)) return u.origin + '/api';
-  // ¿es la página del sistema? Su config.js dice a qué servidor habla.
+  // ¿es la página del sistema? Su config.js dice a qué servidor habla (se LEE, no se ejecuta).
+  let api = null;
   try {
     const r = await fetch(u.origin + '/js/config.js', { signal: AbortSignal.timeout(20000) });
-    if (r.ok) {
-      const codigo = (await r.text()) + '\n;typeof API_URL !== "undefined" ? API_URL : ""';
-      const api = vm.runInNewContext(codigo, { location: { hostname: u.hostname, origin: u.origin, protocol: u.protocol } }, { timeout: 500 });
-      if (typeof api === 'string' && /^https?:\/\//.test(api)) return api.replace(/\/$/, '');
-    }
+    if (r.ok) api = apiDeConfigJs((await r.text()).slice(0, 100000), u);
   } catch (e) { /* se prueba como dirección del servidor */ }
+  if (api) {
+    let a = null;
+    try { a = new URL(api); } catch (e) { a = null; }
+    // El servidor que diga config.js también debe ser una nube permitida.
+    if (a && /^https?:$/.test(a.protocol)) {
+      try { validarNube(a); return (a.origin + a.pathname).replace(/\/$/, ''); } catch (e) { /* no permitida: se usa la de la página */ }
+    }
+  }
   return u.origin + '/api';
 }
 
@@ -396,4 +453,4 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
   };
 }
 
-module.exports = { crearSincronizador, resolverApi, vincularConUsuario, iniciarSesionDueno, vincularConToken, leerNube, llamarNube, errorNube, esRed, EXCLUIDAS };
+module.exports = { crearSincronizador, resolverApi, apiDeConfigJs, hostDeNubePermitido, vincularConUsuario, iniciarSesionDueno, vincularConToken, leerNube, llamarNube, errorNube, esRed, EXCLUIDAS };

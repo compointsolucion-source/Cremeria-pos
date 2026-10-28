@@ -579,7 +579,8 @@
   function iniciarSocket() {
     if (typeof io !== 'function' || !usuario || typeof API_URL === 'undefined') return;
     try {
-      const socket = io(API_URL.replace('/api', ''));
+      // El servidor pide el token de la sesión para conectarse a los avisos en vivo.
+      const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
       socket.on('connect', () => { socket.emit('unirse_sucursal', usuario.sucursal_id); refrescarSuave(); });
       socket.on('pedido_actualizado', refrescarSuave);
     } catch (e) { /* sin tiempo real: queda la revisión cada rato */ }

@@ -92,7 +92,7 @@ async function declararImportes({ titulo = 'Declaración de caja', subtitulo = '
       overlay.querySelector('#declPantalla').textContent = buffer === '' ? '0' : buffer;
       overlay.querySelector('#declFilas').innerHTML = filas.map((f, i) => {
         const v = i === sel && buffer !== '' ? (parseFloat(buffer) || 0) : valores[f.k];
-        return `<tr data-i="${i}" class="${i === sel ? 'sel' : ''}"><td>${f.clave}</td><td>${f.nombre}</td><td class="imp">${fmt(f, v)}</td></tr>`;
+        return `<tr data-i="${i}" class="${i === sel ? 'sel' : ''}"><td>${escHtml(f.clave)}</td><td>${escHtml(f.nombre)}</td><td class="imp">${fmt(f, v)}</td></tr>`;
       }).join('');
       const tot = overlay.querySelector('#declTotal');
       if (tot) tot.textContent = dineroTurno(filas.filter(f => f.k !== 'dolares_usd').reduce((a, f) => a + valores[f.k], 0));

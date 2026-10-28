@@ -20,11 +20,49 @@ const limitadorLogin = rateLimit({
   message: { error: 'Demasiados intentos de inicio de sesión. Espera unos minutos e intenta de nuevo.' }
 });
 
-router.post('/login', limitadorLogin, async (req, res) => {
+// Además, por USUARIO: máximo 15 contraseñas equivocadas cada 15 minutos para el mismo nombre de
+// usuario (aunque el ataque cambie de dirección de internet). Los aciertos no cuentan.
+const limitadorLoginUsuario = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => 'u:' + String((req.body && req.body.usuario) || '').trim().toLowerCase().slice(0, 60),
+  message: { error: 'Demasiados intentos con este usuario. Espera unos minutos e intenta de nuevo.' }
+});
+
+// Huella falsa para comparar cuando el usuario no existe: así la respuesta tarda lo mismo
+// y no se puede adivinar qué usuarios existen midiendo el tiempo.
+const HASH_FALSO = bcrypt.hashSync('compoint-usuario-inexistente', 10);
+
+// Crea la sesión (token) de un usuario. "tv" es su versión de sesión (ver middleware/auth.js).
+function firmarSesion(user) {
+  return jwt.sign(
+    {
+      id: user.id,
+      nombre: user.nombre,
+      usuario: user.usuario,
+      rol: user.rol,
+      sucursal_id: user.sucursal_id,
+      permisos: user.permisos,
+      tv: Number(user.token_version) || 0
+    },
+    process.env.JWT_SECRET,
+    // La sesión no se vence sola mientras trabajan: solo termina al dar «Salir», si el dueño desactiva al usuario
+    // o si cambia su contraseña (todo eso se revisa en cada solicitud en middleware/auth.js).
+    { expiresIn: '365d' }
+  );
+}
+
+router.post('/login', limitadorLogin, limitadorLoginUsuario, async (req, res) => {
   try {
     const { usuario, password } = req.body;
-    if (!usuario || !password) {
+    if (!usuario || !password || typeof usuario !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+    }
+    if (usuario.length > 60 || password.length > 200) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
 
     const result = await pool.query(
@@ -33,6 +71,7 @@ router.post('/login', limitadorLogin, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      await bcrypt.compare(password, HASH_FALSO);
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
 
@@ -54,20 +93,7 @@ router.post('/login', limitadorLogin, async (req, res) => {
       }
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        nombre: user.nombre,
-        usuario: user.usuario,
-        rol: user.rol,
-        sucursal_id: user.sucursal_id,
-        permisos: user.permisos
-      },
-      process.env.JWT_SECRET,
-      // La sesión no se vence sola mientras trabajan: solo termina al dar «Salir» (o si el dueño desactiva al usuario,
-      // lo que se revisa en cada solicitud en middleware/auth.js).
-      { expiresIn: '365d' }
-    );
+    const token = firmarSesion(user);
 
     await registrarBitacora(pool, {
       usuario_id: user.id,
@@ -110,10 +136,16 @@ router.put('/cambiar-password', verificarToken, async (req, res) => {
     const passwordValida = await bcrypt.compare(password_actual, result.rows[0].password_hash);
     if (!passwordValida) return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
 
+    if (password_nueva.length > 100) return res.status(400).json({ error: 'La contraseña es demasiado larga' });
     const nuevoHash = await bcrypt.hash(password_nueva, 10);
-    await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [nuevoHash, req.usuario.id]);
+    // Sube la versión de sesión: se cierran las sesiones abiertas en otros equipos.
+    const act = await pool.query(
+      'UPDATE usuarios SET password_hash = $1, token_version = COALESCE(token_version, 0) + 1 WHERE id = $2 RETURNING *', [nuevoHash, req.usuario.id]);
+    require('../middleware/auth')._limpiarMemoriaActivos();
+    await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'cambiar_password', modulo: 'usuarios', referencia_id: req.usuario.id });
 
-    res.json({ ok: true });
+    // Esta misma pantalla sigue trabajando con una sesión nueva.
+    res.json({ ok: true, token: firmarSesion(act.rows[0]) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al cambiar la contraseña' });
@@ -235,13 +267,14 @@ async function comprobarCodigo(usuario, codigo) {
     `SELECT * FROM recuperacion_codigos WHERE usuario_id = $1 AND usado = false AND expira_en > NOW()
      ORDER BY creado_en DESC LIMIT 1`, [u.id])).rows[0];
   if (!fila) return null;
-  if (fila.intentos >= recuperacion.MAX_INTENTOS) return null;
-  if (!recuperacion.huellaCoincide(fila.codigo_hash, codigo, u.id)) {
-    await pool.query(
-      `UPDATE recuperacion_codigos SET intentos = intentos + 1, usado = (intentos + 1 >= $2) WHERE id = $1`,
-      [fila.id, recuperacion.MAX_INTENTOS]);
-    return null;
-  }
+  // El intento se cuenta ANTES de comparar y de forma atómica: aunque lleguen muchos intentos al
+  // mismo tiempo, nunca pasan más de MAX_INTENTOS.
+  const turno = await pool.query(
+    `UPDATE recuperacion_codigos SET intentos = intentos + 1, usado = (intentos + 1 >= $2)
+      WHERE id = $1 AND usado = false AND intentos < $2 RETURNING intentos`,
+    [fila.id, recuperacion.MAX_INTENTOS]);
+  if (!turno.rows.length) return null;
+  if (!recuperacion.huellaCoincide(fila.codigo_hash, codigo, u.id)) return null;
   return { fila, usuarioId: u.id };
 }
 
@@ -268,7 +301,8 @@ router.post('/recuperar/restablecer', limitadorCodigo, async (req, res) => {
     if (!ok) return res.status(400).json({ error: ERROR_CODIGO });
 
     const hash = await bcrypt.hash(nueva, 10);
-    await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [hash, ok.usuarioId]);
+    await pool.query('UPDATE usuarios SET password_hash = $1, token_version = COALESCE(token_version, 0) + 1 WHERE id = $2', [hash, ok.usuarioId]);
+    require('../middleware/auth')._limpiarMemoriaActivos();
     await pool.query('UPDATE recuperacion_codigos SET usado = true WHERE usuario_id = $1', [ok.usuarioId]);
     await registrarBitacora(pool, { usuario_id: ok.usuarioId, accion: 'recuperar_password', modulo: 'usuarios', referencia_id: ok.usuarioId });
     res.json({ ok: true });

@@ -9,15 +9,36 @@ const { migrar } = require('./utils/migrar');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 1e6 });
+const jwt = require('jsonwebtoken');
+const { datosActuales } = require('./middleware/auth');
 
-// Render/Cloudflare actúan como proxy delante del servidor: sin esto, Express
-// vería siempre la IP interna del proxy en vez de la IP real del navegador,
-// lo que rompería el límite de intentos de login (afectaría a todos por igual).
-app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// En la nube (Coolify/Render) hay un proxy delante del servidor: sin esto, Express vería siempre
+// la IP interna del proxy en vez de la del navegador y el límite de intentos de login afectaría a todos.
+// En la computadora del negocio NO hay proxy: ahí no se confía en el encabezado X-Forwarded-For
+// (si se confiara, cualquiera en la red podría inventarse una IP nueva en cada intento).
+const ES_LOCAL = !!process.env.COMPOINT_ID_EQUIPO;
+app.set('trust proxy', ES_LOCAL ? false : 1);
+
+// Encabezados de seguridad para todas las respuestas.
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'SAMEORIGIN');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('Content-Security-Policy', "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+  if (req.secure) res.set('Strict-Transport-Security', 'max-age=31536000');
+  next();
+});
 
 app.use(cors({ exposedHeaders: ['X-Licencia-Estado', 'X-Licencia-Tipo', 'X-Licencia-Dias', 'X-Licencia-Vence'] }));
-app.use(express.json({ limit: '15mb' }));
+// Tamaño máximo de lo que se manda: 2 MB en general; 15 MB solo donde se suben fotos, archivos
+// o listas grandes (así nadie puede saturar el servidor mandando datos enormes al login, por ejemplo).
+const jsonNormal = express.json({ limit: '2mb' });
+const jsonGrande = express.json({ limit: '15mb' });
+const RUTAS_GRANDES = /^\/api\/(imagenes|sync|backups|facturacion|productos|clientes|configuracion|kits)(\/|$)/;
+app.use((req, res, next) => (RUTAS_GRANDES.test(req.path) ? jsonGrande : jsonNormal)(req, res, next));
 app.set('io', io);
 
 // Modo servidor del negocio (instalación local): el mismo servidor entrega las
@@ -44,10 +65,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Socket.io: cada dispositivo se une a la "sala" de su sucursal
+// Socket.io (avisos en tiempo real): SOLO con sesión válida. Cada dispositivo se une a la
+// "sala" de SU sucursal (el jefe general puede elegir cualquiera). Sin sesión no recibe nada.
+io.use((socket, next) => {
+  const token = socket.handshake && socket.handshake.auth && socket.handshake.auth.token;
+  if (!token || typeof token !== 'string') return next(new Error('Sesión requerida'));
+  jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
+    if (err) return next(new Error('Sesión no válida'));
+    datosActuales(usuario.id).then((d) => {
+      if (d && (!d.activo || (Number(usuario.tv) || 0) !== d.tv)) return next(new Error('Sesión no válida'));
+      socket.data.usuario = d ? { ...usuario, rol: d.rol, sucursal_id: d.sucursal_id } : usuario;
+      next();
+    });
+  });
+});
 io.on('connection', (socket) => {
   socket.on('unirse_sucursal', (sucursalId) => {
-    socket.join(`sucursal_${sucursalId}`);
+    const u = socket.data.usuario || {};
+    const pedida = parseInt(sucursalId, 10);
+    const sala = u.sucursal_id ? Number(u.sucursal_id) : (u.rol === 'jefe_general' && pedida > 0 ? pedida : null);
+    if (!sala) return;
+    for (const r of socket.rooms) if (r.startsWith('sucursal_')) socket.leave(r);
+    socket.join(`sucursal_${sala}`);
   });
 });
 
@@ -116,6 +155,8 @@ app.get('/health', async (req, res) => {
 app.use((err, req, res, next) => {
   console.error(`[${new Date().toISOString()}] Error no capturado en ${req.method} ${req.originalUrl}:`, err.message);
   if (res.headersSent) return next(err);
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Lo que se mandó es demasiado grande' });
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Datos mal formados' });
   res.status(500).json({ error: 'Ocurrió un error inesperado en el servidor' });
 });
 

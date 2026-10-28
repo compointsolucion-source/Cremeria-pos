@@ -40,6 +40,13 @@ function coordenadas(lat, lng) {
   return { latitud: Math.round(a * 1e7) / 1e7, longitud: Math.round(b * 1e7) / 1e7 };
 }
 
+// Enlace de ubicación (Google Maps, WhatsApp...): solo http:// o https://. Cualquier otra cosa
+// (javascript:, data:, etc.) se guarda vacía para que nadie pueda meter un enlace peligroso.
+function enlaceSeguro(v) {
+  const t = textoOnull(v, 500);
+  return t && /^https?:\/\//i.test(t) ? t : null;
+}
+
 // Dirección tal como llega de una pantalla -> campos listos para guardar (o { error }).
 function normalizarDireccion(b) {
   const calle = textoOnull(b.calle, 200);
@@ -55,7 +62,7 @@ function normalizarDireccion(b) {
     referencias: textoOnull(b.referencias, 300),
     latitud: c.latitud,
     longitud: c.longitud,
-    ubicacion_enlace: textoOnull(b.ubicacion_enlace, 500),
+    ubicacion_enlace: enlaceSeguro(b.ubicacion_enlace),
     zona_id: Number.isInteger(Number(b.zona_id)) && Number(b.zona_id) > 0 ? Number(b.zona_id) : null
   };
 }
@@ -79,4 +86,4 @@ async function calcularEnvio(db, sucursalId, zonaId, subtotal) {
 // "D-0192": cómo se ve el número de un pedido en pantalla.
 const numeroPedido = (id) => 'D-' + String(id).padStart(4, '0');
 
-module.exports = { TZ, AHORA_LOCAL, ESTADOS, ESTADOS_ACTIVOS, TRANSICIONES, r2, textoOnull, soloDigitos, coordenadas, normalizarDireccion, calcularEnvio, numeroPedido };
+module.exports = { TZ, AHORA_LOCAL, ESTADOS, ESTADOS_ACTIVOS, TRANSICIONES, r2, textoOnull, soloDigitos, coordenadas, enlaceSeguro, normalizarDireccion, calcularEnvio, numeroPedido };

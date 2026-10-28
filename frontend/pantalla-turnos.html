@@ -161,7 +161,8 @@ function volverAlSistema() {
   else location.href = 'admin/dashboard.html';
 }
 
-const socket = io(API_URL.replace('/api', ''));
+// El servidor pide el token de la sesión para conectarse a los avisos en vivo.
+const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
 socket.emit('unirse_sucursal', usuario.sucursal_id);
 socket.on('ficha_llamada', (ficha) => {
   mostrarTurnoActual(ficha);
@@ -173,9 +174,9 @@ function mostrarTurnoActual(ficha) {
   document.getElementById('turnoActual').innerHTML = `
     <div class="etiqueta">Turno</div>
     <div class="fila-actual">
-      <div class="numero-turno">${String(ficha.numero).padStart(3,'0')}</div>
+      <div class="numero-turno">${escHtml(String(ficha.numero).padStart(3,'0'))}</div>
     </div>
-    <div class="mostrador-destino">➡️ ${ficha.mostrador_asignado}</div>
+    <div class="mostrador-destino">➡️ ${escHtml(ficha.mostrador_asignado)}</div>
   `;
 }
 
@@ -212,8 +213,8 @@ async function cargarHistorial() {
     const fichas = await apiFetch('/fichas/recientes');
     document.getElementById('historial').innerHTML = fichas.slice(1).map(f => `
       <div class="historial-item">
-        <div class="num">${String(f.numero).padStart(3,'0')}</div>
-        <div class="mostrador">${f.mostrador_asignado || ''}</div>
+        <div class="num">${escHtml(String(f.numero).padStart(3,'0'))}</div>
+        <div class="mostrador">${escHtml(f.mostrador_asignado || '')}</div>
       </div>
     `).join('');
   } catch (err) {
@@ -291,12 +292,13 @@ function mostrarPromoActual() {
   const panel = document.getElementById('panelPromos');
   if (!promo) return;
 
-  const titulo = promo.titulo ? `<div class="promo-titulo">${promo.titulo}</div>` : '';
+  // Título y direcciones se escapan: vienen de la configuración y no deben poder meter código en la pantalla.
+  const titulo = promo.titulo ? `<div class="promo-titulo">${escHtml(promo.titulo)}</div>` : '';
 
   if (promo.tipo === 'imagen') {
-    panel.innerHTML = `${titulo}<img class="promo-imagen" src="${promo.imagen_url}">`;
+    panel.innerHTML = `${titulo}<img class="promo-imagen" src="${escHtml(promo.imagen_url)}">`;
   } else if (promo.tipo === 'video') {
-    panel.innerHTML = `${titulo}<video class="promo-video" src="${promo.video_url}" autoplay muted playsinline loop></video>`;
+    panel.innerHTML = `${titulo}<video class="promo-video" src="${escHtml(promo.video_url)}" autoplay muted playsinline loop></video>`;
   } else if (promo.tipo === 'qr') {
     panel.innerHTML = `${titulo}<div class="promo-qr-caja" id="cajaQrPromo"></div>`;
     QRCode.toCanvas(document.createElement('canvas'), promo.qr_contenido, { width: 220, margin: 1 }, (err, canvas) => {
@@ -345,7 +347,7 @@ async function cargarProximos() {
   try {
     const fichas = await apiFetch('/fichas/proximas');
     cont.innerHTML = '<h4>Próximos</h4>' + (fichas.length
-      ? fichas.map(f => `<div class="proximo-item">${String(f.numero).padStart(3,'0')}</div>`).join('')
+      ? fichas.map(f => `<div class="proximo-item">${escHtml(String(f.numero).padStart(3,'0'))}</div>`).join('')
       : '<div class="proximo-vacio">Sin turnos en espera</div>');
   } catch (err) { console.error(err); }
 }

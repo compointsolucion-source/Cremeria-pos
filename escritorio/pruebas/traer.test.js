@@ -8,6 +8,8 @@ const assert = require('node:assert/strict');
 const http = require('http');
 const path = require('path');
 
+// La nube de mentira vive en 127.0.0.1: eso solo se acepta en modo desarrollo.
+process.env.COMPOINT_DEV = '1';
 const { abrirSesionNube, traerDeNube, mensajeAmable } = require('../src/servidor/traer');
 
 // Nube de mentira: `rutas` es una función (método, ruta con consulta, cuerpo, encabezados) → { status, datos }.

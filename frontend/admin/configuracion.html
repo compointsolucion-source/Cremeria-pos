@@ -1425,11 +1425,11 @@ function renderListaPromosTurnos() {
   cont.innerHTML = promosTurnosState.map((p, i) => `
     <div style="display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:8px; padding:8px;">
       <div id="miniaturaPromo${i}" style="width:48px; height:48px; border-radius:6px; background:#EEE; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; font-size:20px;">
-        ${p.tipo === 'imagen' ? `<img src="${p.imagen_url}" style="width:100%; height:100%; object-fit:cover;">` : (p.tipo === 'video' ? '🎬' : '⏳')}
+        ${p.tipo === 'imagen' ? `<img src="${escHtml(p.imagen_url)}" style="width:100%; height:100%; object-fit:cover;">` : (p.tipo === 'video' ? '🎬' : '⏳')}
       </div>
       <div style="flex-grow:1; font-size:13px; min-width:0;">
-        <div style="font-weight:600;">${p.titulo || (p.tipo === 'qr' ? 'Código QR' : (p.tipo === 'video' ? 'Video' : 'Imagen'))}</div>
-        <div style="color:#888; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.tipo === 'qr' ? p.qr_contenido : (p.tipo === 'video' ? 'Video' : 'Imagen')}</div>
+        <div style="font-weight:600;">${escHtml(p.titulo || (p.tipo === 'qr' ? 'Código QR' : (p.tipo === 'video' ? 'Video' : 'Imagen')))}</div>
+        <div style="color:#888; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.tipo === 'qr' ? escHtml(p.qr_contenido) : (p.tipo === 'video' ? 'Video' : 'Imagen')}</div>
       </div>
       <button class="btn btn-secondary" onclick="eliminarPromo(${i})">Quitar</button>
     </div>

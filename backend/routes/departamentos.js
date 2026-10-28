@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requierePermiso } = require('../middleware/auth');
+const { verificarToken, requierePermiso, requiereRol } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Listar departamentos (categorías)
@@ -38,8 +38,10 @@ router.post('/', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req,
   }
 });
 
+// Los departamentos son los mismos para TODAS las sucursales: renombrarlos o borrarlos
+// afecta a todas, así que solo lo hacen dueño, gerente o jefe general.
 // Editar departamento
-router.put('/:id', verificarToken, requierePermiso('PRODUCTOS_EDITAR'), async (req, res) => {
+router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     const { nombre, orden } = req.body;
     const result = await pool.query(
@@ -55,7 +57,7 @@ router.put('/:id', verificarToken, requierePermiso('PRODUCTOS_EDITAR'), async (r
 });
 
 // Eliminar departamento (los productos que lo usaban quedan "Sin categoría")
-router.delete('/:id', verificarToken, requierePermiso('PRODUCTOS_EDITAR'), async (req, res) => {
+router.delete('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
     await pool.query('UPDATE productos SET categoria_id = NULL WHERE categoria_id = $1', [req.params.id]);
     await pool.query('DELETE FROM categorias WHERE id = $1', [req.params.id]);

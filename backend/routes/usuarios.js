@@ -44,6 +44,9 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     if (!['gerente', 'cajero', 'mostrador', 'repartidor'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
+    if (rol === 'gerente' && req.usuario.rol === 'gerente') {
+      return res.status(403).json({ error: 'Solo el dueño puede crear gerentes' });
+    }
     if (password.length < 6) {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
@@ -76,9 +79,17 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
 // Editar nombre/usuario/rol/activo/permisos de un empleado (dueño/gerente)
 router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    const { rol, activo, permisos, nombre_mostrador, telefono } = req.body;
+    const { rol, activo, nombre_mostrador, telefono } = req.body;
     if (rol && !['gerente', 'cajero', 'mostrador', 'repartidor'].includes(rol)) {
       return res.status(400).json({ error: 'Rol inválido' });
+    }
+    // Permisos: solo se aceptan los que existen y con valor sí/no (nada más se guarda).
+    let permisos = null;
+    if (req.body.permisos && typeof req.body.permisos === 'object' && !Array.isArray(req.body.permisos)) {
+      permisos = {};
+      for (const [k, v] of Object.entries(req.body.permisos)) {
+        if (TODOS_LOS_PERMISOS.includes(k) && typeof v === 'boolean') permisos[k] = v;
+      }
     }
 
     // Nombre y usuario: si vienen, no pueden quedar vacíos. El usuario no lleva espacios.
@@ -100,6 +111,10 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
     const objetivo = await pool.query('SELECT rol, nombre, usuario, activo, permisos FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND eliminado_en IS NULL', [req.params.id, req.sucursalId]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede modificar al usuario dueño desde aquí' });
+    // Un gerente no puede tocar a otro gerente ni nombrar gerentes: eso solo lo hace el dueño.
+    if (req.usuario.rol === 'gerente' && (objetivo.rows[0].rol === 'gerente' || rol === 'gerente')) {
+      return res.status(403).json({ error: 'Solo el dueño puede modificar o nombrar a un gerente' });
+    }
     const valorAnterior = objetivo.rows[0];
 
     const result = await pool.query(
@@ -186,10 +201,14 @@ router.put('/:id/restablecer-password', verificarToken, requiereRol('jefe_genera
 
     const objetivo = await pool.query('SELECT rol FROM usuarios WHERE id = $1 AND sucursal_id = $2 AND eliminado_en IS NULL', [req.params.id, req.sucursalId]);
     if (objetivo.rows.length === 0) return res.status(404).json({ error: 'Empleado no encontrado' });
-    if (objetivo.rows[0].rol === 'dueno') return res.status(403).json({ error: 'No se puede restablecer la contraseña del dueño desde aquí' });
+    if (objetivo.rows[0].rol === 'dueno' || objetivo.rows[0].rol === 'jefe_general') return res.status(403).json({ error: 'No se puede restablecer la contraseña del dueño desde aquí' });
+    if (objetivo.rows[0].rol === 'gerente' && req.usuario.rol === 'gerente') return res.status(403).json({ error: 'Solo el dueño puede restablecer la contraseña de un gerente' });
+    if (password_nueva.length > 100) return res.status(400).json({ error: 'La contraseña es demasiado larga' });
 
     const nuevoHash = await bcrypt.hash(password_nueva, 10);
-    await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [nuevoHash, req.params.id]);
+    // Sube la versión de sesión: las sesiones abiertas de ese empleado se cierran.
+    await pool.query('UPDATE usuarios SET password_hash = $1, token_version = COALESCE(token_version, 0) + 1 WHERE id = $2 AND sucursal_id = $3', [nuevoHash, req.params.id, req.sucursalId]);
+    require('../middleware/auth')._limpiarMemoriaActivos();
 
     await registrarBitacora(pool, {
       usuario_id: req.usuario.id,

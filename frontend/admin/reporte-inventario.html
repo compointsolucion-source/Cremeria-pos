@@ -401,7 +401,10 @@ function exportarReporteCSV() {
   const lista = filasVisibles;
   if (lista.length === 0) { mostrarToast('No hay datos para exportar', 'error'); return; }
 
-  const celda = (t) => `"${String(t == null ? '' : t).replace(/"/g, '""')}"`;
+  // Si un texto empieza con = + - @ (o tabulador/enter), Excel lo toma como fórmula: se le pone un ' adelante
+  // para que se vea como texto. Los números normales (ej. -150.00) se dejan igual.
+  const sinFormula = (t) => (/^[=+\-@\t\r]/.test(t) && !/^[-+]?\d+(\.\d+)?$/.test(t) ? "'" + t : t);
+  const celda = (t) => `"${sinFormula(String(t == null ? '' : t)).replace(/"/g, '""')}"`;
   const encabezado = 'Codigo,Descripcion,Departamento,Tipo Venta,Costo,Precio Venta,Existencia,Estado,Inv Minimo,Inv Maximo\n';
   const filas = lista.map(p =>
     [celda(p.codigo_barras), celda(p.nombre), celda(p.categoria_nombre), p.tipo_venta === 'unidad' ? 'Por Pieza' : 'A Granel',

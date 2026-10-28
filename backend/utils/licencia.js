@@ -341,33 +341,25 @@ async function infoParaNube() {
 }
 
 // Lado LOCAL: el servidor del cliente toma la licencia de su nube y deja la prueba. Devuelve { adoptada, motivo }.
-// - Código firmado de la nube: se comprueba la firma aquí también (no se confía a ciegas) y que sea de ESA nube.
-// - Nube sin control de licencia: es un sistema propio de Compoint; la computadora queda sin prueba.
-// - Licencia vigente sin código (puesta a mano por Compoint en la nube): se copia tipo, plan y vencimiento.
+// SOLO se toma un código de activación FIRMADO por Compoint: se comprueba la firma aquí también (no se confía
+// a ciegas en lo que conteste la nube) y que sea de ESA nube. Cualquier respuesta sin código firmado
+// (nube "sin control", o licencia puesta a mano sin código) NO da ni alarga nada: esta computadora se queda
+// con la prueba o la licencia que ya tenía. Para que se tome sola, Compoint activa la nube con un código.
 // Nunca se baja de categoría: si esta computadora ya tiene una licencia propia igual o más larga, se queda con ella.
 async function adoptarDeNube(info) {
   if (!info || typeof info !== 'object') return { adoptada: false, motivo: 'sin_datos' };
   const hoyReal = hoy();
-  let nueva;
-  if (info.codigo) {
-    const r = codigo.verificarCodigo(String(info.codigo), llavePublica);
-    if (!r.ok) return { adoptada: false, motivo: 'codigo_invalido', detalle: r.mensaje };
-    const d = r.datos;
-    const idNube = codigo.leerIdEquipo(info.id_equipo);
-    if (idNube === null || d.idEquipoValor !== idNube) return { adoptada: false, motivo: 'codigo_de_otra_nube' };
-    if (d.tipo === 'demo') return { adoptada: false, motivo: 'es_prueba' };
-    nueva = { tipo: d.tipo, plan: d.plan, maxSuc: d.maxSucursales, inicio: d.emitida, vence: d.vence || SIN_FIN, codigo: textoLimpio(info.codigo),
-      serial: d.serial, origen: 'codigo', idNube: codigo.formatearIdEquipo(idNube) };
-  } else if (info.control === false) {
-    nueva = { tipo: 'permanente', plan: 'nube', maxSuc: null, inicio: hoyReal, vence: SIN_FIN, codigo: null, serial: null, origen: 'sin_control', idNube: null };
-  } else if (info.control === true && (info.tipo === 'anual' || info.tipo === 'permanente')) {
-    const vence = info.tipo === 'permanente' || !info.vence ? SIN_FIN : String(info.vence);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(vence)) return { adoptada: false, motivo: 'datos_invalidos' };
-    nueva = { tipo: info.tipo, plan: info.plan === 'local' ? 'local' : 'nube', maxSuc: Number(info.max_sucursales) > 0 ? Number(info.max_sucursales) : null,
-      inicio: hoyReal, vence, codigo: null, serial: null, origen: 'fila', idNube: null };
-  } else {
-    return { adoptada: false, motivo: 'sin_licencia_de_cliente' };
+  if (!info.codigo) {
+    return { adoptada: false, motivo: info.control === false ? 'nube_sin_control' : 'sin_codigo_firmado' };
   }
+  const r = codigo.verificarCodigo(String(info.codigo), llavePublica);
+  if (!r.ok) return { adoptada: false, motivo: 'codigo_invalido', detalle: r.mensaje };
+  const d = r.datos;
+  const idNube = codigo.leerIdEquipo(info.id_equipo);
+  if (idNube === null || d.idEquipoValor !== idNube) return { adoptada: false, motivo: 'codigo_de_otra_nube' };
+  if (d.tipo === 'demo') return { adoptada: false, motivo: 'es_prueba' };
+  const nueva = { tipo: d.tipo, plan: d.plan, maxSuc: d.maxSucursales, inicio: d.emitida, vence: d.vence || SIN_FIN, codigo: textoLimpio(info.codigo),
+    serial: d.serial, origen: 'codigo', idNube: codigo.formatearIdEquipo(idNube) };
 
   // ¿Esta computadora ya tiene algo igual o mejor?
   const actual = await estado();
@@ -378,7 +370,7 @@ async function adoptarDeNube(info) {
   if (nueva.vence < hoyReal && (sirveActual || demoVigente)) return { adoptada: false, motivo: 'vencida' };
   // La licencia activada aquí con un código propio no se cambia por otra igual o más corta.
   if (sirveActual && !actual.desde_nube && venceActual >= nueva.vence) return { adoptada: false, motivo: 'ya_tiene_licencia_propia' };
-  // Las que vienen de la nube con código firmado no retroceden. Las que vienen "a mano" (sin código) siguen lo que diga la nube.
+  // Las que vienen de la nube con código firmado no retroceden.
   if (sirveActual && actual.desde_nube === 'codigo') {
     if (venceActual > nueva.vence) return { adoptada: false, motivo: 'ya_tiene_una_mas_larga' };
     if (venceActual === nueva.vence && nueva.serial !== null && nueva.serial < (actual.serial || 0)) return { adoptada: false, motivo: 'ya_tiene_una_mas_reciente' };

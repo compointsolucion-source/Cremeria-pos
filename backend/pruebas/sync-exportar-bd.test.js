@@ -225,33 +225,39 @@ test('código de otra nube, alterado, vencido o de prueba → NO se adopta y la 
   assert.equal((await lic.estado()).tipo, 'demo', 'la prueba sigue como estaba');
 });
 
-test('nube sin control de licencia (sistema propio) → la computadora queda sin prueba, permanente', async () => {
+test('nube sin control de licencia (respuesta sin firma) → NO se adopta: la prueba sigue igual', async () => {
   comoLocal(); await limpiar();
-  await lic.estado();
+  const antes = await lic.estado();
   const r = await lic.adoptarDeNube({ control: false, cliente: null, id_equipo: ID_NUBE });
-  assert.equal(r.adoptada, true);
+  assert.deepEqual([r.adoptada, r.motivo], [false, 'nube_sin_control']);
   const e = await lic.estado();
-  assert.deepEqual([e.tipo, e.estado, e.permanente, e.desde_nube, e.puede_vender], ['permanente', 'activa', true, 'sin_control', true]);
+  assert.deepEqual([e.tipo, e.estado, e.vence, e.permanente, e.desde_nube], ['demo', 'demo', antes.vence, false, null]);
 });
 
-test('licencia puesta a mano en la nube (sin código) → se copia tipo, plan y vigencia', async () => {
+test('licencia puesta a mano en la nube (sin código firmado) → NO se adopta, ni anual ni permanente', async () => {
   comoLocal(); await limpiar();
-  await lic.estado();
-  const r = await lic.adoptarDeNube({ control: true, cliente: 'Cremería La Vaquita', tipo: 'anual', plan: 'local', vence: '2027-05-01', max_sucursales: 2, codigo: null, id_equipo: ID_NUBE });
-  assert.equal(r.adoptada, true);
+  const antes = await lic.estado();
+  for (const info of [
+    { control: true, cliente: 'Cremería La Vaquita', tipo: 'anual', plan: 'local', vence: '2027-05-01', max_sucursales: 2, codigo: null, id_equipo: ID_NUBE },
+    { control: true, cliente: 'X', tipo: 'permanente', plan: 'nube', vence: null, id_equipo: ID_NUBE }
+  ]) {
+    const r = await lic.adoptarDeNube(info);
+    assert.deepEqual([r.adoptada, r.motivo], [false, 'sin_codigo_firmado'], JSON.stringify(info));
+  }
   const e = await lic.estado();
-  assert.deepEqual([e.tipo, e.plan, e.vence, e.max_sucursales, e.desde_nube, e.con_codigo, e.estado], ['anual', 'local', '2027-05-01', 2, 'fila', false, 'activa']);
+  assert.deepEqual([e.tipo, e.estado, e.vence, e.desde_nube, e.cliente], ['demo', 'demo', antes.vence, null, null]);
 });
 
 test('nube que también está en prueba, vencida o con datos raros → no se adopta', async () => {
   comoLocal(); await limpiar();
   await lic.estado();
   const casos = [
-    [{ control: true, tipo: 'demo', vence: '2026-11-10', id_equipo: ID_NUBE }, 'sin_licencia_de_cliente'],
-    [{ control: true, tipo: 'anual', vence: '2026-01-01', id_equipo: ID_NUBE }, 'vencida'],
-    [{ control: true, tipo: 'anual', vence: 'mañana', id_equipo: ID_NUBE }, 'datos_invalidos'],
+    [{ control: true, tipo: 'demo', vence: '2026-11-10', id_equipo: ID_NUBE }, 'sin_codigo_firmado'],
+    [{ control: true, tipo: 'anual', vence: '2026-01-01', id_equipo: ID_NUBE }, 'sin_codigo_firmado'],
+    [{ control: true, tipo: 'anual', vence: 'mañana', id_equipo: ID_NUBE }, 'sin_codigo_firmado'],
+    [{ control: true, tipo: 'anual', vence: '2027-10-16', codigo: 'CPT1-NO-ES-UN-CODIGO', id_equipo: ID_NUBE }, 'codigo_invalido'],
     [null, 'sin_datos'],
-    [{ control: true, id_equipo: ID_NUBE }, 'sin_licencia_de_cliente']
+    [{ control: true, id_equipo: ID_NUBE }, 'sin_codigo_firmado']
   ];
   for (const [info, motivo] of casos) {
     const r = await lic.adoptarDeNube(info);
@@ -282,27 +288,29 @@ test('no se baja de categoría: una licencia propia más larga se respeta; una r
   assert.equal((await lic.estado()).vence, '2028-12-01');
 });
 
-test('si la nube estaba "sin control" y luego Compoint le pone licencia, la computadora la toma (aunque sea más corta)', async () => {
+test('si la nube estaba "sin control" y luego Compoint le pone licencia con código, la computadora la toma', async () => {
   comoLocal(); await limpiar(); reloj('2026-10-16');
   await lic.estado();
-  await lic.adoptarDeNube({ control: false, id_equipo: ID_NUBE });
-  assert.equal((await lic.estado()).desde_nube, 'sin_control');
-  let r = await lic.adoptarDeNube({ control: true, cliente: 'Cremería La Vaquita', tipo: 'anual', plan: 'nube', vence: '2027-03-01', codigo: emitir({ vence: '2027-03-01' }), id_equipo: ID_NUBE });
+  let r = await lic.adoptarDeNube({ control: false, id_equipo: ID_NUBE });
+  assert.equal(r.adoptada, false);
+  assert.equal((await lic.estado()).tipo, 'demo');
+  r = await lic.adoptarDeNube({ control: true, cliente: 'Cremería La Vaquita', tipo: 'anual', plan: 'nube', vence: '2027-03-01', codigo: emitir({ vence: '2027-03-01' }), id_equipo: ID_NUBE });
   assert.equal(r.adoptada, true, JSON.stringify(r));
-  let e = await lic.estado();
+  const e = await lic.estado();
   assert.deepEqual([e.tipo, e.vence, e.desde_nube, e.cliente], ['anual', '2027-03-01', 'codigo', 'Cremería La Vaquita']);
-  // una licencia "a mano" (sin código) sigue lo que diga la nube, hacia arriba o hacia abajo
-  await limpiar(); await lic.estado();
-  await lic.adoptarDeNube({ control: true, tipo: 'anual', plan: 'nube', vence: '2027-10-01', id_equipo: ID_NUBE });
-  r = await lic.adoptarDeNube({ control: true, tipo: 'anual', plan: 'nube', vence: '2027-06-01', id_equipo: ID_NUBE });
-  assert.equal(r.adoptada, true);
-  assert.equal((await lic.estado()).vence, '2027-06-01');
+  // después, respuestas sin firma no la cambian ni la alargan
+  for (const info of [{ control: false, id_equipo: ID_NUBE }, { control: true, tipo: 'permanente', plan: 'nube', id_equipo: ID_NUBE }, { control: true, tipo: 'anual', plan: 'nube', vence: '2030-01-01', id_equipo: ID_NUBE }]) {
+    r = await lic.adoptarDeNube(info);
+    assert.equal(r.adoptada, false, JSON.stringify(info));
+  }
+  const despues = await lic.estado();
+  assert.deepEqual([despues.tipo, despues.vence, despues.permanente, despues.desde_nube], ['anual', '2027-03-01', false, 'codigo']);
 });
 
 test('nube con licencia ya vencida: con prueba vigente se ignora; sin nada vigente se toma para mostrar el aviso correcto', async () => {
   comoLocal(); await limpiar(); reloj('2026-10-16');
   await lic.estado();
-  const vencida = { control: true, cliente: 'Cremería La Vaquita', tipo: 'anual', plan: 'nube', vence: '2026-09-01', id_equipo: ID_NUBE };
+  const vencida = { control: true, cliente: 'Cremería La Vaquita', tipo: 'anual', plan: 'nube', vence: '2026-09-01', codigo: emitir({ emitida: '2025-09-01', vence: '2026-09-01' }), id_equipo: ID_NUBE };
   let r = await lic.adoptarDeNube(vencida);
   assert.deepEqual([r.adoptada, r.motivo], [false, 'vencida'], 'la prueba vigente es mejor que una licencia vencida');
   // la prueba termina: ya no hay nada vigente

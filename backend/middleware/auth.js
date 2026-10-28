@@ -1,23 +1,36 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 
-// La sesión ya no se vence por tiempo, así que se comprueba que el usuario siga ACTIVO.
-// Si el dueño lo desactiva o lo elimina, su sesión deja de servir de inmediato (máx. 30 s por la memoria rápida).
+// En cada solicitud se lee del usuario lo que manda HOY (no lo que decía la sesión al entrar):
+// si sigue activo, su rol, sus permisos, su sucursal y su "versión de sesión".
+// Así, si el dueño lo desactiva, le cambia el rol o le quita un permiso, aplica de inmediato
+// (máx. 30 s por la memoria rápida), y si cambia su contraseña, sus sesiones viejas dejan de servir.
 const _activos = new Map();
 const VIGENCIA_CONSULTA_MS = 30 * 1000;
-async function usuarioSigueActivo(id) {
+async function datosActuales(id) {
   const hoy = Date.now();
   const previo = _activos.get(id);
-  if (previo && hoy - previo.t < VIGENCIA_CONSULTA_MS) return previo.activo;
+  if (previo && hoy - previo.t < VIGENCIA_CONSULTA_MS) return previo.datos;
   try {
-    const r = await pool.query('SELECT activo FROM usuarios WHERE id = $1', [id]);
-    const activo = r.rows.length > 0 && r.rows[0].activo !== false;
-    _activos.set(id, { activo, t: hoy });
+    let r;
+    try {
+      r = await pool.query('SELECT activo, rol, permisos, sucursal_id, token_version FROM usuarios WHERE id = $1', [id]);
+    } catch (e) {
+      if (e.code !== '42703') throw e; // base sin la columna nueva todavía (se agrega sola al arrancar)
+      r = await pool.query('SELECT activo, rol, permisos, sucursal_id, 0 AS token_version FROM usuarios WHERE id = $1', [id]);
+    }
+    const f = r.rows[0];
+    const datos = f ? { activo: f.activo !== false, rol: f.rol, permisos: f.permisos, sucursal_id: f.sucursal_id, tv: Number(f.token_version) || 0 } : { activo: false };
+    _activos.set(id, { datos, t: hoy });
     if (_activos.size > 500) _activos.clear();
-    return activo;
+    return datos;
   } catch (e) {
-    return true; // si la base no responde un instante, no se saca a nadie de su venta
+    return null; // si la base no responde un instante, no se saca a nadie de su venta (se usan los datos de la sesión)
   }
+}
+async function usuarioSigueActivo(id) {
+  const d = await datosActuales(id);
+  return d ? d.activo : true;
 }
 
 // El repartidor SOLO puede usar su propio módulo (sus entregas y su corte) y lo
@@ -38,11 +51,15 @@ function verificarToken(req, res, next) {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
     if (err) return res.status(401).json({ error: 'Token inválido o expirado' });
-    if (usuario.rol === 'repartidor' && !rutaPermitidaParaRepartidor(req.originalUrl)) {
-      return res.status(403).json({ error: 'Tu usuario de repartidor solo puede usar el módulo de entregas' });
-    }
-    usuarioSigueActivo(usuario.id).then((activo) => {
-      if (!activo) return res.status(401).json({ error: 'Tu usuario ya no está activo' });
+    datosActuales(usuario.id).then((d) => {
+      if (d) {
+        if (!d.activo) return res.status(401).json({ error: 'Tu usuario ya no está activo' });
+        if ((Number(usuario.tv) || 0) !== d.tv) return res.status(401).json({ error: 'Tu sesión se cerró (cambió la contraseña). Vuelve a entrar.' });
+        usuario = { ...usuario, rol: d.rol, permisos: d.permisos, sucursal_id: d.sucursal_id };
+      }
+      if (usuario.rol === 'repartidor' && !rutaPermitidaParaRepartidor(req.originalUrl)) {
+        return res.status(403).json({ error: 'Tu usuario de repartidor solo puede usar el módulo de entregas' });
+      }
       req.usuario = usuario;
       next();
     });
@@ -70,6 +87,10 @@ function requiereSucursalId(req, res, next) {
   if (req.usuario.sucursal_id) {
     req.sucursalId = req.usuario.sucursal_id;
     return next();
+  }
+  // Solo el jefe general (dueño de varias sucursales) elige con cuál trabaja.
+  if (req.usuario.rol !== 'jefe_general') {
+    return res.status(403).json({ error: 'Tu usuario no tiene sucursal asignada. Pide al dueño que la revise en Equipo.' });
   }
 
   const idIndicado = parseInt(req.query.sucursal_id || req.headers['x-sucursal-id'], 10);
@@ -124,4 +145,4 @@ function requierePermiso(permiso) {
 }
 
 module.exports = {
-  _limpiarMemoriaActivos: () => _activos.clear(), verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };
+  datosActuales, _limpiarMemoriaActivos: () => _activos.clear(), verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };

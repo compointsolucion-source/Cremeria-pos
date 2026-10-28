@@ -28,7 +28,8 @@ let clienteSeleccionado = null;
 let scannerActivo = false;
 let html5QrCode;
 
-const socket = io(API_URL.replace('/api', ''));
+// El servidor pide el token de la sesión para conectarse a los avisos en vivo.
+const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
 socket.emit('unirse_sucursal', usuario.sucursal_id);
 socket.on('nuevo_ticket', () => cargarBandeja());
 socket.on('ticket_pagado', () => cargarBandeja());
@@ -113,10 +114,10 @@ async function cargarBandeja() {
       const div = document.createElement('div');
       div.className = `ticket-pendiente ${claseEspera}`;
       div.innerHTML = `
-        <span><b>${t.folio}</b>${marcaPedido}<br><small>${textoEspera}</small></span>
+        <span><b>${escHtml(t.folio)}</b>${marcaPedido}<br><small>${textoEspera}</small></span>
         <span style="display:flex; align-items:center; gap:10px;">
           $${parseFloat(t.total).toFixed(2)}
-          <button class="btn-cancelar-ticket-pendiente" title="Cancelar (el cliente ya no lo requiere)" data-id="${t.id}" data-folio="${t.folio}">✕</button>
+          <button class="btn-cancelar-ticket-pendiente" title="Cancelar (el cliente ya no lo requiere)" data-id="${escHtml(t.id)}" data-folio="${escHtml(t.folio)}">✕</button>
         </span>
       `;
       if (ticketActual && ticketActual.folio === t.folio) div.classList.add('sel');
@@ -162,11 +163,11 @@ function renderPanelCobro() {
     const puedeEditar = i.tipo !== 'kit';
     const tieneDescuentoItem = parseFloat(i.descuento_monto || 0) > 0;
     const lineaDescuentoItem = tieneDescuentoItem
-      ? `<div style="font-size:12px; color:#C62828;">Descuento (${i.descuento_motivo || ''}): -$${parseFloat(i.descuento_monto).toFixed(2)}</div>`
+      ? `<div style="font-size:12px; color:#C62828;">Descuento (${escHtml(i.descuento_motivo || '')}): -$${parseFloat(i.descuento_monto).toFixed(2)}</div>`
       : '';
     return `
       <div class="detalle-item">
-        <span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${detalle}</small>${lineaDescuentoItem}</span></span>
+        <span class="info"><img class="mini-foto" src="${escHtml(i.imagen_url || IMAGEN_RESPALDO)}" alt=""><span>${escHtml(i.nombre_producto)}<br><small>${escHtml(detalle)}</small>${lineaDescuentoItem}</span></span>
         <span class="acciones">
           $${parseFloat(i.subtotal).toFixed(2)}
           ${puedeEditar ? `<button onclick="editarCantidad(${i.id}, ${i.cantidad})">✏️</button>` : ''}
@@ -179,16 +180,16 @@ function renderPanelCobro() {
   const tieneDescuento = parseFloat(t.descuento_monto || 0) > 0;
   const filasDescuento = tieneDescuento ? `
     <div style="display:flex; justify-content:space-between; font-size:14px; color:#666;"><span>Subtotal</span><span>$${parseFloat(t.total).toFixed(2)}</span></div>
-    <div style="display:flex; justify-content:space-between; font-size:14px; color:#C62828;"><span>Descuento (${t.descuento_motivo || ''})</span><span>-$${parseFloat(t.descuento_monto).toFixed(2)}</span></div>
+    <div style="display:flex; justify-content:space-between; font-size:14px; color:#C62828;"><span>Descuento (${escHtml(t.descuento_motivo || '')})</span><span>-$${parseFloat(t.descuento_monto).toFixed(2)}</span></div>
   ` : '';
 
   panel.innerHTML = `
     <div class="encabezado-ticket">
       <span style="display:flex; align-items:center; gap:8px;">
         <button class="btn btn-secondary btn-volver-cobro" onclick="volverABandeja()">← Volver</button>
-        <h3>Ticket ${t.folio}</h3>
+        <h3>Ticket ${escHtml(t.folio)}</h3>
       </span>
-      <button class="btn btn-secondary" id="btnAsignarCliente" onclick="asignarClienteCaja()">👤 ${clienteSeleccionado ? clienteSeleccionado.nombre : 'Asignar cliente'}</button>
+      <button class="btn btn-secondary" id="btnAsignarCliente" onclick="asignarClienteCaja()">👤 ${clienteSeleccionado ? escHtml(clienteSeleccionado.nombre) : 'Asignar cliente'}</button>
     </div>
     ${itemsHtml}
     ${filasDescuento}
@@ -249,7 +250,7 @@ function renderBotonesMetodoPago() {
 
   document.getElementById('metodoPagoBtns').innerHTML = metodosDisponibles
     .filter(m => m.activo)
-    .map(m => `<button class="btn btn-secondary" id="${idsBoton[m.id]}" onclick="setMetodo('${m.id}')">${m.label}</button>`)
+    .map(m => `<button class="btn btn-secondary" id="${idsBoton[m.id]}" onclick="setMetodo('${m.id}')">${escHtml(m.label)}</button>`)
     .join('');
 
   // El primer método activo disponible es el que queda seleccionado al abrir el ticket.
@@ -332,7 +333,7 @@ function setMetodo(m) {
     camposDiv.innerHTML = `
       <input type="text" id="buscarCliente" placeholder="Buscar cliente por nombre..." oninput="buscarClientes()">
       <div id="resultadosCliente"></div>
-      <div id="clienteElegido" style="margin-top:8px; font-weight:600;">${clienteSeleccionado ? 'Cliente seleccionado: ' + clienteSeleccionado.nombre : ''}</div>
+      <div id="clienteElegido" style="margin-top:8px; font-weight:600;">${clienteSeleccionado ? 'Cliente seleccionado: ' + escHtml(clienteSeleccionado.nombre) : ''}</div>
     `;
   } else if (m === 'dolares') {
     const tipoCambio = parseFloat((configuracionNegocioCaja || {}).tipo_cambio_dolar || 0);
@@ -560,16 +561,25 @@ function buscarClientes() {
   debounceBusqueda = setTimeout(async () => {
     const texto = document.getElementById('buscarCliente').value.trim();
     if (texto.length < 2) { document.getElementById('resultadosCliente').innerHTML = ''; return; }
-    const resultados = await apiFetch(`/clientes/buscar/${texto}`);
-    document.getElementById('resultadosCliente').innerHTML = resultados.map(c => `
-      <div class="resultado-cliente" onclick='elegirCliente(${JSON.stringify(c)})'>
-        ${c.nombre} — Debe $${parseFloat(c.saldo_actual).toFixed(2)} / Límite $${parseFloat(c.limite_credito).toFixed(2)}
+    const resultados = await apiFetch(`/clientes/buscar/${encodeURIComponent(texto)}`);
+    // Los datos del cliente NO van dentro del onclick (un nombre con comillas podría meter código):
+    // se guarda cada cliente en un mapa por id y el botón solo lleva su data-id.
+    clientesBuscadosCaja = new Map(resultados.map(c => [String(c.id), c]));
+    const lista = document.getElementById('resultadosCliente');
+    lista.innerHTML = resultados.map(c => `
+      <div class="resultado-cliente" data-id="${escHtml(c.id)}">
+        ${escHtml(c.nombre)} — Debe $${parseFloat(c.saldo_actual).toFixed(2)} / Límite $${parseFloat(c.limite_credito).toFixed(2)}
       </div>
     `).join('');
+    lista.querySelectorAll('.resultado-cliente').forEach(div => {
+      div.onclick = () => elegirCliente(clientesBuscadosCaja.get(div.dataset.id));
+    });
   }, 300);
 }
+let clientesBuscadosCaja = new Map();
 
 function elegirCliente(cliente) {
+  if (!cliente) return;
   clienteSeleccionado = cliente;
   document.getElementById('resultadosCliente').innerHTML = '';
   document.getElementById('buscarCliente').value = '';
@@ -709,8 +719,8 @@ async function cargarHistorialCaja() {
     const fecha = document.getElementById('fechaHistorialCaja').value;
     const ventas = await apiFetch(`/tickets/historial-dia?fecha=${fecha}`);
     document.getElementById('listaHistorialCaja').innerHTML = ventas.map(v => `
-      <div class="hist-fila" data-id="${v.id}" data-folio="${v.folio}">
-        <span><b>${v.folio}</b>${v.estado === 'cancelado' ? ' <span style="color:#C62828;">(cancelado)</span>' : ''}<br><small>${v.cajero_nombre || '—'} · ${new Date(v.fecha_pago || v.fecha_creacion).toLocaleTimeString()}</small></span>
+      <div class="hist-fila" data-id="${escHtml(v.id)}" data-folio="${escHtml(v.folio)}">
+        <span><b>${escHtml(v.folio)}</b>${v.estado === 'cancelado' ? ' <span style="color:#C62828;">(cancelado)</span>' : ''}<br><small>${escHtml(v.cajero_nombre || '—')} · ${new Date(v.fecha_pago || v.fecha_creacion).toLocaleTimeString()}</small></span>
         <b>$${parseFloat(v.total).toFixed(2)}</b>
       </div>`).join('') || '<p style="color:#888; text-align:center;">Sin ventas en esta fecha</p>';
     document.querySelectorAll('#listaHistorialCaja .hist-fila').forEach(f => { f.onclick = () => verTicketHistorialCaja(f); });
@@ -727,10 +737,10 @@ async function verTicketHistorialCaja(fila) {
     const t = await apiFetch(`/tickets/folio/${encodeURIComponent(fila.dataset.folio)}`);
     ticketHistorialCaja = t;
     document.getElementById('detalleHistorialCaja').innerHTML = `
-      <h4>Folio: ${t.folio}</h4>
-      <p style="font-size:13px; color:#666;">Estado: ${t.estado} — Método: ${t.metodo_pago || '—'}</p>
+      <h4>Folio: ${escHtml(t.folio)}</h4>
+      <p style="font-size:13px; color:#666;">Estado: ${escHtml(t.estado)} — Método: ${escHtml(t.metodo_pago || '—')}</p>
       ${t.referencia_pago ? `<div class="ref-pago-historial">💬 Referencia: <b>${escaparRefCaja(t.referencia_pago)}</b></div>` : ''}
-      ${t.items.map(i => `<div class="detalle-item"><span class="info"><img class="mini-foto" src="${i.imagen_url || IMAGEN_RESPALDO}" alt=""><span>${i.nombre_producto}<br><small>${i.tipo_venta === 'peso' ? GRANEL.detalle(i, '×') : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`}</small></span></span><span>$${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}
+      ${t.items.map(i => `<div class="detalle-item"><span class="info"><img class="mini-foto" src="${escHtml(i.imagen_url || IMAGEN_RESPALDO)}" alt=""><span>${escHtml(i.nombre_producto)}<br><small>${i.tipo_venta === 'peso' ? escHtml(GRANEL.detalle(i, '×')) : `${i.cantidad} × $${parseFloat(i.precio_unitario).toFixed(2)}`}</small></span></span><span>$${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}
       <p style="text-align:right; font-weight:700; margin:10px 0;">Total: $${totalNetoDeTicket(t).toFixed(2)}</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="imprimirCopiaHistorialCaja()">🖨️ Imprimir copia</button>

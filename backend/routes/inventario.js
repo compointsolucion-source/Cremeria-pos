@@ -4,6 +4,21 @@ const pool = require('../db');
 const { verificarToken, requiereRol, requierePermiso, tienePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
+// ¿Ese producto es de esta sucursal? (nadie puede mover el inventario de otra sucursal mandando otro id)
+async function productoDeLaSucursal(db, productoId, sucursalId) {
+  const id = Number(productoId);
+  if (!Number.isInteger(id) || id <= 0) return false;
+  const r = await db.query('SELECT id FROM productos WHERE id = $1 AND sucursal_id = $2', [id, sucursalId]);
+  return r.rows.length > 0;
+}
+
+// Cantidad opcional: vacía = no se cambia (null); si viene, debe ser un número >= 0.
+const cantidadOpcional = (v) => {
+  if (v === undefined || v === null || v === '') return { valor: null };
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? { valor: n } : { error: true };
+};
+
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
 router.use(verificarToken, requiereSucursalId);
@@ -128,13 +143,18 @@ router.get('/alertas', verificarToken, async (req, res) => {
 // Configurar el stock mínimo de un producto
 router.put('/:producto_id/minimo', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente'), async (req, res) => {
   try {
-    const { stock_minimo, stock_maximo } = req.body;
+    if (!(await productoDeLaSucursal(pool, req.params.producto_id, req.sucursalId))) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    const minimo = cantidadOpcional(req.body.stock_minimo);
+    const maximo = cantidadOpcional(req.body.stock_maximo);
+    if (minimo.error || maximo.error) return res.status(400).json({ error: 'El mínimo y el máximo deben ser números de 0 en adelante' });
     await pool.query(
-      `INSERT INTO inventario (producto_id, stock_minimo, stock_maximo) VALUES ($1, $2, $3)
+      `INSERT INTO inventario (producto_id, stock_minimo, stock_maximo) VALUES ($1, COALESCE($2::numeric, 0), $3)
        ON CONFLICT (producto_id) DO UPDATE SET
-         stock_minimo = COALESCE($2, inventario.stock_minimo),
-         stock_maximo = COALESCE($3, inventario.stock_maximo)`,
-      [req.params.producto_id, stock_minimo, stock_maximo !== undefined ? stock_maximo : null]
+         stock_minimo = COALESCE($2::numeric, inventario.stock_minimo),
+         stock_maximo = COALESCE($3::numeric, inventario.stock_maximo)`,
+      [Number(req.params.producto_id), minimo.valor, maximo.valor]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -152,7 +172,7 @@ router.post('/ajuste', verificarToken, async (req, res) => {
     //        o recibiste mercancía sin pasar por Compras),
     //       'merma' (SIEMPRE RESTA — caducidad/desperdicio),
     //       'ajuste_manual' (SIEMPRE RESTA — conteo físico que dio menos de lo esperado)
-    if (!producto_id || !cantidad || cantidad <= 0) {
+    if (!producto_id || !(Number(cantidad) > 0) || !Number.isFinite(Number(cantidad))) {
       return res.status(400).json({ error: 'Producto y cantidad son requeridos' });
     }
     if (!['merma', 'ajuste_manual', 'entrada_manual'].includes(tipo)) {
@@ -164,7 +184,21 @@ router.post('/ajuste', verificarToken, async (req, res) => {
       return res.status(403).json({ error: `No tienes el permiso "${permisoRequerido}" para esta acción. Pide a tu gerente que te lo asigne en Equipo.` });
     }
 
-    const cantidadConSigno = tipo === 'entrada_manual' ? cantidad : -cantidad;
+    if (!(await productoDeLaSucursal(conexion, producto_id, req.sucursalId))) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    // Cambiar precios de paso (al recibir mercancía) es cambiar precios: pide su propio permiso.
+    const cambiaPrecios = tipo === 'entrada_manual' && (precio_costo || precio || precio_mayoreo);
+    if (cambiaPrecios) {
+      if (!tienePermiso(req.usuario, 'PRODUCTOS_PRECIO')) {
+        return res.status(403).json({ error: 'No tienes el permiso "PRODUCTOS_PRECIO" para cambiar precios. Pide a tu gerente que te lo asigne en Equipo.' });
+      }
+      const malos = [precio_costo, precio, precio_mayoreo].some((v) => v && !(Number(v) >= 0 && Number.isFinite(Number(v))));
+      if (malos) return res.status(400).json({ error: 'Los precios deben ser números de 0 en adelante' });
+    }
+
+    const cantidadConSigno = tipo === 'entrada_manual' ? Number(cantidad) : -Number(cantidad);
 
     await conexion.query('BEGIN');
 
@@ -186,14 +220,14 @@ router.post('/ajuste', verificarToken, async (req, res) => {
 
     // Si se recibió mercancía con costo/precio nuevo, actualizar el producto
     // de una vez (solo tiene sentido en entrada manual, no al restar por merma).
-    if (tipo === 'entrada_manual' && (precio_costo || precio || precio_mayoreo)) {
+    if (cambiaPrecios) {
       await conexion.query(
         `UPDATE productos SET
           precio_costo = COALESCE($1, precio_costo),
           precio = COALESCE($2, precio),
           precio_mayoreo = COALESCE($3, precio_mayoreo)
-         WHERE id = $4`,
-        [precio_costo || null, precio || null, precio_mayoreo || null, producto_id]
+         WHERE id = $4 AND sucursal_id = $5`,
+        [precio_costo || null, precio || null, precio_mayoreo || null, producto_id, req.sucursalId]
       );
     }
 
@@ -208,7 +242,7 @@ router.post('/ajuste', verificarToken, async (req, res) => {
     await conexion.query('COMMIT');
     res.json({ ok: true });
   } catch (err) {
-    await conexion.query('ROLLBACK');
+    await conexion.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al registrar el ajuste' });
   } finally {
@@ -216,14 +250,15 @@ router.post('/ajuste', verificarToken, async (req, res) => {
   }
 });
 
-// Historial de movimientos de un producto
+// Historial de movimientos de un producto (solo productos de esta sucursal)
 router.get('/:producto_id/movimientos', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT m.*, u.nombre AS usuario_nombre FROM movimientos_inventario m
+       JOIN productos p ON p.id = m.producto_id
        JOIN usuarios u ON m.usuario_id = u.id
-       WHERE m.producto_id = $1 ORDER BY m.fecha DESC LIMIT 50`,
-      [req.params.producto_id]
+       WHERE m.producto_id = $1 AND p.sucursal_id = $2 ORDER BY m.fecha DESC LIMIT 50`,
+      [req.params.producto_id, req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {

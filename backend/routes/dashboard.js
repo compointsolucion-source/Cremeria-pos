@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId, tienePermiso } = require('../middleware/auth');
 
 // Dashboard consolidado, solo para jefe_general: suma todas las sucursales
 // ACTIVAS en un solo vistazo, sin tener que entrar una por una. Se define
@@ -67,9 +67,13 @@ router.get('/general', verificarToken, requiereRol('jefe_general'), async (req, 
 // sola vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
 router.use(verificarToken, requiereSucursalId);
 
+// Resumen del Inicio. Utilidad, costos, fiado y quién debe son datos del negocio: solo los ve
+// quien tiene permiso de reportes (dueño, gerente y jefe general siempre). A los demás se les
+// manda la MISMA forma de respuesta pero con esos datos vacíos, para que la pantalla no truene.
 router.get('/resumen', verificarToken, async (req, res) => {
   try {
     const sucursalId = req.sucursalId;
+    const veDatosSensibles = tienePermiso(req.usuario, 'REPORTES_VER');
     const ahora = new Date();
     const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
     const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
@@ -81,7 +85,7 @@ router.get('/resumen', verificarToken, async (req, res) => {
       [sucursalId, inicioHoy, finHoy]
     );
 
-    const gananciaHoy = await pool.query(
+    const gananciaHoy = !veDatosSensibles ? null : await pool.query(
       `WITH costos_promedio AS (
          SELECT producto_id, AVG(costo_unitario) AS costo_promedio FROM compra_detalle GROUP BY producto_id
        )
@@ -104,7 +108,7 @@ router.get('/resumen', verificarToken, async (req, res) => {
     );
 
     // Fiado total pendiente
-    const fiadoTotal = await pool.query(
+    const fiadoTotal = !veDatosSensibles ? null : await pool.query(
       `SELECT COALESCE(SUM(saldo_actual),0) AS total FROM clientes WHERE sucursal_id = $1 AND activo = true`,
       [sucursalId]
     );
@@ -126,7 +130,7 @@ router.get('/resumen', verificarToken, async (req, res) => {
     );
 
     // Créditos cercanos al límite (90% o más de su límite usado)
-    const creditosCercaLimite = await pool.query(
+    const creditosCercaLimite = !veDatosSensibles ? null : await pool.query(
       `SELECT nombre, saldo_actual, limite_credito
        FROM clientes
        WHERE sucursal_id = $1 AND activo = true AND limite_credito > 0 AND saldo_actual >= (limite_credito * 0.9)
@@ -145,14 +149,14 @@ router.get('/resumen', verificarToken, async (req, res) => {
       (
         SELECT 'compra' AS tipo, pr.nombre AS referencia, c.total AS monto, c.fecha
         FROM compras c JOIN proveedores pr ON c.proveedor_id = pr.id
-        WHERE c.sucursal_id = $1
+        WHERE c.sucursal_id = $1 AND $2::boolean
         ORDER BY c.fecha DESC LIMIT 5
       )
       UNION ALL
       (
         SELECT 'abono' AS tipo, cl.nombre AS referencia, ca.monto, ca.fecha
         FROM creditos_abono ca JOIN clientes cl ON ca.cliente_id = cl.id
-        WHERE cl.sucursal_id = $1
+        WHERE cl.sucursal_id = $1 AND $2::boolean
         ORDER BY ca.fecha DESC LIMIT 5
       )
       UNION ALL
@@ -163,25 +167,26 @@ router.get('/resumen', verificarToken, async (req, res) => {
         ORDER BY mi.fecha DESC LIMIT 5
       )
       ORDER BY fecha DESC LIMIT 15`,
-      [sucursalId]
+      [sucursalId, veDatosSensibles]
     );
 
-    const ventasProductos = parseFloat(gananciaHoy.rows[0].ventas_productos);
-    const costoEstimado = parseFloat(gananciaHoy.rows[0].costo_estimado);
+    let utilidad = { ventas_productos: null, costo_estimado: null, ganancia: null };
+    if (veDatosSensibles) {
+      const ventasProductos = parseFloat(gananciaHoy.rows[0].ventas_productos);
+      const costoEstimado = parseFloat(gananciaHoy.rows[0].costo_estimado);
+      utilidad = { ventas_productos: ventasProductos, costo_estimado: costoEstimado, ganancia: ventasProductos - costoEstimado };
+    }
 
     res.json({
       ventas_hoy: ventasHoy.rows[0],
-      utilidad_hoy: {
-        ventas_productos: ventasProductos,
-        costo_estimado: costoEstimado,
-        ganancia: ventasProductos - costoEstimado
-      },
+      utilidad_hoy: utilidad,
       ventas_por_hora: ventasPorHora.rows,
-      fiado_total: parseFloat(fiadoTotal.rows[0].total),
+      fiado_total: veDatosSensibles ? parseFloat(fiadoTotal.rows[0].total) : null,
       stock_bajo: stockBajo.rows,
       agotados: agotados.rows,
-      creditos_cerca_limite: creditosCercaLimite.rows,
-      actividad_reciente: actividadReciente.rows
+      creditos_cerca_limite: veDatosSensibles ? creditosCercaLimite.rows : [],
+      actividad_reciente: actividadReciente.rows,
+      datos_restringidos: !veDatosSensibles
     });
   } catch (err) {
     console.error(err);

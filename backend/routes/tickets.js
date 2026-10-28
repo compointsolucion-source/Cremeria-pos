@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
+const { verificarToken, requierePermiso, requiereSucursalId, tienePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 const { r2, subtotalRenglon } = require('../utils/importeExacto');
 const { descontarInventarioVenta } = require('../utils/inventarioVenta');
 const bcrypt = require('bcryptjs');
+const { METODOS_PAGO, validarTurno, montoNoNegativo } = require('../utils/seguridadCaja');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
@@ -17,6 +18,39 @@ router.use(verificarToken, requiereSucursalId);
 function generarFolio(sucursalId) {
   const base = Date.now().toString(36).toUpperCase().slice(-6);
   return `S${sucursalId}${base}`;
+}
+
+// Revisa y limpia los renglones que manda una pantalla (mostrador, caja) ANTES de guardarlos:
+//  - cantidad > 0 y precio >= 0 (sin negativos que funcionen como descuento escondido);
+//  - si el renglón es de un producto o kit, debe ser de ESTA sucursal y el nombre se toma
+//    del catálogo (no del que mande la pantalla);
+//  - el nombre libre se limpia de caracteres que podrían esconder código (<, >, comillas).
+// Devuelve los renglones listos o lanza {status, error}.
+function nombreLimpio(t) {
+  return String(t == null ? '' : t).replace(/[<>"'`\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 150);
+}
+async function revisarRenglones(db, items, sucursalId) {
+  if (!Array.isArray(items) || !items.length) throw { status: 400, error: 'El ticket necesita al menos un producto' };
+  if (items.length > 500) throw { status: 400, error: 'Demasiados renglones en un solo ticket' };
+  const salida = [];
+  for (const it of items) {
+    const cantidad = Number(it && it.cantidad);
+    const precio = Number(it && it.precio_unitario);
+    if (!(Number.isFinite(cantidad) && cantidad > 0 && cantidad < 1e6)) throw { status: 400, error: 'Cantidad inválida en un renglón' };
+    if (!(Number.isFinite(precio) && precio >= 0 && precio < 1e7)) throw { status: 400, error: 'Precio inválido en un renglón' };
+    const tipo = it.tipo === 'kit' ? 'kit' : 'producto';
+    let nombre = nombreLimpio(it.nombre_producto);
+    const id = tipo === 'kit' ? it.kit_id : it.producto_id;
+    if (id) {
+      const r = await db.query(`SELECT nombre FROM ${tipo === 'kit' ? 'kits' : 'productos'} WHERE id = $1 AND sucursal_id = $2`, [id, sucursalId]);
+      if (!r.rows.length) throw { status: 400, error: 'Uno de los productos no es de esta sucursal' };
+      nombre = nombreLimpio(r.rows[0].nombre) || nombre;
+    }
+    if (!nombre) throw { status: 400, error: 'Falta el nombre de un producto' };
+    salida.push({ ...it, tipo, cantidad, precio_unitario: precio, nombre_producto: nombre,
+      producto_id: tipo === 'producto' ? (it.producto_id || null) : null, kit_id: tipo === 'kit' ? (it.kit_id || null) : null });
+  }
+  return salida;
 }
 
 // Referencia de pago: comentario libre que escribe el cajero al cobrar con tarjeta o transferencia
@@ -32,10 +66,8 @@ function referenciaPago(metodo, texto) {
 router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
   const cliente = await pool.connect();
   try {
-    const { items } = req.body; // [{tipo, producto_id|kit_id, nombre_producto, cantidad, precio_unitario}]
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'El ticket necesita al menos un producto' });
-    }
+    // [{tipo, producto_id|kit_id, nombre_producto, cantidad, precio_unitario}]
+    const items = await revisarRenglones(cliente, req.body && req.body.items, req.sucursalId);
 
     await cliente.query('BEGIN');
 
@@ -73,6 +105,7 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     res.json({ ...ticket, items: itemsGuardados });
   } catch (err) {
     await cliente.query('ROLLBACK');
+    if (err.status) return res.status(err.status).json({ error: err.error });
     console.error(err);
     res.status(500).json({ error: 'Error al generar el ticket' });
   } finally {
@@ -91,14 +124,19 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
     if (!/^[A-Z0-9-]{4,20}$/.test(folio)) return res.status(400).json({ error: 'Folio inválido' });
     const metodosOk = ['efectivo', 'tarjeta', 'transferencia', 'dolares', 'cheque', 'vale_despensa', 'mixto'];
     if (!metodosOk.includes(b.metodo_pago)) return res.status(400).json({ error: 'Método de pago no permitido para ventas sin internet' });
-    const items = Array.isArray(b.items) ? b.items : [];
-    if (!items.length || items.length > 500) return res.status(400).json({ error: 'La venta necesita productos' });
-    for (const it of items) {
-      if (!(Number(it.cantidad) > 0) || !(Number(it.precio_unitario) >= 0) || !it.nombre_producto) return res.status(400).json({ error: 'Renglón de venta inválido' });
-    }
-
     const previo = await conexion.query('SELECT * FROM tickets WHERE folio = $1', [folio]);
-    if (previo.rows.length) return res.json({ ...previo.rows[0], duplicado: true });
+    if (previo.rows.length) {
+      // Solo se devuelve si es de esta sucursal (no se enseñan tickets de otra).
+      if (Number(previo.rows[0].sucursal_id) !== Number(req.sucursalId)) return res.status(409).json({ error: 'Ese folio ya existe en otra sucursal' });
+      return res.json({ ...previo.rows[0], duplicado: true });
+    }
+    let items;
+    try { items = await revisarRenglones(conexion, b.items, req.sucursalId); } catch (e) { return res.status(e.status || 400).json({ error: e.error || 'Renglón de venta inválido' }); }
+    // Descuentos en una venta sin internet: solo quien tiene permiso de aplicar descuentos.
+    const hayDescuento = Number(b.descuento_monto) > 0 || items.some((it) => Number(it.descuento_monto) > 0);
+    if (hayDescuento && !tienePermiso(req.usuario, 'DESCUENTO_APLICAR')) {
+      return res.status(403).json({ error: 'Esta venta trae descuento y tu usuario no tiene permiso de aplicar descuentos' });
+    }
 
     // Fecha real de la venta (la de la caja), sin permitir futuro ni más de 60 días atrás.
     let fecha = new Date(b.fecha);
@@ -121,10 +159,14 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
     const montoTarjeta = Math.max(Number(b.monto_tarjeta) || 0, 0);
     const efectivoRecibido = b.efectivo_recibido ? Math.max(Number(b.efectivo_recibido) || 0, 0) : null;
 
+    // El turno debe ser de esta sucursal y del propio cajero (puede ya estar cerrado: la venta se hizo sin internet).
     let turnoId = null;
-    if (b.turno_id) {
-      const t = await conexion.query('SELECT id FROM turnos WHERE id = $1 AND sucursal_id = $2', [parseInt(b.turno_id), req.sucursalId]);
-      if (t.rows.length) turnoId = t.rows[0].id;
+    try {
+      const t = await validarTurno(conexion, { turnoId: b.turno_id, sucursalId: req.sucursalId, usuario: req.usuario, exigirAbierto: false });
+      turnoId = t ? t.id : null;
+    } catch (e) { return res.status(e.status || 400).json({ error: e.error }); }
+    if (montoEfectivo + montoTarjeta + 0.05 < neto) {
+      return res.status(400).json({ error: 'Lo cobrado no cubre el total de la venta' });
     }
 
     await conexion.query('BEGIN');
@@ -141,7 +183,7 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
         `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal, descuento_monto, descuento_motivo)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [tk.id, l.tipo, l.tipo === 'producto' ? (l.it.producto_id || null) : null, l.tipo === 'kit' ? (l.it.kit_id || null) : null,
-         String(l.it.nombre_producto).slice(0, 150), l.cantidad, l.precio, l.subtotal, l.desc,
+         l.it.nombre_producto, l.cantidad, l.precio, l.subtotal, l.desc,
          l.desc > 0 ? String(l.it.descuento_motivo || 'Descuento (venta sin internet)').slice(0, 255) : null]
       );
     }
@@ -158,7 +200,7 @@ router.post('/venta-offline', verificarToken, requierePermiso('VENTAS_CREAR'), a
   } catch (err) {
     await conexion.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') { // otro envío igual llegó al mismo tiempo
-      const ya = await pool.query('SELECT * FROM tickets WHERE folio = $1', [String(req.body && req.body.folio || '').toUpperCase()]).catch(() => ({ rows: [] }));
+      const ya = await pool.query('SELECT * FROM tickets WHERE folio = $1 AND sucursal_id = $2', [String(req.body && req.body.folio || '').toUpperCase(), req.sucursalId]).catch(() => ({ rows: [] }));
       if (ya.rows.length) return res.json({ ...ya.rows[0], duplicado: true });
     }
     console.error(err);
@@ -177,13 +219,13 @@ router.post('/pendiente-offline', verificarToken, requierePermiso('VENTAS_CREAR'
     const b = req.body || {};
     const folio = String(b.folio || '').toUpperCase();
     if (!/^[A-Z0-9-]{4,20}$/.test(folio)) return res.status(400).json({ error: 'Folio inválido' });
-    const items = Array.isArray(b.items) ? b.items : [];
-    if (!items.length || items.length > 500) return res.status(400).json({ error: 'El ticket necesita productos' });
-    for (const it of items) {
-      if (!(Number(it.cantidad) > 0) || !(Number(it.precio_unitario) >= 0) || !it.nombre_producto) return res.status(400).json({ error: 'Renglón de ticket inválido' });
-    }
     const previo = await conexion.query('SELECT * FROM tickets WHERE folio = $1', [folio]);
-    if (previo.rows.length) return res.json({ ...previo.rows[0], duplicado: true });
+    if (previo.rows.length) {
+      if (Number(previo.rows[0].sucursal_id) !== Number(req.sucursalId)) return res.status(409).json({ error: 'Ese folio ya existe en otra sucursal' });
+      return res.json({ ...previo.rows[0], duplicado: true });
+    }
+    let items;
+    try { items = await revisarRenglones(conexion, b.items, req.sucursalId); } catch (e) { return res.status(e.status || 400).json({ error: e.error || 'Renglón de ticket inválido' }); }
 
     let fecha = new Date(b.fecha);
     const ahora = new Date();
@@ -205,7 +247,7 @@ router.post('/pendiente-offline', verificarToken, requierePermiso('VENTAS_CREAR'
         `INSERT INTO ticket_detalle (ticket_id, tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario, subtotal)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [ticket.id, tipo, tipo === 'producto' ? (item.producto_id || null) : null, tipo === 'kit' ? (item.kit_id || null) : null,
-         String(item.nombre_producto).slice(0, 150), item.cantidad, item.precio_unitario, subtotales[n]]
+         item.nombre_producto, item.cantidad, item.precio_unitario, subtotales[n]]
       );
     }
     await conexion.query('COMMIT');
@@ -215,7 +257,7 @@ router.post('/pendiente-offline', verificarToken, requierePermiso('VENTAS_CREAR'
   } catch (err) {
     await conexion.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') {
-      const ya = await pool.query('SELECT * FROM tickets WHERE folio = $1', [String(req.body && req.body.folio || '').toUpperCase()]).catch(() => ({ rows: [] }));
+      const ya = await pool.query('SELECT * FROM tickets WHERE folio = $1 AND sucursal_id = $2', [String(req.body && req.body.folio || '').toUpperCase(), req.sucursalId]).catch(() => ({ rows: [] }));
       if (ya.rows.length) return res.json({ ...ya.rows[0], duplicado: true });
     }
     console.error(err);
@@ -365,10 +407,9 @@ router.get('/historial-dia', verificarToken, async (req, res) => {
 router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
   const cliente = await pool.connect();
   try {
-    const { tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario } = req.body;
-    if (!nombre_producto || !cantidad || !precio_unitario) {
-      return res.status(400).json({ error: 'Faltan datos del producto a agregar' });
-    }
+    if (!req.body || !req.body.nombre_producto) return res.status(400).json({ error: 'Faltan datos del producto a agregar' });
+    const [renglon] = await revisarRenglones(cliente, [req.body], req.sucursalId);
+    const { tipo, producto_id, kit_id, nombre_producto, cantidad, precio_unitario } = renglon;
 
     await cliente.query('BEGIN');
 
@@ -404,7 +445,8 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
 
     res.json({ ticket: ticketActualizado.rows[0], item: detalleResult.rows[0] });
   } catch (err) {
-    await cliente.query('ROLLBACK');
+    await cliente.query('ROLLBACK').catch(() => {});
+    if (err.status) return res.status(err.status).json({ error: err.error });
     console.error(err);
     res.status(500).json({ error: 'Error al agregar el producto al ticket' });
   } finally {
@@ -412,44 +454,68 @@ router.post('/:id/agregar-item', verificarToken, requierePermiso('VENTAS_CREAR')
   }
 });
 
-router.put('/item/:itemId', verificarToken, async (req, res) => {
+// Busca un renglón SOLO si su ticket es de esta sucursal y sigue pendiente (no se tocan ventas cobradas).
+async function renglonEditable(db, itemId, sucursalId) {
+  const r = await db.query(
+    `SELECT d.* FROM ticket_detalle d JOIN tickets t ON t.id = d.ticket_id
+      WHERE d.id = $1 AND t.sucursal_id = $2 AND t.estado = 'pendiente' FOR UPDATE OF t`,
+    [itemId, sucursalId]);
+  return r.rows[0] || null;
+}
+
+router.put('/item/:itemId', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
   try {
-    const { cantidad } = req.body;
-    if (!cantidad || cantidad <= 0) return res.status(400).json({ error: 'Cantidad inválida' });
+    const cantidad = Number(req.body && req.body.cantidad);
+    if (!(Number.isFinite(cantidad) && cantidad > 0 && cantidad < 1e6)) return res.status(400).json({ error: 'Cantidad inválida' });
 
-    const itemResult = await pool.query('SELECT * FROM ticket_detalle WHERE id = $1', [req.params.itemId]);
-    if (itemResult.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
-    const item = itemResult.rows[0];
+    await conexion.query('BEGIN');
+    const item = await renglonEditable(conexion, req.params.itemId, req.sucursalId);
+    if (!item) { await conexion.query('ROLLBACK'); return res.status(404).json({ error: 'El producto no existe o el ticket ya se cobró' }); }
 
-    const nuevoSubtotal = cantidad * item.precio_unitario;
-    await pool.query('UPDATE ticket_detalle SET cantidad = $1, subtotal = $2 WHERE id = $3', [cantidad, nuevoSubtotal, item.id]);
+    const nuevoSubtotal = r2(cantidad * item.precio_unitario);
+    await conexion.query('UPDATE ticket_detalle SET cantidad = $1, subtotal = $2 WHERE id = $3', [cantidad, nuevoSubtotal, item.id]);
 
-    const totalResult = await pool.query('SELECT COALESCE(SUM(subtotal),0) AS total FROM ticket_detalle WHERE ticket_id = $1', [item.ticket_id]);
-    await pool.query('UPDATE tickets SET total = $1 WHERE id = $2', [totalResult.rows[0].total, item.ticket_id]);
+    const totalResult = await conexion.query('SELECT COALESCE(SUM(subtotal),0) AS total FROM ticket_detalle WHERE ticket_id = $1', [item.ticket_id]);
+    await conexion.query('UPDATE tickets SET total = $1 WHERE id = $2', [totalResult.rows[0].total, item.ticket_id]);
+    await registrarBitacora(conexion, { usuario_id: req.usuario.id, accion: 'modificar_renglon', modulo: 'tickets', referencia_id: item.ticket_id,
+      valor_anterior: { renglon: item.id, cantidad: item.cantidad }, valor_nuevo: { renglon: item.id, cantidad } });
+    await conexion.query('COMMIT');
 
     res.json({ ok: true, nuevo_total: totalResult.rows[0].total });
   } catch (err) {
+    await conexion.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al modificar la cantidad' });
+  } finally {
+    conexion.release();
   }
 });
 
 // Eliminar un item del ticket antes de cobrar
-router.delete('/item/:itemId', verificarToken, async (req, res) => {
+router.delete('/item/:itemId', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, res) => {
+  const conexion = await pool.connect();
   try {
-    const itemResult = await pool.query('SELECT ticket_id FROM ticket_detalle WHERE id = $1', [req.params.itemId]);
-    if (itemResult.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
-    const ticketId = itemResult.rows[0].ticket_id;
+    await conexion.query('BEGIN');
+    const item = await renglonEditable(conexion, req.params.itemId, req.sucursalId);
+    if (!item) { await conexion.query('ROLLBACK'); return res.status(404).json({ error: 'El producto no existe o el ticket ya se cobró' }); }
+    const ticketId = item.ticket_id;
 
-    await pool.query('DELETE FROM ticket_detalle WHERE id = $1', [req.params.itemId]);
+    await conexion.query('DELETE FROM ticket_detalle WHERE id = $1', [item.id]);
 
-    const totalResult = await pool.query('SELECT COALESCE(SUM(subtotal),0) AS total FROM ticket_detalle WHERE ticket_id = $1', [ticketId]);
-    await pool.query('UPDATE tickets SET total = $1 WHERE id = $2', [totalResult.rows[0].total, ticketId]);
+    const totalResult = await conexion.query('SELECT COALESCE(SUM(subtotal),0) AS total FROM ticket_detalle WHERE ticket_id = $1', [ticketId]);
+    await conexion.query('UPDATE tickets SET total = $1 WHERE id = $2', [totalResult.rows[0].total, ticketId]);
+    await registrarBitacora(conexion, { usuario_id: req.usuario.id, accion: 'quitar_renglon', modulo: 'tickets', referencia_id: ticketId,
+      valor_anterior: { renglon: item.id, producto: item.nombre_producto, cantidad: item.cantidad } });
+    await conexion.query('COMMIT');
 
     res.json({ ok: true, nuevo_total: totalResult.rows[0].total });
   } catch (err) {
+    await conexion.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al eliminar el item' });
+  } finally {
+    conexion.release();
   }
 });
 
@@ -568,8 +634,13 @@ router.put('/item/:itemId/descuento', verificarToken, requierePermiso('DESCUENTO
 router.post('/:id/pagar', verificarToken, async (req, res) => {
   const conexion = await pool.connect();
   try {
-    const { metodo_pago, monto_efectivo, monto_tarjeta, turno_id, cliente_id, efectivo_recibido } = req.body;
+    const { metodo_pago, turno_id, cliente_id } = req.body || {};
     const referencia = referenciaPago(metodo_pago, req.body.referencia_pago);
+    if (!METODOS_PAGO.includes(metodo_pago)) return res.status(400).json({ error: 'Forma de pago no válida' });
+    const monto_efectivo = montoNoNegativo(req.body.monto_efectivo);
+    const monto_tarjeta = montoNoNegativo(req.body.monto_tarjeta);
+    const efectivo_recibido = montoNoNegativo(req.body.efectivo_recibido);
+    if (monto_efectivo === null || monto_tarjeta === null || efectivo_recibido === null) return res.status(400).json({ error: 'Montos de pago no válidos' });
 
     if (metodo_pago === 'credito' && !cliente_id) {
       return res.status(400).json({ error: 'Selecciona un cliente para autorizar el fiado' });
@@ -577,12 +648,21 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
 
     await conexion.query('BEGIN');
 
+    // Se cobra SIEMPRE dentro del turno abierto del propio cajero (dueño/gerente pueden usar uno de la sucursal).
+    let turno;
+    try {
+      turno = await validarTurno(conexion, { turnoId: turno_id, sucursalId: req.sucursalId, usuario: req.usuario, obligatorio: true });
+    } catch (e) {
+      await conexion.query('ROLLBACK');
+      return res.status(e.status || 400).json({ error: e.error });
+    }
+
     // FOR UPDATE bloquea esta fila hasta que termine la transacción: si dos cobros
     // llegan casi al mismo tiempo, el segundo espera a que el primero termine y
     // entonces ve el ticket ya pagado, en vez de cobrarlo dos veces.
     const ticketActualResult = await conexion.query(
-      'SELECT * FROM tickets WHERE id = $1 AND estado = $2 FOR UPDATE',
-      [req.params.id, 'pendiente']
+      'SELECT * FROM tickets WHERE id = $1 AND estado = $2 AND sucursal_id = $3 FOR UPDATE',
+      [req.params.id, 'pendiente', req.sucursalId]
     );
     if (ticketActualResult.rows.length === 0) {
       await conexion.query('ROLLBACK');
@@ -595,10 +675,19 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
     );
     const descuentoItems = parseFloat(itemsDescuentoResult.rows[0].total);
     const totalNeto = parseFloat(ticketActual.total) - parseFloat(ticketActual.descuento_monto || 0) - descuentoItems;
+    if (totalNeto < -0.005) {
+      await conexion.query('ROLLBACK');
+      return res.status(400).json({ error: 'El descuento es mayor que el total. Quita o ajusta el descuento antes de cobrar.' });
+    }
+    // Lo cobrado debe cubrir el total (salvo fiado, que se carga a la cuenta del cliente).
+    if (metodo_pago !== 'credito' && monto_efectivo + monto_tarjeta + 0.05 < totalNeto) {
+      await conexion.query('ROLLBACK');
+      return res.status(400).json({ error: 'Lo cobrado no cubre el total del ticket' });
+    }
 
     // Validar límite de crédito si aplica
     if (metodo_pago === 'credito') {
-      const clienteResult = await conexion.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2', [cliente_id, req.sucursalId]);
+      const clienteResult = await conexion.query('SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2 FOR UPDATE', [cliente_id, req.sucursalId]);
       if (clienteResult.rows.length === 0) {
         await conexion.query('ROLLBACK');
         return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -624,7 +713,7 @@ router.post('/:id/pagar', verificarToken, async (req, res) => {
         efectivo_recibido = $8,
         referencia_pago = $9
        WHERE id = $7 AND estado = 'pendiente' RETURNING *`,
-      [req.usuario.id, metodo_pago, monto_efectivo || 0, monto_tarjeta || 0, turno_id || null, metodo_pago === 'credito' ? cliente_id : null, req.params.id, efectivo_recibido || null, referencia]
+      [req.usuario.id, metodo_pago, monto_efectivo, monto_tarjeta, turno.id, metodo_pago === 'credito' ? cliente_id : null, req.params.id, efectivo_recibido || null, referencia]
     );
     if (result.rows.length === 0) {
       await conexion.query('ROLLBACK');
@@ -672,8 +761,8 @@ router.post('/:id/cancelar', verificarToken, requierePermiso('VENTAS_CANCELAR'),
   try {
     const { motivo } = req.body;
     const result = await pool.query(
-      `UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente' RETURNING folio`,
-      [req.params.id]
+      `UPDATE tickets SET estado = 'cancelado' WHERE id = $1 AND estado = 'pendiente' AND sucursal_id = $2 RETURNING folio`,
+      [req.params.id, req.sucursalId]
     );
 
     if (result.rows.length > 0) {

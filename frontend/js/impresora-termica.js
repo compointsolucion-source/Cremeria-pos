@@ -510,7 +510,7 @@ function imprimirFichaConDialogoDelSistema(numero, ancho_ticket) {
     </head>
     <body>
       <div>SU TURNO</div>
-      <div class="numero">${numeroTexto}</div>
+      <div class="numero">${escaparHtmlTicket(numeroTexto)}</div>
       <div>Espere a ser llamado</div>
       <script>
         window.onload = () => window.print();
@@ -714,8 +714,9 @@ function anchoQrPromoPx(ancho, tamano) {
   return tabla[tamano] || tabla.mediano;
 }
 
+// También escapa comillas: así sirve igual para texto y para atributos (src="...").
 function escaparHtmlTicket(t) {
-  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(t === null || t === undefined ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function bytesConEstilo(texto, { negrita = false, grande = false } = {}) {
@@ -1410,7 +1411,8 @@ async function construirHtmlTicket(datosTicket) {
 
   if (d.logoUrl) {
     const pct = d.logoTamano === 'chico' ? 28 : (d.logoTamano === 'grande' ? 75 : 50);
-    partes.push(`<img src="${d.logoUrl}" style="width:${pct}%;">`);
+    // La dirección del logo se escapa: si trajera comillas podría meter código en la ventana de impresión.
+    partes.push(`<img src="${esc(d.logoUrl)}" style="width:${pct}%;">`);
   }
   if (d.negocio.nombre) partes.push(`<div class="c nombre">${esc(d.negocio.nombre)}</div>`);
   const datosNegocio = [];

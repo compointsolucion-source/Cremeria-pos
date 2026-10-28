@@ -4,6 +4,7 @@ const pool = require('../db');
 const { verificarToken, requiereRol, requierePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 const { normalizarDireccion, soloDigitos } = require('../utils/pedidosUtil');
+const { METODOS_ABONO, esSupervisor, validarTurno, montoNoNegativo, errorCaja } = require('../utils/seguridadCaja');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
@@ -61,16 +62,23 @@ router.get('/buscar/:texto', verificarToken, async (req, res) => {
   }
 });
 
-// Crear cliente
+// Crear cliente.
+// El límite de crédito (cuánto se le puede fiar) solo lo pone dueño, gerente o jefe general;
+// si lo crea un cajero, el cliente nace con límite $0 (luego el dueño se lo sube en Editar).
 router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, res) => {
   try {
-    const { nombre, telefono, limite_credito, tipo, usa_mayoreo } = req.body;
+    const { nombre, telefono, tipo, usa_mayoreo } = req.body;
     if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
     if (tipo !== undefined && !['publico', 'tienda'].includes(tipo)) return res.status(400).json({ error: 'Tipo de cliente inválido' });
+    let limite_credito = 0;
+    if (esSupervisor(req.usuario)) {
+      limite_credito = montoNoNegativo(req.body.limite_credito);
+      if (limite_credito === null) return res.status(400).json({ error: 'El límite de crédito no es válido' });
+    }
 
     const result = await pool.query(
       `INSERT INTO clientes (sucursal_id, nombre, telefono, limite_credito, tipo, usa_mayoreo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [req.sucursalId, nombre, telefono || null, limite_credito || 0, tipo || 'publico', usa_mayoreo === true]
+      [req.sucursalId, nombre, telefono || null, limite_credito, tipo || 'publico', usa_mayoreo === true]
     );
 
     await registrarBitacora(pool, {
@@ -78,7 +86,7 @@ router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, 
       accion: 'crear_cliente',
       modulo: 'clientes',
       referencia_id: result.rows[0].id,
-      valor_nuevo: { nombre, telefono, limite_credito: limite_credito || 0 }
+      valor_nuevo: { nombre, telefono, limite_credito }
     });
 
     res.json(result.rows[0]);
@@ -93,6 +101,9 @@ router.post('/', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, 
 // ya existe (sin importar mayúsculas), se ACTUALIZAN su teléfono y su límite de crédito
 // pero NUNCA su saldo (para no pisar lo que ya debe de verdad); si no existe, se CREA
 // con el saldo que traía del sistema anterior. Filas sin nombre se omiten.
+// Límite y saldo inicial solo los toma si importa dueño, gerente o jefe general; si importa
+// un cajero, los nuevos quedan con límite y saldo en $0 y a los que ya existen no se les
+// toca el límite (solo el teléfono).
 router.post('/importar', verificarToken, requierePermiso('CLIENTES_CREAR'), async (req, res) => {
   const conexion = await pool.connect();
   try {
@@ -110,14 +121,15 @@ router.post('/importar', verificarToken, requierePermiso('CLIENTES_CREAR'), asyn
     const porNombre = {};
     existentes.rows.forEach(c => { porNombre[c.nombre_lower] = c.id; });
 
+    const puedeCredito = esSupervisor(req.usuario);
     let creados = 0, actualizados = 0, omitidos = 0;
     await conexion.query('BEGIN');
     for (const fila of clientes) {
       const nombre = String(fila.nombre || '').trim().slice(0, 150);
       if (!nombre) { omitidos++; continue; }
       const telefono = String(fila.telefono || '').trim().slice(0, 20) || null;
-      const limite = monto(fila.limite_credito);
-      const saldo = monto(fila.saldo);
+      const limite = puedeCredito ? monto(fila.limite_credito) : 0;
+      const saldo = puedeCredito ? monto(fila.saldo) : 0;
       const clave = nombre.toLowerCase();
 
       if (porNombre[clave]) {
@@ -152,7 +164,7 @@ router.post('/importar', verificarToken, requierePermiso('CLIENTES_CREAR'), asyn
   } catch (err) {
     await conexion.query('ROLLBACK').catch(() => {});
     console.error(err);
-    res.status(500).json({ error: 'Error al importar los clientes: ' + err.message });
+    res.status(500).json({ error: 'Error al importar los clientes. Revisa el archivo e inténtalo de nuevo.' });
   } finally {
     conexion.release();
   }
@@ -205,34 +217,65 @@ router.get('/:id/estado-cuenta', verificarToken, async (req, res) => {
   }
 });
 
-// Registrar un abono (pago a cuenta)
+// Registrar un abono (pago a cuenta).
+// Reglas: el cliente debe ser de esta sucursal; la forma de pago una de las que cuenta el corte;
+// el monto mayor a $0 y nunca mayor a lo que debe; y si es en efectivo, el dinero entra a un
+// turno de caja abierto (si no se manda turno, se usa el turno abierto del propio usuario).
 router.post('/:id/abono', verificarToken, requierePermiso('CREDITO_ABONO'), async (req, res) => {
-  const cliente = await pool.connect();
+  const conexion = await pool.connect();
   try {
-    const { monto, metodo_pago, turno_id } = req.body;
-    if (!monto || monto <= 0) return res.status(400).json({ error: 'Monto inválido' });
+    const { turno_id } = req.body;
+    const metodo = req.body.metodo_pago || 'efectivo';
+    if (!METODOS_ABONO.includes(metodo)) return res.status(400).json({ error: 'Forma de pago no válida para un abono' });
+    const monto = Math.round(Number(req.body.monto) * 100) / 100;
+    if (!Number.isFinite(monto) || monto <= 0) return res.status(400).json({ error: 'Monto inválido' });
 
-    await cliente.query('BEGIN');
+    await conexion.query('BEGIN');
 
-    await cliente.query(
+    // FOR UPDATE: dos abonos al mismo tiempo no pueden dejar el saldo por debajo de $0.
+    const c = await conexion.query(
+      'SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2 FOR UPDATE',
+      [req.params.id, req.sucursalId]
+    );
+    if (c.rows.length === 0) throw errorCaja(404, 'Cliente no encontrado');
+    const saldo = parseFloat(c.rows[0].saldo_actual || 0);
+    if (monto > saldo + 0.005) {
+      throw errorCaja(400, `El abono ($${monto.toFixed(2)}) es mayor que lo que debe el cliente ($${saldo.toFixed(2)})`);
+    }
+
+    let turnoPedido = turno_id;
+    if ((turnoPedido === undefined || turnoPedido === null || turnoPedido === '') && metodo === 'efectivo') {
+      const propio = await conexion.query(
+        `SELECT id FROM turnos WHERE sucursal_id = $1 AND usuario_id = $2 AND estado = 'abierto' ORDER BY fecha_apertura DESC LIMIT 1`,
+        [req.sucursalId, req.usuario.id]
+      );
+      if (propio.rows.length) turnoPedido = propio.rows[0].id;
+    }
+    const turno = await validarTurno(conexion, {
+      turnoId: turnoPedido, sucursalId: req.sucursalId, usuario: req.usuario,
+      obligatorio: metodo === 'efectivo'
+    });
+
+    await conexion.query(
       `INSERT INTO creditos_abono (cliente_id, monto, metodo_pago, turno_id, recibido_por)
        VALUES ($1, $2, $3, $4, $5)`,
-      [req.params.id, monto, metodo_pago || 'efectivo', turno_id || null, req.usuario.id]
+      [c.rows[0].id, monto, metodo, turno ? turno.id : null, req.usuario.id]
     );
 
-    const result = await cliente.query(
+    const result = await conexion.query(
       `UPDATE clientes SET saldo_actual = saldo_actual - $1 WHERE id = $2 RETURNING *`,
-      [monto, req.params.id]
+      [monto, c.rows[0].id]
     );
 
-    await cliente.query('COMMIT');
+    await conexion.query('COMMIT');
     res.json(result.rows[0]);
   } catch (err) {
-    await cliente.query('ROLLBACK');
+    await conexion.query('ROLLBACK').catch(() => {});
+    if (err.status) return res.status(err.status).json({ error: err.error });
     console.error(err);
     res.status(500).json({ error: 'Error al registrar el abono' });
   } finally {
-    cliente.release();
+    conexion.release();
   }
 });
 

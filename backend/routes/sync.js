@@ -21,7 +21,9 @@ const { registrarBitacora } = require('../utils/bitacora');
 
 const router = express.Router();
 // sync_vinculo guarda la clave de ESTA nube: nunca se copia ni se vacía con el espejo.
-const EXCLUIDAS = new Set(['licencia', 'instalacion', 'datos_negocio', 'licencia_solicitud', 'schema_migrations', 'sync_vinculo']);
+// recuperacion_codigos (códigos para recuperar contraseña) y terminos_aceptaciones (constancia legal) tampoco viajan.
+const EXCLUIDAS = new Set(['licencia', 'instalacion', 'datos_negocio', 'licencia_solicitud', 'schema_migrations', 'sync_vinculo',
+  'recuperacion_codigos', 'terminos_aceptaciones']);
 const q = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 
 // ------------------------------------------------------------ autenticación
@@ -138,6 +140,12 @@ async function ajustarContadores(c, m, tablas) {
 // Vincular otra vez reemplaza la clave anterior (la computadora vinculada antes deja de poder subir).
 router.post('/vincular', verificarToken, requiereRol('dueno', 'jefe_general'), async (req, res) => {
   try {
+    // Solo con una sesión RECIÉN abierta (el panel del servidor entra con usuario y contraseña justo antes).
+    // Así una sesión vieja o robada no sirve para vincular otra computadora y copiar toda la información.
+    const edad = Date.now() / 1000 - (Number(req.usuario.iat) || 0);
+    if (!(edad >= 0 && edad < 10 * 60)) {
+      return res.status(403).json({ error: 'Por seguridad, vuelve a escribir tu usuario y contraseña para vincular.' });
+    }
     await asegurarTabla();
     const previa = await pool.query('SELECT 1 FROM sync_vinculo WHERE id = 1');
     const clave = crypto.randomBytes(24).toString('hex');

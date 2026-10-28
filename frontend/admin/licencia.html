@@ -367,7 +367,7 @@ async function iniciarContratar() {
 function accionesSolicitudHTML(s) {
   const wa = s.estado === 'enviada' ? 'WhatsApp (más rápido)' : 'Mandar por WhatsApp';
   return `<div class="ct-acciones">
-      <a class="btn btn-wa" href="${esc(s.whatsapp_url)}" target="_blank" rel="noopener">💬 ${wa}</a>
+      <a class="btn btn-wa" href="${esc(/^https?:\/\//i.test(String(s.whatsapp_url || '')) ? s.whatsapp_url : '#')}" target="_blank" rel="noopener">💬 ${wa}</a>
       <button class="btn btn-secondary" onclick="copiarSolicitud()">📋 Copiar solicitud</button>
       <button class="btn btn-secondary" onclick="guardarArchivo()">💾 Guardar archivo</button>
       ${s.estado === 'pendiente' || s.estado === 'vencida' || s.estado === 'rechazada' ? '<button class="btn btn-secondary" id="btnReintentar" onclick="reintentarEnvio()">🔄 Reintentar envío</button>' : ''}

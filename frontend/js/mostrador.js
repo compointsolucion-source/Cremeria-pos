@@ -94,8 +94,8 @@ function renderProductos() {
       card.className = 'producto-card';
       card.innerHTML = `
         <span class="badge-tipo badge-kit">KIT</span>
-        <img src="${k.imagen_url || IMAGEN_RESPALDO}" alt="${k.nombre}">
-        <div class="nombre">${k.nombre}</div>
+        <img src="${escHtml(k.imagen_url || IMAGEN_RESPALDO)}" alt="${escHtml(k.nombre)}">
+        <div class="nombre">${escHtml(k.nombre)}</div>
         <div class="precio">$${parseFloat(k.precio_kit).toFixed(2)}</div>
       `;
       card.onclick = () => agregarKit(k);
@@ -107,7 +107,7 @@ function renderProductos() {
       card.className = 'producto-card';
       const badge = p.tipo_venta === 'unidad' ? '<span class="badge-tipo badge-unidad">PZA</span>' : '<span class="badge-tipo badge-peso">KG</span>';
       const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
-      card.innerHTML = `${badge}<img src="${p.imagen_url || IMAGEN_RESPALDO}" alt="${p.nombre}"><div class="nombre">${p.nombre}</div><div class="precio">${precioLabel}</div>`;
+      card.innerHTML = `${badge}<img src="${escHtml(p.imagen_url || IMAGEN_RESPALDO)}" alt="${escHtml(p.nombre)}"><div class="nombre">${escHtml(p.nombre)}</div><div class="precio">${precioLabel}</div>`;
       card.onclick = () => seleccionarProducto(p);
       grid.appendChild(card);
     });
@@ -124,8 +124,8 @@ function renderProductos() {
       card.className = 'producto-card';
       card.innerHTML = `
         <span class="badge-tipo badge-kit">KIT</span>
-        <img src="${k.imagen_url || IMAGEN_RESPALDO}" alt="${k.nombre}">
-        <div class="nombre">${k.nombre}</div>
+        <img src="${escHtml(k.imagen_url || IMAGEN_RESPALDO)}" alt="${escHtml(k.nombre)}">
+        <div class="nombre">${escHtml(k.nombre)}</div>
         <div class="precio">$${parseFloat(k.precio_kit).toFixed(2)}</div>
       `;
       card.onclick = () => agregarKit(k);
@@ -158,11 +158,11 @@ function renderProductos() {
       : '<span class="badge-tipo badge-peso">KG</span>';
     const precioLabel = p.tipo_venta === 'unidad' ? `$${parseFloat(p.precio).toFixed(2)}/pza` : `$${parseFloat(p.precio).toFixed(2)}/kg`;
     const tienePromo = p.promociones && p.promociones.length > 0;
-    const avisoPromo = tienePromo ? `<div style="font-size:10px; color:#F9A825; font-weight:700;">🏷️ ${p.promociones[0].cantidad_minima}+ = $${parseFloat(p.promociones[0].precio_promocional).toFixed(2)}</div>` : '';
+    const avisoPromo = tienePromo ? `<div style="font-size:10px; color:#F9A825; font-weight:700;">🏷️ ${escHtml(p.promociones[0].cantidad_minima)}+ = $${parseFloat(p.promociones[0].precio_promocional).toFixed(2)}</div>` : '';
     card.innerHTML = `
       ${badge}
-      <img src="${p.imagen_url || IMAGEN_RESPALDO}" alt="${p.nombre}">
-      <div class="nombre">${p.nombre}</div>
+      <img src="${escHtml(p.imagen_url || IMAGEN_RESPALDO)}" alt="${escHtml(p.nombre)}">
+      <div class="nombre">${escHtml(p.nombre)}</div>
       <div class="precio">${precioLabel}</div>
       ${avisoPromo}
     `;
@@ -484,11 +484,11 @@ async function buscarPorCodigo(codigo) {
   }
 
   try {
-    const producto = await apiFetch(`/productos/codigo/${codigo}`);
+    const producto = await apiFetch(`/productos/codigo/${encodeURIComponent(codigo)}`);
     seleccionarProducto(producto);
   } catch (err) {
     try {
-      const kit = await apiFetch(`/kits/codigo/${codigo}`);
+      const kit = await apiFetch(`/kits/codigo/${encodeURIComponent(codigo)}`);
       agregarKit(kit);
     } catch (err2) {
       mostrarToast('No se encontró ningún producto o kit con ese código: ' + codigo, 'error');
@@ -545,7 +545,7 @@ function renderCarrito() {
     const div = document.createElement('div');
     div.className = 'carrito-item';
     div.innerHTML = `
-      <span>${item.nombre_producto}<br><small>${detalle}</small></span>
+      <span>${escHtml(item.nombre_producto)}<br><small>${escHtml(detalle)}</small></span>
       <span>$${subtotal.toFixed(2)} <button onclick="quitarItem(${idx})">✕</button></span>
     `;
     cont.appendChild(div);

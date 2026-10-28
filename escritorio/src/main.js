@@ -14,9 +14,11 @@ const configCliente = require('./config-cliente');
 
 const PUERTO_INTERMEDIARIO = 3500;
 
-// Permitir que la página (https) le hable al intermediario de la red local (http://IP:3500).
+// Permitir que la página del sistema (https) le hable al intermediario de OTRA computadora de la red
+// (http://IP:3500): sin esto Chrome lo bloquea por ser "contenido no seguro" dentro de una página https.
+// (Para http://localhost:3500 no hace falta.) La ventana solo puede abrir páginas del sistema (ver protegerNavegacion).
+// Los avisos de "red privada" de Chrome ya NO se apagan: el intermediario los contesta bien.
 app.commandLine.appendSwitch('allow-running-insecure-content');
-app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults');
 app.commandLine.appendSwitch('enable-web-bluetooth');
 app.setAppUserModelId('mx.com.compoint.punto');
 
@@ -100,6 +102,62 @@ function origenEsDelSistema(origen) {
 }
 const esLocal = (evento) => { try { return String(evento.senderFrame.url).startsWith('file://'); } catch (e) { return false; } };
 
+// ¿Es una dirección de la red local? (IP 10.x, 172.16-31.x, 192.168.x, o un nombre de equipo sin puntos / .local)
+function hostDeRedLocal(h) {
+  const t = String(h || '').toLowerCase();
+  if (intermediario.ipPrivada(t)) return true;
+  return /^[a-z0-9-]+$/.test(t) || /^[a-z0-9-]+\.local$/.test(t);
+}
+// Páginas que pueden usar el intermediario de impresión de esta computadora (además de localhost):
+// el sistema configurado aquí, el mismo servidor del negocio abierto por IP o por nombre, y la nube
+// con la que este servidor sincroniza (las cajas que trabajan en la nube también imprimen por aquí).
+function origenPuedeImprimir(origen) {
+  if (origenEsDelSistema(origen)) return true;
+  try {
+    const u = new URL(origen);
+    // El servidor del negocio en la red local puede abrirse por IP o por nombre: mismo puerto = mismo sistema.
+    const base = configuracion().modo === 'servidor' && servidorLocal ? new URL(servidorLocal.urlLocal) : new URL(configuracion().url);
+    if (base.protocol === 'http:' && u.protocol === 'http:' && hostDeRedLocal(base.hostname) && hostDeRedLocal(u.hostname) && u.port === base.port) return true;
+    if (configuracion().modo === 'servidor' && servidorLocal) {
+      const s = (servidorLocal.configuracion() || {}).sync || {};
+      for (const d of [s.texto, s.api]) {
+        if (!d) continue;
+        try { if (new URL(/^https?:\/\//i.test(d) ? d : 'https://' + d).origin === u.origin) return true; } catch (e) { /* dirección rara */ }
+      }
+    }
+  } catch (e) { /* no se puede */ }
+  return false;
+}
+
+// Páginas propias del programa (setup.html, sin-conexion.html, …).
+const esArchivoPropio = (url) => {
+  try {
+    if (!String(url).startsWith('file:')) return false;
+    const ruta = path.resolve(require('url').fileURLToPath(String(url).split(/[?#]/)[0])).toLowerCase();
+    const base = path.resolve(__dirname).toLowerCase();
+    return ruta === base || ruta.startsWith(base + path.sep);
+  } catch (e) { return false; }
+};
+// La ventana solo puede ir a páginas del sistema (o a las propias del programa). Cualquier otro enlace
+// (WhatsApp, Mercado Pago, ayuda externa…) se abre en el navegador normal de Windows.
+function protegerNavegacion(wc, { soloArchivos = false } = {}) {
+  const permitida = (url) => esArchivoPropio(url) || (!soloArchivos && origenEsDelSistema(url));
+  const bloquear = (e, url, porRedireccion) => {
+    if (permitida(url)) return;
+    // Al abrir el sistema, http → https del mismo nombre (lo hace el hospedaje) sí se deja pasar.
+    if (porRedireccion && !soloArchivos) {
+      try { const a = new URL(url), c = new URL(configuracion().url); if (a.protocol === 'https:' && c.protocol === 'http:' && a.host === c.host) return; } catch (er) { /* no */ }
+    }
+    e.preventDefault();
+    log('Navegación bloqueada hacia ' + String(url).slice(0, 200));
+    // Enlaces web, correo y teléfono se abren con el programa normal de Windows.
+    try { if (/^(https?|mailto|tel):$/.test(new URL(url).protocol) && !porRedireccion) shell.openExternal(url); } catch (er) { /* ignorar */ }
+  };
+  wc.on('will-navigate', (e, url) => bloquear(e, url, false));
+  // Solo la página principal: los cuadros internos (iframes) pueden redirigir a donde necesiten.
+  wc.on('will-redirect', (e, url, enSuLugar, esPrincipal) => { if (esPrincipal !== false) bloquear(e, url, true); });
+}
+
 // ------------------------------------------------------------ ventanas
 function iconoApp() { return path.join(__dirname, 'icono.png'); }
 
@@ -111,6 +169,7 @@ function abrirConfig() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   ventanaConfig.setMenu(null);
+  protegerNavegacion(ventanaConfig.webContents, { soloArchivos: true });
   ventanaConfig.loadFile(path.join(__dirname, 'setup.html'));
   ventanaConfig.on('closed', () => { ventanaConfig = null; if (!ventana) { saliendo = true; app.quit(); } });
 }
@@ -137,6 +196,9 @@ function crearVentana() {
     ventana.loadFile(path.join(__dirname, 'sin-conexion.html'));
   });
   wc.on('did-finish-load', () => intentarAutoLogin());
+  protegerNavegacion(wc);
+  // Las ventanitas que abre el sistema (impresión) tampoco pueden irse a otras páginas.
+  wc.on('did-create-window', (hija) => protegerNavegacion(hija.webContents));
 
   // Ventanas nuevas: las de impresión del propio sistema sí; enlaces externos al navegador.
   wc.setWindowOpenHandler(({ url }) => {
@@ -208,12 +270,19 @@ function credenciales() {
 }
 
 async function intentarAutoLogin() {
-  if (!autoLoginPendiente || !ventana) return;
+  if (!autoLoginPendiente || !ventana || ventana.isDestroyed()) return;
+  // La contraseña guardada SOLO se escribe en la página del sistema configurado (nunca en otra página).
+  const marco = ventana.webContents.mainFrame;
+  let origenActual = null;
+  try { origenActual = new URL(marco.url).origin; } catch (e) { return; }
+  if (!origenActual || origenActual === 'null' || !origenEsDelSistema(origenActual)) return;
   const cred = credenciales();
   if (!cred) { autoLoginPendiente = false; return; }
   const script = `(function(u,p){var a=document.getElementById('usuario'),b=document.getElementById('password');if(!a||!b||typeof login!=='function')return false;a.value=u;b.value=p;login();return true;})(${JSON.stringify(cred.usuario)},${JSON.stringify(cred.password)})`;
   try {
-    const hecho = await ventana.webContents.executeJavaScript(script);
+    // Se vuelve a revisar justo antes, por si la página cambió mientras tanto.
+    if (marco.detached || new URL(marco.url).origin !== origenActual) return;
+    const hecho = await marco.executeJavaScript(script);
     if (hecho) autoLoginPendiente = false; // una sola vez por arranque: si cierras sesión, entra otra persona
   } catch (e) { log('Auto-login falló: ' + e.message); }
 }
@@ -597,6 +666,7 @@ function pedirDatosNegocio() {
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
     });
     ventanaAlta.setMenu(null);
+    protegerNavegacion(ventanaAlta.webContents, { soloArchivos: true });
     ventanaAlta.loadFile(path.join(__dirname, 'servidor-alta.html'));
     ventanaAlta.on('closed', () => { ventanaAlta = null; sesionNube = null; if (resolverAlta) { const r = resolverAlta; resolverAlta = null; r(null); } });
   });
@@ -629,6 +699,7 @@ function abrirPanel() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   ventanaPanel.setMenu(null);
+  protegerNavegacion(ventanaPanel.webContents, { soloArchivos: true });
   ventanaPanel.loadFile(path.join(__dirname, 'servidor-panel.html'));
   ventanaPanel.on('closed', () => { ventanaPanel = null; sesionNube = null; });
 }
@@ -689,7 +760,8 @@ ipcMain.handle('srv-nube-revisar', async (e, d) => {
     return { error: mensajeAmable(err) };
   }
   const l = sesionNube.licencia || {};
-  return { ok: true, resumen: sesionNube.resumen, licencia: { control: l.control !== false, cliente: l.cliente || '', tipo: l.tipo || '', vence: l.vence || '', estado: l.estado || '' } };
+  // conCodigo: solo una licencia con código firmado se toma sola en esta computadora.
+  return { ok: true, resumen: sesionNube.resumen, licencia: { control: l.control !== false, cliente: l.cliente || '', tipo: l.tipo || '', vence: l.vence || '', estado: l.estado || '', conCodigo: !!l.codigo } };
 });
 
 ipcMain.handle('srv-alta-guardar', async (e, datos) => {
@@ -982,7 +1054,7 @@ app.whenReady().then(async () => {
   crearBandeja();
   aplicarInicioConWindows();
   iniciarActualizaciones();
-  if (configuracion().intermediario !== false) intermediario.iniciar(PUERTO_INTERMEDIARIO, log);
+  if (configuracion().intermediario !== false) intermediario.iniciar(PUERTO_INTERMEDIARIO, log, { origenPermitido: origenPuedeImprimir });
   if (configuracion().modo === 'servidor') { await iniciarModoServidor(); return; }
   crearVentana();
 });

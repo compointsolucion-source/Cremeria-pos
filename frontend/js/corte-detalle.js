@@ -170,7 +170,10 @@ function corteDetalleHTML(c, { ganancia = false } = {}) {
 
 // Descarga el corte como CSV (abre en Excel).
 function descargarCorteDetalleCSV(c, { ganancia = false } = {}) {
-  const f = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  // Si un texto empieza con = + - @ (o tabulador/enter), Excel lo toma como fórmula: se le pone un ' adelante
+  // para que se vea como texto. Los números normales (ej. -150.00) se dejan igual.
+  const sinFormula = (t) => (/^[=+\-@\t\r]/.test(t) && !/^[-+]?\d+(\.\d+)?$/.test(t) ? "'" + t : t);
+  const f = (v) => '"' + sinFormula(String(v === null || v === undefined ? '' : v)).replace(/"/g, '""') + '"';
   const caja = c.caja || {}, dev = (c.ventas && c.ventas.devoluciones) || 0;
   const esDia = !!(c.turno && c.turno.dia);
   const filas = [['Concepto', 'Importe']];

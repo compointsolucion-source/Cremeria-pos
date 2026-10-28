@@ -190,8 +190,10 @@ async function cargarCatalogos() {
   try {
     const r = await fetch(API + '/catalogos');
     const c = await r.json();
-    $('regimen').innerHTML = '<option value="">Elige tu régimen…</option>' + Object.entries(c.regimenes).map(([k, v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
-    $('uso').innerHTML = '<option value="">Elige el uso…</option>' + Object.entries(c.usos).map(([k, v]) => `<option value="${k}">${k} — ${v}</option>`).join('');
+    // Se escapa lo que manda el servidor para que nunca se pinte como código.
+    const e = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
+    $('regimen').innerHTML = '<option value="">Elige tu régimen…</option>' + Object.entries(c.regimenes).map(([k, v]) => `<option value="${e(k)}">${e(k)} — ${e(v)}</option>`).join('');
+    $('uso').innerHTML = '<option value="">Elige el uso…</option>' + Object.entries(c.usos).map(([k, v]) => `<option value="${e(k)}">${e(k)} — ${e(v)}</option>`).join('');
   } catch (e) {
     // Se reintenta al pasar al paso 2 (el servidor pudo estar despertando).
   }

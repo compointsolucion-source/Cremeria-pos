@@ -180,7 +180,12 @@ test('código correcto: verifica, cambia la contraseña, entra con la nueva y el
   assert.equal((await api(null, 'POST', '/api/auth/recuperar/restablecer', { usuario: 'rosa', codigo: cod, password_nueva: '123' })).status, 400, 'muy corta');
   const r = await api(null, 'POST', '/api/auth/recuperar/restablecer', { usuario: 'rosa', codigo: cod, password_nueva: 'Clave-Nueva-9' });
   assert.equal(r.status, 200, JSON.stringify(r.json));
-  assert.equal((await entrar('rosa', 'Clave-Nueva-9')).status, 200, 'entra con la nueva');
+  // Al cambiar la contraseña, las sesiones que ya estaban abiertas se cierran.
+  require('../middleware/auth')._limpiarMemoriaActivos();
+  assert.equal((await api('rosa', 'GET', '/api/auth/mi-correo')).status, 401, 'la sesión vieja ya no sirve');
+  const nueva = await entrar('rosa', 'Clave-Nueva-9');
+  assert.equal(nueva.status, 200, 'entra con la nueva');
+  T.rosa = nueva.json.token;
   assert.equal((await entrar('rosa', 'Clave-Vieja-1')).status, 401, 'la vieja ya no');
   const otra = await api(null, 'POST', '/api/auth/recuperar/restablecer', { usuario: 'rosa', codigo: cod, password_nueva: 'Otra-Clave-1' });
   assert.equal(otra.status, 400, 'el código ya se usó');

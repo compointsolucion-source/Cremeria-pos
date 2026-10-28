@@ -5,7 +5,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
 
-const { vincularConUsuario, resolverApi } = require('../src/servidor/sync');
+// La nube de mentira vive en 127.0.0.1: eso solo se acepta en modo desarrollo.
+process.env.COMPOINT_DEV = '1';
+const { vincularConUsuario, resolverApi, apiDeConfigJs, hostDeNubePermitido } = require('../src/servidor/sync');
+const fs = require('fs');
+const path = require('path');
 
 // Nube de mentira. `comportamiento` decide qué responde cada ruta.
 function nubeFalsa(comportamiento = {}) {
@@ -124,4 +128,53 @@ test('resolverApi: acepta la dirección del servidor con o sin /api, y exige htt
   assert.equal(await resolverApi('https://minegocio-pos.onrender.com/api/'), 'https://minegocio-pos.onrender.com/api');
   await assert.rejects(() => resolverApi('http://minegocio.com'), /https/);
   await assert.rejects(() => resolverApi(''), /Escribe la dirección/);
+});
+
+test('resolverApi: solo nubes de Compoint (compoint.com.mx o *.onrender.com) con https', async () => {
+  assert.equal(await resolverApi('https://cp1000.compoint.com.mx/api'), 'https://cp1000.compoint.com.mx/api');
+  assert.equal(await resolverApi('compoint.com.mx/api'), 'https://compoint.com.mx/api');
+  for (const malo of ['https://evil.com/api', 'https://compoint.com.mx.evil.com/api', 'https://evilcompoint.com.mx/api', 'https://onrender.com.evil.net/api', 'https://usuario:clave@cp1.compoint.com.mx/api']) {
+    await assert.rejects(() => resolverApi(malo), /no es de tu sistema/, malo);
+  }
+  await assert.rejects(() => resolverApi('http://cp1000.compoint.com.mx/api'), /https/);
+  assert.equal(hostDeNubePermitido('CP1.Compoint.com.mx'), true);
+  assert.equal(hostDeNubePermitido('x.onrender.com'), true);
+  assert.equal(hostDeNubePermitido('192.168.1.10'), false);
+});
+
+test('resolverApi: localhost solo con COMPOINT_DEV=1', async () => {
+  const antes = process.env.COMPOINT_DEV;
+  delete process.env.COMPOINT_DEV;
+  try {
+    await assert.rejects(() => resolverApi('http://127.0.0.1:3000/api'), /no es de tu sistema/);
+    await assert.rejects(() => resolverApi('https://localhost/api'), /no es de tu sistema/);
+  } finally { process.env.COMPOINT_DEV = antes; }
+});
+
+test('resolverApi: lee config.js SIN ejecutarlo, y el servidor que diga también debe ser de Compoint', async () => {
+  const servir = (texto) => new Promise((ok) => {
+    const srv = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'application/javascript' }); res.end(texto); });
+    srv.listen(0, '127.0.0.1', () => ok({ url: 'http://127.0.0.1:' + srv.address().port, cerrar: () => new Promise((r) => srv.close(r)) }));
+  });
+  // Código que intentaría escapar si se ejecutara: no se ejecuta, se usa la dirección de la página.
+  global.__ejecutado = false;
+  let s = await servir("const API_URL = (function(){ this.constructor.constructor('global.__ejecutado = true')(); return 'https://cp1.compoint.com.mx/api'; })();");
+  try { assert.equal(await resolverApi(s.url), s.url + '/api'); assert.equal(global.__ejecutado, false); } finally { await s.cerrar(); }
+  // Dirección escrita: se toma si es de Compoint…
+  s = await servir("const API_URL = 'https://cliente9-pos.onrender.com/api';");
+  try { assert.equal(await resolverApi(s.url), 'https://cliente9-pos.onrender.com/api'); } finally { await s.cerrar(); }
+  // …y si no, se ignora.
+  s = await servir("const API_URL = 'https://evil.com/api';");
+  try { assert.equal(await resolverApi(s.url), s.url + '/api'); } finally { await s.cerrar(); }
+  s = await servir("const API_URL = location.origin + '/api';\n");
+  try { assert.equal(await resolverApi(s.url), s.url + '/api'); } finally { await s.cerrar(); }
+});
+
+test('apiDeConfigJs: entiende el config.js del frontend igual que el navegador', () => {
+  const texto = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'js', 'config.js'), 'utf8');
+  const de = (h) => apiDeConfigJs(texto, new URL('https://' + h));
+  assert.equal(de('cliente1-pos-web.onrender.com'), 'https://cliente1-pos.onrender.com/api');
+  assert.equal(de('cliente2-pos-web.onrender.com'), 'https://cliente2-pos.onrender.com/api');
+  assert.match(de('cp1000.compoint.com.mx'), /^https:\/\//);
+  assert.equal(de('sistema.minegocio.com'), de('cp1000.compoint.com.mx'), 'las líneas comentadas no cuentan');
 });

@@ -23,6 +23,13 @@ function getUsuario() {
   return u ? JSON.parse(u) : null;
 }
 
+// Convierte cualquier texto que viene del servidor (nombres, notas, motivos...) en texto "seguro"
+// para meterlo dentro de HTML o de un atributo: así un nombre con <script> o comillas se ve tal cual
+// y no se ejecuta como código. Usarlo SIEMPRE en innerHTML con datos que escribe la gente.
+function escHtml(t) {
+  return String(t === null || t === undefined ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // El ancho del papel es una preferencia de ESTE dispositivo específico
 // (cada terminal puede tener conectada una impresora distinta) — se
 // guarda en localStorage, no en la configuración compartida de la tienda.

@@ -285,7 +285,10 @@ async function guardarSolicitud() {
 function exportarCsv() {
   if (!solicitudes.length) { mostrarToast('No hay solicitudes para exportar', 'error'); return; }
   const cols = ['Fecha', 'Estado', 'Folio', 'Total', 'RFC', 'Razon social', 'Regimen', 'CP', 'Uso CFDI', 'Correo', 'Telefono', 'UUID'];
-  const celda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // Si un texto empieza con = + - @ (o tabulador/enter), Excel lo toma como fórmula: se le pone un ' adelante
+  // para que se vea como texto. Los números normales (ej. -150.00) se dejan igual.
+  const sinFormula = (t) => (/^[=+\-@\t\r]/.test(t) && !/^[-+]?\d+(\.\d+)?$/.test(t) ? "'" + t : t);
+  const celda = (v) => `"${sinFormula(String(v ?? '')).replace(/"/g, '""')}"`;
   const filas = solicitudes.map(s => [fechaCorta(s.creado_en), s.estado, s.folio, s.total, s.rfc, s.razon_social, s.regimen_fiscal, s.codigo_postal, s.uso_cfdi, s.correo, s.telefono, s.uuid_factura].map(celda).join(','));
   const blob = new Blob(['﻿' + [cols.join(','), ...filas].join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');

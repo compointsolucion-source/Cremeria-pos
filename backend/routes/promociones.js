@@ -13,12 +13,15 @@ function puedeEditarPrecios(req, res, next) {
   return res.status(403).json({ error: 'No tienes permiso para configurar promociones de precio' });
 }
 
-// Listar los escalones de precio de un producto
+// Listar los escalones de precio de un producto (solo productos de esta sucursal)
 router.get('/:producto_id', verificarToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM promociones WHERE producto_id = $1 AND activo = true ORDER BY cantidad_minima ASC',
-      [req.params.producto_id]
+      `SELECT pr.* FROM promociones pr
+       JOIN productos p ON p.id = pr.producto_id
+       WHERE pr.producto_id = $1 AND p.sucursal_id = $2 AND pr.activo = true
+       ORDER BY pr.cantidad_minima ASC`,
+      [req.params.producto_id, req.sucursalId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -59,10 +62,16 @@ router.post('/:producto_id', verificarToken, puedeEditarPrecios, async (req, res
   }
 });
 
-// Eliminar un escalón de precio
+// Eliminar un escalón de precio (solo si el producto es de esta sucursal)
 router.delete('/escalon/:id', verificarToken, puedeEditarPrecios, async (req, res) => {
   try {
-    await pool.query('UPDATE promociones SET activo = false WHERE id = $1', [req.params.id]);
+    const r = await pool.query(
+      `UPDATE promociones SET activo = false
+       WHERE id = $1 AND producto_id IN (SELECT id FROM productos WHERE sucursal_id = $2)
+       RETURNING id`,
+      [req.params.id, req.sucursalId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Promoción no encontrada' });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);

@@ -4,6 +4,10 @@ const pool = require('../db');
 const { verificarToken, requiereRol, requierePermiso, tienePermiso, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
+// Un código de barras para buscar en Open Food Facts: solo números, de 8 a 14 dígitos
+// (EAN-8, UPC, EAN-13, GTIN-14). Así nunca se arma una dirección rara con lo que escriban.
+const codigoBarrasPublico = (c) => (/^\d{8,14}$/.test(String(c || '').trim()) ? String(c).trim() : null);
+
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
 router.use(verificarToken, requiereSucursalId);
@@ -71,6 +75,12 @@ router.get('/categorias', verificarToken, async (req, res) => {
 // existe, se ACTUALIZA; si no, se CREA. Los departamentos que no existan
 // se crean solos. Filas sin nombre de producto se omiten (no hay nada que
 // dar de alta) y se reportan como omitidas, no se inventan datos.
+// Seguridad:
+//  - Precios (venta, costo, mayoreo) de productos que YA existen solo se cambian si el
+//    usuario tiene el permiso PRODUCTOS_PRECIO; si no, se ignoran esas columnas.
+//  - La existencia de productos que YA existen solo se cambia si el usuario tiene
+//    INVENTARIO_AJUSTAR y la fila trae la columna Existencia; la diferencia queda anotada
+//    en el historial de movimientos de inventario. Si no, la existencia no se toca.
 router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), async (req, res) => {
   try {
     const { productos } = req.body;
@@ -94,6 +104,8 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
       porNombre[p.nombre_lower] = p.id;
     });
 
+    const puedePrecios = tienePermiso(req.usuario, 'PRODUCTOS_PRECIO');
+    const puedeAjustarStock = tienePermiso(req.usuario, 'INVENTARIO_AJUSTAR');
     let creados = 0, actualizados = 0, omitidos = 0;
     const errores = [];
     const TAMANO_LOTE = 100;
@@ -115,7 +127,11 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
           const precio_costo = fila.precio_costo || null;
           const precio = fila.precio || null;
           const precio_mayoreo = fila.precio_mayoreo || null;
-          const existencia = fila.existencia !== undefined ? fila.existencia : 0;
+          // ¿La fila trae una existencia válida (número de 0 en adelante)? Si no, se toma 0 para los nuevos.
+          const existenciaNum = Number(fila.existencia);
+          const traeExistencia = fila.existencia !== undefined && fila.existencia !== null && fila.existencia !== ''
+            && Number.isFinite(existenciaNum) && existenciaNum >= 0;
+          const existencia = traeExistencia ? existenciaNum : 0;
           const stock_minimo = fila.stock_minimo || 0;
           const stock_maximo = fila.stock_maximo || null;
           const departamentoNombre = (fila.departamento || '').trim();
@@ -143,6 +159,7 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
           // si no, por nombre exacto.
           let productoId = (codigo_barras && porCodigo[codigo_barras]) || porNombre[nombreLower] || null;
 
+          const yaExistia = !!productoId;
           if (productoId) {
             await conexion.query(
               `UPDATE productos SET
@@ -151,7 +168,8 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
                 imagen_url = CASE WHEN (imagen_url IS NULL OR imagen_url = '') THEN COALESCE($6, imagen_url) ELSE imagen_url END,
                 tipo_venta = COALESCE($7, tipo_venta)
                WHERE id = $5`,
-              [precio, precio_costo, precio_mayoreo, categoria_id, productoId, imagen_url, tipoVentaExcel]
+              [puedePrecios ? precio : null, puedePrecios ? precio_costo : null, puedePrecios ? precio_mayoreo : null,
+               categoria_id, productoId, imagen_url, tipoVentaExcel]
             );
             actualizados++;
           } else {
@@ -169,20 +187,45 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
             creados++;
           }
 
-          await conexion.query(
-            `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (producto_id) DO UPDATE SET
-               existencia_actual = $2, stock_minimo = $3, stock_maximo = COALESCE($4, inventario.stock_maximo)`,
-            [productoId, existencia, stock_minimo, stock_maximo]
-          );
+          if (!yaExistia) {
+            // Producto nuevo: nace con la existencia del archivo.
+            await conexion.query(
+              `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (producto_id) DO UPDATE SET
+                 existencia_actual = $2, stock_minimo = $3, stock_maximo = COALESCE($4, inventario.stock_maximo)`,
+              [productoId, existencia, stock_minimo, stock_maximo]
+            );
+          } else {
+            // Producto que ya existía: mínimo/máximo sí se actualizan; la existencia no se toca...
+            const inv = await conexion.query(
+              `INSERT INTO inventario (producto_id, existencia_actual, stock_minimo, stock_maximo)
+               VALUES ($1, 0, $2, $3)
+               ON CONFLICT (producto_id) DO UPDATE SET
+                 stock_minimo = $2, stock_maximo = COALESCE($3, inventario.stock_maximo)
+               RETURNING existencia_actual`,
+              [productoId, stock_minimo, stock_maximo]
+            );
+            // ...salvo que el usuario pueda ajustar inventario y el archivo traiga la existencia:
+            // entonces se pone la del archivo y la diferencia queda en el historial.
+            const diferencia = Math.round((existencia - parseFloat(inv.rows[0].existencia_actual)) * 1000) / 1000;
+            if (puedeAjustarStock && traeExistencia && diferencia !== 0) {
+              await conexion.query('UPDATE inventario SET existencia_actual = $1 WHERE producto_id = $2', [existencia, productoId]);
+              await conexion.query(
+                `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, motivo, usuario_id)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [productoId, diferencia > 0 ? 'entrada_manual' : 'ajuste_manual', diferencia, 'Importación de Excel', req.usuario.id]
+              );
+            }
+          }
         }
 
         await conexion.query('COMMIT');
       } catch (errLote) {
         await conexion.query('ROLLBACK').catch(() => {});
         console.error('Error en lote de importación:', errLote);
-        errores.push(`Filas ${inicio + 1}-${inicio + lote.length}: ${errLote.message}`);
+        const causa = errLote.code === '23505' ? 'hay un código de barras repetido' : 'revisa los datos de esas filas';
+        errores.push(`Filas ${inicio + 1}-${inicio + lote.length}: no se pudieron guardar (${causa})`);
       } finally {
         conexion.release();
       }
@@ -198,7 +241,7 @@ router.post('/importar', verificarToken, requierePermiso('PRODUCTOS_CREAR'), asy
     res.json({ creados, actualizados, omitidos, errores });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al importar el archivo: ' + err.message });
+    res.status(500).json({ error: 'Error al importar el archivo. Revisa el archivo e inténtalo de nuevo.' });
   }
 });
 
@@ -224,8 +267,10 @@ router.get('/codigo/:codigo', verificarToken, async (req, res) => {
 // a mano productos comerciales conocidos. Si no lo encuentra, no es un error:
 // simplemente no hay datos que autocompletar.
 router.get('/buscar-externo/:codigo', verificarToken, async (req, res) => {
+  const codigo = codigoBarrasPublico(req.params.codigo);
+  if (!codigo) return res.status(400).json({ error: 'El código de barras debe tener solo números (de 8 a 14 dígitos)' });
   try {
-    const respuesta = await fetch(`https://world.openfoodfacts.org/api/v2/product/${req.params.codigo}.json`);
+    const respuesta = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json`);
     const datos = await respuesta.json();
 
     if (datos.status !== 1 || !datos.product) {
@@ -301,8 +346,10 @@ router.post('/:id/actualizar-imagen-externa', verificarToken, requierePermiso('P
     if (!producto.codigo_barras) {
       return res.json({ actualizado: false, motivo: 'Sin código de barras' });
     }
+    const codigo = codigoBarrasPublico(producto.codigo_barras);
+    if (!codigo) return res.json({ actualizado: false, motivo: 'Código de barras no comercial (no es de 8 a 14 números)' });
 
-    const respuestaExterna = await fetch(`https://world.openfoodfacts.org/api/v2/product/${producto.codigo_barras}.json`);
+    const respuestaExterna = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json`);
     const datosExternos = await respuestaExterna.json();
 
     if (datosExternos.status !== 1 || !datosExternos.product) {

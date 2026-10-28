@@ -13,6 +13,8 @@ const PT = (function () {
   const $ = (id) => document.getElementById(id);
   const pad = (n) => String(n).padStart(2, '0');
   const lleno = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  // Solo se abre como enlace si empieza con http:// o https:// (así un "javascript:..." no se ejecuta). Si no, devuelve ''.
+  const enlaceSeguro = (v) => { const t = String(v === undefined || v === null ? '' : v).trim(); return /^https?:\/\//i.test(t) ? t : ''; };
   const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const esAdmin = ['dueno', 'gerente', 'jefe_general'].includes((usuarioPedidos || {}).rol);
   const primerNombre = (n) => String(n || '').trim().split(/\s+/)[0] || '';
@@ -116,7 +118,8 @@ const PT = (function () {
       case 'preparando': return { txt: p.tipo === 'recoger' ? '✓ Listo para recoger' : '✓ Listo para salir', est: 'listo' };
       case 'listo':
         if (p.tipo === 'recoger') return { txt: '📦 Ya lo recogió', est: 'entregado' };
-        if (p.repartidor_id) return { txt: `🛵 Salió con ${primerNombre(p.repartidor_nombre)}`, est: 'en_camino' };
+        // El texto se pinta como HTML en el botón: el nombre va escapado.
+        if (p.repartidor_id) return { txt: `🛵 Salió con ${esc(primerNombre(p.repartidor_nombre))}`, est: 'en_camino' };
         return { txt: '👤 Asignar repartidor', asignar: true };
       case 'en_camino': return { txt: '✔ Entregado', est: 'entregado' };
       case 'no_entregado': return { txt: '↩ Volver a "listo"', est: 'listo' };
@@ -435,7 +438,7 @@ const PT = (function () {
         ${p.zona_nombre ? `<div class="pt-sub">Zona: ${esc(p.zona_nombre)} · envío ${dinero(p.costo_envio)}</div>` : ''}
         <div class="pt-botonera"><a class="btn btn-secondary" style="background:#33CCFF;border-color:#33CCFF;color:#06303d" target="_blank" rel="noopener" href="${esc(UBICACION.urlWaze(p))}">🧭 Waze</a>
           <a class="btn btn-secondary" target="_blank" rel="noopener" href="${esc(UBICACION.urlGoogleMaps(p))}">🗺 Google Maps</a>
-          ${lleno(p.ubicacion_enlace) ? `<a class="btn btn-secondary" target="_blank" rel="noopener" href="${esc(p.ubicacion_enlace)}">📍 Ubicación del cliente</a>` : ''}</div></div>` : '';
+          ${enlaceSeguro(p.ubicacion_enlace) ? `<a class="btn btn-secondary" target="_blank" rel="noopener" href="${esc(enlaceSeguro(p.ubicacion_enlace))}">📍 Ubicación del cliente</a>` : ''}</div></div>` : '';
     const repartidor = p.tipo === 'domicilio' ? `<div class="pt-dato"><span>Repartidor</span><span>${p.repartidor_id ? esc(p.repartidor_nombre) : 'Sin asignar'}</span></div>` : '';
     const lineas = (p.items || []).map((i) => `<li><span>${esc(i.nombre_producto)}<br><small style="color:var(--muted)">${i.es_envio ? (p.zona_nombre ? 'Zona: ' + esc(p.zona_nombre) : 'Costo de envío') : esc(typeof GRANEL !== 'undefined' ? GRANEL.detalle(i, '×') : i.cantidad)}</small></span><b>${dinero(i.subtotal)}</b></li>`).join('');
     const hist = [['Pedido creado', horaLocal(p.creado_en)], ['Aceptado en Mostrador' + (p.aceptado_por_nombre ? ' por ' + esc(primerNombre(p.aceptado_por_nombre)) : ''), horaLocal(p.aceptado_en)], ['Listo', horaLocal(p.listo_en)], ['Salió', horaLocal(p.salio_en)], ['Llegó', horaLocal(p.llego_en)], ['Entregado', horaLocal(p.entregado_en)], ['Aviso al cliente', horaLocal(p.aviso_camino_en)]]
@@ -672,7 +675,8 @@ const PT = (function () {
 
   function iniciarSocket() {
     if (typeof io !== 'function' || !usuarioPedidos) return;
-    const socket = io(API_URL.replace('/api', ''));
+    // El servidor pide el token de la sesión para conectarse a los avisos en vivo.
+    const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
     socket.on('connect', () => { socket.emit('unirse_sucursal', usuarioPedidos.sucursal_id); vivo(true); refrescarSuave(); });
     socket.on('disconnect', () => vivo(false));
     socket.on('pedido_actualizado', (d) => {

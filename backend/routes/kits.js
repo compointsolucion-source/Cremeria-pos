@@ -4,6 +4,20 @@ const pool = require('../db');
 const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
+// Revisa los productos que trae un kit: cada uno debe ser de esta sucursal y con cantidad
+// mayor a 0. Devuelve un mensaje de error, o null si todo está bien.
+async function errorEnProductosDelKit(productos, sucursalId) {
+  for (const p of productos) {
+    const id = Number(p && p.producto_id), cantidad = Number(p && p.cantidad);
+    if (!Number.isInteger(id) || id <= 0) return 'Hay un producto no válido en el kit';
+    if (!Number.isFinite(cantidad) || cantidad <= 0) return 'La cantidad de cada producto del kit debe ser mayor a 0';
+  }
+  const ids = [...new Set(productos.map((p) => Number(p.producto_id)))];
+  const r = await pool.query('SELECT id FROM productos WHERE id = ANY($1::int[]) AND sucursal_id = $2', [ids, sucursalId]);
+  if (r.rows.length !== ids.length) return 'Uno de los productos del kit no existe en esta sucursal';
+  return null;
+}
+
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
 router.use(verificarToken, requiereSucursalId);
@@ -54,9 +68,12 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
   const cliente = await pool.connect();
   try {
     const { nombre, precio_kit, imagen_url, codigo_barras, productos } = req.body;
-    if (!nombre || !precio_kit || !productos || productos.length === 0) {
+    if (!nombre || !precio_kit || !Array.isArray(productos) || productos.length === 0) {
       return res.status(400).json({ error: 'Nombre, precio y al menos un producto son requeridos' });
     }
+    if (!(Number(precio_kit) > 0)) return res.status(400).json({ error: 'El precio del kit debe ser mayor a 0' });
+    const errorProductos = await errorEnProductosDelKit(productos, req.sucursalId);
+    if (errorProductos) return res.status(400).json({ error: errorProductos });
 
     await cliente.query('BEGIN');
 
@@ -70,7 +87,7 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     for (const p of productos) {
       await cliente.query(
         `INSERT INTO kit_productos (kit_id, producto_id, cantidad) VALUES ($1, $2, $3)`,
-        [kit.id, p.producto_id, p.cantidad]
+        [kit.id, Number(p.producto_id), Number(p.cantidad)]
       );
     }
 
@@ -85,7 +102,7 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     await cliente.query('COMMIT');
     res.json(kit);
   } catch (err) {
-    await cliente.query('ROLLBACK');
+    await cliente.query('ROLLBACK').catch(() => {});
     console.error(err);
     if (err.code === '23505') return res.status(400).json({ error: 'Ese código de barras ya está en uso' });
     res.status(500).json({ error: 'Error al crear el kit' });
@@ -101,9 +118,12 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
   const cliente = await pool.connect();
   try {
     const { nombre, precio_kit, imagen_url, codigo_barras, productos } = req.body;
-    if (!nombre || !precio_kit || !productos || productos.length === 0) {
+    if (!nombre || !precio_kit || !Array.isArray(productos) || productos.length === 0) {
       return res.status(400).json({ error: 'Nombre, precio y al menos un producto son requeridos' });
     }
+    if (!(Number(precio_kit) > 0)) return res.status(400).json({ error: 'El precio del kit debe ser mayor a 0' });
+    const errorProductos = await errorEnProductosDelKit(productos, req.sucursalId);
+    if (errorProductos) return res.status(400).json({ error: errorProductos });
 
     await cliente.query('BEGIN');
 
@@ -127,7 +147,7 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
     for (const p of productos) {
       await cliente.query(
         `INSERT INTO kit_productos (kit_id, producto_id, cantidad) VALUES ($1, $2, $3)`,
-        [kit.id, p.producto_id, p.cantidad]
+        [kit.id, Number(p.producto_id), Number(p.cantidad)]
       );
     }
 
@@ -143,7 +163,7 @@ router.put('/:id', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente
     await cliente.query('COMMIT');
     res.json(kit);
   } catch (err) {
-    await cliente.query('ROLLBACK');
+    await cliente.query('ROLLBACK').catch(() => {});
     console.error(err);
     if (err.code === '23505') return res.status(400).json({ error: 'Ese código de barras ya está en uso' });
     res.status(500).json({ error: 'Error al editar el kit' });

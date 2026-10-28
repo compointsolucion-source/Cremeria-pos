@@ -26,6 +26,28 @@ if (cloudinaryConfigurado) {
   });
 }
 
+// Carpetas de Cloudinary que usa el sistema (productos, kits, logo del negocio y anuncios).
+// Cualquier otro nombre se manda a "general": así nadie puede escribir en otra ruta.
+const CARPETAS_PERMITIDAS = ['general', 'productos', 'kits', 'logos', 'promos'];
+const carpetaSegura = (c) => (CARPETAS_PERMITIDAS.includes(c) ? c : 'general');
+
+// Solo se acepta una imagen de verdad en base64 ("data:image/...;base64,..."), nunca una
+// ruta de archivo ni una dirección web (Cloudinary las iría a leer por su cuenta).
+const PATRON_IMAGEN = /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+\/=\s]+$/;
+const MAX_BYTES_IMAGEN = 5 * 1024 * 1024; // 5 MB ya decodificada
+
+// Devuelve un mensaje de error, o null si la imagen sirve.
+function errorEnImagen(imagen) {
+  if (typeof imagen !== 'string' || !PATRON_IMAGEN.test(imagen)) {
+    return 'La imagen no es válida (solo JPG, PNG, WEBP o GIF)';
+  }
+  const datos = imagen.slice(imagen.indexOf(',') + 1).replace(/\s/g, '');
+  const relleno = datos.endsWith('==') ? 2 : (datos.endsWith('=') ? 1 : 0);
+  const bytes = Math.floor(datos.length * 3 / 4) - relleno;
+  if (bytes > MAX_BYTES_IMAGEN) return 'La imagen es demasiado grande (máximo 5 MB)';
+  return null;
+}
+
 // Recibe una imagen en base64 (ya comprimida por el navegador) y la sube a
 // Cloudinary. Devuelve la URL final que se debe guardar como imagen_url en
 // productos/kits/configuración — ya NO se guarda el base64 completo en la
@@ -37,9 +59,11 @@ router.post('/subir', verificarToken, async (req, res) => {
   try {
     const { imagen_base64, carpeta } = req.body;
     if (!imagen_base64) return res.status(400).json({ error: 'Falta la imagen a subir' });
+    const errorImagen = errorEnImagen(imagen_base64);
+    if (errorImagen) return res.status(400).json({ error: errorImagen });
 
     const resultado = await cloudinary.uploader.upload(imagen_base64, {
-      folder: `cremeria-pos/${carpeta || 'general'}`,
+      folder: `cremeria-pos/${carpetaSegura(carpeta)}`,
       resource_type: 'image'
     });
 
@@ -69,7 +93,7 @@ router.post('/subir-video', verificarToken, (req, res) => {
 
     if (!req.file) return res.status(400).json({ error: 'Falta el video a subir' });
 
-    const carpeta = req.body.carpeta || 'general';
+    const carpeta = carpetaSegura(req.body.carpeta);
 
     try {
       const streamDeSubida = cloudinary.uploader.upload_stream(
@@ -91,3 +115,5 @@ router.post('/subir-video', verificarToken, (req, res) => {
 });
 
 module.exports = router;
+module.exports._errorEnImagen = errorEnImagen; // para las pruebas
+module.exports._carpetaSegura = carpetaSegura;

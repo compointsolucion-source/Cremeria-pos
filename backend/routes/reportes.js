@@ -119,6 +119,16 @@ router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (re
   }
 });
 
+// Celda segura para CSV: si empieza con = + - @ (o tabulador/retorno), Excel la tomaría como
+// fórmula; se le pone un apóstrofo adelante para que se vea como texto. Si trae comas, comillas
+// o saltos de línea, va entre comillas.
+function celdaCsv(valor) {
+  let t = valor === null || valor === undefined ? '' : String(valor);
+  if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  if (/[",\r\n]/.test(t)) t = '"' + t.replace(/"/g, '""') + '"';
+  return t;
+}
+
 // Exportar el listado de ventas del rango a CSV (abre directo en Excel/Sheets)
 router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
@@ -136,7 +146,7 @@ router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER
 
     const encabezado = 'Folio,Fecha,Metodo de Pago,Total,Descuento,Cajero\n';
     const filas = result.rows.map(r =>
-      `${r.folio},${new Date(r.fecha_pago).toISOString()},${r.metodo_pago},${r.total},${r.descuento_monto || 0},${r.cajero || ''}`
+      [r.folio, new Date(r.fecha_pago).toISOString(), r.metodo_pago, r.total, r.descuento_monto || 0, r.cajero || ''].map(celdaCsv).join(',')
     ).join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
@@ -373,3 +383,4 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
 });
 
 module.exports = router;
+module.exports._celdaCsv = celdaCsv; // para las pruebas

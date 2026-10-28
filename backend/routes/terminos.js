@@ -9,7 +9,8 @@ const { registrarBitacora } = require('../utils/bitacora');
 const T = require('../utils/terminos');
 
 const corto = (v, max) => String(v == null ? '' : v).slice(0, max);
-const ipDe = (req) => corto((req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '', 60);
+// IP según Express (respeta la regla de proxy de server.js; no se puede inventar con un encabezado).
+const ipDe = (req) => corto(req.ip || '', 60);
 
 async function ultimaAceptacion() {
   const r = await pool.query(

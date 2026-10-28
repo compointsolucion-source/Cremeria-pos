@@ -481,7 +481,10 @@ function descargarCSV() {
   const lista = turnosFiltrados();
   if (!lista.length) { mostrarToast('No hay cortes en este periodo para descargar', 'error'); return; }
   const T = totales(lista);
-  const f = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  // Si un texto empieza con = + - @ (o tabulador/enter), Excel lo toma como fórmula: se le pone un ' adelante
+  // para que se vea como texto. Los números normales (ej. -150.00) se dejan igual.
+  const sinFormula = (t) => (/^[=+\-@\t\r]/.test(t) && !/^[-+]?\d+(\.\d+)?$/.test(t) ? "'" + t : t);
+  const f = (v) => '"' + sinFormula(String(v === null || v === undefined ? '' : v)).replace(/"/g, '""') + '"';
   const turno = S.vista === 'turno';
   const cab = [turno ? 'Turno' : S.vista === 'dia' ? 'Día' : 'Mes', turno ? 'Cajero' : 'Turnos', turno ? 'Fecha' : '', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia', 'Estado'];
   const fila = (a, b, c, x, dif) => [a, b, c, x.efectivo, x.tarjeta, x.transferencia, x.credito, x.otros, x.descuentos, x.venta_neta, dif === null || dif === undefined ? '' : dif, estadoDif(dif)];

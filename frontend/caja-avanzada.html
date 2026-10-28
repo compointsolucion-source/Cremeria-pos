@@ -511,8 +511,8 @@ function renderPestanas() {
   const barra = document.getElementById('barraPestanas');
   barra.innerHTML = pestanas.map((p, idx) => `
     <div class="pestana-ticket ${idx === pestanaActivaIndex ? 'activa' : ''}" onclick="cambiarAPestana(${idx})" ondblclick="renombrarPestana(${idx})">
-      ${p.nombre} <span class="contador-pestana">${p.carrito.length}</span>
-      <button type="button" class="cerrar-pestana" title="Cerrar pestaña" aria-label="Cerrar ${p.nombre}" onclick="event.stopPropagation(); cerrarPestana(${idx})">×</button>
+      ${escHtml(p.nombre)} <span class="contador-pestana">${p.carrito.length}</span>
+      <button type="button" class="cerrar-pestana" title="Cerrar pestaña" aria-label="Cerrar ${escHtml(p.nombre)}" onclick="event.stopPropagation(); cerrarPestana(${idx})">×</button>
     </div>
   `).join('');
 }
@@ -661,12 +661,12 @@ function buscarProductoAvanzada() {
   sugerencias.innerHTML =
     coincidenciasKits.map((k, idx) => `
       <div class="sugerencia-avanzada-item" data-idx="${idx}" onclick='seleccionarSugerenciaAvanzada(${k.id}, "kit")'>
-        <span>📦 ${k.nombre}</span><span>$${parseFloat(k.precio_kit).toFixed(2)}</span>
+        <span>📦 ${escHtml(k.nombre)}</span><span>$${parseFloat(k.precio_kit).toFixed(2)}</span>
       </div>
     `).join('') +
     coincidenciasProductos.map((p, idx) => `
       <div class="sugerencia-avanzada-item" data-idx="${coincidenciasKits.length + idx}" onclick='seleccionarSugerenciaAvanzada(${p.id}, "producto")'>
-        <span>${p.nombre}</span><span>$${parseFloat(p.precio).toFixed(2)}</span>
+        <span>${escHtml(p.nombre)}</span><span>$${parseFloat(p.precio).toFixed(2)}</span>
       </div>
     `).join('');
   sugerencias.style.display = 'block';
@@ -1468,7 +1468,7 @@ function consultarVerificador() {
     ? parseFloat(producto.existencia_actual).toFixed(2) : 'N/D';
 
   resultado.innerHTML = `
-    <div style="font-size:16px; font-weight:700;">${producto.nombre}</div>
+    <div style="font-size:16px; font-weight:700;">${escHtml(producto.nombre)}</div>
     <div style="font-size:32px; font-weight:800; color:var(--primary,#5FAE46); margin:8px 0;">$${parseFloat(producto.precio).toFixed(2)}</div>
     <div style="font-size:14px; color:#666;">Existencia: ${existencia}</div>
   `;
@@ -1500,7 +1500,7 @@ async function actualizarPanelUltimaVenta() {
       detalleExtra = ` — Efectivo $${parseFloat(ticket.monto_efectivo).toFixed(2)} + Tarjeta $${parseFloat(ticket.monto_tarjeta).toFixed(2)}`;
     }
 
-    contenido.innerHTML = `Folio <b>${ticket.folio}</b> — Total <b>$${totalNetoTicketAv(ticket).toFixed(2)}</b> — Pagado con <b>${metodoLegible}</b>${detalleExtra}`;
+    contenido.innerHTML = `Folio <b>${escHtml(ticket.folio)}</b> — Total <b>$${totalNetoTicketAv(ticket).toFixed(2)}</b> — Pagado con <b>${escHtml(metodoLegible)}</b>${detalleExtra}`;
     panel.style.display = 'block';
   } catch (err) {
     // Si nunca se ha cobrado nada en esta sucursal, no hay "última venta"
@@ -1569,7 +1569,7 @@ async function cargarCajerosFiltroHistorial() {
   try {
     const usuarios = await apiFetch('/usuarios');
     const select = document.getElementById('cajeroHistorial');
-    select.innerHTML = '<option value="">Todos los cajeros</option>' + usuarios.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+    select.innerHTML = '<option value="">Todos los cajeros</option>' + usuarios.map(u => `<option value="${escHtml(u.id)}">${escHtml(u.nombre)}</option>`).join('');
   } catch (err) {
     // Silencioso a propósito — ver el detalle arriba.
   }
@@ -1583,9 +1583,9 @@ async function cargarHistorialVentas() {
     const ventas = await apiFetch(`/tickets/historial-dia${query}`);
 
     document.getElementById('tablaHistorialVentas').innerHTML = ventas.map(v => `
-      <tr onclick="seleccionarTicketHistorial(${v.id})" style="cursor:pointer;">
-        <td>${v.folio}${v.estado === 'cancelado' ? ' <span style="color:#C62828;">(cancelado)</span>' : ''}</td>
-        <td>${v.cajero_nombre || '—'}</td>
+      <tr onclick="seleccionarTicketHistorial(${Number(v.id)})" style="cursor:pointer;">
+        <td>${escHtml(v.folio)}${v.estado === 'cancelado' ? ' <span style="color:#C62828;">(cancelado)</span>' : ''}</td>
+        <td>${escHtml(v.cajero_nombre || '—')}</td>
         <td>${new Date(v.fecha_pago || v.fecha_creacion).toLocaleTimeString()}</td>
         <td class="numero">$${parseFloat(v.total).toFixed(2)}</td>
       </tr>
@@ -1602,19 +1602,19 @@ async function seleccionarTicketHistorial(id) {
   try {
     const ventas = await apiFetch(`/tickets/historial-dia?fecha=${document.getElementById('fechaHistorial').value}`);
     const resumen = ventas.find(v => v.id === id);
-    const ticketCompleto = await apiFetch(`/tickets/folio/${resumen.folio}`);
+    const ticketCompleto = await apiFetch(`/tickets/folio/${encodeURIComponent(resumen.folio)}`);
     ticketSeleccionadoHistorial = ticketCompleto;
 
     document.getElementById('detalleTicketHistorial').innerHTML = `
-      <h4>Folio: ${ticketCompleto.folio}</h4>
-      <p style="font-size:13px; color:#666;">Estado: ${ticketCompleto.estado} — Método: ${ticketCompleto.metodo_pago || '—'}</p>
+      <h4>Folio: ${escHtml(ticketCompleto.folio)}</h4>
+      <p style="font-size:13px; color:#666;">Estado: ${escHtml(ticketCompleto.estado)} — Método: ${escHtml(ticketCompleto.metodo_pago || '—')}</p>
       ${ticketCompleto.referencia_pago ? `<div class="ref-pago-historial">💬 Referencia: <b>${escaparNombreAv(ticketCompleto.referencia_pago)}</b></div>` : ''}
       <table class="tabla-venta" style="margin-bottom:10px;">
         <thead><tr><th>Producto</th><th class="numero">Cant.</th><th class="numero">Importe</th></tr></thead>
         <tbody>
           ${ticketCompleto.items.map(i => `
-            <tr onclick="itemDevolucionSeleccionado=${i.id}" style="cursor:pointer;">
-              <td>${i.nombre_producto}</td><td class="numero">${i.cantidad}</td><td class="numero">$${parseFloat(i.subtotal).toFixed(2)}</td>
+            <tr onclick="itemDevolucionSeleccionado=${Number(i.id)}" style="cursor:pointer;">
+              <td>${escHtml(i.nombre_producto)}</td><td class="numero">${escHtml(i.cantidad)}</td><td class="numero">$${parseFloat(i.subtotal).toFixed(2)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -1884,7 +1884,7 @@ function renderMetodosPagoModalCobrar() {
   }
 
   document.getElementById('metodosPagoModalCobrar').innerHTML = metodos.filter(m => m.activo).map(m => `
-    <button class="btn btn-secondary" id="btnCobrarAv${m.id}" onclick="setMetodoCobrarAvanzada('${m.id}')">${m.label}</button>
+    <button class="btn btn-secondary" id="btnCobrarAv${m.id}" onclick="setMetodoCobrarAvanzada('${m.id}')">${escHtml(m.label)}</button>
   `).join('');
 
   setMetodoCobrarAvanzada('efectivo');
@@ -2093,11 +2093,18 @@ function buscarClientesCobrarAvanzada() {
     if (!texto) { document.getElementById('resultadosClienteCobrarAv').innerHTML = ''; return; }
     try {
       const resultados = await apiFetch(`/clientes/buscar/${encodeURIComponent(texto)}`);
-      document.getElementById('resultadosClienteCobrarAv').innerHTML = resultados.map(c => `
-        <div class="resultado-cliente" onclick='elegirClienteCobrarAvanzada(${c.id}, "${c.nombre.replace(/"/g, '&quot;')}")'>
-          ${c.nombre} — Debe: $${parseFloat(c.saldo_actual).toFixed(2)} / Límite: $${parseFloat(c.limite_credito).toFixed(2)}
+      // El nombre del cliente NO va dentro del onclick (unas comillas en el nombre podrían meter código):
+      // cada renglón lleva solo su data-id y el cliente se busca en este mapa al darle clic.
+      const porId = new Map(resultados.map(c => [String(c.id), c]));
+      const lista = document.getElementById('resultadosClienteCobrarAv');
+      lista.innerHTML = resultados.map(c => `
+        <div class="resultado-cliente" data-id="${escHtml(c.id)}">
+          ${escHtml(c.nombre)} — Debe: $${parseFloat(c.saldo_actual).toFixed(2)} / Límite: $${parseFloat(c.limite_credito).toFixed(2)}
         </div>
       `).join('') || '<p style="color:#888;">Sin resultados</p>';
+      lista.querySelectorAll('.resultado-cliente').forEach(div => {
+        div.onclick = () => { const c = porId.get(div.dataset.id); if (c) elegirClienteCobrarAvanzada(c.id, c.nombre); };
+      });
     } catch (err) {
       mostrarToast(err.message, 'error');
     }

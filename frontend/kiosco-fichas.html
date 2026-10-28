@@ -98,7 +98,8 @@
 requiereLogin();
 const usuario = getUsuario();
 
-const socket = io(API_URL.replace('/api', ''));
+// El servidor pide el token de la sesión para conectarse a los avisos en vivo.
+const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
 socket.emit('unirse_sucursal', usuario.sucursal_id);
 socket.on('nueva_ficha', actualizarContadorKiosco);
 socket.on('ficha_llamada', actualizarContadorKiosco);

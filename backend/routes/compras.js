@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verificarToken, requiereRol, requiereSucursalId } = require('../middleware/auth');
+const { verificarToken, requiereRol, requiereSucursalId, tienePermiso } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
@@ -67,22 +67,54 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
   const conexion = await pool.connect();
   try {
     const { proveedor_id, items } = req.body; // [{producto_id, cantidad, costo_unitario, precio_venta_nuevo}]
-    if (!proveedor_id || !items || items.length === 0) {
+    if (!proveedor_id || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Proveedor y al menos un producto son requeridos' });
     }
 
+    // Cada renglón: producto válido, cantidad mayor a 0, costo y precio nuevo de $0 en adelante.
+    for (const it of items) {
+      const cantidad = Number(it.cantidad), costo = Number(it.costo_unitario);
+      if (!Number.isInteger(Number(it.producto_id)) || Number(it.producto_id) <= 0) {
+        return res.status(400).json({ error: 'Hay un producto no válido en la compra' });
+      }
+      if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        return res.status(400).json({ error: 'La cantidad de cada producto debe ser mayor a 0' });
+      }
+      if (!Number.isFinite(costo) || costo < 0) {
+        return res.status(400).json({ error: 'El costo de cada producto debe ser de $0 en adelante' });
+      }
+      if (it.precio_venta_nuevo) {
+        const precioNuevo = Number(it.precio_venta_nuevo);
+        if (!Number.isFinite(precioNuevo) || precioNuevo < 0) {
+          return res.status(400).json({ error: 'El precio de venta nuevo no es válido' });
+        }
+      }
+    }
+    // Cambiar el precio de venta desde una compra pide el permiso de precios.
+    if (items.some((it) => it.precio_venta_nuevo) && !tienePermiso(req.usuario, 'PRODUCTOS_PRECIO')) {
+      return res.status(403).json({ error: 'No tienes el permiso "PRODUCTOS_PRECIO" para cambiar el precio de venta.' });
+    }
+
+    // El proveedor y todos los productos deben ser de esta sucursal.
+    if (!Number.isInteger(Number(proveedor_id)) || Number(proveedor_id) <= 0) return res.status(400).json({ error: 'Proveedor no válido' });
+    const proveedor = await conexion.query('SELECT id FROM proveedores WHERE id = $1 AND sucursal_id = $2', [Number(proveedor_id), req.sucursalId]);
+    if (proveedor.rows.length === 0) return res.status(404).json({ error: 'Proveedor no encontrado' });
+    const idsProductos = [...new Set(items.map((it) => Number(it.producto_id)))];
+    const propios = await conexion.query('SELECT id FROM productos WHERE id = ANY($1::int[]) AND sucursal_id = $2', [idsProductos, req.sucursalId]);
+    if (propios.rows.length !== idsProductos.length) return res.status(404).json({ error: 'Uno de los productos no existe en esta sucursal' });
+
     await conexion.query('BEGIN');
 
-    const total = items.reduce((sum, it) => sum + (it.cantidad * it.costo_unitario), 0);
+    const total = items.reduce((sum, it) => sum + (Number(it.cantidad) * Number(it.costo_unitario)), 0);
 
     const compraResult = await conexion.query(
       `INSERT INTO compras (sucursal_id, proveedor_id, usuario_id, total) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.sucursalId, proveedor_id, req.usuario.id, total]
+      [req.sucursalId, Number(proveedor_id), req.usuario.id, total]
     );
     const compra = compraResult.rows[0];
 
     for (const item of items) {
-      const subtotal = item.cantidad * item.costo_unitario;
+      const subtotal = Number(item.cantidad) * Number(item.costo_unitario);
 
       await conexion.query(
         `INSERT INTO compra_detalle (compra_id, producto_id, cantidad, costo_unitario, precio_venta_nuevo, subtotal)
@@ -97,7 +129,7 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
 
       // El costo de compra pasa a ser el costo actual del producto (y el % de
       // ganancia se recalcula con el precio de venta vigente).
-      if (item.costo_unitario > 0) {
+      if (Number(item.costo_unitario) > 0) {
         await conexion.query(
           `UPDATE productos SET precio_costo = $1,
              ganancia_porcentaje = CASE WHEN precio > 0 THEN ROUND(((precio - $1::numeric) / $1::numeric * 100), 2) ELSE ganancia_porcentaje END
@@ -133,7 +165,7 @@ router.post('/', verificarToken, requiereRol('jefe_general', 'dueno', 'gerente')
     await conexion.query('COMMIT');
     res.json(compra);
   } catch (err) {
-    await conexion.query('ROLLBACK');
+    await conexion.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al registrar la compra' });
   } finally {
