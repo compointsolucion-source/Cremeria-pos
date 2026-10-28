@@ -469,6 +469,7 @@ async function apiFetch(endpoint, options = {}) {
     // Algunas pantallas (formularios) necesitan saber QUÉ campo falló.
     if (data.campos) error.campos = data.campos;
     if (data.motivo) error.motivo = data.motivo;
+    if (data.repetida) error.repetida = true;
     throw error;
   }
   return data;

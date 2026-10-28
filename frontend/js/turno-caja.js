@@ -208,6 +208,7 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '', ganancia = false } = 
   L.push(fila(t('+VENTAS EN EFECTIVO:', '+VTA EFECTIVO:'), m(c.caja.efectivo_ventas)));
   const cajaNueva = c.caja.devoluciones_efectivo !== undefined; // el servidor ya separa abonos, salidas y devoluciones
   if (cajaNueva && c.caja.abonos_efectivo) L.push(fila(t('+ABONOS EFECTIVO:', '+ABONOS:'), m(c.caja.abonos_efectivo)));
+  if (c.caja.recargas_efectivo) L.push(fila(t('+RECARGAS/SERVICIOS:', '+RECARGAS:'), m(c.caja.recargas_efectivo)));
   L.push(fila(t('+DEPOSITOS EFECTIVO:', '+DEPOSITOS:'), m(c.caja.depositos)));
   L.push(fila(t('-RETIROS EFECTIVO:', '-RETIROS:'), m(cajaNueva ? c.caja.salidas : c.caja.retiros)));
   if (cajaNueva && c.caja.devoluciones_efectivo) L.push(fila(t('-DEVOLUCIONES EFVO:', '-DEVOLUC.:'), m(c.caja.devoluciones_efectivo)));
@@ -244,6 +245,16 @@ function lineasCorteCaja(c, { columnas = 48, negocio = '', ganancia = false } = 
     L.push(igual);
     L.push('MOVIMIENTOS DE CAJA');
     c.movimientos.forEach(mv => L.push(fila((mv.tipo === 'ingreso' ? '+' : '-') + (mv.concepto || (mv.tipo === 'ingreso' ? 'Ingreso' : 'Egreso')).slice(0, columnas - 14), m(mv.monto))));
+  }
+
+  if (c.recargas && c.recargas.cantidad) {
+    L.push(igual);
+    L.push(t('RECARGAS Y SERVICIOS', 'RECARGAS/SERV.'));
+    if (c.recargas.recargas) L.push(fila(t('TIEMPO AIRE:', 'T. AIRE:'), m(c.recargas.recargas)));
+    if (c.recargas.servicios) L.push(fila(t('PAGO DE SERVICIOS:', 'SERVICIOS:'), m(c.recargas.servicios)));
+    if (c.recargas.cargos) L.push(fila(t('COMISIONES COBRADAS:', 'COMISIONES:'), m(c.recargas.cargos)));
+    if (c.recargas.tarjeta) L.push(fila(t('COBRADO CON TARJETA:', 'CON TARJETA:'), m(c.recargas.tarjeta)));
+    L.push(fila(t('OPERACIONES:', 'OPERACIONES:'), c.recargas.cantidad));
   }
 
   if ((c.pagos_creditos || []).length) {

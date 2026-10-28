@@ -92,6 +92,25 @@ async function construirResumenTurno(db, turno) {
   );
   const abonosEfectivo = redondear(abonos.rows.filter(a => (a.metodo_pago || 'efectivo') === 'efectivo').reduce((x, a) => x + parseFloat(a.monto), 0));
 
+  // Recargas y pagos de servicios REALES y exitosos del turno (las de modo prueba no cuentan).
+  const rec = await db.query(
+    `SELECT COUNT(*) AS n,
+            COALESCE(SUM(total), 0) AS total,
+            COALESCE(SUM(cargo), 0) AS cargos,
+            COALESCE(SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END), 0) AS efectivo,
+            COALESCE(SUM(CASE WHEN metodo_pago = 'tarjeta' THEN total ELSE 0 END), 0) AS tarjeta,
+            COALESCE(SUM(CASE WHEN tipo = 'recarga' THEN monto ELSE 0 END), 0) AS recargas,
+            COALESCE(SUM(CASE WHEN tipo = 'servicio' THEN monto ELSE 0 END), 0) AS servicios
+     FROM recargas_ventas WHERE turno_id = $1 AND estado = 'exitosa' AND modo_prueba = FALSE`,
+    [turnoId]
+  ).catch(() => ({ rows: [{ n: 0, total: 0, cargos: 0, efectivo: 0, tarjeta: 0, recargas: 0, servicios: 0 }] }));
+  const rr = rec.rows[0];
+  const recargas = {
+    cantidad: parseInt(rr.n, 10) || 0, total: redondear(rr.total), cargos: redondear(rr.cargos),
+    efectivo: redondear(rr.efectivo), tarjeta: redondear(rr.tarjeta),
+    recargas: redondear(rr.recargas), servicios: redondear(rr.servicios)
+  };
+
   // Ganancia = lo vendido menos el costo de los productos (los que no tienen costo capturado no suman ganancia).
   const gan = await db.query(
     `SELECT COALESCE(SUM(CASE WHEN p.precio_costo IS NOT NULL AND p.precio_costo > 0
@@ -138,7 +157,7 @@ async function construirResumenTurno(db, turno) {
   const nombreDe = (id) => (nombres.rows.find(u => u.id === id) || {}).nombre || null;
 
   const fondo = parseFloat(turno.fondo_inicial);
-  const saldoEfectivo = redondear(fondo + formas.efectivo + depositos - retiros + abonosEfectivo);
+  const saldoEfectivo = redondear(fondo + formas.efectivo + depositos - retiros + abonosEfectivo + recargas.efectivo);
   const n = tickets.rows.length;
 
   return {
@@ -156,6 +175,7 @@ async function construirResumenTurno(db, turno) {
       depositos: redondear(depositos),
       retiros: redondear(retiros),
       abonos_efectivo: abonosEfectivo,
+      recargas_efectivo: recargas.efectivo,
       devoluciones_efectivo: devolucionesEfectivo,
       salidas: redondear(Math.max(0, retiros - devolucionesEfectivo)),
       saldo_efectivo: saldoEfectivo
@@ -180,6 +200,7 @@ async function construirResumenTurno(db, turno) {
       folio_final: n ? tickets.rows[n - 1].folio : null
     },
     movimientos: movs.rows.map(m => ({ tipo: m.tipo, monto: redondear(m.monto), concepto: m.concepto, fecha: m.fecha, es_devolucion: m.tipo === 'egreso' && /^Devolución ticket /.test(m.concepto || '') })),
+    recargas,
     pagos_creditos: abonos.rows.map(a => ({ cliente: a.cliente, monto: redondear(a.monto), metodo: a.metodo_pago || 'efectivo', fecha: a.fecha })),
     clientes_top: clientesTop.rows.map(c => ({ nombre: c.nombre, ventas: parseInt(c.ventas, 10), monto: redondear(c.monto) })),
     declaracion: turno.declaracion || null
@@ -192,7 +213,7 @@ function esperadoPorForma(resumen) {
   const abonoPor = (forma) => redondear((resumen.pagos_creditos || []).filter(a => a.metodo === forma).reduce((x, a) => x + a.monto, 0));
   return {
     efectivo: resumen.caja.saldo_efectivo,
-    tarjeta: redondear(resumen.formas.tarjeta + abonoPor('tarjeta')),
+    tarjeta: redondear(resumen.formas.tarjeta + abonoPor('tarjeta') + ((resumen.recargas && resumen.recargas.tarjeta) || 0)),
     transferencia: redondear(resumen.formas.transferencia + abonoPor('transferencia')),
     dolares: resumen.formas.dolares,
     cheque: resumen.formas.cheque,
@@ -525,7 +546,8 @@ function combinarResumenes(lista, fecha) {
     caja: {
       fondo_inicial: suma(r => r.caja.fondo_inicial), efectivo_ventas: suma(r => r.caja.efectivo_ventas),
       depositos: suma(r => r.caja.depositos), retiros: suma(r => r.caja.retiros),
-      abonos_efectivo: suma(r => r.caja.abonos_efectivo), devoluciones_efectivo: suma(r => r.caja.devoluciones_efectivo),
+      abonos_efectivo: suma(r => r.caja.abonos_efectivo), recargas_efectivo: suma(r => r.caja.recargas_efectivo),
+      devoluciones_efectivo: suma(r => r.caja.devoluciones_efectivo),
       salidas: suma(r => r.caja.salidas), saldo_efectivo: suma(r => r.caja.saldo_efectivo)
     },
     formas,
@@ -544,6 +566,8 @@ function combinarResumenes(lista, fecha) {
       folio_final: conFolio.length ? conFolio[conFolio.length - 1].cuentas.folio_final : null
     },
     movimientos: lista.flatMap(r => r.movimientos.map(m => ({ ...m, cajero: r.turno.cajero }))).sort((a, b) => new Date(a.fecha) - new Date(b.fecha)),
+    recargas: ['cantidad', 'total', 'cargos', 'efectivo', 'tarjeta', 'recargas', 'servicios']
+      .reduce((o, k) => { o[k] = k === 'cantidad' ? lista.reduce((x, r) => x + ((r.recargas && r.recargas.cantidad) || 0), 0) : suma(r => r.recargas && r.recargas[k]); return o; }, {}),
     pagos_creditos: lista.flatMap(r => r.pagos_creditos.map(p => ({ ...p, cajero: r.turno.cajero }))),
     clientes_top: Object.values(clientes).sort((a, b) => b.monto - a.monto).slice(0, 5),
     declaracion: todosCerrados && decls.length === lista.length ? {

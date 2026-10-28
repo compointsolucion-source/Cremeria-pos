@@ -269,6 +269,7 @@
       <button class="btn btn-secondary" onclick="aplicarMayoreoAvanzada()">🏷️ F11 - Mayoreo</button>
       <button class="btn btn-secondary" onclick="abrirEntradaDinero()">💰 F7 - Entradas</button>
       <button class="btn btn-secondary" onclick="abrirSalidaDinero()">💸 F8 - Salidas</button>
+      <button class="btn btn-secondary" id="btnRecargas" onclick="abrirRecargas()">📱 Recargas</button>
       <button class="btn btn-secondary" onclick="abrirVerificadorPrecios()">🔍 F9 - Verificador</button>
     </div>
 
@@ -2404,6 +2405,7 @@ window.addEventListener('nube-despierta', () => {
 actualizarPanelUltimaVenta();
 </script>
 <script src="js/caja-avanzada-mostrador.js"></script>
+<script src="js/recargas.js"></script>
 <script>
 // Vista elegida en este equipo (Clásica o Caja Mostrador) y categorías para la cuadrícula.
 cargarCategoriasAv();

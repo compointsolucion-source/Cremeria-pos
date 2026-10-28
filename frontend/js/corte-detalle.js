@@ -139,6 +139,7 @@ function corteDetalleHTML(c, { ganancia = false } = {}) {
       <table class="cd-t"><tr><td>Fondo de caja</td><td>${cdDin(caja.fondo_inicial)}</td></tr>
         <tr><td>Ventas en efectivo</td><td class="mas">+ ${cdDin(caja.efectivo_ventas)}</td></tr>
         <tr><td>Abonos en efectivo</td><td class="mas">+ ${cdDin(caja.abonos_efectivo || 0)}</td></tr>
+        ${caja.recargas_efectivo ? `<tr><td>Recargas y servicios</td><td class="mas">+ ${cdDin(caja.recargas_efectivo)}</td></tr>` : ''}
         <tr><td>Entradas</td><td class="mas">+ ${cdDin(caja.depositos)}</td></tr>
         <tr><td>Salidas</td><td class="menos">− ${cdDin(salidas)}</td></tr>
         <tr><td>Devoluciones en efectivo</td><td class="menos">− ${cdDin(caja.devoluciones_efectivo || 0)}</td></tr>
@@ -146,6 +147,12 @@ function corteDetalleHTML(c, { ganancia = false } = {}) {
       ${bloqueDecl}</div>
     <div class="caja cd-bloque"><h3><span class="em">⬇️</span> Entradas de efectivo</h3>${lista(entradas, 'No hubo entradas de efectivo')}</div>
     <div class="caja cd-bloque"><h3><span class="em">⬆️</span> Salidas de efectivo</h3>${lista(salidasLista, 'No hubo salidas de efectivo')}</div>
+    ${c.recargas && c.recargas.cantidad ? `<div class="caja cd-bloque"><h3><span class="em">📱</span> Recargas y servicios</h3>
+      <table class="cd-t"><tr><td>Tiempo aire</td><td>${cdDin(c.recargas.recargas)}</td></tr>
+        <tr><td>Pago de servicios</td><td>${cdDin(c.recargas.servicios)}</td></tr>
+        <tr><td>Comisiones cobradas</td><td class="mas">+ ${cdDin(c.recargas.cargos)}</td></tr>
+        ${c.recargas.tarjeta ? `<tr><td>Cobrado con tarjeta</td><td>${cdDin(c.recargas.tarjeta)}</td></tr>` : ''}
+        <tr class="total"><td>${c.recargas.cantidad} operación${c.recargas.cantidad === 1 ? '' : 'es'}</td><td>${cdDin(c.recargas.total)}</td></tr></table></div>` : ''}
     <div class="caja cd-bloque"><h3><span class="em">👥</span> Pagos de créditos</h3>${pagos.length
       ? `<table class="cd-t">${pagos.map((p) => `<tr><td>${cdEsc(p.cliente)} · ${cdEsc(p.metodo)}${p.cajero ? ` <small>(${cdEsc(p.cajero)})</small>` : ''}</td><td>${cdDin(p.monto)}</td></tr>`).join('')}</table>`
       : '<div class="cd-vacio">No se recibieron pagos de créditos</div>'}</div>
@@ -182,7 +189,7 @@ function descargarCorteDetalleCSV(c, { ganancia = false } = {}) {
   filas.push(['', ''], ['VENTAS TOTALES', cdVentasTotales(c)]);
   if (ganancia) filas.push(['GANANCIA', c.ventas.ganancia]);
   filas.push(['', ''], ['DINERO EN CAJA', ''], ['Fondo de caja', caja.fondo_inicial], ['Ventas en efectivo', caja.efectivo_ventas],
-    ['Abonos en efectivo', caja.abonos_efectivo || 0], ['Entradas', caja.depositos], ['Salidas', caja.salidas !== undefined ? caja.salidas : caja.retiros],
+    ['Abonos en efectivo', caja.abonos_efectivo || 0], ['Recargas y servicios', caja.recargas_efectivo || 0], ['Entradas', caja.depositos], ['Salidas', caja.salidas !== undefined ? caja.salidas : caja.retiros],
     ['Devoluciones en efectivo', caja.devoluciones_efectivo || 0], ['Total en caja', caja.saldo_efectivo]);
   filas.push(['', ''], ['VENTAS POR FORMA DE PAGO', '']);
   Object.entries(c.formas || {}).forEach(([k, v]) => filas.push([k, v]));

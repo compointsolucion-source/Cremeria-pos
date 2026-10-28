@@ -251,6 +251,9 @@
       <button type="button" class="menu-item" data-sec="pagos" onclick="abrirSeccion('pagos')">
         <span class="menu-ico">💳</span><span class="menu-txt"><b>Formas de pago</b><small id="resPagos">—</small></span><span class="menu-chev">›</span>
       </button>
+      <button type="button" class="menu-item" data-sec="recargas" onclick="abrirSeccion('recargas')">
+        <span class="menu-ico">📲</span><span class="menu-txt"><b>Recargas y servicios</b><small id="resRecargas">—</small></span><span class="menu-chev">›</span>
+      </button>
       <button type="button" class="menu-item" data-sec="anuncios" onclick="abrirSeccion('anuncios')">
         <span class="menu-ico">📢</span><span class="menu-txt"><b>Anuncios y promociones</b><small id="resAnuncios">—</small></span><span class="menu-chev">›</span>
       </button>
@@ -800,6 +803,38 @@
           <div class="barra-guardar">
             <button class="btn btn-primary btn-principal" onclick="guardarFormasPago()">💾 Guardar formas de pago</button>
             <span class="nota">Los cambios se aplican en todos los equipos.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ RECARGAS Y PAGO DE SERVICIOS ============ -->
+      <section class="sec" id="sec-recargas">
+        <div class="sec-cab-wrap">
+          <div class="sec-cab"><button type="button" class="btn-volver" onclick="volverAlMenu()" aria-label="Volver a Configuración">‹</button>
+            <div class="sec-tit"><h2>📲 Recargas y servicios</h2><p>Tiempo aire y pago de luz, agua, teléfono y cable desde Caja.</p></div></div>
+          <span class="insignia negocio">🏪 Todo el negocio</span>
+        </div>
+        <div class="sec-cuerpo">
+          <div id="recEstado" class="nota" style="margin-bottom:12px">Cargando…</div>
+          <div class="pagos">
+            <div class="pago" data-sw="recActivo">
+              <label class="pago-cab"><span class="pago-ico">📱</span><b>Vender recargas y servicios</b><input type="checkbox" class="interruptor" id="recActivo"></label>
+              <p class="nota txt-off">Apagado: el botón no funciona en Caja.</p>
+              <p class="nota txt-on">El botón «📱 Recargas» aparece en Caja.</p>
+            </div>
+            <div class="pago on">
+              <div class="pago-cab"><span class="pago-ico">💡</span><b>Comisión por pagar un recibo</b></div>
+              <label class="campo"><span>Lo que cobras de más por cada pago de servicio (luz, agua…)</span><input type="number" id="recCargo" min="0" max="200" step="1" placeholder="Ej. 10"></label>
+              <p class="nota">Ejemplo: recibo de $350 + $10 de comisión = el cliente paga $360.</p>
+            </div>
+            <div class="pago on">
+              <div class="pago-cab"><span class="pago-ico">📈</span><b>Lo que te paga el proveedor por recarga</b></div>
+              <label class="campo"><span>Porcentaje (solo informativo, para tus reportes)</span><input type="number" id="recPct" min="0" max="30" step="0.1" placeholder="Ej. 5"></label>
+              <p class="nota">En recargas no se cobra de más al cliente: tu ganancia es la comisión que te da el proveedor.</p>
+            </div>
+          </div>
+          <div class="barra-guardar">
+            <button class="btn btn-primary btn-principal" onclick="guardarRecargas()">💾 Guardar recargas</button>
           </div>
         </div>
       </section>
@@ -1961,7 +1996,44 @@ function descargarAccesoDirectoImpresion() {
 // ============ Menú de secciones ============
 // PC: menú a la izquierda y la sección elegida a la derecha.
 // Celular: lista de secciones; al tocar una se abre a pantalla completa.
-const SECCIONES = ['dispositivo', 'impresion', 'domicilio', 'bascula', 'contenido', 'pagos', 'anuncios', 'zona'];
+const SECCIONES = ['dispositivo', 'impresion', 'domicilio', 'bascula', 'contenido', 'pagos', 'recargas', 'anuncios', 'zona'];
+
+// ============ Recargas y servicios ============
+async function cargarRecargas() {
+  try {
+    const e = await apiFetch('/recargas/estado');
+    document.getElementById('recActivo').checked = !!e.activo;
+    document.getElementById('recCargo').value = e.cargo_servicio;
+    document.getElementById('recPct').value = e.comision_pct || '';
+    const caja = document.querySelector('.pago[data-sw="recActivo"]');
+    if (caja) caja.classList.toggle('on', !!e.activo);
+    document.getElementById('recEstado').innerHTML = e.modo === 'real'
+      ? '🟢 <b>Proveedor conectado.</b> Las recargas son reales y entran al corte de caja.'
+      : '🧪 <b>Modo prueba.</b> Todavía no hay proveedor conectado: se puede practicar, pero no se manda saldo real y no cuenta en el corte.';
+    document.getElementById('resRecargas').textContent = !e.activo ? 'Apagado' : (e.modo === 'real' ? 'Conectado' : 'Modo prueba') + ' · comisión $' + Number(e.cargo_servicio);
+  } catch (err) {
+    const r = document.getElementById('resRecargas'); if (r) r.textContent = '—';
+    const s = document.getElementById('recEstado'); if (s) s.textContent = err.message;
+  }
+}
+async function guardarRecargas() {
+  try {
+    await apiFetch('/recargas/config', { method: 'PUT', body: JSON.stringify({
+      activo: document.getElementById('recActivo').checked,
+      cargo_servicio: Number(document.getElementById('recCargo').value || 0),
+      comision_pct: Number(document.getElementById('recPct').value || 0)
+    }) });
+    mostrarToast('Recargas guardadas', 'exito');
+    cargarRecargas();
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+document.addEventListener('DOMContentLoaded', () => setTimeout(cargarRecargas, 300));
+document.addEventListener('change', (ev) => {
+  if (ev.target && ev.target.id === 'recActivo') {
+    const caja = document.querySelector('.pago[data-sw="recActivo"]');
+    if (caja) caja.classList.toggle('on', ev.target.checked);
+  }
+});
 const SECCIONES_CON_VISTA_PREVIA = ['impresion', 'contenido', 'domicilio'];
 const mqAngosto = window.matchMedia('(max-width: 1000px)');
 let seccionActual = null;
