@@ -25,20 +25,29 @@ function modo() { return proveedorConfigurado ? 'real' : 'prueba'; }
 // Catálogo de referencia. Cuando se conecte el proveedor, su propio catálogo (con los
 // montos exactos que permite cada compañía) reemplaza esta lista.
 const MONTOS_COMUNES = [10, 20, 30, 50, 100, 150, 200, 300, 500];
+// Paquetes de EJEMPLO (nombre y precio): se reemplazan por el catálogo real de Taecel al conectarlo.
+const paq = (cia, nombre, montos, detalle) => montos.map((m) => ({ codigo: `${cia}-${m}`, nombre, monto: m, detalle }));
+const DETALLE_PAQ = 'Llamadas, mensajes, redes e internet';
+// color = color de cada compañía en la pantalla (solo para reconocerla rápido).
 const CATALOGO_REFERENCIA = [
-  { codigo: 'telcel', nombre: 'Telcel', tipo: 'recarga', montos: [10, 20, 30, 50, 80, 100, 150, 200, 300, 500] },
-  { codigo: 'att', nombre: 'AT&T', tipo: 'recarga', montos: MONTOS_COMUNES },
-  { codigo: 'movistar', nombre: 'Movistar', tipo: 'recarga', montos: MONTOS_COMUNES },
-  { codigo: 'unefon', nombre: 'Unefon', tipo: 'recarga', montos: MONTOS_COMUNES },
-  { codigo: 'bait', nombre: 'Bait', tipo: 'recarga', montos: [30, 50, 100, 150, 200, 300] },
-  { codigo: 'virgin', nombre: 'Virgin', tipo: 'recarga', montos: [20, 30, 50, 100, 150, 200] },
-  { codigo: 'cfe', nombre: 'CFE (luz)', tipo: 'servicio', etiqueta: 'Número de servicio (12 dígitos del recibo)' },
-  { codigo: 'telmex', nombre: 'Telmex', tipo: 'servicio', etiqueta: 'Teléfono a 10 dígitos' },
-  { codigo: 'siapa', nombre: 'SIAPA (agua)', tipo: 'servicio', etiqueta: 'Número de cuenta del recibo' },
-  { codigo: 'izzi', nombre: 'izzi', tipo: 'servicio', etiqueta: 'Número de cuenta' },
-  { codigo: 'totalplay', nombre: 'Totalplay', tipo: 'servicio', etiqueta: 'Número de cuenta' },
-  { codigo: 'megacable', nombre: 'Megacable', tipo: 'servicio', etiqueta: 'Número de contrato' },
-  { codigo: 'sky', nombre: 'SKY', tipo: 'servicio', etiqueta: 'Número de cuenta' }
+  { codigo: 'telcel', nombre: 'Telcel', tipo: 'recarga', color: '#0A3D91', montos: [10, 20, 30, 50, 80, 100, 150, 200, 300, 500],
+    paquetes: paq('telcel', 'Amigo Sin Límite', [50, 100, 150, 200, 300, 500], DETALLE_PAQ) },
+  { codigo: 'att', nombre: 'AT&T', tipo: 'recarga', color: '#0095D9', montos: MONTOS_COMUNES,
+    paquetes: paq('att', 'Unidos', [50, 100, 150, 200, 300], DETALLE_PAQ) },
+  { codigo: 'movistar', nombre: 'Movistar', tipo: 'recarga', color: '#019DF4', montos: MONTOS_COMUNES,
+    paquetes: paq('movistar', 'Internet + redes', [50, 100, 150, 200], DETALLE_PAQ) },
+  { codigo: 'unefon', nombre: 'Unefon', tipo: 'recarga', color: '#E5A800', montos: MONTOS_COMUNES,
+    paquetes: paq('unefon', 'Paquete', [50, 100, 150, 200], DETALLE_PAQ) },
+  { codigo: 'bait', nombre: 'Bait', tipo: 'recarga', color: '#1D4F9C', montos: [30, 50, 100, 150, 200, 300],
+    paquetes: paq('bait', 'Paquete', [100, 150, 200], DETALLE_PAQ) },
+  { codigo: 'virgin', nombre: 'Virgin', tipo: 'recarga', color: '#D7192D', montos: [20, 30, 50, 100, 150, 200] },
+  { codigo: 'cfe', nombre: 'CFE (luz)', tipo: 'servicio', color: '#00843D', etiqueta: 'Número de servicio (12 dígitos del recibo)' },
+  { codigo: 'telmex', nombre: 'Telmex', tipo: 'servicio', color: '#0066B3', etiqueta: 'Teléfono a 10 dígitos' },
+  { codigo: 'siapa', nombre: 'SIAPA (agua)', tipo: 'servicio', color: '#1C8DD0', etiqueta: 'Número de cuenta del recibo' },
+  { codigo: 'izzi', nombre: 'izzi', tipo: 'servicio', color: '#00A19B', etiqueta: 'Número de cuenta' },
+  { codigo: 'totalplay', nombre: 'Totalplay', tipo: 'servicio', color: '#7AB929', etiqueta: 'Número de cuenta' },
+  { codigo: 'megacable', nombre: 'Megacable', tipo: 'servicio', color: '#E4002B', etiqueta: 'Número de contrato' },
+  { codigo: 'sky', nombre: 'SKY', tipo: 'servicio', color: '#0B4EA2', etiqueta: 'Número de cuenta' }
 ];
 const SERVICIO_MAX = 10000;
 
@@ -61,7 +70,7 @@ async function consultarSaldo() {
 
 const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-// Vende. datos = { tipo, compania, referencia, monto, folio_interno }
+// Vende. datos = { tipo, compania, referencia, monto, paquete (código o null), folio_interno }
 async function venderRecarga(datos) {
   if (!proveedorConfigurado) {
     // Simulación: un número que termina en 0000 sale "rechazado" para poder probar ese caso.

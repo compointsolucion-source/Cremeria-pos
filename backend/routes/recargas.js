@@ -91,10 +91,17 @@ router.post('/vender', requierePermiso('RECARGAS_VENDER'), async (req, res) => {
     if (!item) return res.status(400).json({ error: 'Elige una compañía de la lista' });
 
     const referencia = String(b.referencia || '').replace(/[\s-]/g, '');
+    // Paquete (Amigo Sin Límite, internet…): solo de las compañías de celular que lo tienen.
+    let paquete = null;
+    if (b.paquete !== undefined && b.paquete !== null && b.paquete !== '') {
+      paquete = item.tipo === 'recarga' ? (item.paquetes || []).find((p) => p.codigo === String(b.paquete)) || null : null;
+      if (!paquete) return res.status(400).json({ error: `Ese paquete no existe para ${item.nombre}` });
+    }
     let monto = Number(b.monto);
     if (item.tipo === 'recarga') {
       if (!/^\d{10}$/.test(referencia)) return res.status(400).json({ error: 'El número de celular debe tener 10 dígitos' });
-      if (!item.montos.includes(monto)) return res.status(400).json({ error: `Ese monto no existe para ${item.nombre}` });
+      if (paquete) monto = paquete.monto; // el precio del paquete lo pone el catálogo, no la pantalla
+      else if (!item.montos.includes(monto)) return res.status(400).json({ error: `Ese monto no existe para ${item.nombre}` });
     } else {
       if (!/^[0-9A-Za-z]{6,30}$/.test(referencia)) return res.status(400).json({ error: 'Revisa el número del recibo: solo números y letras, de 6 a 30' });
       if (!(Number.isFinite(monto) && monto >= 1 && monto <= proveedor.SERVICIO_MAX)) {
@@ -141,9 +148,9 @@ router.post('/vender', requierePermiso('RECARGAS_VENDER'), async (req, res) => {
     let fila;
     try {
       fila = (await pool.query(
-        `INSERT INTO recargas_ventas (sucursal_id, turno_id, usuario_id, tipo, compania, referencia, monto, cargo, total, metodo_pago, estado, modo_prueba, clave)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pendiente', $11, $12) RETURNING *`,
-        [req.sucursalId, turno.id, req.usuario.id, item.tipo, item.codigo, referencia, monto, cargo, total, metodo, prueba, clave]
+        `INSERT INTO recargas_ventas (sucursal_id, turno_id, usuario_id, tipo, compania, referencia, monto, cargo, total, metodo_pago, estado, modo_prueba, clave, producto)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pendiente', $11, $12, $13) RETURNING *`,
+        [req.sucursalId, turno.id, req.usuario.id, item.tipo, item.codigo, referencia, monto, cargo, total, metodo, prueba, clave, paquete ? paquete.nombre : null]
       )).rows[0];
     } catch (e) {
       if (e.code === '23505' && clave) { // dos clics al mismo tiempo
@@ -156,7 +163,7 @@ router.post('/vender', requierePermiso('RECARGAS_VENDER'), async (req, res) => {
     // 2) Se manda al proveedor.
     let r;
     try {
-      r = await proveedor.venderRecarga({ tipo: item.tipo, compania: item.codigo, referencia, monto, folio_interno: fila.id });
+      r = await proveedor.venderRecarga({ tipo: item.tipo, compania: item.codigo, referencia, monto, paquete: paquete ? paquete.codigo : null, folio_interno: fila.id });
     } catch (e) {
       r = { estado: 'fallida', folio: null, mensaje: String(e.message || 'No se pudo hacer la venta').slice(0, 200), sinIntegrar: e.codigo === 'SIN_INTEGRAR' };
     }
@@ -168,7 +175,7 @@ router.post('/vender', requierePermiso('RECARGAS_VENDER'), async (req, res) => {
 
     await registrarBitacora(pool, {
       usuario_id: req.usuario.id, accion: item.tipo === 'recarga' ? 'venta_recarga' : 'pago_servicio', modulo: 'recargas', referencia_id: fila.id,
-      valor_nuevo: { compania: item.codigo, referencia, monto, cargo, total, metodo, estado, prueba, turno_id: turno.id }
+      valor_nuevo: { compania: item.codigo, paquete: paquete ? paquete.nombre : null, referencia, monto, cargo, total, metodo, estado, prueba, turno_id: turno.id }
     });
 
     if (r.sinIntegrar) return res.status(503).json({ error: 'El proveedor de recargas todavía no está conectado. No cobres esta venta.', venta: fila });
@@ -190,7 +197,7 @@ router.get('/ventas', async (req, res) => {
     if (!esSupervisor(req.usuario)) { params.push(req.usuario.id); filtro += ` AND r.usuario_id = $${params.length}`; }
     const r = await pool.query(
       `SELECT r.id, r.tipo, r.compania, r.referencia, r.monto, r.cargo, r.total, r.metodo_pago, r.estado, r.modo_prueba,
-              r.folio_proveedor, r.mensaje, r.fecha, u.nombre AS cajero
+              r.folio_proveedor, r.mensaje, r.fecha, r.producto, u.nombre AS cajero
        FROM recargas_ventas r LEFT JOIN usuarios u ON u.id = r.usuario_id
        WHERE r.sucursal_id = $1 ${filtro} ORDER BY r.fecha DESC LIMIT 200`,
       params

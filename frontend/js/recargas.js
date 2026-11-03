@@ -4,7 +4,7 @@
 // Reglas que cuida el servidor: turno abierto, permiso RECARGAS_VENDER, número válido,
 // sin cobros dobles. Aquí solo se guía a la cajera paso a paso.
 (function () {
-  const est = { catalogo: [], estado: null, tab: 'recarga', compania: null, monto: null, metodo: 'efectivo', ocupado: false };
+  const est = { catalogo: [], estado: null, tab: 'recarga', compania: null, monto: null, paquete: null, metodo: 'efectivo', ocupado: false };
   const $ = (id) => document.getElementById(id);
   const din = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const esc = (t) => (typeof escHtml === 'function' ? escHtml(t) : String(t));
@@ -29,6 +29,15 @@
     .rc-grid.montos { grid-template-columns:repeat(auto-fill,minmax(74px,1fr)); }
     .rc-op { padding:11px 6px; border-radius:9px; border:2px solid var(--border,#E4E6E9); background:var(--campo-fondo,#fff); color:inherit; font-weight:700; font-size:15px; cursor:pointer; }
     .rc-op.activo { border-color:var(--primary,#5FAE46); background:rgba(95,174,70,.12); }
+    .rc-cia { position:relative; display:flex; flex-direction:column; align-items:center; gap:5px; padding:12px 6px 10px; border-top:5px solid var(--c,#999); }
+    .rc-cia .ini { width:34px; height:34px; border-radius:50%; background:var(--c,#999); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; }
+    .rc-cia.activo { border-color:var(--c,#5FAE46); border-top-color:var(--c,#999); background:color-mix(in srgb, var(--c,#5FAE46) 10%, transparent); }
+    .rc-paqs { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+    .rc-paq { text-align:left; padding:11px 12px; border-radius:11px; border:2px solid var(--border,#E4E6E9); background:var(--campo-fondo,#fff); color:inherit; cursor:pointer; }
+    .rc-paq b { display:block; font-size:22px; color:var(--c,#1F2023); }
+    .rc-paq span { display:block; font-weight:700; font-size:14px; margin-top:2px; }
+    .rc-paq small { display:block; color:var(--muted,#7A7D83); font-size:12px; margin-top:4px; line-height:1.3; }
+    .rc-paq.activo { border-color:var(--c,#5FAE46); background:color-mix(in srgb, var(--c,#5FAE46) 10%, transparent); }
     .rc-campo { width:100%; padding:11px; font-size:19px; letter-spacing:1px; border:1px solid var(--border,#E4E6E9); border-radius:9px; background:var(--campo-fondo,#fff); color:inherit; box-sizing:border-box; }
     .rc-campo.mal { border-color:var(--danger,#C62828); }
     .rc-dos { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -61,6 +70,7 @@
       <div id="rcAviso"></div>
       <div class="rc-tabs">
         <button data-tab="recarga" onclick="rcTab('recarga')">📱 Recargas</button>
+        <button data-tab="paquete" onclick="rcTab('paquete')">📦 Paquetes</button>
         <button data-tab="servicio" onclick="rcTab('servicio')">💡 Servicios</button>
         <button data-tab="hoy" onclick="rcTab('hoy')">📋 Hoy</button>
       </div>
@@ -97,7 +107,7 @@
   };
 
   window.rcTab = function (tab) {
-    est.tab = tab; est.compania = null; est.monto = null; est.metodo = 'efectivo';
+    est.tab = tab; est.compania = null; est.monto = null; est.paquete = null; est.metodo = 'efectivo';
     document.querySelectorAll('#rcFondo .rc-tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.tab === tab));
     if (tab === 'hoy') return listaHoy();
     formulario();
@@ -105,19 +115,24 @@
 
   function formulario() {
     const tipo = est.tab;
-    const lista = est.catalogo.filter((c) => c.tipo === tipo);
-    const esRec = tipo === 'recarga';
+    const lista = tipo === 'paquete'
+      ? est.catalogo.filter((c) => c.tipo === 'recarga' && (c.paquetes || []).length)
+      : est.catalogo.filter((c) => c.tipo === tipo);
+    const esServ = tipo === 'servicio';
+    const color = (c) => (/^#[0-9A-Fa-f]{6}$/.test(c.color || '') ? c.color : '#7A7D83');
     $('rcCuerpo').innerHTML = `
-      <div class="rc-paso">1. ${esRec ? 'Compañía' : 'Servicio'}</div>
-      <div class="rc-grid">${lista.map((c) => `<button class="rc-op" data-c="${esc(c.codigo)}" onclick="rcCompania('${esc(c.codigo)}')">${esc(c.nombre)}</button>`).join('')}</div>
+      <div class="rc-paso">1. ${esServ ? 'Servicio' : 'Compañía'}</div>
+      <div class="rc-grid">${lista.map((c) => `<button class="rc-op rc-cia" style="--c:${color(c)}" data-c="${esc(c.codigo)}" onclick="rcCompania('${esc(c.codigo)}')"><span class="ini">${esc(c.nombre.replace(/[^A-Za-z0-9]/g, '').slice(0, 1).toUpperCase())}</span>${esc(c.nombre)}</button>`).join('')}</div>
       <div id="rcResto"></div>`;
   }
 
   window.rcCompania = function (codigo) {
-    est.compania = est.catalogo.find((c) => c.codigo === codigo) || null; est.monto = null;
+    est.compania = est.catalogo.find((c) => c.codigo === codigo) || null; est.monto = null; est.paquete = null;
     document.querySelectorAll('#rcCuerpo [data-c]').forEach((b) => b.classList.toggle('activo', b.dataset.c === codigo));
     const c = est.compania; if (!c) return;
     const esRec = c.tipo === 'recarga';
+    const esPaq = est.tab === 'paquete';
+    const col = /^#[0-9A-Fa-f]{6}$/.test(c.color || '') ? c.color : '#1F2023';
     $('rcResto').innerHTML = `
       <div class="rc-paso">2. ${esRec ? 'Número de celular' : esc(c.etiqueta || 'Número del recibo')}</div>
       ${esRec ? `<div class="rc-dos">
@@ -126,8 +141,9 @@
         </div>`
         : `<input id="rcNum" class="rc-campo" maxlength="30" placeholder="Como viene en el recibo" autocomplete="off" oninput="rcRevisar()">`}
       <div class="rc-nota" id="rcNotaNum"></div>
-      <div class="rc-paso">3. ${esRec ? 'Monto' : 'Monto a pagar del recibo'}</div>
-      ${esRec ? `<div class="rc-grid montos">${c.montos.map((m) => `<button class="rc-op" data-m="${m}" onclick="rcMonto(${m})">$${m}</button>`).join('')}</div>`
+      <div class="rc-paso">3. ${esPaq ? 'Paquete' : esRec ? 'Monto' : 'Monto a pagar del recibo'}</div>
+      ${esPaq ? `<div class="rc-paqs">${(c.paquetes || []).map((p) => `<button class="rc-paq" style="--c:${col}" data-q="${esc(p.codigo)}" onclick="rcPaquete('${esc(p.codigo)}')"><b>$${Number(p.monto)}</b><span>${esc(p.nombre)}</span><small>${esc(p.detalle || '')}</small></button>`).join('')}</div><div class="rc-nota">Los días y los datos de cada paquete los marca la compañía.</div>`
+        : esRec ? `<div class="rc-grid montos">${c.montos.map((m) => `<button class="rc-op" data-m="${m}" onclick="rcMonto(${m})">$${m}</button>`).join('')}</div>`
         : `<input id="rcMonto" class="rc-campo" inputmode="decimal" placeholder="$0.00" oninput="rcRevisar()">`}
       <div class="rc-paso">4. Forma de pago</div>
       <div class="rc-grid montos" style="grid-template-columns:1fr 1fr">
@@ -144,6 +160,13 @@
   window.rcMonto = function (m) {
     est.monto = m;
     document.querySelectorAll('#rcResto [data-m]').forEach((b) => b.classList.toggle('activo', Number(b.dataset.m) === m));
+    rcRevisar();
+  };
+  window.rcPaquete = function (codigo) {
+    const c = est.compania; if (!c) return;
+    est.paquete = (c.paquetes || []).find((p) => p.codigo === codigo) || null;
+    est.monto = est.paquete ? Number(est.paquete.monto) : null;
+    document.querySelectorAll('#rcResto [data-q]').forEach((b) => b.classList.toggle('activo', b.dataset.q === codigo));
     rcRevisar();
   };
   window.rcMetodo = function (m) {
@@ -180,7 +203,7 @@
     const paga = Number(String(($('rcPaga') && $('rcPaga').value) || '').replace(/[$,\s]/g, ''));
     const cambio = est.metodo === 'efectivo' && paga > 0 ? paga - d.total : null;
     $('rcResumen').innerHTML = d.monto > 0 ? `
-      <div><span>${d.c.tipo === 'recarga' ? 'Recarga' : 'Recibo'} ${esc(d.c.nombre)}</span><span>${din(d.monto)}</span></div>
+      <div><span>${est.paquete ? esc(d.c.nombre + ' · ' + est.paquete.nombre) : (d.c.tipo === 'recarga' ? 'Recarga ' : 'Recibo ') + esc(d.c.nombre)}</span><span>${din(d.monto)}</span></div>
       ${d.cargo ? `<div><span>Comisión por el servicio</span><span>${din(d.cargo)}</span></div>` : ''}
       <div class="tot"><span>Total a cobrar</span><span>${din(d.total)}</span></div>
       ${cambio !== null ? `<div style="color:${cambio < 0 ? 'var(--danger)' : 'var(--ok-texto,#2E7D32)'}"><span>${cambio < 0 ? 'Le faltan' : 'Cambio'}</span><span>${din(Math.abs(cambio))}</span></div>` : ''}` : '';
@@ -196,6 +219,7 @@
     const turno = typeof asegurarTurnoAbierto === 'function' ? await asegurarTurnoAbierto() : await apiFetch('/turnos/actual');
     if (!turno) return;
     const cuerpo = { compania: d.c.codigo, referencia: d.num, monto: d.monto, metodo_pago: est.metodo, turno_id: turno.id, clave: nuevaClave() };
+    if (est.paquete) cuerpo.paquete = est.paquete.codigo;
     est.ocupado = true;
     const b = $('rcBoton'); b.disabled = true; b.textContent = '⏳ Enviando… no cierres esta ventana';
     try {
@@ -222,15 +246,15 @@
     const ok = r.estado === 'exitosa', pend = r.estado === 'pendiente';
     $('rcCuerpo').innerHTML = `<div class="rc-fin">
       <div class="ico">${ok ? '✅' : pend ? '⏳' : '❌'}</div>
-      <h4>${ok ? (d.c.tipo === 'recarga' ? '¡Recarga hecha!' : '¡Pago hecho!') : pend ? 'La compañía no ha contestado' : 'No se pudo hacer'}</h4>
-      <div class="det">${esc(d.c.nombre)} · ${esc(r.referencia)} · ${din(r.total)}</div>
+      <h4>${ok ? (r.producto ? '¡Paquete activado!' : d.c.tipo === 'recarga' ? '¡Recarga hecha!' : '¡Pago hecho!') : pend ? 'La compañía no ha contestado' : 'No se pudo hacer'}</h4>
+      <div class="det">${esc(d.c.nombre)}${r.producto ? ' · ' + esc(r.producto) : ''} · ${esc(r.referencia)} · ${din(r.total)}</div>
       ${r.folio_proveedor ? `<div class="det">Folio: <b>${esc(r.folio_proveedor)}</b></div>` : ''}
       ${r.mensaje ? `<div class="det" style="margin-top:6px">${esc(r.mensaje)}</div>` : ''}
       <div class="det" style="margin-top:8px;font-weight:700;color:${ok ? 'var(--ok-texto,#2E7D32)' : 'var(--danger,#C62828)'}">
         ${ok ? (r.modo_prueba ? 'Es de prueba: no cobres.' : 'Cobra ' + din(r.total) + ' al cliente.') : pend ? 'NO cobres todavía. Revisa en la pestaña "Hoy" en unos minutos.' : 'No le cobres al cliente.'}</div>
       <div style="display:flex;gap:8px;margin-top:16px">
         ${ok ? '<button class="btn btn-secondary" style="flex:1" id="rcImprimir">🖨️ Imprimir ticket</button>' : ''}
-        <button class="btn btn-primary" style="flex:1" onclick="rcTab('${d.c.tipo}')">➕ Otra</button>
+        <button class="btn btn-primary" style="flex:1" onclick="rcTab('${est.tab}')">➕ Otra</button>
       </div></div>`;
     if (ok) {
       const imp = () => imprimirTicketRecarga(r, d.c).catch((e) => mostrarToast('No se imprimió: ' + e.message, 'error'));
@@ -249,10 +273,11 @@
     const L = [];
     if (negocio) L.push({ t: negocio, big: true });
     if (r.modo_prueba) L.push({ t: '*** PRUEBA - SIN VALOR ***', big: true });
-    L.push(c.tipo === 'recarga' ? 'RECARGA DE TIEMPO AIRE' : 'PAGO DE SERVICIO');
+    L.push(r.producto ? 'PAQUETE DE CELULAR' : c.tipo === 'recarga' ? 'RECARGA DE TIEMPO AIRE' : 'PAGO DE SERVICIO');
     L.push(f.toLocaleString('es-MX'));
     L.push('--------------------------------');
     L.push('COMPANIA: ' + c.nombre.toUpperCase());
+    if (r.producto) L.push('PAQUETE: ' + String(r.producto).toUpperCase());
     L.push((c.tipo === 'recarga' ? 'NUMERO: ' : 'REFERENCIA: ') + r.referencia);
     L.push('MONTO: ' + din(r.monto));
     if (Number(r.cargo)) L.push('COMISION: ' + din(r.cargo));
@@ -276,7 +301,7 @@
       $('rcCuerpo').innerHTML = filas.length ? `
         <div style="margin-bottom:8px;font-size:14.5px">Hechas (reales): <b>${reales.length}</b> · Total: <b>${din(suma)}</b></div>
         <table class="rc-lista">${filas.map((f) => `<tr>
-          <td>${esc(nombre(f.compania))}${f.modo_prueba ? '<span class="rc-chip">prueba</span>' : ''}<br><small>${esc(f.referencia)} · ${new Date(f.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}${f.cajero ? ' · ' + esc(f.cajero) : ''}</small></td>
+          <td>${esc(nombre(f.compania))}${f.producto ? ' · ' + esc(f.producto) : ''}${f.modo_prueba ? '<span class="rc-chip">prueba</span>' : ''}<br><small>${esc(f.referencia)} · ${new Date(f.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}${f.cajero ? ' · ' + esc(f.cajero) : ''}</small></td>
           <td style="text-align:right;white-space:nowrap">${din(f.total)}<br><small>${NOMBRES_ESTADO[f.estado] || esc(f.estado)}</small></td></tr>`).join('')}</table>`
         : '<p style="text-align:center;color:var(--muted)">Todavía no hay recargas hoy.</p>';
     } catch (e) {

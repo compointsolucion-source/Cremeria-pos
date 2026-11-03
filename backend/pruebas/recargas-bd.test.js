@@ -50,7 +50,7 @@ test.before(async () => {
   if (!servidor.listening) await new Promise((ok) => servidor.once('listening', ok));
   base = 'http://127.0.0.1:' + servidor.address().port;
   for (let i = 0; i < 100; i++) {
-    const r = await pool.query("SELECT 1 FROM schema_migrations WHERE nombre LIKE '019%'").catch(() => ({ rows: [] }));
+    const r = await pool.query("SELECT 1 FROM schema_migrations WHERE nombre LIKE '020%'").catch(() => ({ rows: [] }));
     if (r.rows.length) break;
     await esperar(100);
   }
@@ -186,4 +186,19 @@ test('la cajera solo ve sus recargas; la dueña ve todas', async () => {
   assert.equal(otra.json.length, 0);
   const duena = await api('duena', 'GET', '/api/recargas/ventas');
   assert.ok(duena.json.length >= 4);
+});
+
+test('paquetes: el precio lo pone el catálogo y se guarda el nombre del paquete', async () => {
+  await api('duena', 'PUT', '/api/recargas/config', { activo: true });
+  const t = (await api('otra', 'GET', '/api/turnos/actual')).json;
+  const c = await api('otra', 'GET', '/api/recargas/catalogo');
+  const telcel = c.json.find((x) => x.codigo === 'telcel');
+  assert.ok(telcel.paquetes.length && telcel.color);
+  const p = telcel.paquetes[1];
+  const r = await api('otra', 'POST', '/api/recargas/vender', { compania: 'telcel', paquete: p.codigo, referencia: '3377777777', monto: 1, metodo_pago: 'efectivo', turno_id: t.id });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(Number(r.json.monto), p.monto);
+  assert.equal(r.json.producto, p.nombre);
+  assert.equal((await api('otra', 'POST', '/api/recargas/vender', { compania: 'telcel', paquete: 'no-existe', referencia: '3377777770', turno_id: t.id })).status, 400);
+  assert.equal((await api('otra', 'POST', '/api/recargas/vender', { compania: 'cfe', paquete: p.codigo, referencia: '123456789012', monto: 100, turno_id: t.id })).status, 400);
 });
