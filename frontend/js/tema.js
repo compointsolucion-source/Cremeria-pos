@@ -15,10 +15,24 @@
     document.documentElement.setAttribute('data-color-tema', colorTema);
   }
 
+  // Tema "Compoint": además de colores y letra (css/tema-compoint.css) cambia los emojis por íconos de línea.
+  // Ese código solo se carga con este tema y antes de pintar la página (así no se ven los emojis un instante).
+  const DIR_JS = (document.currentScript && document.currentScript.src || '').replace(/tema\.js(\?.*)?$/, '');
+  if (obtenerColorTemaPreferido() === 'compoint' && DIR_JS) {
+    if (document.readyState === 'loading') {
+      document.write('<script src="' + DIR_JS + 'iconos-compoint.js"><\/script>');
+    } else {
+      const s = document.createElement('script'); s.src = DIR_JS + 'iconos-compoint.js'; document.head.appendChild(s);
+    }
+  }
+
   // Se expone para que Configuración pueda cambiarlo y guardarlo.
   window.establecerColorTema = function (colorTema) {
+    const antes = obtenerColorTemaPreferido();
     localStorage.setItem('color_tema', colorTema);
     aplicarColorTema(colorTema);
+    // Entrar o salir del tema Compoint cambia los íconos de toda la pantalla: se recarga para aplicarlo completo.
+    if ((antes === 'compoint') !== (colorTema === 'compoint')) setTimeout(() => location.reload(), 150);
   };
 
   function sistemaEsOscuro() {

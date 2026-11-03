@@ -1,0 +1,204 @@
+/* ===== Tema "Compoint": azul marino de Compoint con verde solo para la acción principal,
+   letra Archivo (va dentro del sistema, funciona sin internet), íconos de línea en vez de emojis
+   (js/iconos-compoint.js, lo carga tema.js) y el total como display de báscula.
+   Todo va bajo html[data-color-tema="compoint"]: con otro tema este archivo no cambia nada. ===== */
+
+@font-face {
+  font-family: "Archivo Compoint";
+  src: url("../fuentes/archivo-latin.woff2") format("woff2");
+  font-weight: 100 900; font-stretch: 62% 125%; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191-2193, U+2212, U+2215;
+}
+@font-face {
+  font-family: "Archivo Compoint";
+  src: url("../fuentes/archivo-latin-ext.woff2") format("woff2");
+  font-weight: 100 900; font-stretch: 62% 125%; font-display: swap;
+  unicode-range: U+0100-024F, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2C60-2C7F, U+A720-A7FF;
+}
+
+html[data-color-tema="compoint"] {
+  --tinta: #0F1C2E; --tinta-2: #1A2B42; --tinta-tenue: #93A3B5;
+  --primary: #3AA335; --primary-dark: #2E8A2A; --on-primary: #FFFFFF;
+  --background: #F3F5F4; --surface: #FFFFFF; --text: #18222F; --muted: #5B6673;
+  --border: #DCE1E5; --secondary: #DCE1E5;
+  --success: #3AA335; --warning: #B7741A; --danger: #B93A2E;
+  --ok-texto: #2E8A2A; --ambar-texto: #8F5A10;
+  --topbar-fondo: #FFFFFF; --topbar-texto: #18222F;
+  --campo-fondo: #FFFFFF; --tabla-cab: #FFFFFF; --fila-hover: #F6F8F7; --fila-borde: #EDF0F2;
+  --shadow: none; --radius: 12px; --radius-sm: 8px;
+  --sidebar-fondo: #0F1C2E; --sidebar-texto: #C9D2DC; --sidebar-texto-tenue: #7C8998; --sidebar-borde: rgba(255,255,255,.08);
+  --sidebar-hover: rgba(255,255,255,.05); --sidebar-activo-fondo: rgba(255,255,255,.09); --sidebar-activo-texto: #FFFFFF; --sidebar-activo-borde: #3AA335;
+}
+html[data-tema="oscuro"][data-color-tema="compoint"] {
+  --primary: #4CBF46; --primary-dark: #3AA335; --on-primary: #06210A;
+  --background: #0B141F; --surface: #132133; --text: #E8EEF4; --muted: #93A3B5;
+  --border: #23344A; --secondary: #23344A; --ok-texto: #8DD887; --ambar-texto: #F0BE6A;
+  --topbar-fondo: #0F1C2E; --topbar-texto: #E8EEF4;
+  --campo-fondo: #0E1A28; --tabla-cab: #132133; --fila-hover: #1A2B42; --fila-borde: #1D2E44;
+  --sidebar-fondo: #08111C; --sidebar-borde: rgba(255,255,255,.06);
+}
+
+/* ---------- Letra y números ---------- */
+html[data-color-tema="compoint"] body,
+html[data-color-tema="compoint"] button,
+html[data-color-tema="compoint"] input,
+html[data-color-tema="compoint"] select,
+html[data-color-tema="compoint"] textarea { font-family: "Archivo Compoint", -apple-system, "Segoe UI", Roboto, sans-serif; }
+html[data-color-tema="compoint"] .num,
+html[data-color-tema="compoint"] td,
+html[data-color-tema="compoint"] .total-grande { font-variant-numeric: tabular-nums; }
+html[data-color-tema="compoint"] h1, html[data-color-tema="compoint"] h2,
+html[data-color-tema="compoint"] h3 { font-stretch: 92%; letter-spacing: -0.015em; }
+
+/* ---------- Íconos de línea (los pone iconos-compoint.js) ---------- */
+html[data-color-tema="compoint"] svg.ico { width: 1.12em; height: 1.12em; vertical-align: -0.18em; flex: none; }
+html[data-color-tema="compoint"] .btn svg.ico, html[data-color-tema="compoint"] button svg.ico { opacity: .85; }
+html[data-color-tema="compoint"] svg.ico.ico-t { margin-right: .42em; }
+html[data-color-tema="compoint"] .punto-estado { display: inline-block; width: .62em; height: .62em; border-radius: 50%; vertical-align: .05em; margin-right: .1em; }
+html[data-color-tema="compoint"] kbd.tecla-rapida,
+html[data-color-tema="compoint"] .pista-teclas kbd {
+  font-family: inherit; font-size: 11.5px; font-weight: 600; line-height: 1.4; color: var(--muted);
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; margin-left: 8px; background: rgba(128,128,128,.06);
+}
+html[data-color-tema="compoint"] .btn-primary kbd.tecla-rapida { color: #fff; border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.14); }
+
+/* ---------- Barra de arriba: clara, con línea abajo ---------- */
+html[data-color-tema="compoint"] .top-bar { border-bottom: 1px solid var(--border); min-height: 60px; }
+html[data-color-tema="compoint"] .top-bar h1 { font-size: 20px; font-weight: 700; }
+html[data-color-tema="compoint"] .top-bar .btn-secondary { background: var(--surface); }
+html[data-color-tema="compoint"] .btn-abrir-sidebar { color: var(--topbar-texto); }
+
+/* Selectores que estaban pensados para la barra oscura (Caja: Clásica/Mostrador; Mostrador: Mostrador/A domicilio/Para recoger) */
+html[data-color-tema="compoint"] .selector-vista,
+html[data-color-tema="compoint"] .modo-venta { background: rgba(15,28,46,.07); border-radius: 10px; }
+html[data-color-tema="compoint"] .selector-vista button,
+html[data-color-tema="compoint"] .modo-venta button { color: var(--muted); }
+html[data-color-tema="compoint"] .selector-vista button.activa,
+html[data-color-tema="compoint"] .modo-venta button.activo { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(15,28,46,.14); }
+html[data-tema="oscuro"][data-color-tema="compoint"] .selector-vista,
+html[data-tema="oscuro"][data-color-tema="compoint"] .modo-venta { background: rgba(255,255,255,.08); }
+html[data-tema="oscuro"][data-color-tema="compoint"] .selector-vista button.activa,
+html[data-tema="oscuro"][data-color-tema="compoint"] .modo-venta button.activo { background: var(--tinta-2); }
+
+/* ---------- Menú lateral azul marino ---------- */
+html[data-color-tema="compoint"] .sidebar { border-right: 0; }
+html[data-color-tema="compoint"] .sidebar-marca { color: #fff; font-size: 15.5px; }
+html[data-color-tema="compoint"] .sidebar-item.activo,
+html[data-color-tema="compoint"] .sg-cuerpo .sidebar-item.activo { position: relative; }
+html[data-color-tema="compoint"] .sidebar-item.activo::before {
+  content: ""; position: absolute; left: -10px; top: 7px; bottom: 7px; width: 3px; border-radius: 0 3px 3px 0; background: var(--sidebar-activo-borde);
+}
+html[data-color-tema="compoint"] .sidebar-grupo.con-activo > .sg-cab,
+html[data-color-tema="compoint"] .sidebar-grupo.con-activo > .sg-cab .sidebar-icono { color: #fff; }
+html[data-color-tema="compoint"] .sidebar-colapsar-escritorio { background: var(--tinta-2); color: #C9D2DC; border-color: rgba(255,255,255,.15); }
+
+/* ---------- Botones, tarjetas, tablas ---------- */
+html[data-color-tema="compoint"] .btn { border-radius: 8px; font-weight: 600; }
+html[data-color-tema="compoint"] .btn-secondary { border-color: var(--border); }
+html[data-color-tema="compoint"] .card,
+html[data-color-tema="compoint"] .caja,
+html[data-color-tema="compoint"] .panel-form { box-shadow: none; border: 1px solid var(--border); }
+html[data-color-tema="compoint"] thead th {
+  text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--tabla-cab);
+}
+html[data-color-tema="compoint"] .pill { border-radius: 6px; font-weight: 700; }
+html[data-color-tema="compoint"] .pestanas button.activa { color: var(--text); border-bottom-color: var(--tinta); }
+html[data-color-tema="compoint"] .pestanas button.activa i { background: var(--tinta); color: #fff; }
+html[data-color-tema="compoint"] input:focus, html[data-color-tema="compoint"] select:focus, html[data-color-tema="compoint"] textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--tinta) 35%, transparent); outline-offset: 0; border-color: var(--tinta);
+}
+html[data-tema="oscuro"][data-color-tema="compoint"] .pestanas button.activa { border-bottom-color: var(--primary); }
+html[data-tema="oscuro"][data-color-tema="compoint"] .pestanas button.activa i { background: var(--primary); color: var(--on-primary); }
+
+/* ---------- Inicio: las cifras de hoy en una sola franja oscura ---------- */
+html[data-color-tema="compoint"] .kpis { background: var(--tinta); border-radius: 12px; gap: 0; padding: 6px 0; }
+html[data-color-tema="compoint"] .kpis .kpi { background: transparent; border: 0; border-radius: 0; color: #fff; padding: 14px 22px; border-left: 1px solid rgba(255,255,255,.12); }
+html[data-color-tema="compoint"] .kpis .kpi:first-child { border-left: 0; }
+html[data-color-tema="compoint"] .kpis .kpi .ic { background: rgba(255,255,255,.08) !important; color: #C9D2DC; width: 40px; height: 40px; border-radius: 9px; font-size: 20px; }
+html[data-color-tema="compoint"] .kpis .kpi .v { color: #fff; font-stretch: 82%; font-size: 28px; }
+html[data-color-tema="compoint"] .kpis .kpi:first-child .v { font-size: 36px; }
+html[data-color-tema="compoint"] .kpis .kpi .v.verde-t { color: #8DD887; }
+html[data-color-tema="compoint"] .kpis .kpi .v.naranja-t { color: #F0BE6A; }
+html[data-color-tema="compoint"] .kpis .kpi .l, html[data-color-tema="compoint"] .kpis .kpi small { color: var(--tinta-tenue); }
+html[data-color-tema="compoint"] .kpis .kpi.alerta { background: transparent; }
+
+/* ---------- Caja Avanzada: total como display y acciones a la derecha ---------- */
+html[data-color-tema="compoint"] .tabla-venta thead th { background: var(--surface); color: var(--muted); text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; border-bottom: 1px solid var(--border); border-right-color: transparent; }
+html[data-color-tema="compoint"] .tabla-venta th, html[data-color-tema="compoint"] .tabla-venta td { border-right-color: transparent; }
+html[data-color-tema="compoint"] .tabla-venta tbody tr:nth-child(even) td { background: transparent; }
+html[data-color-tema="compoint"] .tabla-venta td.col-desc { font-weight: 600; }
+html[data-color-tema="compoint"] .tabla-venta td.col-cant, html[data-color-tema="compoint"] .tabla-venta td.col-importe { font-weight: 700; }
+html[data-color-tema="compoint"] .barra-superior-avanzada input { border: 2px solid var(--tinta); height: 50px; font-size: 16px; }
+html[data-color-tema="compoint"] .barra-superior-avanzada .btn-agregar-cod { background: var(--tinta); border-color: var(--tinta); color: #fff; }
+html[data-color-tema="compoint"] .barra-superior-avanzada, html[data-color-tema="compoint"] .barra-atajos { box-shadow: none; border: 1px solid var(--border); }
+html[data-color-tema="compoint"] .pestana-ticket { border-width: 1px; border-radius: 8px; }
+html[data-color-tema="compoint"] .pestana-ticket.activa { border-color: var(--tinta); color: var(--text); background: var(--surface); }
+html[data-color-tema="compoint"] .pestana-ticket .contador-pestana { background: var(--tinta); color: #fff; }
+html[data-color-tema="compoint"] .zona-total { background: var(--tinta); border: 0; color: #fff; box-shadow: none; }
+html[data-color-tema="compoint"] .zona-total .total-etiqueta { color: var(--tinta-tenue); font-size: 0; letter-spacing: 0; }
+html[data-color-tema="compoint"] .zona-total .total-etiqueta::after { content: "Total a cobrar"; font-size: 14px; font-weight: 600; }
+html[data-color-tema="compoint"] .zona-total .total-grande { color: #fff; font-stretch: 78%; letter-spacing: -0.02em; }
+html[data-color-tema="compoint"] .zona-total .contador-articulos { color: var(--tinta-tenue); }
+html[data-color-tema="compoint"] .zona-total .contador-articulos b { color: #fff; }
+html[data-color-tema="compoint"] .zona-total .pista-teclas { color: var(--tinta-tenue); }
+html[data-color-tema="compoint"] .zona-total .pista-teclas kbd { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.25); margin-left: 0; }
+html[data-color-tema="compoint"] .zona-total .btn-cobrar-grande { background: var(--primary); color: #fff; }
+
+@media (min-width: 1200px) {
+  html[data-color-tema="compoint"] body:not(.vista-mostrador) #vistaClasica {
+    display: grid; grid-template-columns: minmax(0, 1fr) 360px; column-gap: 16px;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "pest total" "busca total" "atajos total" "tabla botones" "tabla botones" "tabla ultima";
+  }
+  html[data-color-tema="compoint"] #vistaClasica > .barra-pestanas { grid-area: pest; }
+  html[data-color-tema="compoint"] #vistaClasica > .barra-superior-avanzada { grid-area: busca; }
+  html[data-color-tema="compoint"] #vistaClasica > .barra-atajos { grid-area: atajos; }
+  html[data-color-tema="compoint"] #vistaClasica > .tabla-venta-wrap { grid-area: tabla; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total {
+    grid-area: total; margin: 0 0 10px; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 18px 20px; border-radius: 12px; align-self: start;
+  }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total > div:first-child { order: 2; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.12); margin-top: 12px; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total .total-bloque { flex-direction: column; align-items: stretch; gap: 8px; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total .total-etiqueta { display: block; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total .total-grande { font-size: 62px; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total .btn-cobrar-grande { width: 100%; margin-top: 10px; min-height: 60px; font-size: 20px; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-total .pista-teclas { white-space: normal; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-inferior-btns {
+    grid-area: botones; margin: 0; flex-direction: column; flex-wrap: nowrap; gap: 0; align-self: start;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px;
+  }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-inferior-btns .btn {
+    background: transparent; border: 0; border-radius: 8px; justify-content: flex-start; min-height: 42px; font-size: 14.5px; width: 100%; text-align: left;
+  }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-inferior-btns .btn + .btn { border-top: 1px solid var(--fila-borde); border-radius: 0; }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-inferior-btns .btn:hover { background: var(--fila-hover); }
+  html[data-color-tema="compoint"] #vistaClasica > .zona-inferior-btns .btn kbd.tecla-rapida { margin-left: auto; }
+  html[data-color-tema="compoint"] #vistaClasica > #panelUltimaVenta { grid-area: ultima; margin-top: 10px !important; font-size: 13.5px !important; font-weight: 500 !important; }
+  html[data-color-tema="compoint"] #vistaClasica > #panelUltimaVenta * { font-size: 13.5px !important; }
+}
+
+/* ---------- Mostrador y Caja Mostrador: productos sin foto con iniciales ---------- */
+html[data-color-tema="compoint"] .producto-card { box-shadow: none; border: 1px solid var(--border); border-radius: 10px; }
+html[data-color-tema="compoint"] .producto-card.sin-foto img { display: none; }
+html[data-color-tema="compoint"] .producto-card .sigla-producto {
+  display: grid; place-items: center; width: 54px; height: 54px; border-radius: 10px; margin: 6px auto 8px;
+  font-weight: 800; font-size: 19px; font-stretch: 85%; letter-spacing: .01em;
+}
+html[data-color-tema="compoint"] .producto-card .badge-tipo { text-transform: lowercase; background: rgba(15,28,46,.07) !important; color: var(--muted) !important; font-weight: 600; border-radius: 5px; }
+html[data-color-tema="compoint"] .producto-card .precio { font-weight: 700; font-stretch: 88%; font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+html[data-color-tema="compoint"] .vm-cat.activa,
+html[data-color-tema="compoint"] .categoria-tab.activa { background: var(--tinta) !important; color: #fff !important; }
+html[data-color-tema="compoint"]:not([data-tema="oscuro"]) .vm-cat:not(.activa):not(.kits),
+html[data-color-tema="compoint"]:not([data-tema="oscuro"]) .categoria-tab:not(.activa):not(.kits) { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+html[data-color-tema="compoint"] .barra-fichas,
+html[data-color-tema="compoint"] .barra-acciones { background: var(--surface); border-bottom: 1px solid var(--border); }
+
+/* ---------- Modo oscuro: que el display y lo azul marino no se pierdan con el fondo ---------- */
+html[data-tema="oscuro"][data-color-tema="compoint"] .zona-total,
+html[data-tema="oscuro"][data-color-tema="compoint"] .kpis { background: #1C3150; border: 1px solid #2A4366; }
+html[data-tema="oscuro"][data-color-tema="compoint"] .barra-superior-avanzada .btn-agregar-cod { background: #2A4366; border-color: #2A4366; }
+html[data-tema="oscuro"][data-color-tema="compoint"] .barra-superior-avanzada input { border-color: #3B5A85; }
+html[data-tema="oscuro"][data-color-tema="compoint"] .pestana-ticket .contador-pestana { background: var(--primary); color: var(--on-primary); }
+html[data-tema="oscuro"][data-color-tema="compoint"] .pestana-ticket.activa { border-color: var(--primary); }
+html[data-tema="oscuro"][data-color-tema="compoint"] .vm-cat.activa,
+html[data-tema="oscuro"][data-color-tema="compoint"] .categoria-tab.activa { background: #2A4366 !important; }

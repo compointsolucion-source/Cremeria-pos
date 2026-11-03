@@ -1,3 +1,6 @@
+/* Tema "Compoint" (azul marino, letra Archivo e íconos de línea): sus reglas solo aplican si se elige ese tema. */
+@import url("tema-compoint.css");
+
 :root {
   --primary: #5FAE46;
   --primary-dark: #4C9439;
