@@ -31,6 +31,31 @@
   .seg button.est-facturada.activo { color: #2E7D32; }
   .seg button.est-rechazada.activo { color: #B71C1C; }
   textarea { resize: vertical; }
+  .paso { border: 1px solid var(--border, #E4E6E9); border-radius: 12px; padding: 12px; margin-top: 10px; background: var(--surface, #fff); }
+  .paso.apagado { opacity: .6; }
+  .paso h4 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .num-paso { display: inline-flex; width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--primary, #5FAE46); color: #fff; font-size: 13px; font-weight: 800; align-items: center; justify-content: center; }
+  .btn-ancho { width: 100%; justify-content: center; }
+  .datos-mini { font-size: 12.5px; color: var(--muted, #555); background: rgba(128,128,128,.08); border-radius: 8px; padding: 8px 10px; margin-top: 8px; line-height: 1.55; font-family: Consolas, monospace; word-break: break-word; }
+  .fila-botones { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .uno-por-uno { margin-top: 8px; font-size: 13px; }
+  .uno-por-uno summary { cursor: pointer; color: var(--primary-dark, #4C9439); font-weight: 700; padding: 4px 0; }
+  .archivos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .arch { border: 2px dashed #C9CDD3; border-radius: 10px; padding: 10px; text-align: center; font-size: 13px; background: rgba(128,128,128,.04); color: inherit; font-family: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+  .arch b { font-size: 20px; }
+  .arch small { color: var(--muted, #7A7D83); font-size: 11.5px; word-break: break-all; }
+  .arch.listo { border-style: solid; border-color: #9ccf8c; background: rgba(95,174,70,.10); cursor: default; font-weight: 700; }
+  .arch-acc { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
+  .arch-acc .mini { height: 28px; font-size: 12px; }
+  .lee { font-size: 13px; line-height: 1.6; margin-top: 8px; }
+  .uuid { word-break: break-all; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .wa { background: #25D366 !important; border-color: #25D366 !important; color: #fff !important; }
+  .rojo-btn { background: #C62828; border-color: #C62828; color: #fff; }
+  .paso.rechazo { border-color: rgba(198,40,40,.4); }
+  .ligas { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
+  .liga { font-size: 13px; font-weight: 700; cursor: pointer; color: var(--muted, #555); }
+  .liga.roja { color: #B71C1C; }
 </style>
 </head>
 <body>
@@ -100,7 +125,6 @@ let resumen = { pendiente: 0, facturada: 0, rechazada: 0 };
 let catalogos = { regimenes: {}, usos: {} };
 let temporizadorBusqueda = null;
 let abierta = null;            // solicitud abierta en el panel
-let estadoElegido = 'pendiente';
 let ajustes = { activa: true, dias: 30 };
 const esAngosto = window.matchMedia('(max-width: 1000px)');
 const ETIQUETA = { pendiente: 'Pendiente', facturada: 'Facturada', rechazada: 'Rechazada' };
@@ -152,7 +176,7 @@ function pintarLista() {
       <div class="info">
         <b>${escapar(s.razon_social)}</b>
         <small class="rfc">${escapar(s.rfc)}</small>
-        <small>Folio ${escapar(s.folio)} · ${fechaCorta(s.creado_en)}${s.tiene_constancia ? ' · 📎' : ''}</small>
+        <small>Folio ${escapar(s.folio)} · ${fechaCorta(s.creado_en)}${s.tiene_constancia ? ' · 📎' : ''}${s.tiene_pdf || s.tiene_xml ? ' · 📄 factura subida' : ''}</small>
       </div>
       <div class="der"><b class="num">${dinero(s.total)}</b><span class="pill ${COLOR[s.estado]}">${ETIQUETA[s.estado]}</span></div>
     </div>`).join('');
@@ -184,28 +208,123 @@ function filaDato(etiqueta, valor, copia) {
 function pintarVacioPanel() {
   abierta = null;
   document.getElementById('panelTitulo').textContent = '📄 Detalle de la solicitud';
-  document.getElementById('panelCuerpo').innerHTML = '<div class="vacio-panel"><div class="gran">🧾</div>Elige una solicitud de la lista para ver los datos fiscales de tu cliente y marcarla como facturada.</div>';
+  document.getElementById('panelCuerpo').innerHTML = '<div class="vacio-panel"><div class="gran">🧾</div>Elige una solicitud de la lista. Ahí copias los datos para hacer la factura, la subes y le avisas a tu cliente.</div>';
   document.getElementById('panelPie').style.display = 'none';
 }
 
-async function abrirDetalle(id) {
-  try {
-    const s = await apiFetch('/facturacion/' + id);
-    abierta = s;
-    estadoElegido = s.estado;
-    const t = s.ticket || {};
-    document.getElementById('panelTitulo').textContent = `📄 Solicitud #${s.id}`;
-    document.getElementById('panelCuerpo').innerHTML = `
-      <div class="entre" style="align-items:flex-start;">
-        <div style="min-width:0;">
-          <div style="font-weight:800; font-size:16px; word-break:break-word;">${escapar(s.razon_social)}</div>
-          <div class="conteo">Ticket <b>${escapar(s.folio)}</b> · ${dinero(s.total)} · ${fechaCorta(s.creado_en)}</div>
-        </div>
-        <span class="pill ${COLOR[s.estado]}">${ETIQUETA[s.estado]}</span>
-      </div>
+// Forma de pago del ticket con su clave del SAT (para no tener que buscarla).
+const FORMA_PAGO = {
+  efectivo: 'Efectivo (01)',
+  tarjeta: 'Tarjeta (04 crédito / 28 débito)',
+  transferencia: 'Transferencia (03)',
+  mixto: 'Mixto: usa la forma con la que se pagó más',
+  credito: 'A crédito (99 Por definir)'
+};
+const formaPago = (m) => FORMA_PAGO[m] || (m || '—');
+const cantidadTexto = (n) => { const x = Number(n); return Number.isInteger(x) ? String(x) : x.toFixed(3).replace(/0+$/, ''); };
 
-      <div class="bloque blanco" style="gap:0; padding-top:4px; padding-bottom:4px;">
-        <h5 style="padding-top:8px;">Datos fiscales</h5>
+// Todo lo que se necesita para hacer la factura, en un solo texto para pegar.
+function textoParaFacturar(s) {
+  const t = s.ticket || {};
+  const lineas = [
+    'DATOS PARA LA FACTURA',
+    'RFC: ' + s.rfc,
+    'Nombre o razón social: ' + s.razon_social,
+    'Régimen fiscal: ' + s.regimen_fiscal + ' — ' + (catalogos.regimenes[s.regimen_fiscal] || ''),
+    'Código postal fiscal: ' + s.codigo_postal,
+    'Uso de la factura: ' + s.uso_cfdi + ' — ' + (catalogos.usos[s.uso_cfdi] || ''),
+    'Correo: ' + s.correo,
+    'Forma de pago: ' + formaPago(t.metodo_pago),
+    '',
+    `PRODUCTOS (ticket ${s.folio}${t.fecha_pago ? ', ' + fechaCorta(t.fecha_pago) : ''})`
+  ];
+  (s.items || []).forEach((i) => lineas.push(`${cantidadTexto(i.cantidad)} × ${i.nombre_producto} — ${dinero(i.precio_unitario)} c/u = ${dinero(i.subtotal)}`));
+  if (Number(t.descuento_monto) > 0) lineas.push('Descuento: -' + dinero(t.descuento_monto));
+  lineas.push('TOTAL: ' + dinero(s.total) + ' (precios al público, impuestos incluidos)');
+  return lineas.join('\n');
+}
+
+function vistaPreviaDatos(s) {
+  const t = s.ticket || {};
+  const productos = (s.items || []).slice(0, 4).map((i) => `${cantidadTexto(i.cantidad)} × ${escapar(i.nombre_producto)} — ${dinero(i.subtotal)}`);
+  const mas = (s.items || []).length > 4 ? `<br>… y ${(s.items || []).length - 4} más` : '';
+  return `RFC: ${escapar(s.rfc)} · ${escapar(s.razon_social)}<br>Régimen ${escapar(s.regimen_fiscal)} · CP ${escapar(s.codigo_postal)} · Uso ${escapar(s.uso_cfdi)} · Pago: ${escapar(formaPago(t.metodo_pago))}<br>${productos.join('<br>')}${mas}`;
+}
+
+function copiarTodo() { if (abierta) copiarTexto(textoParaFacturar(abierta), 'Datos copiados: pégalos en el SAT o en tu programa'); }
+
+// Enlace que se le manda al cliente para bajar su factura.
+function enlaceCliente(s) {
+  return `${location.origin}/facturar.html?f=${encodeURIComponent(s.folio)}&c=${encodeURIComponent(s.clave_descarga || '')}`;
+}
+function mensajeWhatsApp(s) {
+  return `Hola 👋, tu factura del ticket *${s.folio}* por *${dinero(s.total)}* ya está lista.\n\nDescárgala aquí (PDF y XML):\n${enlaceCliente(s)}\n\nGracias por tu compra.${s.negocio ? '\n*' + s.negocio + '*' : ''}`;
+}
+function numeroWhatsApp(tel) {
+  const d = String(tel || '').replace(/\D/g, '');
+  if (d.length === 10) return '52' + d;
+  if (d.length === 12 && d.startsWith('52')) return d;
+  if (d.length === 13 && d.startsWith('521')) return '52' + d.slice(3);
+  return '';
+}
+function tieneFactura(s) { return !!(s && (s.tiene_pdf || s.tiene_xml) && s.clave_descarga); }
+function mandarWhatsApp() {
+  if (!tieneFactura(abierta)) { mostrarToast('Primero sube el PDF o el XML de la factura', 'error'); return; }
+  const num = numeroWhatsApp(abierta.telefono);
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(mensajeWhatsApp(abierta))}`, '_blank', 'noopener');
+}
+function copiarEnlace() {
+  if (!tieneFactura(abierta)) { mostrarToast('Primero sube el PDF o el XML de la factura', 'error'); return; }
+  copiarTexto(enlaceCliente(abierta), 'Enlace copiado');
+}
+
+function zonaArchivo(s, tipo) {
+  const tiene = s['tiene_' + tipo];
+  const nombre = s[`factura_${tipo}_nombre`];
+  const icono = tipo === 'pdf' ? '📄' : '🧩';
+  if (tiene) {
+    return `<div class="arch listo"><b>${icono}</b>${tipo.toUpperCase()} ✔<small>${escapar(nombre || '')}</small>
+      <span class="arch-acc"><button class="mini" onclick="verArchivo('${tipo}')">Ver</button><button class="mini" onclick="elegirArchivo('${tipo}')">Cambiar</button><button class="mini" title="Quitar" onclick="quitarArchivo('${tipo}')">🗑️</button></span></div>`;
+  }
+  return `<button type="button" class="arch" onclick="elegirArchivo('${tipo}')"><b>${icono}</b>Subir ${tipo.toUpperCase()}<small>${tipo === 'pdf' ? 'La factura para imprimir' : 'El archivo .xml del SAT'}</small></button>`;
+}
+
+function resultadoRevision(s) {
+  if (!s.tiene_xml) {
+    return s.tiene_pdf ? '<div class="aviso amarillo lee">Sube también el <b>XML</b>: con él revisamos que el RFC y el total coincidan y llenamos el folio fiscal solo.</div>' : '';
+  }
+  const avisos = s.avisos || [];
+  if (avisos.length) {
+    return `<div class="aviso rojo lee">⚠️ <b>Revisa antes de guardar:</b><br>${avisos.map((a) => '• ' + escapar(a)).join('<br>')}<br><br>Puedes subir la factura correcta o guardarla así si estás seguro.</div>`;
+  }
+  return `<div class="aviso verde lee">✅ <b>Revisamos tu XML y todo coincide:</b><br>
+    RFC del cliente: <b>${escapar(s.factura_rfc || s.rfc)}</b> ✔ · Total: <b>${dinero(s.factura_total !== null && s.factura_total !== undefined ? s.factura_total : s.total)}</b> ✔<br>
+    Folio fiscal: <b class="uuid">${escapar(s.uuid_factura || '—')}</b></div>`;
+}
+
+function pintarDetalle() {
+  const s = abierta;
+  const t = s.ticket || {};
+  const lista = tieneFactura(s);
+  document.getElementById('panelTitulo').textContent = `📄 Solicitud #${s.id}`;
+  document.getElementById('panelCuerpo').innerHTML = `
+    <div class="entre" style="align-items:flex-start;">
+      <div style="min-width:0;">
+        <div style="font-weight:800; font-size:16px; word-break:break-word;">${escapar(s.razon_social)}</div>
+        <div class="conteo">Ticket <b>${escapar(s.folio)}</b> · ${dinero(s.total)} · ${fechaCorta(s.creado_en)}</div>
+      </div>
+      <span class="pill ${COLOR[s.estado]}">${ETIQUETA[s.estado]}</span>
+    </div>
+
+    <div class="paso">
+      <h4><span class="num-paso">1</span> Haz la factura en el SAT o en tu programa</h4>
+      <button class="btn btn-primary btn-ancho" onclick="copiarTodo()">📋 Copiar todos los datos para facturar</button>
+      <div class="datos-mini">${vistaPreviaDatos(s)}</div>
+      <div class="fila-botones">
+        <a class="btn btn-secondary btn-chico" href="https://portal.facturaelectronica.sat.gob.mx/" target="_blank" rel="noopener">↗️ Abrir portal del SAT</a>
+        ${s.tiene_constancia ? `<button class="btn btn-secondary btn-chico" onclick="verConstancia(${s.id})">📎 Ver constancia</button>` : '<span class="conteo" style="align-self:center;">Sin constancia adjunta</span>'}
+      </div>
+      <details class="uno-por-uno"><summary>Ver y copiar los datos uno por uno</summary>
         ${filaDato('RFC', s.rfc)}
         ${filaDato('Nombre o razón social', s.razon_social)}
         ${filaDato('Código postal fiscal', s.codigo_postal)}
@@ -213,43 +332,123 @@ async function abrirDetalle(id) {
         ${filaDato('Uso de la factura', s.uso_cfdi + ' — ' + (catalogos.usos[s.uso_cfdi] || ''), s.uso_cfdi)}
         ${filaDato('Correo', s.correo)}
         ${filaDato('Teléfono', s.telefono)}
-      </div>
+        ${filaDato('Forma de pago', formaPago(t.metodo_pago), false)}
+        <div class="items-ticket">${(s.items || []).map(i => `<div><span>${cantidadTexto(i.cantidad)} × ${escapar(i.nombre_producto)}</span><span>${dinero(i.subtotal)}</span></div>`).join('')}</div>
+      </details>
+    </div>
 
-      <div class="bloque blanco" style="gap:0; padding-top:4px; padding-bottom:10px;">
-        <h5 style="padding-top:8px;">Ticket</h5>
-        ${filaDato('Folio', s.folio)}
-        ${filaDato('Total', dinero(s.total), false)}
-        ${filaDato('Pagado el', fechaCorta(t.fecha_pago), false)}
-        ${filaDato('Forma de pago', t.metodo_pago, false)}
-        <div class="items-ticket">${(s.items || []).map(i => `<div><span>${Number(i.cantidad)} × ${escapar(i.nombre_producto)}</span><span>${dinero(i.subtotal)}</span></div>`).join('')}</div>
-      </div>
+    <div class="paso">
+      <h4><span class="num-paso">2</span> Sube la factura que hiciste</h4>
+      <div class="archivos">${zonaArchivo(s, 'pdf')}${zonaArchivo(s, 'xml')}</div>
+      <div id="subiendo" class="conteo" style="display:none; margin-top:6px;">⏳ Subiendo…</div>
+      ${resultadoRevision(s)}
+      <div class="campo" style="margin-top:8px;"><label for="mUuid">Folio fiscal (UUID) ${s.tiene_xml ? '<span class="conteo">(se llenó con el XML)</span>' : '<span class="conteo">(opcional, si no subes XML)</span>'}</label>
+        <input type="text" id="mUuid" maxlength="60" value="${escapar(s.uuid_factura || '')}" placeholder="Ej. 6F2B9C41-7D0E-…"></div>
+    </div>
 
-      <div class="bloque">
-        <div class="entre"><span>📎 <b>Constancia de situación fiscal</b></span>
-          ${s.tiene_constancia ? `<button class="btn btn-secondary btn-chico" onclick="verConstancia(${s.id})">Ver</button>` : ''}</div>
-        ${s.tiene_constancia ? `<span class="ayuda conteo">${escapar(s.constancia_nombre || 'constancia')}</span>` : '<span class="conteo">El cliente no adjuntó constancia.</span>'}
+    <div class="paso ${lista ? '' : 'apagado'}">
+      <h4><span class="num-paso">3</span> Avísale a tu cliente</h4>
+      <div class="dos">
+        <button class="btn btn-primary btn-ancho wa" onclick="mandarWhatsApp()" ${lista ? '' : 'disabled'}>💬 Mandar por WhatsApp</button>
+        <button class="btn btn-secondary btn-ancho" onclick="copiarEnlace()" ${lista ? '' : 'disabled'}>🔗 Copiar enlace</button>
       </div>
+      <div class="conteo" style="margin-top:6px;">${lista
+        ? (numeroWhatsApp(s.telefono) ? `Se abre WhatsApp con el mensaje para <b>${escapar(s.telefono)}</b>; solo dale «Enviar».` : 'El cliente no dejó teléfono: al abrir WhatsApp elige a quién mandarlo.') +
+          ' Tu cliente también la puede bajar solo en tu página de facturas, con su folio y su RFC.'
+        : 'Primero sube el PDF o el XML (paso 2).'}</div>
+    </div>
 
-      <div class="campo"><label>Estado de la solicitud</label>
-        <div class="seg" id="segEstado">
-          ${['pendiente', 'facturada', 'rechazada'].map(k => `<button type="button" class="est-${k} ${estadoElegido === k ? 'activo' : ''}" onclick="ponerEstado('${k}')">${{ pendiente: '⏳ Pendiente', facturada: '✅ Facturada', rechazada: '⛔ Rechazada' }[k]}</button>`).join('')}
-        </div>
-      </div>
-      <div class="campo"><label for="mUuid">Folio fiscal (UUID) de la factura — opcional</label><input type="text" id="mUuid" maxlength="60" value="${escapar(s.uuid_factura || '')}" placeholder="Ej. 6F2B…"></div>
-      <div class="campo"><label for="mNota">Nota para el cliente <span id="notaAyuda" style="font-weight:500;"></span></label><textarea id="mNota" rows="2" maxlength="500" placeholder="Ej. El código postal no coincide con la constancia">${escapar(s.nota_admin || '')}</textarea></div>
-      <div class="conteo">Recibida ${fechaCorta(s.creado_en)} · Última actualización ${fechaCorta(s.actualizado_en)}</div>`;
-    ponerEstado(estadoElegido);
-    document.getElementById('panelPie').style.display = '';
+    <div class="paso rechazo" id="cajaRechazo" style="display:none;">
+      <h4>⛔ Rechazar solicitud</h4>
+      <div class="campo"><label for="mNota">Motivo (tu cliente lo verá al consultar)</label>
+        <textarea id="mNota" rows="2" maxlength="500" placeholder="Ej. El código postal no coincide con la constancia">${escapar(s.nota_admin || '')}</textarea></div>
+      <div class="dos"><button class="btn btn-secondary btn-ancho" onclick="mostrarRechazo(false)">Cancelar</button><button class="btn btn-ancho rojo-btn" onclick="guardarSolicitud('rechazada')">Rechazar</button></div>
+    </div>
+    ${s.estado === 'rechazada' && s.nota_admin ? `<div class="aviso rojo" style="margin-top:8px;">Motivo del rechazo: ${escapar(s.nota_admin)}</div>` : ''}
+    <div class="conteo" style="margin-top:8px;">Recibida ${fechaCorta(s.creado_en)} · Última actualización ${fechaCorta(s.actualizado_en)}</div>`;
+
+  const pie = document.getElementById('panelPie');
+  const principal = s.estado === 'facturada'
+    ? '<button class="btn btn-primary btn-grande" style="width:100%;" onclick="guardarSolicitud(\'facturada\')">💾 Guardar cambios</button>'
+    : '<button class="btn btn-primary btn-grande" style="width:100%;" onclick="guardarSolicitud(\'facturada\')">✅ Guardar como facturada</button>';
+  const ligas = [];
+  if (s.estado !== 'rechazada') ligas.push('<a class="liga roja" onclick="mostrarRechazo(true)">⛔ Rechazar (con motivo para el cliente)</a>');
+  if (s.estado !== 'pendiente') ligas.push('<a class="liga" onclick="guardarSolicitud(\'pendiente\')">↩️ Regresar a pendientes</a>');
+  pie.innerHTML = principal + `<div class="ligas">${ligas.join('')}</div>`;
+  pie.style.display = '';
+}
+
+function mostrarRechazo(si) {
+  const caja = document.getElementById('cajaRechazo');
+  caja.style.display = si ? '' : 'none';
+  if (si) { caja.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('mNota').focus(); }
+}
+
+async function abrirDetalle(id) {
+  try {
+    abierta = await apiFetch('/facturacion/' + id);
+    pintarDetalle();
     pintarLista();
     if (esAngosto.matches) abrirHoja();
   } catch (err) { mostrarToast(err.message, 'error'); }
 }
 
-function ponerEstado(k) {
-  estadoElegido = k;
-  document.querySelectorAll('#segEstado button').forEach(b => b.classList.toggle('activo', b.classList.contains('est-' + k)));
-  const ayuda = document.getElementById('notaAyuda');
-  if (ayuda) ayuda.textContent = k === 'rechazada' ? '(obligatoria: el cliente verá este motivo)' : '(si rechazas, el cliente verá este motivo)';
+async function recargarDetalle() {
+  if (!abierta) return;
+  const id = abierta.id;
+  abierta = await apiFetch('/facturacion/' + id);
+  pintarDetalle();
+}
+
+// ---------- Subir / ver / quitar la factura ----------
+function elegirArchivo(tipo) {
+  const entrada = document.createElement('input');
+  entrada.type = 'file';
+  entrada.accept = tipo === 'pdf' ? '.pdf,application/pdf' : '.xml,text/xml,application/xml';
+  entrada.onchange = () => { if (entrada.files[0]) subirArchivo(tipo, entrada.files[0]); };
+  entrada.click();
+}
+
+async function subirArchivo(tipo, archivo) {
+  if (!abierta) return;
+  const ext = archivo.name.split('.').pop().toLowerCase();
+  if (ext !== tipo) { mostrarToast(`Elige un archivo .${tipo}`, 'error'); return; }
+  if (archivo.size > 3 * 1024 * 1024) { mostrarToast('El archivo pesa más de 3 MB', 'error'); return; }
+  const aviso = document.getElementById('subiendo');
+  if (aviso) aviso.style.display = '';
+  try {
+    const base64 = await new Promise((ok, mal) => { const l = new FileReader(); l.onload = () => ok(l.result); l.onerror = () => mal(new Error('No se pudo leer el archivo')); l.readAsDataURL(archivo); });
+    const r = await apiFetch(`/facturacion/${abierta.id}/archivos`, {
+      method: 'POST', body: JSON.stringify({ [tipo]: { nombre: archivo.name, base64 } })
+    });
+    await recargarDetalle();
+    if (r.avisos && r.avisos.length) mostrarToast('Subida, pero revisa los avisos en rojo', 'error', 4000);
+    else mostrarToast(tipo === 'xml' ? 'XML subido y revisado ✔' : 'PDF subido ✔', 'exito');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    if (aviso) aviso.style.display = 'none';
+  }
+}
+
+async function verArchivo(tipo) {
+  try {
+    const r = await fetch(`${API_URL}/facturacion/${abierta.id}/archivos/${tipo}`, {
+      headers: { Authorization: 'Bearer ' + getToken(), 'X-Sucursal-Id': sucursalSeleccionada() }
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo abrir el archivo');
+    const url = URL.createObjectURL(await r.blob());
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+async function quitarArchivo(tipo) {
+  if (!(await confirmarAccion(`¿Quitar el ${tipo.toUpperCase()} de esta factura?`))) return;
+  try {
+    await apiFetch(`/facturacion/${abierta.id}/archivos/${tipo}`, { method: 'DELETE' });
+    await recargarDetalle();
+    mostrarToast(tipo.toUpperCase() + ' quitado', 'exito');
+  } catch (err) { mostrarToast(err.message, 'error'); }
 }
 
 async function verConstancia(id) {
@@ -264,17 +463,22 @@ async function verConstancia(id) {
   } catch (err) { mostrarToast(err.message, 'error'); }
 }
 
-async function guardarSolicitud() {
+async function guardarSolicitud(estado) {
   if (!abierta) return;
-  const estado = estadoElegido;
-  const nota = document.getElementById('mNota').value.trim();
-  if (estado === 'rechazada' && !nota) { mostrarToast('Escribe el motivo del rechazo para que el cliente sepa qué corregir', 'error'); return; }
+  const notaCampo = document.getElementById('mNota');
+  const nota = estado === 'rechazada' ? notaCampo.value.trim() : (estado === 'pendiente' ? '' : (abierta.nota_admin || ''));
+  if (estado === 'rechazada' && !nota) { mostrarToast('Escribe el motivo del rechazo para que el cliente sepa qué corregir', 'error'); notaCampo.focus(); return; }
+  if (estado === 'facturada' && abierta.estado !== 'facturada' && !tieneFactura(abierta)) {
+    const ok = await confirmarAccion('Todavía no subes el PDF ni el XML: tu cliente no podrá descargar su factura aquí. ¿Guardarla como facturada de todos modos?');
+    if (!ok) return;
+  }
   try {
     await apiFetch('/facturacion/' + abierta.id, {
       method: 'PUT',
-      body: JSON.stringify({ estado, nota_admin: nota, uuid_factura: document.getElementById('mUuid').value.trim() })
+      body: JSON.stringify({ estado, nota_admin: estado === 'facturada' ? '' : nota, uuid_factura: (document.getElementById('mUuid') || {}).value || '' })
     });
-    mostrarToast({ facturada: 'Marcada como facturada', rechazada: 'Solicitud rechazada', pendiente: 'Regresada a pendientes' }[estado], 'exito');
+    const yaEstaba = abierta.estado === estado;
+    mostrarToast({ facturada: yaEstaba ? 'Cambios guardados' : 'Marcada como facturada', rechazada: 'Solicitud rechazada', pendiente: 'Regresada a pendientes' }[estado], 'exito');
     const id = abierta.id;
     await cargar();
     if (esAngosto.matches) { cerrarHoja(); pintarVacioPanel(); }

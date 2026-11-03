@@ -2,4 +2,5 @@
 - Nuevo «Historial de cortes»: por turno, día o mes, y el botón «Solo con diferencia».
 - Cada corte muestra cuánto debía haber, cuánto se contó y la diferencia.
 - Menú más sencillo: una sola opción de cortes.
+- Facturación: copia los datos con un clic, sube el PDF y el XML, y avísale a tu cliente por WhatsApp para que la descargue.
 - Recargas: nueva pestaña «Paquetes» y colores por compañía.

@@ -39,6 +39,9 @@
   .estado-pendiente { background: #FFF6E0; border: 1px solid #F1DDA3; }
   .estado-facturada { background: #EEF7EA; border: 1px solid #CFE6C6; }
   .estado-rechazada { background: #FDECEA; border: 1px solid #F5C2BE; }
+  .descargas { display: grid; gap: 8px; margin-top: 12px; }
+  .descargas a { text-decoration: none; display: flex; justify-content: center; align-items: center; }
+  .folio-fiscal { font-size: 12.5px; color: #555; word-break: break-all; }
   #rfc, #cRfc, #folio, #cFolio { text-transform: uppercase; }
   .pie { text-align: center; font-size: 12px; color: var(--muted); margin-top: 18px; }
 </style>
@@ -101,7 +104,7 @@
           <input type="email" id="correo" maxlength="150" placeholder="Aquí te enviaremos tu factura" required>
         </label>
         <label class="campo">Teléfono <small>(opcional)</small>
-          <input type="tel" id="telefono" maxlength="20" placeholder="Para aclaraciones">
+          <input type="tel" id="telefono" maxlength="20" placeholder="Para avisarte por WhatsApp cuando esté lista">
         </label>
 
         <div class="campo">Constancia de Situación Fiscal <small>PDF, JPG o PNG — máximo 3 MB (recomendado)</small>
@@ -123,7 +126,7 @@
         <div class="icono">✅</div>
         <h2>¡Solicitud enviada!</h2>
         <p>Recibimos tu solicitud <b id="numSolicitud"></b> del ticket <b id="exFolio"></b>.</p>
-        <p style="color:var(--muted); font-size:14px;">Revisaremos tus datos y te enviaremos la factura a tu correo. Puedes ver cómo va en <b>"Consultar mi solicitud"</b>.</p>
+        <p style="color:var(--muted); font-size:14px;">Revisaremos tus datos y haremos tu factura. Cuando esté lista la descargas aquí mismo en <b>"Consultar mi solicitud"</b> con tu folio y tu RFC.</p>
         <button class="btn btn-secondary" style="margin-top:8px;" onclick="reiniciar()">Pedir otra factura</button>
       </div>
     </div>
@@ -289,19 +292,44 @@ function reiniciar() {
   marcarPaso(1);
 }
 
+const escapar = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
+
+function pintarEstado(r) {
+  const caja = $('estadoCaja');
+  let html;
+  if (r.estado === 'facturada' && r.clave && (r.tiene_pdf || r.tiene_xml)) {
+    const base = `${API}/descargar?f=${encodeURIComponent(r.folio)}&c=${encodeURIComponent(r.clave)}&tipo=`;
+    html = '✅ <b>¡Tu factura está lista!</b>' + (r.uuid ? `<div class="folio-fiscal">Folio fiscal ${escapar(r.uuid)}</div>` : '') +
+      '<div class="descargas">' +
+      (r.tiene_pdf ? `<a class="btn btn-primary" href="${base}pdf">📄 Descargar PDF</a>` : '') +
+      (r.tiene_xml ? `<a class="btn btn-secondary" href="${base}xml">🧩 Descargar XML</a>` : '') +
+      '</div>';
+  } else if (r.estado === 'facturada') {
+    html = '✅ <b>¡Factura emitida!</b><br>El negocio te la entregará. Si no te llega, pídesela con tu folio de ticket.';
+  } else if (r.estado === 'pendiente') {
+    html = '⏳ <b>En revisión</b><br>Recibimos tu solicitud. Cuando esté lista la podrás descargar aquí mismo.';
+  } else {
+    html = '⚠️ <b>Necesitamos que corrijas algo</b><br>' + escapar(r.nota || '') + '<br><small>Puedes volver a pedirla en "Pedir factura".</small>';
+  }
+  caja.className = 'estado-caja estado-' + r.estado; caja.innerHTML = html; caja.style.display = 'block';
+}
+
 async function consultarEstado(ev) {
   ev.preventDefault();
   mostrarError('errorC', ''); $('estadoCaja').style.display = 'none';
   try {
-    const r = await llamar('/estado', { folio: $('cFolio').value.trim(), rfc: $('cRfc').value.trim() });
-    const caja = $('estadoCaja');
-    const textos = {
-      pendiente: ['estado-pendiente', '⏳ <b>En revisión</b><br>Recibimos tu solicitud. En cuanto esté lista te llegará a tu correo.'],
-      facturada: ['estado-facturada', '✅ <b>¡Factura emitida!</b><br>Revisa tu correo (y la carpeta de spam).'],
-      rechazada: ['estado-rechazada', '⚠️ <b>Necesitamos que corrijas algo</b><br>' + (r.nota ? String(r.nota).replace(/[<>&]/g, '') : '') + '<br><small>Puedes volver a pedirla en "Pedir factura".</small>']
-    };
-    const [clase, html] = textos[r.estado];
-    caja.className = 'estado-caja ' + clase; caja.innerHTML = html; caja.style.display = 'block';
+    pintarEstado(await llamar('/estado', { folio: $('cFolio').value.trim(), rfc: $('cRfc').value.trim() }));
+  } catch (e) {
+    mostrarError('errorC', e.message);
+  }
+}
+
+// Enlace que el negocio manda por WhatsApp: ?f=FOLIO&c=CLAVE → se muestra directo la factura para bajarla.
+async function abrirDesdeEnlace(folio, clave) {
+  cambiarPestana('consultar');
+  $('cFolio').value = folio;
+  try {
+    pintarEstado(await llamar('/estado', { folio, clave }));
   } catch (e) {
     mostrarError('errorC', e.message);
   }
@@ -310,6 +338,7 @@ async function consultarEstado(ev) {
 // Si el ticket trae un QR con ?folio=..., se llena solo.
 const parametros = new URLSearchParams(location.search);
 if (parametros.get('folio')) { $('folio').value = parametros.get('folio'); $('cFolio').value = parametros.get('folio'); }
+if (parametros.get('f') && parametros.get('c')) abrirDesdeEnlace(parametros.get('f'), parametros.get('c'));
 cargarCatalogos();
 </script>
 </body>
