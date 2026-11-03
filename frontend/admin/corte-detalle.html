@@ -23,7 +23,7 @@
       </button>
       <h1>📊 Corte de caja</h1></div>
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <a class="btn btn-secondary" href="cortes-dia.html">📅 Cortes por día</a>
+      <a class="btn btn-secondary" href="cortes.html">📚 Historial de cortes</a>
       <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
     </div>
   </div>
@@ -48,7 +48,7 @@ let corteActual = null;
 function volver() {
   const dia = params.get('dia') || (corteActual && corteActual.turno && corteActual.turno.fecha_apertura ? null : null);
   if (document.referrer && /cortes|caja-turno/.test(document.referrer)) history.back();
-  else window.location.href = params.get('dia') ? 'cortes-dia.html?fecha=' + encodeURIComponent(params.get('dia')) : 'caja-turno.html';
+  else window.location.href = params.get('dia') ? 'cortes.html?vista=dia&fecha=' + encodeURIComponent(params.get('dia')) : 'caja-turno.html';
 }
 
 async function imprimirActual() {
@@ -69,7 +69,7 @@ async function cargar() {
         return;
       }
     } else {
-      cuerpo.innerHTML = '<div class="cd-msg caja">Elige un corte desde <a href="cortes-dia.html">Cortes por día</a> o desde <a href="caja-turno.html">Corte de Caja</a>.</div>';
+      cuerpo.innerHTML = '<div class="cd-msg caja">Elige un corte desde <a href="cortes.html">Historial de cortes</a> o desde <a href="caja-turno.html">Corte de Caja</a>.</div>';
       return;
     }
     const ver = cdEsSupervisor();

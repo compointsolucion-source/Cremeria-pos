@@ -1,6 +1,6 @@
 // Corte de caja desglosado (como el "Corte" de Eleventa): ventas totales, ganancia, dinero en caja, formas de pago,
 // entradas y salidas, departamentos, pagos de créditos y clientes. Lo usan "corte-detalle.html" (un turno o el día
-// completo) y "cortes-dia.html". Recibe el mismo resumen que devuelve /turnos/:id/resumen o /turnos/dia.
+// completo) y "cortes.html" (historial). Recibe el mismo resumen que devuelve /turnos/:id/resumen o /turnos/dia.
 
 (function () {
   const estilo = document.createElement('style');

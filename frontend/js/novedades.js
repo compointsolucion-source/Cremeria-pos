@@ -9,6 +9,16 @@
 
   const NOVEDADES = [
     {
+      version: '1.2.1', fecha: '2026-11-03',
+      puntos: [
+        '🔒 <b>Corte de Caja</b> renovado: abre tu turno y ve cómo va el día en un solo lugar.',
+        '📚 Nuevo <b>Historial de cortes</b>: por turno, día o mes, y el botón <b>Solo con diferencia</b>.',
+        '🧮 Cada corte muestra cuánto <b>debía haber</b>, cuánto <b>se contó</b> y la diferencia.',
+        '🧭 Menú más sencillo: una sola opción de cortes.',
+        '📱 Recargas: nueva pestaña <b>Paquetes</b> y colores por compañía.'
+      ]
+    },
+    {
       version: '1.2.0', fecha: '2026-10-28',
       puntos: [
         '📱 Nuevo botón <b>Recargas y servicios</b> en Caja: tiempo aire y pago de luz, agua, teléfono y cable (por ahora para practicar).',
@@ -41,7 +51,7 @@
     'En <b>Administración → Backups</b> puedes guardar una copia de toda tu información cuando quieras.',
     'En <b>Equipo</b> cada empleado tiene su usuario, y tú decides qué puede hacer cada uno.',
     'Al cerrar el turno, declara lo que hay en caja: el sistema te dice al momento si <b>sobra o falta</b>.',
-    'En <b>Cortes por día</b> ves el corte de todos los cajeros sumado en uno solo.',
+    'En <b>Historial de cortes → Por día</b> ves el corte de todos los cajeros sumado en uno solo.',
     'Si capturas el <b>costo</b> de tus productos, el corte te muestra cuánto <b>ganaste</b>.',
     'Cada producto puede tener <b>precio de mayoreo</b>; en Caja Avanzada se aplica con <b>F11</b>.',
     'En <b>Clientes/Créditos</b> llevas el fiado: cuánto debe cada cliente y sus abonos.',

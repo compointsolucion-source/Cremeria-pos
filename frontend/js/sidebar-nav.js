@@ -85,7 +85,8 @@ const GRUPOS_SIDEBAR = [
       { icono: 'billetera', texto: 'Caja', href: 'caja.html', permiso: ['CAJA_ABRIR', 'CAJA_MOVIMIENTO', 'CAJA_CERRAR'] },
       { icono: 'monitor', texto: 'Caja Avanzada', href: 'caja-avanzada.html', permiso: ['CAJA_ABRIR', 'CAJA_MOVIMIENTO', 'CAJA_CERRAR'] },
       { icono: 'deshacer', texto: 'Devoluciones', href: 'devoluciones.html', permiso: 'VENTAS_DEVOLVER' },
-      { icono: 'calculadora', texto: 'Corte de Caja', href: 'caja-turno.html', permiso: ['CAJA_ABRIR', 'CAJA_CERRAR'] },
+      // El historial de cortes y el detalle de un corte se abren desde Corte de Caja: en el menú queda una sola opción
+      { icono: 'calculadora', texto: 'Corte de Caja', href: 'caja-turno.html', tambien: ['cortes.html', 'cortes-dia.html', 'corte-detalle.html'], permiso: ['CAJA_ABRIR', 'CAJA_CERRAR'] },
       { icono: 'tv', texto: 'Pantalla de Turnos', href: 'pantalla-turnos.html', permiso: ['VENTAS_CREAR', 'CAJA_ABRIR'] },
       { icono: 'ticket', texto: 'Kiosco de Fichas', href: 'kiosco-fichas.html', permiso: ['VENTAS_CREAR', 'CAJA_ABRIR'] }
     ]
@@ -112,8 +113,6 @@ const GRUPOS_SIDEBAR = [
     clave: 'reportes', titulo: 'Reportes', icono: 'tendencia',
     items: [
       { icono: 'tendencia', texto: 'Reportes', href: 'reportes.html', permiso: 'REPORTES_VER' },
-      { icono: 'calculadora', texto: 'Cortes de caja', href: 'cortes.html', permiso: ['CAJA_ABRIR', 'CAJA_CERRAR'] },
-      { icono: 'calculadora', texto: 'Cortes por día', href: 'cortes-dia.html', permiso: ['CAJA_ABRIR', 'CAJA_CERRAR'] },
       { icono: 'portapapeles', texto: 'Bitácora', href: 'bitacora.html', roles: ROLES_ADMIN_SIDEBAR }
     ]
   },
@@ -222,8 +221,9 @@ function gruposAbiertosGuardados() {
   try { const l = JSON.parse(leerLocalSidebar('sidebar_grupos') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; }
 }
 
+const esItemActual = (item, actual) => item.href === actual || (item.tambien || []).includes(actual);
 function itemSidebarHTML(item, actual, conTitle) {
-  return `<a class="sidebar-item ${item.href === actual ? 'activo' : ''}" href="${rutaSidebar(item.href)}" title="${escaparSidebar(item.texto)}">
+  return `<a class="sidebar-item ${esItemActual(item, actual) ? 'activo' : ''}" href="${rutaSidebar(item.href)}" title="${escaparSidebar(item.texto)}">
       <span class="sidebar-icono">${svgIcono(item.icono, conTitle ? 19 : 17)}</span>
       <span class="sidebar-texto">${item.texto}</span>
     </a>`;
@@ -251,7 +251,7 @@ function construirSidebar() {
   const gruposHTML = gruposVisibles.map((grupo) => {
     // Un grupo con un solo módulo no necesita desplegarse: va directo, como un botón normal.
     if (grupo.items.length === 1) return `<div class="sidebar-grupo sidebar-grupo-simple">${itemSidebarHTML(grupo.items[0], actual, true)}</div>`;
-    const conActivo = grupo.items.some((it) => it.href === actual);
+    const conActivo = grupo.items.some((it) => esItemActual(it, actual));
     const abierto = conActivo || abiertosGuardados.includes(grupo.clave);
     return `
     <div class="sidebar-grupo ${abierto ? 'abierto' : ''} ${conActivo ? 'con-activo' : ''}" data-grupo="${grupo.clave}">
@@ -400,7 +400,7 @@ function todosLosModulosSidebar() {
 function pantallaPermitidaSidebar() {
   const usuario = typeof getUsuario === 'function' ? getUsuario() : null;
   if (!usuario) return true; // sin sesión: cada pantalla ya manda al inicio de sesión
-  const item = todosLosModulosSidebar().find((it) => it.href === paginaActual());
+  const item = todosLosModulosSidebar().find((it) => esItemActual(it, paginaActual()));
   if (!item) return true;    // pantallas fuera del menú (ej. la del repartidor): no se tocan
   return itemVisibleSidebar(item, usuario, permisosExtraDelToken());
 }

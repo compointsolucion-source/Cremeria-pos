@@ -13,7 +13,7 @@
 <script src="../js/tema.js"></script>
 <style>
   .columnas { --ancho-panel: 430px; }
-  .columnas.una { grid-template-columns: minmax(0, 1fr); max-width: 900px; margin: 0 auto; }
+  .columnas.una { grid-template-columns: minmax(0, 1fr); max-width: 1150px; margin: 0 auto; }
   .oculto { display: none !important; }
 
   /* Banner del turno */
@@ -61,13 +61,50 @@
   .mov .info small { color: var(--muted, #7A7D83); font-size: 12px; }
   .mov .importe { font-weight: 800; font-size: 15px; white-space: nowrap; }
 
-  /* Cortes anteriores */
-  .corte { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border, #E4E6E9); }
-  .corte:last-child { border-bottom: none; }
-  .corte .cuadro { background: rgba(128,128,128,.16); font-size: 20px; }
-  .corte .info { flex: 1; min-width: 0; }
-  .corte .info b { display: block; font-size: 14.5px; }
-  .corte .info small { color: var(--muted, #7A7D83); font-size: 12px; }
+  /* Caja cerrada: abrir turno + resumen de hoy */
+  .hero { max-width: 1150px; margin: 0 auto 14px; display: grid; grid-template-columns: 1.25fr 1fr; overflow: hidden; }
+  .hero .h-izq { padding: 24px 26px; }
+  .hero .h-izq small { color: var(--muted, #7A7D83); font-weight: 800; text-transform: uppercase; letter-spacing: .05em; font-size: 12px; }
+  .hero .h-izq h2 { font-size: 24px; margin: 6px 0; }
+  .hero .h-izq p { color: var(--muted, #7A7D83); font-size: 14.5px; margin: 0 0 16px; }
+  .hero .h-izq .btn { font-size: 18px; padding: 14px 26px; }
+  .hero .h-der { padding: 20px 22px; border-left: 1px solid var(--border, #E4E6E9); background: rgba(128,128,128,.04); }
+  .hero .h-der h4 { font-size: 13px; color: var(--muted, #7A7D83); margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .hero .h-kp { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hero .h-kp div { background: var(--surface, #fff); border: 1px solid var(--border, #E4E6E9); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .hero .h-kp small { display: block; color: var(--muted, #7A7D83); font-size: 12px; font-weight: 700; }
+  .hero .h-kp b { font-size: 19px; overflow-wrap: anywhere; }
+  .t-verde { color: var(--ok-texto, #2E7D32); } .t-rojo { color: var(--danger, #C62828); } .t-ambar { color: var(--ambar-texto, #8A5A00); }
+
+  /* Últimos cortes */
+  .caja-titulo .ver-todos { color: var(--primary-dark, #4C9439); font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; }
+  .resumen-cortes { margin: 0 16px 10px; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; font-weight: 600; }
+  .resumen-cortes.mal { background: rgba(198,40,40,.08); border: 1px solid rgba(198,40,40,.25); color: var(--danger, #C62828); }
+  .resumen-cortes.bien { background: rgba(95,174,70,.10); border: 1px solid rgba(95,174,70,.3); color: var(--ok-texto, #2E7D32); }
+  .tabla-cortes { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tabla-cortes th { text-align: right; color: var(--muted, #7A7D83); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; padding: 9px 12px; background: var(--tabla-cab, #FAFAFB); border-top: 1px solid var(--border, #E4E6E9); border-bottom: 1px solid var(--border, #E4E6E9); white-space: nowrap; }
+  .tabla-cortes td { text-align: right; padding: 10px 12px; border-bottom: 1px solid var(--fila-borde, #F2F3F5); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tabla-cortes th.i, .tabla-cortes td.i { text-align: left; }
+  .tabla-cortes td.i b { display: block; font-size: 14.5px; }
+  .tabla-cortes td.i small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .tabla-cortes tr:last-child td { border-bottom: none; }
+  .tabla-cortes tr.alerta td:first-child { box-shadow: inset 4px 0 0 var(--danger, #C62828); }
+  .tabla-cortes .acc { width: 1%; }
+  .tabla-cortes .acc .mini { margin-left: 4px; }
+  .lista-cortes-cel { display: none; }
+  /* Con turno abierto la columna es angosta: los cortes se ven como tarjetas */
+  #columnas:not(.una) .tabla-cortes { display: none; }
+  #columnas:not(.una) .lista-cortes-cel { display: block; }
+  .corte-cel { padding: 11px 14px; border-bottom: 1px solid var(--border, #E4E6E9); display: grid; gap: 6px; }
+  .corte-cel:last-child { border-bottom: none; }
+  .corte-cel.alerta { box-shadow: inset 4px 0 0 var(--danger, #C62828); }
+  .corte-cel .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .corte-cel .l1 b { font-size: 15px; }
+  .corte-cel .sub { color: var(--muted, #7A7D83); font-size: 12px; }
+  .corte-cel .l2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 6px; align-items: end; font-size: 12px; color: var(--muted, #7A7D83); }
+  .corte-cel .l2 b { display: block; color: var(--text, #1F2023); font-size: 13.5px; }
+  .corte-cel .l3 { display: flex; gap: 6px; justify-content: flex-end; }
+  @media (max-width: 600px) { .corte-cel .l2 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .corte-cel .l3 { grid-column: 1 / -1; } }
 
   /* Formulario de movimiento */
   .monto-grande { position: relative; }
@@ -82,15 +119,6 @@
   /* Barra de acciones fija (celular) */
   .barra-acciones { display: none; }
 
-  /* Buscar corte */
-  .ov-corte { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 12px; }
-  .ov-corte .modal-corte { background: var(--surface, #fff); color: var(--text, #1F2023); border-radius: 14px; padding: 18px; width: 100%; max-width: 440px; max-height: 92vh; overflow: auto; display: grid; gap: 10px; box-shadow: var(--shadow); }
-  .ov-corte .modal-corte h3 { margin: 0; }
-  .ov-corte .modal-corte.ancho { max-width: 96vw; width: auto; }
-  .ov-corte pre { font: 13px/1.35 monospace; white-space: pre; margin: 0; overflow: auto; }
-  .botones-modal { display: flex; gap: 8px; }
-  .botones-modal .btn { flex: 1; }
-
   @media (max-width: 1000px) {
     .banner { padding: 14px 16px; }
     .banner .der b { font-size: 24px; }
@@ -100,9 +128,18 @@
     .barra-acciones .btn { padding: 11px 4px; font-weight: 800; }
     .contenido { padding-bottom: 100px; }
   }
+  @media (max-width: 820px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero .h-der { border-left: none; border-top: 1px solid var(--border, #E4E6E9); }
+    .hero .h-izq { padding: 18px; }
+    .hero .h-izq h2 { font-size: 20px; }
+    .hero .h-izq .btn { width: 100%; justify-content: center; }
+    .tabla-cortes { display: none; }
+    .lista-cortes-cel { display: block; }
+  }
   .ct-c { display: none; }
   @media (max-width: 600px) {
-    /* Los 3 botones de arriba en una sola fila */
+    /* El botón de arriba ocupa la fila */
     .ct-acciones { width: 100%; flex-wrap: nowrap !important; }
     .ct-acciones .btn { flex: 1; padding: 9px 6px; font-size: 14px; white-space: nowrap; justify-content: center; }
     .ct-l { display: none; }
@@ -114,9 +151,7 @@
     .kpi .v { font-size: 20px; }
     .banner { flex-wrap: wrap; }
     .banner .der { text-align: left; }
-    .corte .cuadro { display: none; }
     .mov { padding: 10px 12px; gap: 10px; }
-    .corte { padding: 10px 12px; }
     .caja-titulo { padding: 12px 12px 6px; }
   }
 </style>
@@ -128,14 +163,13 @@
       </button>
       <h1>📊 Corte de Caja</h1></div>
     <div class="ct-acciones" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <a class="btn btn-primary" href="cortes-dia.html">📅&nbsp;<span class="ct-l">Cortes por día</span><span class="ct-c">Por día</span></a>
-      <a class="btn btn-secondary" href="cortes.html">📊&nbsp;<span class="ct-l">Reporte de cortes</span><span class="ct-c">Reporte</span></a>
-      <button class="btn btn-secondary" onclick="abrirBuscadorCortes()">🔍&nbsp;<span class="ct-l">Buscar corte</span><span class="ct-c">Buscar</span></button>
+      <a class="btn btn-secondary" href="cortes.html">📚&nbsp;<span class="ct-l">Historial de cortes</span><span class="ct-c">Historial</span></a>
     </div>
   </div>
 
   <div class="contenido">
     <div class="banner cerrado oculto" id="banner"></div>
+    <div class="caja hero oculto" id="hero"></div>
     <div class="aviso-turno oculto" id="avisoTurno"></div>
 
     <div class="columnas una" id="columnas">
@@ -151,7 +185,7 @@
         </div>
 
         <div class="caja recorta separa">
-          <div class="caja-titulo"><h3 id="tituloCortes">Cortes anteriores</h3><span class="conteo">últimos 5</span></div>
+          <div class="caja-titulo"><h3 id="tituloCortes">🔒 Últimos cortes</h3><a class="ver-todos" href="cortes.html">Ver todos los cortes →</a></div>
           <div id="listaCortes"><div class="vacio">Cargando…</div></div>
         </div>
       </div>
@@ -292,9 +326,9 @@ function pintarBanner() {
     b.innerHTML = `<div class="izq"><span class="punto"></span><div><small>Turno abierto · ${escapar(turnoActual.usuario_nombre || u.nombre || '')}</small><span class="grande">${escapar(desdeTexto(turnoActual.fecha_apertura))}</span></div></div>
       <div class="der"><small>Fondo inicial</small><b class="num">${dinero(turnoActual.fondo_inicial)}</b></div>`;
   } else if (turnoActual === null) {
-    b.classList.add('cerrado');
-    b.innerHTML = `<div class="izq"><span class="punto"></span><div><small>Sin turno abierto</small><span class="grande">Abre el turno para registrar movimientos y hacer el corte</span></div></div>
-      <button class="btn btn-primary" onclick="abrirTurno()">🔓 Abrir turno</button>`;
+    // Sin turno: en lugar de la barra oscura se muestra el cuadro de «Abrir turno» con el resumen de hoy
+    b.classList.add('oculto');
+    b.innerHTML = '';
   } else {
     b.classList.add('cerrado');
     b.innerHTML = `<div class="izq"><span class="punto"></span><div><small>No se pudo consultar el turno</small><span class="grande">Revisa tu conexión e intenta de nuevo</span></div></div>
@@ -306,6 +340,7 @@ function pintarTodo() {
   const hay = !!turnoActual;
   document.body.classList.toggle('barra-fija', hay);
   pintarBanner();
+  pintarHero();
   pintarAvisoTurno();
   pintarVentas();
   document.getElementById('colTurno').classList.toggle('oculto', !hay);
@@ -319,7 +354,7 @@ function pintarTodo() {
 
 async function abrirTurno() {
   const turno = await abrirTurnoConDeclaracion();
-  if (turno) cargarTurno();
+  if (turno) { cargarTurno(); cargarCortes(); }
 }
 
 // ---------- Movimientos ----------
@@ -441,7 +476,7 @@ async function realizarCorte() {
     try {
       await imprimirCorteTurno(resultado.id);
     } catch (err) {
-      mostrarToast('El corte se guardó, pero no se pudo imprimir: ' + err.message + ' — puedes reimprimirlo abajo en "Cortes anteriores".', 'error', 8000);
+      mostrarToast('El corte se guardó, pero no se pudo imprimir: ' + err.message + ' — puedes reimprimirlo abajo en "Últimos cortes".', 'error', 8000);
     }
     cerrarHoja();
     // Corte normal: se muestra el corte desglosado (con opción de imprimir). Si viene de "Salir", se sale como antes.
@@ -455,158 +490,121 @@ async function realizarCorte() {
   }
 }
 
-// ---------- Cortes anteriores ----------
+// ---------- Últimos cortes y resumen de hoy ----------
 function esSupervisorUI() {
   const u = getUsuario();
   return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol);
 }
 
+const p2 = (n) => String(n).padStart(2, '0');
+const isoLocal = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+const DIAS_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES_C = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const diaCorte = (s) => { const [y, m, d] = s.split('-').map(Number); const f = new Date(y, m - 1, d); return `${DIAS_L[f.getDay()]} ${d} ${MESES_C[m - 1]}`; };
+function horasCorte(t) {
+  if (!t.fecha_cierre) return `${horaCorta(t.fecha_apertura)} – abierto`;
+  const otroDia = isoLocal(new Date(t.fecha_apertura)) !== isoLocal(new Date(t.fecha_cierre));
+  return `${horaCorta(t.fecha_apertura)} – ${horaCorta(t.fecha_cierre)}${otroDia ? ' (otro día)' : ''}`;
+}
+const conDif = (d) => d !== null && d !== undefined && Math.abs(Number(d)) >= 0.005;
+function pillDif(d) {
+  if (d === null || d === undefined) return '<span class="pill gris">sin declarar</span>';
+  if (!conDif(d)) return '<span class="pill verde">Cuadrada</span>';
+  return d > 0 ? `<span class="pill amarillo">Sobró ${dinero(d)}</span>` : `<span class="pill rojo">Faltó ${dinero(Math.abs(d))}</span>`;
+}
+const montoONada = (v) => (v === null || v === undefined ? '—' : dinero(v));
+
+let cortesInfo = null; // { ultimos: [...], hoy: { vendido, cortes }, fondoAnterior }
+
 async function cargarCortes() {
   const cont = document.getElementById('listaCortes');
+  if (!esSupervisorUI()) document.getElementById('tituloCortes').textContent = '🔒 Mis últimos cortes';
   try {
-    if (!esSupervisorUI()) document.getElementById('tituloCortes').textContent = 'Mis cortes anteriores';
-    const turnos = (await apiFetch('/turnos/historial')).filter((t) => t.estado === 'cerrado').slice(0, 5);
-    if (turnos.length === 0) { cont.innerHTML = '<div class="vacio">Aún no hay cortes.</div>'; return; }
-    cont.innerHTML = turnos.map((t) => {
-      const dif = t.declaracion ? Number(t.declaracion.diferencia) : (Number(t.saldo_contado) - Number(t.saldo_teorico));
-      let pill;
-      if (!isFinite(dif)) pill = '<span class="pill gris">sin declarar</span>';
-      else if (Math.abs(dif) < 0.005) pill = '<span class="pill verde">cuadrada</span>';
-      else if (dif > 0) pill = `<span class="pill amarillo">sobrante ${dinero(dif)}</span>`;
-      else pill = `<span class="pill rojo">faltante ${dinero(Math.abs(dif))}</span>`;
-      return `<div class="corte">
-        <div class="cuadro">🔒</div>
-        <div class="info"><b>Turno ${escapar(t.id)} · ${t.fecha_cierre ? fechaCorta(t.fecha_cierre) : ''}</b><small>${escapar(t.usuario_nombre)}</small></div>
-        ${pill}
-        <button class="mini" title="Ver el corte completo" onclick="window.location.href='corte-detalle.html?turno=${Number(t.id)}'">📋</button>
-        <button class="mini" title="Reimprimir" onclick="reimprimirCorte(${Number(t.id)})">🖨️</button>
-      </div>`;
-    }).join('');
+    const hoy = new Date(), desde = new Date(); desde.setDate(desde.getDate() - 90);
+    const [rep, hist] = await Promise.all([
+      apiFetch(`/turnos/reporte?desde=${isoLocal(desde)}&hasta=${isoLocal(hoy)}`),
+      apiFetch('/turnos/historial?estado=cerrado&limite=1').catch(() => [])
+    ]);
+    const lista = (rep.turnos || []).slice().sort((a, b) => new Date(b.fecha_cierre || b.fecha_apertura) - new Date(a.fecha_cierre || a.fecha_apertura));
+    const deHoy = lista.filter((t) => t.dia === isoLocal(hoy));
+    cortesInfo = {
+      ultimos: lista.slice(0, 5),
+      hoy: { vendido: deHoy.reduce((x, t) => x + Number(t.venta_neta || 0), 0), cortes: deHoy.length },
+      fondoAnterior: hist && hist[0] ? Number(hist[0].fondo_inicial) : null
+    };
   } catch (err) {
     console.error(err);
-    cont.innerHTML = '<div class="vacio">No se pudieron cargar los cortes.</div>';
+    cortesInfo = null;
+    cont.innerHTML = '<div class="vacio">No se pudieron cargar los cortes.<br><br><button class="btn btn-secondary" onclick="cargarCortes()">Reintentar</button></div>';
+    pintarHero();
+    return;
   }
+  pintarCortes();
+  pintarHero();
+}
+
+function pintarCortes() {
+  const cont = document.getElementById('listaCortes');
+  const ult = cortesInfo ? cortesInfo.ultimos : [];
+  if (!ult.length) { cont.innerHTML = '<div class="vacio">Aún no hay cortes. Cuando cierres tu primer turno aparecerá aquí.</div>'; return; }
+  const falt = ult.filter((t) => conDif(t.diferencia) && t.diferencia < 0), sobr = ult.filter((t) => conDif(t.diferencia) && t.diferencia > 0);
+  const suma = (l) => l.reduce((x, t) => x + Number(t.diferencia), 0);
+  let aviso = '';
+  if (falt.length || sobr.length) {
+    const partes = [];
+    if (falt.length) partes.push(`${falt.length} con faltante (−${dinero(Math.abs(suma(falt)))})`);
+    if (sobr.length) partes.push(`${sobr.length} con sobrante (+${dinero(suma(sobr))})`);
+    aviso = `<div class="resumen-cortes ${falt.length ? 'mal' : 'bien'}">${falt.length ? '⚠️' : 'ℹ️'} En los últimos ${ult.length} cortes: ${partes.join(' y ')}.${falt.length ? ' Revisa los marcados en rojo.' : ''}</div>`;
+  } else {
+    aviso = `<div class="resumen-cortes bien">✅ Los últimos ${ult.length} cortes cuadraron.</div>`;
+  }
+  const botones = (t) => `<button class="mini" title="Ver el corte completo" onclick="window.location.href='corte-detalle.html?turno=${Number(t.id)}'">👁 Ver</button><button class="mini" title="Reimprimir" onclick="reimprimirCorte(${Number(t.id)})">🖨️</button>`;
+  const malo = (t) => conDif(t.diferencia) && t.diferencia < 0;
+  const tabla = `<table class="tabla-cortes"><thead><tr><th class="i">Turno</th><th class="i">Horario</th><th>Vendido</th><th>Debía haber</th><th>Se contó</th><th>Diferencia</th><th></th></tr></thead><tbody>
+    ${ult.map((t) => `<tr class="${malo(t) ? 'alerta' : ''}"><td class="i"><b>#${escapar(t.id)} · ${escapar(diaCorte(t.dia))}</b><small>${escapar(t.cajero)}</small></td>
+      <td class="i">${escapar(horasCorte(t))}</td><td>${dinero(t.venta_neta)}</td><td>${montoONada(t.esperado)}</td><td>${montoONada(t.contado)}</td>
+      <td>${pillDif(t.diferencia)}</td><td class="acc">${botones(t)}</td></tr>`).join('')}
+  </tbody></table>`;
+  const cel = `<div class="lista-cortes-cel">${ult.map((t) => `<div class="corte-cel ${malo(t) ? 'alerta' : ''}">
+      <div class="l1"><b>#${escapar(t.id)} · ${escapar(diaCorte(t.dia))}</b>${pillDif(t.diferencia)}</div>
+      <div class="sub">${escapar(t.cajero)} · ${escapar(horasCorte(t))}</div>
+      <div class="l2"><span>Vendido<b>${dinero(t.venta_neta)}</b></span><span>Debía haber<b>${montoONada(t.esperado)}</b></span><span>Se contó<b>${montoONada(t.contado)}</b></span><span class="l3">${botones(t)}</span></div></div>`).join('')}</div>`;
+  cont.innerHTML = aviso + tabla + cel;
+}
+
+// Caja cerrada: cuadro para abrir turno + cómo va el día
+function pintarHero() {
+  const h = document.getElementById('hero');
+  if (turnoActual !== null) { h.classList.add('oculto'); h.innerHTML = ''; return; }
+  const u = getUsuario() || {};
+  const hoy = new Date();
+  const info = cortesInfo;
+  const ult = info && info.ultimos[0];
+  const fondo = info && info.fondoAnterior !== null && isFinite(info.fondoAnterior)
+    ? ` El último turno empezó con <b>${dinero(info.fondoAnterior)}</b>.` : '';
+  const difUlt = ult ? (conDif(ult.diferencia) ? (ult.diferencia > 0 ? `<b class="t-ambar">+${dinero(ult.diferencia)}</b>` : `<b class="t-rojo">−${dinero(Math.abs(ult.diferencia))}</b>`)
+    : (ult.diferencia === null || ult.diferencia === undefined ? '<b>—</b>' : '<b class="t-verde">Cuadrada</b>')) : '<b>—</b>';
+  h.classList.remove('oculto');
+  h.innerHTML = `<div class="h-izq">
+      <small>⚪ Caja cerrada${u.nombre ? ' · ' + escapar(u.nombre) : ''}</small>
+      <h2>Abre tu turno para empezar a cobrar</h2>
+      <p>Al abrir, cuentas el efectivo con el que empiezas (el fondo). Al terminar haces tu corte aquí mismo.${fondo}</p>
+      <button class="btn btn-primary" onclick="abrirTurno()">🔓 Abrir turno</button>
+    </div>
+    <div class="h-der">
+      <h4>📅 Hoy · ${DIAS_L[hoy.getDay()]} ${hoy.getDate()} de ${MESES_L[hoy.getMonth()]}</h4>
+      <div class="h-kp">
+        <div><small>Vendido hoy</small><b>${info ? dinero(info.hoy.vendido) : '…'}</b></div>
+        <div><small>Cortes hoy</small><b>${info ? info.hoy.cortes : '…'}</b></div>
+        <div><small>Último corte</small><b style="font-size:16px">${ult && ult.fecha_cierre ? escapar(fechaCorta(ult.fecha_cierre)) : '—'}</b></div>
+        <div><small>Diferencia del último</small>${difUlt}</div>
+      </div>
+    </div>`;
 }
 
 async function reimprimirCorte(id) {
   try { await imprimirCorteTurno(id); } catch (err) { mostrarToast(err.message, 'error'); }
-}
-
-// ===== Buscador de cortes (estilo Soft Restaurant) =====
-function abrirBuscadorCortes() {
-  if (document.getElementById('ovBuscarCorte')) return;
-  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  const colsGuardadas = localStorage.getItem('corte_columnas') || '40';
-  const ov = document.createElement('div');
-  ov.id = 'ovBuscarCorte';
-  ov.className = 'ov-corte';
-  ov.innerHTML = `<div class="modal-corte">
-    <h3>🔍 Corte de caja — Buscar</h3>
-    <div class="dos">
-      <div class="campo"><label>Fecha desde</label><input type="date" id="bcDesde" value="${hoy}"></div>
-      <div class="campo"><label>Fecha hasta</label><input type="date" id="bcHasta" value="${hoy}"></div>
-    </div>
-    ${esSupervisorUI() ? '<div class="campo"><label>Cajero</label><select id="bcCajero"><option value="">Todos</option></select></div>' : '<select id="bcCajero" style="display:none;"><option value=""></option></select>'}
-    <div class="campo"><label>Turno</label><select id="bcTurno"><option value="">— Busca primero —</option></select></div>
-    <button class="btn btn-secondary" onclick="buscarTurnosCorte()">🔍 Buscar turnos</button>
-    <div class="dos">
-      <div class="campo"><label>Destino</label>
-        <select id="bcDestino"><option value="impresora">Impresora</option><option value="pantalla">Pantalla</option><option value="excel">Excel (CSV)</option></select></div>
-      <div class="campo"><label>Ancho de ticket</label>
-        <select id="bcCols">${[32, 40, 48].map((n) => `<option value="${n}" ${String(n) === colsGuardadas ? 'selected' : ''}>${n} columnas</option>`).join('')}</select></div>
-    </div>
-    <div class="botones-modal">
-      <button class="btn btn-primary" onclick="ejecutarBusquedaCorte()">Ejecutar</button>
-      <button class="btn btn-secondary" onclick="cerrarBuscador()">Cerrar</button>
-    </div></div>`;
-  ov.addEventListener('mousedown', (e) => { if (e.target === ov) cerrarBuscador(); });
-  document.body.appendChild(ov);
-  buscarTurnosCorte();
-}
-function cerrarBuscador() {
-  const ov = document.getElementById('ovBuscarCorte');
-  if (ov) ov.remove();
-}
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarBuscador(); });
-
-async function buscarTurnosCorte() {
-  const d = document.getElementById('bcDesde').value, h = document.getElementById('bcHasta').value;
-  const cajero = document.getElementById('bcCajero');
-  const sel = document.getElementById('bcTurno');
-  try {
-    const q = new URLSearchParams({ limite: 200 });
-    if (d) q.set('desde', d);
-    if (h) q.set('hasta', h);
-    if (cajero.value) q.set('usuario_id', cajero.value);
-    const turnos = await apiFetch('/turnos/historial?' + q.toString());
-    if (cajero.options.length === 1) {
-      const vistos = {};
-      turnos.forEach((t) => { vistos[t.usuario_id] = t.usuario_nombre; });
-      Object.entries(vistos).forEach(([id, n]) => cajero.add(new Option(n, id)));
-    }
-    window._turnosBusqueda = turnos;
-    sel.innerHTML = turnos.length
-      ? turnos.map((t) => `<option value="${escapar(t.id)}">Turno ${escapar(t.id)} · ${escapar(new Date(t.fecha_apertura).toLocaleString())} · ${escapar(t.usuario_nombre)}${t.estado === 'abierto' ? ' (abierto)' : ''}</option>`).join('')
-      : '<option value="">Sin turnos en ese rango</option>';
-  } catch (err) { mostrarToast(err.message, 'error'); }
-}
-
-async function ejecutarBusquedaCorte() {
-  const id = document.getElementById('bcTurno').value;
-  if (!id) { mostrarToast('Elige un turno primero', 'error'); return; }
-  const destino = document.getElementById('bcDestino').value;
-  const columnas = parseInt(document.getElementById('bcCols').value, 10);
-  localStorage.setItem('corte_columnas', String(columnas));
-  try {
-    if (destino === 'impresora') {
-      await imprimirCorteTurno(id, { columnas });
-    } else if (destino === 'pantalla') {
-      const [corte, cfg] = await Promise.all([apiFetch(`/turnos/${id}/resumen`), configNegocioTurno()]);
-      const lineas = lineasCorteCaja(corte, { columnas, negocio: cfg.nombre_negocio || '' })
-        .map((l) => typeof l === 'string' ? l : l.t).join('\n');
-      const ov = document.createElement('div');
-      ov.className = 'ov-corte';
-      ov.style.zIndex = 10000;
-      const pre = document.createElement('pre');
-      pre.textContent = lineas;
-      const caja = document.createElement('div');
-      caja.className = 'modal-corte ancho';
-      const cerrar = document.createElement('button');
-      cerrar.className = 'btn btn-secondary'; cerrar.textContent = 'Cerrar';
-      cerrar.onclick = () => ov.remove();
-      caja.append(pre, cerrar); ov.appendChild(caja); document.body.appendChild(ov);
-    } else {
-      const corte = await apiFetch(`/turnos/${id}/resumen`);
-      descargarCorteCSV(corte);
-    }
-  } catch (err) { mostrarToast(err.message, 'error'); }
-}
-
-function descargarCorteCSV(c) {
-  // Si un texto empieza con = + - @ (o tabulador/enter), Excel lo toma como fórmula: se le pone un ' adelante
-  // para que se vea como texto. Los números normales (ej. -150.00) se dejan igual.
-  const sinFormula = (t) => (/^[=+\-@\t\r]/.test(t) && !/^[-+]?\d+(\.\d+)?$/.test(t) ? "'" + t : t);
-  const f = (v) => '"' + sinFormula(String(v === null || v === undefined ? '' : v)).replace(/"/g, '""') + '"';
-  const filas = [['Concepto', 'Importe']];
-  filas.push(['Turno', c.turno.id], ['Estado', c.turno.estado], ['Cajero', c.turno.cajero],
-    ['Apertura', c.turno.fecha_apertura], ['Cierre', c.turno.fecha_cierre || '']);
-  filas.push(['', ''], ['CAJA', '']);
-  Object.entries(c.caja).forEach(([k, v]) => filas.push([k, v]));
-  filas.push(['', ''], ['FORMAS DE PAGO', '']);
-  Object.entries(c.formas).forEach(([k, v]) => filas.push([k, v]));
-  filas.push(['Total formas', c.total_formas], ['', ''], ['VENTAS', '']);
-  filas.push(['Subtotal', c.ventas.subtotal], ['Descuentos', c.ventas.descuentos], ['Venta neta', c.ventas.venta_neta]);
-  (c.ventas.por_departamento || []).forEach((d) => filas.push(['Depto: ' + (d.nombre || ''), d.monto]));
-  if (c.declaracion) {
-    filas.push(['', ''], ['DECLARACION', '']);
-    Object.entries(c.declaracion.importes || {}).forEach(([k, v]) => filas.push(['Declarado ' + k, v]));
-    filas.push(['Total declarado', c.declaracion.total_declarado], ['Total esperado', c.declaracion.total_esperado], ['Diferencia', c.declaracion.diferencia]);
-  }
-  const csv = '﻿' + filas.map((r) => r.map(f).join(',')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = `corte-turno-${c.turno.id}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
 }
 
 pintarChips();

@@ -6,7 +6,7 @@
 <link rel="manifest" href="../manifest.json">
 <link rel="icon" href="../favicon.ico">
 <meta name="theme-color" content="#5FAE46">
-<title>Cortes de caja - Compoint Punto</title>
+<title>Historial de cortes - Compoint Punto</title>
 <link rel="stylesheet" href="../css/app-theme.css">
 <link rel="stylesheet" href="../css/sidebar.css">
 <link rel="stylesheet" href="../css/vistas-admin.css">
@@ -24,7 +24,10 @@
   .fila-f .seg { max-width: 340px; }
 
   /* Cifras del periodo */
-  .kp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  .kp { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .kp-formas { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 10px 16px; font-size: 13.5px; color: var(--muted, #7A7D83); }
+  .kp-formas b { color: var(--text, #1F2023); margin-left: 4px; }
+  .tabla-esc td.acc .mini { margin-left: 4px; }
   .kp .kpi { padding: 12px 14px; min-width: 0; }
   .kp .kpi .v { font-size: 21px; overflow-wrap: anywhere; }
   .kpi .ic.verde { background: rgba(95,174,70,.18); }
@@ -64,7 +67,8 @@
   .tarj-m .l1 { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
   .tarj-m .l1 b { font-size: 15px; }
   .tarj-m .sub { font-size: 12px; color: var(--muted, #7A7D83); }
-  .tarj-m .l2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 12px; color: var(--muted, #7A7D83); }
+  .tarj-m .l3 { display: flex; gap: 6px; justify-content: flex-end; }
+  .tarj-m .l2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; color: var(--muted, #7A7D83); }
   .tarj-m .l2 b { display: block; color: var(--text, #1F2023); font-size: 13px; overflow-wrap: anywhere; }
   .tarj-total { padding: 12px 14px; background: var(--tabla-cab, #F1F3F4); display: flex; justify-content: space-between; align-items: center; font-weight: 800; }
 
@@ -111,9 +115,8 @@
     <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>📊 Cortes de caja</h1></div>
+      <h1>📚 Historial de cortes</h1></div>
     <div class="acciones-top">
-      <a class="btn btn-secondary" href="cortes-dia.html">📅 Cortes por día</a>
       <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
       <div class="menu-mas">
         <button type="button" class="btn btn-primary" onclick="alternarMenuMas(this)" aria-haspopup="true" aria-expanded="false">⬇️ Descargar Excel</button>
@@ -135,6 +138,7 @@
           <button type="button" class="chip activo" data-rango="mes">Este mes</button>
           <button type="button" class="chip" data-rango="mespasado">Mes pasado</button>
           <button type="button" class="chip" data-rango="otro">Otro periodo…</button>
+          <button type="button" class="chip chip-dif" id="chipDif" title="Muestra solo los cortes que no cuadraron">⚠️ Solo con diferencia</button>
         </div>
         <div class="fila-f plegada" id="filaFiltros">
           <div class="campo"><label for="fDesde">Desde</label><input type="date" id="fDesde"></div>
@@ -204,11 +208,11 @@ const hhmm = (iso) => { const d = new Date(iso); return `${p2(d.getHours())}:${p
 const textoFechaHora = (iso) => { const d = new Date(iso); return `${isoFecha(d)} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
 const esSupervisorUI = () => { const u = getUsuario(); return !!u && ['jefe_general', 'dueno', 'gerente'].includes(u.rol); };
 
-const CAMPOS_SUMA = ['tickets', 'efectivo', 'tarjeta', 'transferencia', 'credito', 'otros', 'descuentos', 'venta_neta'];
+const CAMPOS_SUMA = ['tickets', 'efectivo', 'tarjeta', 'transferencia', 'credito', 'otros', 'descuentos', 'venta_neta', 'esperado', 'contado'];
 const S = {
   rango: 'mes', desde: '', hasta: '',
   vista: localStorage.getItem('cortes_vista') || 'turno',
-  cajero: '', datos: null, abiertas: new Set(), pedido: 0
+  cajero: '', soloDif: false, datos: null, abiertas: new Set(), pedido: 0
 };
 if (!['turno', 'dia', 'mes'].includes(S.vista)) S.vista = 'turno';
 
@@ -242,10 +246,14 @@ function alternarPeriodoCel() {
   if (!fila.classList.contains('plegada')) document.getElementById('fDesde').focus();
 }
 function marcarControles() {
-  document.querySelectorAll('#chipsRango .chip').forEach((c) => c.classList.toggle('activo', c.dataset.rango === S.rango));
+  document.querySelectorAll('#chipsRango .chip[data-rango]').forEach((c) => c.classList.toggle('activo', c.dataset.rango === S.rango));
   document.querySelectorAll('#segVista button, #segVistaCel button').forEach((b) => b.classList.toggle('activo', b.dataset.vista === S.vista));
 }
-document.getElementById('chipsRango').addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (c) elegirRango(c.dataset.rango); });
+document.getElementById('chipsRango').addEventListener('click', (e) => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  if (c.id === 'chipDif') { S.soloDif = !S.soloDif; c.classList.toggle('activo', S.soloDif); S.abiertas.clear(); render(); return; }
+  elegirRango(c.dataset.rango);
+});
 function cambiarVista(v) { S.vista = v; S.abiertas.clear(); localStorage.setItem('cortes_vista', v); marcarControles(); render(); }
 document.getElementById('filaFiltros').addEventListener('click', (e) => { const b = e.target.closest('#segVista button'); if (b) cambiarVista(b.dataset.vista); });
 document.getElementById('segVistaCel').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) cambiarVista(b.dataset.vista); });
@@ -288,14 +296,16 @@ function llenarCajeros() {
   if (S.cajero && !vistos[S.cajero]) S.cajero = '';
   sel.value = S.cajero;
 }
-const turnosFiltrados = () => (S.datos ? S.datos.turnos : []).filter((t) => !S.cajero || String(t.usuario_id) === String(S.cajero));
+const tieneDif = (t) => t.diferencia !== null && t.diferencia !== undefined && Math.abs(Number(t.diferencia)) >= 0.005;
+const turnosFiltrados = () => (S.datos ? S.datos.turnos : []).filter((t) => (!S.cajero || String(t.usuario_id) === String(S.cajero)) && (!S.soloDif || tieneDif(t)));
 
 // ---------- Cálculos ----------
-function vacio() { return { n: 0, tickets: 0, efectivo: 0, tarjeta: 0, transferencia: 0, credito: 0, otros: 0, descuentos: 0, venta_neta: 0, dif: 0, sinDeclarar: 0 }; }
+function vacio() { return { n: 0, tickets: 0, efectivo: 0, tarjeta: 0, transferencia: 0, credito: 0, otros: 0, descuentos: 0, venta_neta: 0, esperado: 0, contado: 0, dif: 0, sinDeclarar: 0, conDif: 0 }; }
 function sumar(acc, t) {
   acc.n++;
   CAMPOS_SUMA.forEach((c) => { acc[c] += Number(t[c]) || 0; });
   if (t.diferencia === null || t.diferencia === undefined) acc.sinDeclarar++; else acc.dif += Number(t.diferencia);
+  if (tieneDif(t)) acc.conDif++;
   return acc;
 }
 function cerrarCifras(a) { CAMPOS_SUMA.forEach((c) => { a[c] = redondear(a[c]); }); a.dif = redondear(a.dif); return a; }
@@ -312,8 +322,8 @@ function agrupar(lista, vista) {
 function pill(dif, sinDeclarar, n) {
   if (n !== undefined && sinDeclarar >= n) return '<span class="pill gris">sin declarar</span>';
   if (dif === null || dif === undefined) return '<span class="pill gris">sin declarar</span>';
-  if (Math.abs(dif) < 0.005) return '<span class="pill verde">cuadrada</span>';
-  return dif > 0 ? `<span class="pill amarillo">sobrante ${dinero(dif)}</span>` : `<span class="pill rojo">faltante ${dinero(Math.abs(dif))}</span>`;
+  if (Math.abs(dif) < 0.005) return '<span class="pill verde">Cuadrada</span>';
+  return dif > 0 ? `<span class="pill amarillo">Sobró ${dinero(dif)}</span>` : `<span class="pill rojo">Faltó ${dinero(Math.abs(dif))}</span>`;
 }
 const pillTurno = (t) => pill(t.diferencia);
 const estadoDif = (d) => (d === null || d === undefined ? 'Sin declarar' : Math.abs(d) < 0.005 ? 'Cuadrada' : d > 0 ? 'Sobrante' : 'Faltante');
@@ -333,20 +343,19 @@ function render() {
     : Math.abs(T.dif) < 0.005 ? ['⚖️', 'verde', 'Cuadrada', 'Diferencia del periodo']
     : T.dif > 0 ? ['⚖️', 'ambar', '+' + dinero(T.dif), 'Sobrante del periodo'] : ['⚖️', 'rojo', dinero(T.dif), 'Faltante del periodo'];
   document.getElementById('kpis').innerHTML = [
-    kpi('💰', 'verde', dinero(T.venta_neta), `Venta neta · ${T.n} ${T.n === 1 ? 'corte' : 'cortes'}`),
-    kpi('💵', 'verde', dinero(T.efectivo), 'Efectivo'),
-    kpi('💳', 'azul', dinero(T.tarjeta), 'Tarjeta'),
-    kpi('🏦', 'azul', dinero(T.transferencia), 'Transferencia'),
-    kpi('📒', '', dinero(T.credito), 'Crédito (fiado)'),
-    kpi(...difTxt)
-  ].join('');
+    kpi('💰', 'verde', dinero(T.venta_neta), `Vendido · ${T.n} ${T.n === 1 ? 'corte' : 'cortes'}`),
+    kpi('🧮', 'azul', dinero(T.esperado), 'Debía haber en caja'),
+    kpi('✋', 'azul', dinero(T.contado), 'Se contó'),
+    kpi(...difTxt),
+    kpi('⚠️', T.conDif ? 'rojo' : 'verde', `${T.conDif} de ${T.n}`, 'Cortes con diferencia')
+  ].join('') + `<div class="caja kp-formas"><span>💵 Efectivo <b>${dinero(T.efectivo)}</b></span><span>💳 Tarjeta <b>${dinero(T.tarjeta)}</b></span><span>🏦 Transferencia <b>${dinero(T.transferencia)}</b></span><span>📒 Fiado <b>${dinero(T.credito)}</b></span>${T.otros > 0 ? `<span>💲 Otros <b>${dinero(T.otros)}</b></span>` : ''}</div>`;
 
   const titulos = { turno: 'Cortes del periodo', dia: 'Resumen por día', mes: 'Resumen por mes' };
   document.getElementById('tituloTabla').textContent = titulos[S.vista];
   document.getElementById('ayudaTabla').textContent = S.vista === 'turno' ? 'Toca un corte para verlo completo, sin imprimir' : `Suma de todos los turnos del ${S.vista === 'dia' ? 'día' : 'mes'}. Toca para ver sus turnos`;
   document.getElementById('notaPie').textContent = T.otros > 0
-    ? `Venta neta = ventas pagadas menos descuentos. “Otros” = dólares, cheques y vales (${dinero(T.otros)}). El día de cada turno es el día en que se abrió.`
-    : 'Venta neta = ventas pagadas menos descuentos. El día de cada turno es el día en que se abrió.';
+    ? `Vendido = ventas pagadas menos descuentos. “Otros” = dólares, cheques y vales (${dinero(T.otros)}). El día de cada turno es el día en que se abrió.`
+    : 'Vendido = ventas pagadas menos descuentos. El día de cada turno es el día en que se abrió.';
 
   const cuerpo = document.getElementById('cuerpo');
   if (!lista.length) {
@@ -359,8 +368,9 @@ function render() {
 
 const conOtros = () => turnosFiltrados().some((t) => Number(t.otros) > 0);
 
-function celdasMonto(x, otros) {
-  return `<td>${dinero(x.efectivo)}</td><td>${dinero(x.tarjeta)}</td><td>${dinero(x.transferencia)}</td><td>${dinero(x.credito)}</td>${otros ? `<td>${dinero(x.otros)}</td>` : ''}<td><b class="neta">${dinero(x.venta_neta)}</b></td>`;
+const montoONada = (v) => (v === null || v === undefined ? '—' : dinero(v));
+function celdasMonto(x) {
+  return `<td><b class="neta">${dinero(x.venta_neta)}</b></td><td>${montoONada(x.esperado)}</td><td>${montoONada(x.contado)}</td>`;
 }
 function textoHoras(t) {
   const ap = new Date(t.fecha_apertura), ci = t.fecha_cierre ? new Date(t.fecha_cierre) : null;
@@ -372,19 +382,24 @@ function filaTurnoTabla(t, otros, hijo) {
   const primera = hijo ? `↳ Turno ${escapar(t.id)}<small>${escapar(t.cajero)}</small>` : `<b>Turno ${escapar(t.id)}</b><small>${escapar(t.cajero)}</small>`;
   return `<tr class="${hijo ? 'hijo' : ''}" data-turno="${Number(t.id)}" style="cursor:pointer"><td class="i">${primera}</td>
     <td class="i">${hijo ? '' : etiquetaDia(t.dia)}<small>${escapar(textoHoras(t))}</small></td>
-    ${celdasMonto(t, otros)}<td class="izq">${pillTurno(t)}</td><td class="acc"><button type="button" class="mini" title="Ver el corte" data-turno="${Number(t.id)}">👁</button></td></tr>`;
+    ${celdasMonto(t)}<td class="izq">${pillTurno(t)}</td><td class="acc"><button type="button" class="mini" title="Ver el corte" data-turno="${Number(t.id)}">👁 Ver</button><button type="button" class="mini" title="Imprimir el corte" data-accion="imp-turno" data-id="${Number(t.id)}">🖨️</button></td></tr>`;
+}
+// Corte del día (todos los cajeros juntos): solo dueño, gerente y jefe general, y solo en la vista por día
+function botonesDia(g) {
+  if (S.vista !== 'dia' || !esSupervisorUI()) return '';
+  return `<button type="button" class="mini" title="Ver el corte del día" data-accion="ver-dia" data-dia="${escapar(g.clave)}">📋 Corte del día</button><button type="button" class="mini" title="Imprimir el corte del día" data-accion="imp-dia" data-dia="${escapar(g.clave)}">🖨️</button>`;
 }
 function tablaHTML(lista, grupos, T) {
   const otros = conOtros();
-  const cab = (turno) => `<thead><tr><th class="i">${turno ? 'Turno / Cajero' : S.vista === 'dia' ? 'Día' : 'Mes'}</th><th class="${turno ? 'i' : ''}">${turno ? 'Fecha' : 'Turnos'}</th><th>Efectivo</th><th>Tarjeta</th><th>Transf.</th><th>Crédito</th>${otros ? '<th>Otros</th>' : ''}<th>Venta neta</th><th class="izq">Diferencia</th><th></th></tr></thead>`;
+  const cab = (turno) => `<thead><tr><th class="i">${turno ? 'Turno / Cajero' : S.vista === 'dia' ? 'Día' : 'Mes'}</th><th class="${turno ? 'i' : ''}">${turno ? 'Fecha' : 'Turnos'}</th><th>Vendido</th><th>Debía haber</th><th>Se contó</th><th class="izq">Diferencia</th><th></th></tr></thead>`;
   let filas;
   if (!grupos) filas = lista.map((t) => filaTurnoTabla(t, otros, false)).join('');
   else filas = grupos.map((g) => {
     const abierta = S.abiertas.has(g.clave);
-    const cabeza = `<tr class="grupo ${abierta ? 'abierta' : ''}" data-grupo="${escapar(g.clave)}"><td class="i"><span class="flecha">▸</span><b>${escapar(g.titulo)}</b></td><td>${g.n}</td>${celdasMonto(g, otros)}<td class="izq">${pill(g.dif, g.sinDeclarar, g.n)}</td><td class="acc"></td></tr>`;
+    const cabeza = `<tr class="grupo ${abierta ? 'abierta' : ''}" data-grupo="${escapar(g.clave)}"><td class="i"><span class="flecha">▸</span><b>${escapar(g.titulo)}</b></td><td>${g.n}</td>${celdasMonto(g)}<td class="izq">${pill(g.dif, g.sinDeclarar, g.n)}</td><td class="acc">${botonesDia(g)}</td></tr>`;
     return cabeza + (abierta ? g.hijos.map((t) => filaTurnoTabla(t, otros, true)).join('') : '');
   }).join('');
-  const pie = `<tfoot><tr><td class="i">TOTAL DEL PERIODO</td><td>${grupos ? T.n : ''}</td>${celdasMonto(T, otros)}<td class="izq">${pill(T.dif, T.sinDeclarar, T.n)}</td><td></td></tr></tfoot>`;
+  const pie = `<tfoot><tr><td class="i">TOTAL DEL PERIODO</td><td>${grupos ? T.n : ''}</td>${celdasMonto(T)}<td class="izq">${pill(T.dif, T.sinDeclarar, T.n)}</td><td></td></tr></tfoot>`;
   return `<div class="tabla-esc"><table>${cab(!grupos)}<tbody>${filas}</tbody>${pie}</table></div>`;
 }
 function tarjetaCel(x, { hijo = false, grupo = false } = {}) {
@@ -393,7 +408,7 @@ function tarjetaCel(x, { hijo = false, grupo = false } = {}) {
   const p = grupo ? pill(x.dif, x.sinDeclarar, x.n) : pillTurno(x);
   const attr = grupo ? `data-grupo="${escapar(x.clave)}"` : `data-turno="${Number(x.id)}"`;
   return `<div class="tarj-m ${hijo ? 'hijo' : ''}" ${attr}><div class="l1"><b>${escapar(titulo)}</b>${p}</div><div class="sub">${escapar(sub)}</div>
-    <div class="l2"><span>Efectivo<b>${dinero(x.efectivo)}</b></span><span>Tarjeta<b>${dinero(x.tarjeta)}</b></span><span>Transf.<b>${dinero(x.transferencia)}</b></span><span>Neta<b>${dinero(x.venta_neta)}</b></span></div></div>`;
+    <div class="l2"><span>Vendido<b>${dinero(x.venta_neta)}</b></span><span>Debía haber<b>${montoONada(x.esperado)}</b></span><span>Se contó<b>${montoONada(x.contado)}</b></span></div>${grupo && S.vista === 'dia' && esSupervisorUI() ? `<div class="l3">${botonesDia(x)}</div>` : ''}</div>`;
 }
 function listaCelHTML(lista, grupos, T) {
   let html;
@@ -404,6 +419,14 @@ function listaCelHTML(lista, grupos, T) {
 
 // Clic en la tabla o en las tarjetas: abrir un grupo (día/mes) o ver un corte
 document.getElementById('cuerpo').addEventListener('click', (e) => {
+  const acc = e.target.closest('[data-accion]');
+  if (acc) {
+    e.stopPropagation();
+    if (acc.dataset.accion === 'imp-turno') imprimirTurno(Number(acc.dataset.id));
+    else if (acc.dataset.accion === 'ver-dia') window.location.href = 'corte-detalle.html?dia=' + encodeURIComponent(acc.dataset.dia);
+    else if (acc.dataset.accion === 'imp-dia') imprimirDia(acc.dataset.dia);
+    return;
+  }
   const turno = e.target.closest('[data-turno]');
   if (turno) { verCorte(Number(turno.dataset.turno)); return; }
   const grupo = e.target.closest('[data-grupo]');
@@ -418,6 +441,17 @@ document.getElementById('cuerpo').addEventListener('click', (e) => {
 function cerrarDetalle() { const ov = document.getElementById('ovDetalle'); if (ov) ov.remove(); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarDetalle(); });
 function verCorte(id) { window.location.href = 'corte-detalle.html?turno=' + encodeURIComponent(id); }
+async function imprimirTurno(id) {
+  try { await imprimirCorteTurno(id); mostrarToast('Corte enviado a la impresora', 'exito'); } catch (err) { mostrarToast(err.message, 'error'); }
+}
+async function imprimirDia(fecha) {
+  try {
+    const datos = await apiFetch('/turnos/dia?fecha=' + encodeURIComponent(fecha));
+    if (!datos.dia) { mostrarToast('Ese día no tiene corte para imprimir', 'error'); return; }
+    await imprimirCorteDatos(datos.dia);
+    mostrarToast('Corte del día enviado a la impresora', 'exito');
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
 
 // ---------- Descargas ----------
 function nombreArchivo(ext) { return `cortes_${S.desde}_a_${S.hasta}.${ext}`; }
@@ -443,7 +477,7 @@ function exportarExcel() {
   const wb = XLSX.utils.book_new();
 
   const resumen = [
-    ['Cortes de caja'],
+    ['Historial de cortes'],
     ['Periodo', `${S.desde} a ${S.hasta}`],
     ['Cajero', nombreCajeroElegido()],
     ['Generado', textoFechaHora(new Date().toISOString())],
@@ -452,6 +486,7 @@ function exportarExcel() {
     ['Cortes (turnos)', T.n], ['Tickets', T.tickets],
     ['Efectivo', T.efectivo], ['Tarjeta', T.tarjeta], ['Transferencia', T.transferencia], ['Crédito (fiado)', T.credito],
     ['Otros (dólares, cheques, vales)', T.otros], ['Descuentos', T.descuentos], ['Venta neta', T.venta_neta],
+    ['Debía haber en caja', T.esperado], ['Se contó', T.contado],
     ['Diferencia (sobrante + / faltante −)', T.dif]
   ];
   const wsRes = XLSX.utils.aoa_to_sheet(resumen);
@@ -459,19 +494,19 @@ function exportarExcel() {
   wsRes['!cols'] = [{ wch: 38 }, { wch: 22 }];
   XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
 
-  const cabCortes = ['Turno', 'Cajero', 'Día', 'Apertura', 'Cierre', 'Tickets', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia', 'Estado'];
+  const cabCortes = ['Turno', 'Cajero', 'Día', 'Apertura', 'Cierre', 'Tickets', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Debía haber', 'Se contó', 'Diferencia', 'Estado'];
   const filasCortes = lista.map((t) => [t.id, t.cajero, t.dia, textoFechaHora(t.fecha_apertura), t.fecha_cierre ? textoFechaHora(t.fecha_cierre) : '', t.tickets,
-    t.efectivo, t.tarjeta, t.transferencia, t.credito, t.otros, t.descuentos, t.venta_neta, t.diferencia === null ? '' : t.diferencia, estadoDif(t.diferencia)]);
-  filasCortes.push(['TOTAL', '', '', '', '', T.tickets, T.efectivo, T.tarjeta, T.transferencia, T.credito, T.otros, T.descuentos, T.venta_neta, T.dif, '']);
-  XLSX.utils.book_append_sheet(wb, hojaExcel([cabCortes, ...filasCortes], [8, 26, 12, 17, 17, 9, 14, 14, 14, 14, 12, 12, 14, 14, 13], [6, 7, 8, 9, 10, 11, 12, 13]), 'Cortes');
+    t.efectivo, t.tarjeta, t.transferencia, t.credito, t.otros, t.descuentos, t.venta_neta, t.esperado === null || t.esperado === undefined ? '' : t.esperado, t.contado === null || t.contado === undefined ? '' : t.contado, t.diferencia === null ? '' : t.diferencia, estadoDif(t.diferencia)]);
+  filasCortes.push(['TOTAL', '', '', '', '', T.tickets, T.efectivo, T.tarjeta, T.transferencia, T.credito, T.otros, T.descuentos, T.venta_neta, T.esperado, T.contado, T.dif, '']);
+  XLSX.utils.book_append_sheet(wb, hojaExcel([cabCortes, ...filasCortes], [8, 26, 12, 17, 17, 9, 14, 14, 14, 14, 12, 12, 14, 14, 14, 14, 13], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), 'Cortes');
 
-  const cabAgr = (primera) => [primera, 'Turnos', 'Tickets', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia'];
-  const filaAgr = (g, nombre) => [nombre, g.n, g.tickets, g.efectivo, g.tarjeta, g.transferencia, g.credito, g.otros, g.descuentos, g.venta_neta, g.dif];
+  const cabAgr = (primera) => [primera, 'Turnos', 'Tickets', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Debía haber', 'Se contó', 'Diferencia'];
+  const filaAgr = (g, nombre) => [nombre, g.n, g.tickets, g.efectivo, g.tarjeta, g.transferencia, g.credito, g.otros, g.descuentos, g.venta_neta, g.esperado, g.contado, g.dif];
   ['dia', 'mes'].forEach((vista) => {
     const grupos = agrupar(lista, vista).reverse(); // del más viejo al más nuevo
     const filas = grupos.map((g) => filaAgr(g, vista === 'dia' ? g.clave : etiquetaMes(g.clave)));
     filas.push(filaAgr(T, 'TOTAL'));
-    XLSX.utils.book_append_sheet(wb, hojaExcel([cabAgr(vista === 'dia' ? 'Día' : 'Mes'), ...filas], [18, 8, 9, 14, 14, 14, 14, 12, 12, 14, 14], [3, 4, 5, 6, 7, 8, 9, 10]), vista === 'dia' ? 'Por día' : 'Por mes');
+    XLSX.utils.book_append_sheet(wb, hojaExcel([cabAgr(vista === 'dia' ? 'Día' : 'Mes'), ...filas], [18, 8, 9, 14, 14, 14, 14, 12, 12, 14, 14, 14, 14], [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), vista === 'dia' ? 'Por día' : 'Por mes');
   });
 
   XLSX.writeFile(wb, nombreArchivo('xlsx'));
@@ -486,8 +521,9 @@ function descargarCSV() {
   const sinFormula = (t) => (/^[=+\-@\t\r]/.test(t) && !/^[-+]?\d+(\.\d+)?$/.test(t) ? "'" + t : t);
   const f = (v) => '"' + sinFormula(String(v === null || v === undefined ? '' : v)).replace(/"/g, '""') + '"';
   const turno = S.vista === 'turno';
-  const cab = [turno ? 'Turno' : S.vista === 'dia' ? 'Día' : 'Mes', turno ? 'Cajero' : 'Turnos', turno ? 'Fecha' : '', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Diferencia', 'Estado'];
-  const fila = (a, b, c, x, dif) => [a, b, c, x.efectivo, x.tarjeta, x.transferencia, x.credito, x.otros, x.descuentos, x.venta_neta, dif === null || dif === undefined ? '' : dif, estadoDif(dif)];
+  const cab = [turno ? 'Turno' : S.vista === 'dia' ? 'Día' : 'Mes', turno ? 'Cajero' : 'Turnos', turno ? 'Fecha' : '', 'Efectivo', 'Tarjeta', 'Transferencia', 'Crédito', 'Otros', 'Descuentos', 'Venta neta', 'Debía haber', 'Se contó', 'Diferencia', 'Estado'];
+  const nada = (v) => (v === null || v === undefined ? '' : v);
+  const fila = (a, b, c, x, dif) => [a, b, c, x.efectivo, x.tarjeta, x.transferencia, x.credito, x.otros, x.descuentos, x.venta_neta, nada(x.esperado), nada(x.contado), dif === null || dif === undefined ? '' : dif, estadoDif(dif)];
   let filas;
   if (turno) filas = lista.map((t) => fila(t.id, t.cajero, `${t.dia} ${textoHoras(t)}`, t, t.diferencia));
   else filas = agrupar(lista, S.vista).map((g) => fila(S.vista === 'dia' ? g.clave : etiquetaMes(g.clave), g.n, '', g, g.sinDeclarar >= g.n ? null : g.dif));
@@ -504,11 +540,18 @@ function descargarCSV() {
 const esCelular = window.matchMedia('(max-width: 820px)');
 const ajustarBarraFija = () => document.body.classList.toggle('barra-fija', esCelular.matches);
 esCelular.addEventListener('change', ajustarBarraFija); ajustarBarraFija();
-[S.desde, S.hasta] = rangoRapido('mes');
+const qs = new URLSearchParams(location.search);
+if (['turno', 'dia', 'mes'].includes(qs.get('vista'))) S.vista = qs.get('vista');
+const fechaQs = /^\d{4}-\d{2}-\d{2}$/.test(qs.get('fecha') || '') ? qs.get('fecha') : '';
+if (fechaQs) {
+  S.desde = S.hasta = fechaQs;
+  S.rango = fechaQs === rangoRapido('hoy')[0] ? 'hoy' : fechaQs === rangoRapido('ayer')[0] ? 'ayer' : 'otro';
+  if (S.rango === 'otro') document.getElementById('filaFiltros').classList.remove('plegada');
+} else [S.desde, S.hasta] = rangoRapido('mes');
 document.getElementById('fDesde').value = S.desde;
 document.getElementById('fHasta').value = S.hasta;
 marcarControles();
-cargar();
+cargar().then(() => { if (fechaQs && S.vista === 'dia') { S.abiertas.add(fechaQs); render(); } });
 </script>
 <script src="../js/sidebar-nav.js"></script>
 </body>

@@ -496,8 +496,15 @@ router.get('/reporte', verificarToken, async (req, res) => {
         let diferencia = null;
         if (t.declaracion && t.declaracion.diferencia !== undefined && t.declaracion.diferencia !== null) diferencia = redondear(t.declaracion.diferencia);
         else if (t.saldo_contado !== null) diferencia = redondear(Number(t.saldo_contado) - Number(t.saldo_teorico));
+        // Lo que debía haber en caja y lo que se contó al cerrar (para ver de dónde sale la diferencia).
+        const dec = t.declaracion || {};
+        const esperado = dec.total_esperado !== undefined && dec.total_esperado !== null ? redondear(dec.total_esperado)
+          : (t.saldo_teorico !== null ? redondear(t.saldo_teorico) : null);
+        const contado = dec.total_declarado !== undefined && dec.total_declarado !== null ? redondear(dec.total_declarado)
+          : (t.saldo_contado !== null ? redondear(t.saldo_contado) : null);
         return {
           id: t.id, usuario_id: t.usuario_id, cajero: t.cajero, dia: t.dia,
+          esperado, contado,
           fecha_apertura: t.fecha_apertura, fecha_cierre: t.fecha_cierre,
           tickets: Number(t.tickets),
           efectivo: redondear(t.efectivo), tarjeta: redondear(t.tarjeta), transferencia: redondear(t.transferencia),

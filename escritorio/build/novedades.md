@@ -1,4 +1,5 @@
-- Nuevo botón «Recargas y servicios» en Caja: tiempo aire (Telcel, AT&T, Movistar…) y pago de luz, agua, teléfono y cable. Por ahora en modo práctica.
-- Pantalla de entrada con «¿Sabías que…?»: novedades y trucos que van cambiando.
-- Ahora ves la versión de tu sistema arriba, en el menú.
-- Aviso de actualización con botón «Actualizar ahora».
+- Corte de Caja renovado: abre tu turno y ve cómo va el día en un solo lugar.
+- Nuevo «Historial de cortes»: por turno, día o mes, y el botón «Solo con diferencia».
+- Cada corte muestra cuánto debía haber, cuánto se contó y la diferencia.
+- Menú más sencillo: una sola opción de cortes.
+- Recargas: nueva pestaña «Paquetes» y colores por compañía.
