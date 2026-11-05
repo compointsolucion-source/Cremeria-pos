@@ -211,6 +211,7 @@ function precioEfectivo(producto, cantidad) {
 // se cancela al cerrar el modal (con cerrarModal('modalPeso') o al
 // confirmar) para no seguir actualizando un panel que ya no se ve.
 let cancelarSuscripcionPesoModal = null;
+let granelTecleoAMano = false; // true en cuanto se teclea o se usa un botón rápido: la báscula ya no escribe
 
 function abrirModalPeso(producto) {
   productoSeleccionado = producto;
@@ -233,9 +234,16 @@ function abrirModalPeso(producto) {
     const valorTexto = document.getElementById('basculaPesoLive');
     const ultimo = ultimoPesoBascula();
     if (ultimo !== null) valorTexto.textContent = ultimo.toFixed(3);
-    cancelarSuscripcionPesoModal = suscribirsePeso((peso) => {
+    const quitarVista = suscribirsePeso((peso) => {
       valorTexto.textContent = peso.toFixed(3);
     });
+    // El peso se escribe solo en Cantidad mientras no se teclee nada a mano.
+    granelTecleoAMano = false;
+    const quitarLlenado = llenarConBascula((peso) => {
+      if (granelCampo !== 'cantidad') return;
+      granelTexto = peso.toFixed(3); granelFresco = true; actualizarDisplayPeso();
+    }, () => granelTecleoAMano || granelCampo !== 'cantidad');
+    cancelarSuscripcionPesoModal = () => { quitarVista(); quitarLlenado(); };
   } else if (panelBascula) {
     panelBascula.style.display = 'none';
   }
@@ -277,6 +285,7 @@ function granelActivar(campo) {
 
 // Botones rápidos: "$100" o "½ kg".
 function granelRapido(campo, valor) {
+  granelTecleoAMano = true;
   granelCampo = campo;
   granelTexto = String(valor);
   granelFresco = true;
@@ -284,6 +293,7 @@ function granelRapido(campo, valor) {
 }
 
 function teclear(valor) {
+  granelTecleoAMano = true;
   if (granelFresco) { granelTexto = ''; granelFresco = false; }
   if (valor === '.') {
     if (granelTexto.includes('.')) return;
@@ -299,6 +309,7 @@ function teclear(valor) {
 }
 
 function borrarUltimo() {
+  granelTecleoAMano = true;
   if (granelFresco) { granelTexto = ''; granelFresco = false; }
   else granelTexto = granelTexto.slice(0, -1);
   actualizarDisplayPeso();

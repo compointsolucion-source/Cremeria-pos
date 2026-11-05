@@ -344,6 +344,7 @@
         </div>
       </div>
       <p style="font-size:18px; font-weight:700; margin:12px 0 6px;">Precio Unitario = $<span id="precioUnitarioPesoAvanzada"></span></p>
+      <div id="basculaEnVivoAv" style="display:none; background:#F4F5F6; border-radius:10px; padding:6px 10px; margin:6px 0; font-size:14px;">⚖️ Báscula: <b id="basculaPesoLiveAv">0.000</b> kg <button type="button" class="peso-chip" onmousedown="event.preventDefault()" onclick="usarPesoBasculaAv()">Usar este peso</button></div>
       <div class="peso-aviso-exacto" id="avisoExactoPesoAv"></div>
       <div class="peso-rapidos">
         <span class="q">Por importe</span>
@@ -490,6 +491,7 @@
 <script src="js/offline-db.js"></script>
 <script src="js/ventas-offline.js"></script>
 <script src="js/granel.js"></script>
+<script src="js/bascula.js"></script>
 <script src="js/anticipo-cobro.js"></script>
 <script>
 requiereLogin();
@@ -704,6 +706,7 @@ function abrirModalPesoAvanzada(producto) {
   campoPesoAv = document.getElementById('cantidadPesoAvanzada');
   ultimoCampoTecladoPesoAv = campoPesoAv;
   document.getElementById('modalPesoAvanzada').style.display = 'flex';
+  conectarBasculaModalAv();
   // setTimeout(0) le da tiempo al navegador de terminar de mostrar la
   // ventana antes de intentar enfocar — sin esto, el foco a veces no
   // "pega" porque el campo todavía no es visible en ese instante exacto.
@@ -724,6 +727,7 @@ function limpiarNumeroPesoAv(el) {
   if (v !== el.value) el.value = v;
 }
 function tecladoPesoAv(tecla) {
+  if (tecla !== 'enter') tecleoAManoAv = true;
   if (tecla === 'enter') { confirmarPesoAvanzada(); return; }
   const campo = campoPesoAv && document.getElementById('modalPesoAvanzada').contains(campoPesoAv) ? campoPesoAv : document.getElementById('cantidadPesoAvanzada');
   // Al pasar de Cantidad a Importe (o al revés), el campo nuevo se limpia para escribir desde cero.
@@ -736,10 +740,35 @@ function tecladoPesoAv(tecla) {
   campo.dispatchEvent(new Event('input', { bubbles: true }));
 }
 document.getElementById('modalPesoAvanzada').addEventListener('keydown', (e) => {
+  if (/^[0-9.]$/.test(e.key) || e.key === 'Backspace') tecleoAManoAv = true;
   if (e.key === 'Enter') { e.preventDefault(); confirmarPesoAvanzada(); }
 });
 
+// Báscula: muestra el peso en vivo y lo escribe solo en Cantidad mientras no se teclee a mano.
+let quitarBasculaAv = null, tecleoAManoAv = false;
+function conectarBasculaModalAv() {
+  if (quitarBasculaAv) { quitarBasculaAv(); quitarBasculaAv = null; }
+  tecleoAManoAv = false;
+  const panel = document.getElementById('basculaEnVivoAv');
+  if (typeof basculaConectada !== 'function' || !basculaConectada() || localStorage.getItem('bascula_usar_en_mostrador') === '0') { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  const vivo = document.getElementById('basculaPesoLiveAv');
+  const u = ultimoPesoBascula(); if (u !== null) vivo.textContent = u.toFixed(3);
+  const q1 = suscribirsePeso((p) => { vivo.textContent = p.toFixed(3); });
+  const q2 = llenarConBascula((p) => {
+    if (fuentePesoAv !== 'cantidad') return;
+    const c = document.getElementById('cantidadPesoAvanzada'); c.value = p.toFixed(3); reemplazarPesoAv = true; calcularDesdeCantidadAvanzada();
+  }, () => tecleoAManoAv || fuentePesoAv !== 'cantidad');
+  quitarBasculaAv = () => { q1(); q2(); };
+}
+function usarPesoBasculaAv() {
+  const p = typeof ultimoPesoBascula === 'function' ? ultimoPesoBascula() : null;
+  if (!(p > 0)) { mostrarToast('Aún no hay una lectura de la báscula', 'error'); return; }
+  const c = document.getElementById('cantidadPesoAvanzada'); c.value = p.toFixed(3); reemplazarPesoAv = true; calcularDesdeCantidadAvanzada();
+}
+
 function cerrarModalPesoAvanzada() {
+  if (quitarBasculaAv) { quitarBasculaAv(); quitarBasculaAv = null; }
   document.getElementById('modalPesoAvanzada').style.display = 'none';
   document.getElementById('campoCodigoProducto').focus();
 }
@@ -764,6 +793,7 @@ function calcularDesdeImporteAvanzada() {
 
 // Botones rápidos ($100, ½ kg…): ponen el valor en su campo y lo calculan como si se hubiera tecleado.
 function rapidoPesoAv(campo, valor) {
+  tecleoAManoAv = true;
   const input = document.getElementById(campo === 'importe' ? 'importePesoAvanzada' : 'cantidadPesoAvanzada');
   input.value = String(valor);
   campoPesoAv = input;

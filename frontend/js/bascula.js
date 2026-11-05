@@ -66,6 +66,22 @@ function notificarPeso(peso) {
 }
 function ultimoPesoBascula() { return basculaEstado.ultimoPeso; }
 
+// Llena solo un campo de peso mientras la persona no haya tecleado nada a mano.
+// escribir(peso) pone el valor; tecleo() dice si ya se escribió a mano. Devuelve la función para dejar de escuchar.
+function llenarConBascula(escribir, tecleo) {
+  if (typeof basculaConectada !== 'function' || !basculaConectada()) return () => {};
+  if (localStorage.getItem('bascula_usar_en_mostrador') === '0') return () => {};
+  let anterior = null;
+  const poner = (peso) => {
+    if (tecleo()) return;
+    if (!(peso > 0)) return;
+    if (anterior !== null && Math.abs(anterior - peso) < 0.0005) escribir(peso); // dos lecturas iguales = estable
+    anterior = peso;
+  };
+  if (basculaEstado.ultimoPeso > 0) { anterior = basculaEstado.ultimoPeso; escribir(basculaEstado.ultimoPeso); }
+  return suscribirsePeso(poner);
+}
+
 // Busca el primer número decimal con signo opcional dentro de una línea de
 // texto recibida de la báscula (ej. de "ST,GS,+001.250kg" extrae 1.25).
 // Devuelve null si la línea no trae ningún número reconocible (ruido,
@@ -128,7 +144,8 @@ async function conectarBasculaSerial(baudRate = 9600) {
     throw new Error('Este navegador no soporta conexión por puerto serie (USB). Usa Chrome o Edge en computadora — no está disponible en celulares.');
   }
   const puerto = await navigator.serial.requestPort();
-  await puerto.open(opcionesPuertoBascula(baudRate));
+  await abrirPuertoConReintentos(puerto, baudRate);
+  await recordarPuertoElegido(puerto);
 
   basculaEstado.puertoSerial = puerto;
   basculaEstado.transporteActivo = 'serial';
@@ -137,6 +154,44 @@ async function conectarBasculaSerial(baudRate = 9600) {
 
   iniciarLecturaSerial(puerto);
   return 'Báscula (puerto serie)';
+}
+
+// Se recuerda CUÁL puerto se eligió (fabricante/modelo del cable y su lugar en la lista), para que en
+// Mostrador y Caja se abra el mismo (antes se abría el primero autorizado, que podía ser otro COM).
+async function recordarPuertoElegido(puerto) {
+  try {
+    const info = puerto.getInfo ? puerto.getInfo() : {};
+    const todos = navigator.serial.getPorts ? await navigator.serial.getPorts() : [];
+    localStorage.setItem('bascula_puerto', JSON.stringify({ v: info.usbVendorId || null, p: info.usbProductId || null, i: Math.max(0, todos.indexOf(puerto)) }));
+  } catch (e) { /* sin datos del puerto */ }
+}
+function elegirPuertoRecordado(puertos) {
+  let g = null; try { g = JSON.parse(localStorage.getItem('bascula_puerto') || 'null'); } catch (e) { g = null; }
+  if (!g || !puertos.length) return puertos[0] || null;
+  const iguales = puertos.filter((x) => { const i = x.getInfo ? x.getInfo() : {}; return (i.usbVendorId || null) === g.v && (i.usbProductId || null) === g.p; });
+  if (iguales.length === 1) return iguales[0];
+  if (puertos[g.i]) return puertos[g.i];
+  return iguales[0] || puertos[0];
+}
+// Al cambiar de pantalla el puerto puede tardar un instante en soltarse: se reintenta.
+async function abrirPuertoConReintentos(puerto, baudRate) {
+  let ultimoError = null;
+  for (let k = 0; k < 6; k++) {
+    try { await puerto.open(opcionesPuertoBascula(baudRate)); return; } catch (e) {
+      ultimoError = e;
+      if (/already open/i.test(e.message || '')) return; // ya estaba abierto
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+  throw ultimoError;
+}
+// Al salir de la pantalla se suelta el puerto para que la siguiente lo pueda abrir.
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('pagehide', () => {
+    try { detenerPedidoPeso(); } catch (e) {}
+    try { if (basculaEstado.lectorSerial) basculaEstado.lectorSerial.cancel(); } catch (e) {}
+    try { if (basculaEstado.puertoSerial) basculaEstado.puertoSerial.close(); } catch (e) {}
+  });
 }
 
 function detenerPedidoPeso() {
@@ -357,8 +412,8 @@ async function intentarReconexionAutomaticaBascula() {
       const puertosAutorizados = await navigator.serial.getPorts();
       if (puertosAutorizados.length > 0) {
         const baudRate = parseInt(localStorage.getItem('bascula_baud_rate') || '9600');
-        const puerto = puertosAutorizados[0];
-        await puerto.open(opcionesPuertoBascula(baudRate));
+        const puerto = elegirPuertoRecordado(puertosAutorizados);
+        await abrirPuertoConReintentos(puerto, baudRate);
         basculaEstado.puertoSerial = puerto;
         basculaEstado.transporteActivo = 'serial';
         iniciarLecturaSerial(puerto);
