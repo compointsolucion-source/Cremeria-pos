@@ -19,13 +19,13 @@
         '🧭 Menú más sencillo: una sola opción de cortes.',
         '🎨 Tema nuevo <b>Compoint</b>: íconos de línea, letra más clara y el total grande como display. Escógelo en Configuración → Temas completos.',
         '🧾 <b>Facturación</b>: copia los datos con un clic, sube el PDF y el XML, y avísale a tu cliente por WhatsApp para que la descargue.',
-        '📱 Recargas: nueva pestaña <b>Paquetes</b> y colores por compañía.'
+        '🚧 <b>Recargas y pago de servicios: en construcción.</b> Ya puedes ver y practicar la pantalla (con Paquetes); estamos cerrando la conexión con el proveedor para activarlas con saldo real.'
       ]
     },
     {
       version: '1.2.0', fecha: '2026-10-28',
       puntos: [
-        '📱 Nuevo botón <b>Recargas y servicios</b> en Caja: tiempo aire y pago de luz, agua, teléfono y cable (por ahora para practicar).',
+        '🚧 Nuevo botón <b>Recargas y servicios</b> en Caja (en construcción: por ahora solo para practicar).',
         '💡 Al entrar ves <b>¿Sabías que…?</b> con novedades y trucos.',
         '🔢 Tu <b>versión</b> se ve arriba, en el menú.',
         '⬆️ Aviso de actualización con botón <b>Actualizar ahora</b>.'
@@ -68,7 +68,7 @@
     'En <b>Bitácora</b> ves quién hizo cada cambio y a qué hora.',
     'El botón de la flechita en el menú lo deja <b>compacto</b>, solo con iconos, para tener más espacio.',
     'Con el celular también puedes escanear: toca 📷 y apunta al código de barras.',
-    'En <b>Caja → Recargas y servicios</b> vendes tiempo aire y cobras recibos de luz o agua.',
+    '🚧 Muy pronto: <b>recargas y pago de luz, agua y teléfono</b> desde tu caja. Estamos terminando la conexión con el proveedor; mientras, puedes practicar en Caja → Recargas.',
     'Tu comisión por cobrar recibos la cambias en <b>Configuración → Recargas y servicios</b>.',
     'En <b>Kiosco de Fichas</b> el cliente toma su turno solo, y la Pantalla de Turnos lo llama.',
     'Cambia tu contraseña cuando quieras en <b>Administración → Cambiar contraseña</b>.'

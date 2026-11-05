@@ -2065,8 +2065,8 @@ async function cargarRecargas() {
     if (caja) caja.classList.toggle('on', !!e.activo);
     document.getElementById('recEstado').innerHTML = e.modo === 'real'
       ? '🟢 <b>Proveedor conectado.</b> Las recargas son reales y entran al corte de caja.'
-      : '🧪 <b>Modo prueba.</b> Todavía no hay proveedor conectado: se puede practicar, pero no se manda saldo real y no cuenta en el corte.';
-    document.getElementById('resRecargas').textContent = !e.activo ? 'Apagado' : (e.modo === 'real' ? 'Conectado' : 'Modo prueba') + ' · comisión $' + Number(e.cargo_servicio);
+      : '🚧 <b>En construcción.</b> Estamos terminando la conexión con el proveedor de recargas. Por ahora se puede practicar, pero no se manda saldo real y no cuenta en el corte.';
+    document.getElementById('resRecargas').textContent = !e.activo ? 'Apagado' : (e.modo === 'real' ? 'Conectado' : 'En construcción') + ' · comisión $' + Number(e.cargo_servicio);
   } catch (err) {
     const r = document.getElementById('resRecargas'); if (r) r.textContent = '—';
     const s = document.getElementById('recEstado'); if (s) s.textContent = err.message;

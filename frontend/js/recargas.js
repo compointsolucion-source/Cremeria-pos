@@ -96,7 +96,7 @@
       return;
     }
     $('rcAviso').innerHTML = est.estado.modo === 'prueba'
-      ? '<div class="rc-prueba">🧪 <b>Modo prueba.</b> Todavía no hay proveedor conectado: no se manda saldo real y <b>no le cobres al cliente</b>. Estas ventas no cuentan en el corte.</div>'
+      ? '<div class="rc-prueba">🚧 <b>En construcción.</b> Estamos terminando la conexión con el proveedor de recargas. Por ahora es <b>solo para practicar</b>: no se manda saldo real y <b>no le cobres al cliente</b>. Estas ventas no cuentan en el corte.</div>'
       : '';
     rcTab(est.tab === 'hoy' ? 'recarga' : est.tab);
   };
