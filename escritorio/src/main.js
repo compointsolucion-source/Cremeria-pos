@@ -352,9 +352,30 @@ function configurarPermisos() {
     });
     callback(r.response < Math.min(lista.length, 8) ? lista[r.response].deviceId : '');
   });
-  ses.on('select-serial-port', (evento, puertos, wc, callback) => {
+  // Báscula por USB / puerto COM: la persona elige el puerto (antes se tomaba el primero, que casi siempre es COM1).
+  ses.on('select-serial-port', async (evento, puertos, wc, callback) => {
     evento.preventDefault();
-    callback(puertos.length ? puertos[0].portId : '');
+    const padre = BrowserWindow.fromWebContents(wc) || ventana || undefined;
+    if (!puertos.length) {
+      await dialog.showMessageBox(padre, {
+        type: 'warning', title: 'Báscula', message: 'No se encontró ningún puerto COM',
+        detail: 'Revisa que la báscula esté prendida y el cable conectado. Si usas un cable USB a serie, instala su controlador (driver) y vuelve a intentar.',
+        buttons: ['Entendido']
+      });
+      callback(''); return;
+    }
+    const nombre = (p) => {
+      const com = p.portName || 'Puerto';
+      const desc = p.displayName && p.displayName !== com ? ' — ' + p.displayName : '';
+      return (com + desc).slice(0, 70);
+    };
+    const lista = puertos.slice(0, 10);
+    const r = await dialog.showMessageBox(padre, {
+      type: 'question', title: 'Báscula', message: 'Elige el puerto COM de la báscula',
+      detail: 'Si no sabes cuál es: desconecta el cable de la báscula, vuelve a abrir esta lista y fíjate cuál desaparece.',
+      buttons: lista.map(nombre).concat('Cancelar'), cancelId: lista.length, defaultId: 0, noLink: true
+    });
+    callback(r.response < lista.length ? lista[r.response].portId : '');
   });
 }
 
