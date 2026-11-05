@@ -576,8 +576,27 @@
                 <option value="4800">4800</option>
                 <option value="2400">2400</option>
                 <option value="19200">19200</option>
+                <option value="1200">1200</option>
               </select>
             </label>
+            <div class="rejilla">
+              <label class="campo"><span>¿Cómo manda el peso?</span>
+                <select id="basculaComando" onchange="guardarModoBascula()">
+                  <option value="auto">Automático (recomendado)</option>
+                  <option value="continuo">La báscula lo manda sola</option>
+                  <option value="P">Pedirlo con «P» (Torrey y similares)</option>
+                  <option value="ENQ">Pedirlo con ENQ</option>
+                  <option value="W">Pedirlo con «W»</option>
+                </select>
+              </label>
+              <label class="campo"><span>Formato del puerto</span>
+                <select id="basculaFormato" onchange="guardarModoBascula()">
+                  <option value="8N1">8 bits, sin paridad (8N1) — el más común</option>
+                  <option value="7E1">7 bits, paridad par (7E1)</option>
+                </select>
+              </label>
+            </div>
+            <div id="basculaDiag" class="nota" style="background:var(--campo-fondo,#f6f7f8);border:1px dashed var(--border,#ddd);border-radius:10px;padding:8px 10px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;word-break:break-all;display:none"></div>
             <div class="botones">
               <button class="btn btn-secondary" onclick="conectarBasculaUSB()">🔌 Conectar por USB</button>
               <button class="btn btn-primary" onclick="conectarBasculaBT()">🔵 Conectar Bluetooth</button>
@@ -592,6 +611,7 @@
               <div class="dentro">
                 <p class="nota">No existe un solo protocolo que compartan todas las marcas de básculas. Esto funciona con la mayoría de básculas puestas en modo "salida continua" (revisa el manual de tu báscula para activarlo), pero puede necesitar ajustar la velocidad (baud rate) según el modelo real que conectes.</p>
                 <p class="nota">Si no sabes cuál usa tu báscula, deja 9600 e intenta conectar — es la más común en básculas comerciales. Si el peso se ve como símbolos o no aparece, prueba con otra. Siempre puedes seguir tecleándolo a mano.</p>
+                <p class="nota"><b>Cómo saberlo:</b> abajo de los botones sale lo que llega de la báscula. Si dice «Todavía no llega nada»: revisa el puerto COM, prueba otra velocidad (9600 → 4800 → 2400) y el formato 7E1. Si llegan símbolos raros (·), la velocidad está mal. Si llegan números pero el peso no cambia, mándanos foto de ese recuadro.</p>
               </div>
             </details>
           </div>
@@ -1094,6 +1114,41 @@ async function desconectarBasculaUI() {
   actualizarResumenes();
   mostrarToast('Báscula desconectada', 'exito');
 }
+
+// Modo de lectura y formato del puerto (se guardan en este equipo).
+function guardarModoBascula() {
+  const anterior = localStorage.getItem('bascula_formato') || '8N1';
+  localStorage.setItem('bascula_comando', document.getElementById('basculaComando').value);
+  localStorage.setItem('bascula_formato', document.getElementById('basculaFormato').value);
+  localStorage.removeItem('bascula_comando_detectado');
+  if (typeof reiniciarLecturaBascula === 'function') reiniciarLecturaBascula();
+  if (anterior !== document.getElementById('basculaFormato').value && typeof basculaConectada === 'function' && basculaConectada()) {
+    mostrarToast('Para cambiar el formato: Desconectar y volver a Conectar por USB', 'info', 5000);
+  }
+}
+function cargarModoBascula() {
+  const c = document.getElementById('basculaComando'), f = document.getElementById('basculaFormato');
+  if (c) c.value = localStorage.getItem('bascula_comando') || 'auto';
+  if (f) f.value = localStorage.getItem('bascula_formato') || '8N1';
+  const b = document.getElementById('basculaBaudRate'); const g = localStorage.getItem('bascula_baud_rate');
+  if (b && g) b.value = g;
+}
+document.addEventListener('DOMContentLoaded', cargarModoBascula);
+
+// Diagnóstico en vivo: lo que manda la báscula tal cual (para saber si llega algo y en qué forma).
+if (typeof suscribirseCrudoBascula === 'function') suscribirseCrudoBascula((d) => {
+  const el = document.getElementById('basculaDiag'); if (!el) return;
+  if (!d.modo && !d.bytes) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const visible = (d.crudo || '').slice(-60).replace(/[\x00-\x1F\x7F]/g, (c) => ({ '\r': '⏎', '\n': '↵', '\x02': '[STX]', '\x03': '[ETX]', '\x05': '[ENQ]' }[c] || '·'));
+  const nombres = { P: '«P»', ENQ: 'ENQ', W: '«W»', P_CR: '«P»+Enter', W_CR: '«W»+Enter' };
+  const modo = d.modo === 'continuo' ? 'La báscula lo manda sola ✓'
+    : d.modo === 'pedir' ? 'Pidiendo el peso con ' + (nombres[d.comando] || d.comando) + (d.bytes ? ' ✓' : '')
+    : d.modo === 'buscando' ? (d.comando ? 'Probando con ' + (nombres[d.comando] || d.comando) + '…' : 'Escuchando…') : '';
+  el.textContent = '';
+  const l1 = document.createElement('div'); l1.textContent = '📡 ' + modo; el.appendChild(l1);
+  const l2 = document.createElement('div'); l2.textContent = d.bytes ? ('Llegó (' + d.bytes + ' bytes): ' + visible) : 'Todavía no llega nada de la báscula.'; el.appendChild(l2);
+});
 
 function guardarUsoBasculaMostrador() {
   localStorage.setItem('bascula_usar_en_mostrador', document.getElementById('basculaUsarEnMostrador').checked ? '1' : '0');
