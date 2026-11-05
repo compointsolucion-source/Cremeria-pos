@@ -44,6 +44,15 @@
   [data-tema="oscuro"] .cd-ok{background:#24402A;color:#9BE08A}
   [data-tema="oscuro"] .cd-av{background:#44371A;color:#F3CF7A}
   [data-tema="oscuro"] .cd-mal{background:#4A2323;color:#F2A0A0}
+  .cd-exp{padding:14px 18px;border-left:5px solid #E0A100}
+  .cd-exp.ok{border-left-color:#5FAE46}
+  .cd-exp h3{font-size:16px;margin:0 0 4px;display:flex;gap:8px;align-items:center}
+  .cd-exp .res{font-size:14.5px;margin:2px 0 10px;line-height:1.45}
+  .cd-exp ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .cd-exp li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;line-height:1.4;background:var(--tabla-cab,#F5F7F8);border-radius:10px;padding:9px 12px}
+  .cd-exp li .i{font-size:18px;line-height:1.2}
+  .cd-exp li b{font-variant-numeric:tabular-nums}
+  .cd-exp .que{margin-top:10px;font-size:13.5px;color:var(--muted,#7A7D83)}
   @media (max-width: 900px){.cd-cols{grid-template-columns:1fr}.cd-big .v{font-size:24px}}
   /* Cortes por día */
   .cdd-fil{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px}
@@ -82,6 +91,94 @@ function cdEsSupervisor() { const u = getUsuario(); return !!u && ['jefe_general
 
 // Total de ventas del corte (lo cobrado por cualquier forma de pago menos devoluciones).
 function cdVentasTotales(c) { return cdRed((c.total_formas || 0) - ((c.ventas && c.ventas.devoluciones) || 0)); }
+
+// ===== ¿Por qué no cuadra? — explicación automática, sin IA y sin costo =====
+// Revisa las causas más comunes comparando lo que vendió el sistema contra lo que escribió la cajera.
+// Devuelve { cuadra, resumen, puntos: [{ i, t, tipo }] } o null si todavía no hay declaración.
+const CD_NOMBRE_FORMA = { tarjeta: 'tarjeta', transferencia: 'transferencia', vales: 'vales de despensa', dolares: 'dólares', cheque: 'cheque' };
+const CD_DONDE = { tarjeta: 'en la terminal (corte de la terminal)', transferencia: 'en el banco', vales: 'en los vales guardados', dolares: 'en los dólares guardados', cheque: 'en los cheques guardados' };
+function explicarCorte(c) {
+  const d = c && c.declaracion;
+  if (!d || !d.esperado || !d.importes) return null;
+  const caja = c.caja || {};
+  const esp = d.esperado, imp = d.importes;
+  const dif = (k) => cdRed((Number(imp[k]) || 0) - (Number(esp[k]) || 0));
+  const cerca = (a, b, tol = 0.5) => Math.abs(a - b) <= tol;
+  const puntos = [];
+  let soloNoEscrito = 0, faltaReal = 0, sobraReal = 0;
+
+  // 1) Otras formas de pago (tarjeta, transferencia…): casi siempre es que no se escribieron.
+  const otras = Object.keys(esp).filter((k) => k !== 'efectivo');
+  const difEf = dif('efectivo');
+  let cruzada = null;
+  otras.forEach((k) => {
+    const e = Number(esp[k]) || 0, x = Number(imp[k]) || 0, df = dif(k);
+    if (Math.abs(df) < 0.005) return;
+    const nombre = CD_NOMBRE_FORMA[k] || cdEsc(k);
+    if (e > 0 && x === 0) {
+      soloNoEscrito += e;
+      puntos.push({ i: '📝', tipo: 'olvido', t: `No se escribió lo cobrado con <b>${nombre}</b>: <b>${cdDin(e)}</b>. Ese dinero no falta: está ${CD_DONDE[k] || 'guardado'}.` });
+    } else if (cerca(df, -difEf, 1) && Math.abs(difEf) > 0.5) {
+      cruzada = k;
+      puntos.push({ i: '🔀', tipo: 'cruce', t: `Lo que ${df < 0 ? 'falta' : 'sobra'} en ${nombre} (<b>${cdDin(Math.abs(df))}</b>) es casi lo mismo que ${difEf > 0 ? 'sobra' : 'falta'} en efectivo. Probablemente <b>se cobró con una forma y se registró con otra</b> (efectivo ↔ ${nombre}). El dinero está completo.` });
+    } else if (df < 0) {
+      faltaReal += -df;
+      puntos.push({ i: '💳', tipo: 'falta', t: `En <b>${nombre}</b> se escribió ${cdDin(x)} pero el sistema registró ${cdDin(e)} (faltan <b>${cdDin(-df)}</b>). Revisa el corte ${CD_DONDE[k] || ''}: puede faltar un comprobante o haber un cobro con otra forma.` });
+    } else {
+      sobraReal += df;
+      puntos.push({ i: '💳', tipo: 'sobra', t: `En <b>${nombre}</b> se escribió ${cdDin(x)} y el sistema registró ${cdDin(e)} (sobran <b>${cdDin(df)}</b>). Puede que un cobro con ${nombre} se haya marcado como efectivo.` });
+    }
+  });
+
+  // 2) Efectivo.
+  const espEf = Number(esp.efectivo) || 0, impEf = Number(imp.efectivo) || 0;
+  const fondo = Number(caja.fondo_inicial) || 0;
+  if (!cruzada) {
+    if (Math.abs(difEf) < 0.005) {
+      puntos.unshift({ i: '✅', tipo: 'ok', t: `El <b>efectivo está completo</b>: había ${cdDin(espEf)} y se contó ${cdDin(impEf)}.` });
+    } else if (impEf === 0 && espEf > 0) {
+      soloNoEscrito += espEf;
+      puntos.unshift({ i: '📝', tipo: 'olvido', t: `<b>No se escribió el efectivo</b> (debía haber ${cdDin(espEf)}). Hay que contarlo y corregir el corte.` });
+    } else if (fondo > 0 && cerca(impEf, fondo) && espEf > fondo + 1) {
+      faltaReal += -difEf;
+      puntos.unshift({ i: '💵', tipo: 'retiro', t: `Solo se contó el <b>fondo de ${cdDin(fondo)}</b>. Falta lo de las ventas en efectivo (<b>${cdDin(-difEf)}</b>). Lo más probable: <b>se sacó ese dinero antes de cerrar</b> (por ejemplo, para entregarlo) <b>sin registrar una Salida</b>. Pregúntale a la cajera.` });
+    } else if (difEf < 0) {
+      faltaReal += -difEf;
+      const f = -difEf;
+      const redondo = f >= 50 && (cerca(f % 100, 0, 0.01) || cerca(f % 50, 0, 0.01));
+      puntos.unshift({ i: '💵', tipo: 'falta', t: f < 20
+        ? `Faltan <b>${cdDin(f)}</b> en efectivo. Es poco: casi siempre es <b>cambio mal dado</b>.`
+        : redondo
+          ? `Faltan <b>${cdDin(f)}</b> en efectivo, una cantidad redonda: suele ser <b>dinero que se sacó sin registrar la Salida</b> (pago a proveedor, gasto, entrega).`
+          : `Faltan <b>${cdDin(f)}</b> en efectivo. Revisa: ¿se sacó dinero sin registrar la Salida? ¿se dio cambio de más? ¿hubo una devolución en efectivo sin registrar?` });
+    } else {
+      sobraReal += difEf;
+      puntos.unshift({ i: '💵', tipo: 'sobra', t: difEf < 20
+        ? `Sobran <b>${cdDin(difEf)}</b> en efectivo: casi siempre es <b>cambio que no se dio</b> o se dio de menos.`
+        : `Sobran <b>${cdDin(difEf)}</b> en efectivo. Puede ser un cobro con tarjeta registrado como efectivo, una <b>Entrada sin registrar</b> o una venta que no se capturó.` });
+    }
+  }
+  if ((Number(caja.devoluciones_efectivo) || 0) > 0 && Math.abs(difEf) > 0.004) {
+    puntos.push({ i: '↩️', tipo: 'info', t: `En este turno hubo devoluciones en efectivo por ${cdDin(caja.devoluciones_efectivo)} (ya están restadas). Si se devolvió dinero sin registrarlo en el sistema, eso también descuadra.` });
+  }
+
+  const total = cdRed(d.diferencia);
+  const cuadra = Math.abs(total) < 0.005;
+  let resumen;
+  if (cuadra) resumen = 'Todo cuadra: lo que se contó es igual a lo que vendió el sistema.';
+  else if (faltaReal < 0.005 && sobraReal < 0.005) resumen = `El sistema marca ${total < 0 ? 'faltante' : 'sobrante'} de ${cdDin(Math.abs(total))}, pero <b>no falta dinero</b>: solo no se escribió todo al cerrar.`;
+  else resumen = `${total < 0 ? 'Faltante' : 'Sobrante'} marcado: ${cdDin(Math.abs(total))}. ${faltaReal > 0.004 ? `<b>Lo que hay que aclarar: ${cdDin(faltaReal)}</b>` : ''}${sobraReal > 0.004 ? `${faltaReal > 0.004 ? ' · ' : ''}<b>Sobra de verdad: ${cdDin(sobraReal)}</b>` : ''}${soloNoEscrito > 0.004 ? `. Lo demás (${cdDin(soloNoEscrito)}) solo no se escribió.` : '.'}`;
+  return { cuadra, resumen, puntos, faltaReal: cdRed(faltaReal), soloNoEscrito: cdRed(soloNoEscrito) };
+}
+
+function explicacionCorteHTML(c) {
+  const x = explicarCorte(c);
+  if (!x || c.turno.estado !== 'cerrado' || (c.turno && c.turno.dia)) return '';
+  if (x.cuadra) return `<div class="caja cd-exp ok"><h3>✅ La caja cuadra</h3><div class="res">${x.resumen}</div></div>`;
+  return `<div class="caja cd-exp"><h3>🔎 ¿Por qué no cuadra?</h3><div class="res">${x.resumen}</div>
+    <ul>${x.puntos.map((p) => `<li><span class="i">${p.i}</span><span>${p.t}</span></li>`).join('')}</ul>
+    <div class="que">💡 Para que no vuelva a pasar: al cerrar, escribe también lo de <b>tarjeta</b> y <b>transferencia</b>, y registra como <b>Salida</b> todo el dinero que saques de la caja.</div></div>`;
+}
 
 function corteDetalleHTML(c, { ganancia = false } = {}) {
   const caja = c.caja || {};
@@ -132,6 +229,7 @@ function corteDetalleHTML(c, { ganancia = false } = {}) {
   <div class="caja cd-cab"><div><h2>${titulo}${chip}</h2>
     <div class="sub">${horario} · ${cu.normales || 0} venta${cu.normales === 1 ? '' : 's'}${cu.folio_inicial ? ` · folios ${cdEsc(cu.folio_inicial)} al ${cdEsc(cu.folio_final)}` : ''}</div></div>
     <div class="acc" id="cdAcciones"></div></div>
+  ${explicacionCorteHTML(c)}
   <div class="cd-cols">
    <div class="cd-col">
     <div class="caja cd-big"><span class="t">💲 Ventas totales</span><span class="v azul">${cdDin(cdVentasTotales(c))}</span></div>
