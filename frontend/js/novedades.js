@@ -9,8 +9,10 @@
 
   const NOVEDADES = [
     {
-      version: '1.2.1', fecha: '2026-11-03',
+      version: '1.2.1', fecha: '2026-11-05',
       puntos: [
+        '🔎 El corte te dice <b>por qué no cuadra</b>: si falta dinero de verdad o solo no se escribió la tarjeta o la transferencia.',
+        '⚖️ <b>Báscula</b>: eliges el puerto COM, el peso se escribe solo en Mostrador y también sale en Caja Avanzada.',
         '🔒 <b>Corte de Caja</b> renovado: abre tu turno y ve cómo va el día en un solo lugar.',
         '📚 Nuevo <b>Historial de cortes</b>: por turno, día o mes, y el botón <b>Solo con diferencia</b>.',
         '🧮 Cada corte muestra cuánto <b>debía haber</b>, cuánto <b>se contó</b> y la diferencia.',
@@ -153,6 +155,12 @@
       .nov-tarjeta ul { margin:0 0 12px; padding-left:18px; font-size:14px; line-height:1.45; }
       .nov-tarjeta li { margin-bottom:4px; }
       .nov-tarjeta .nov-pie { display:flex; justify-content:flex-end; }
+      @media (max-width: 600px) {
+        .nov-tarjeta { left: 10px; right: 10px; bottom: 10px; width: auto; max-height: 46vh; overflow: auto; padding: 12px 14px; border-radius: 12px; }
+        .nov-tarjeta h4 { font-size: 15px; margin-bottom: 6px; }
+        .nov-tarjeta ul { font-size: 13px; line-height: 1.35; margin-bottom: 8px; }
+        .nov-tarjeta .nov-pie { position: sticky; bottom: 0; background: var(--surface,#fff); padding-top: 6px; }
+      }
       @keyframes novEntra { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
       @media (prefers-reduced-motion: reduce) { .nov-tarjeta { animation:none; } }`;
     document.head.appendChild(s);

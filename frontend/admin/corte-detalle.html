@@ -14,6 +14,17 @@
 <style>
   .oculto { display: none !important; }
   .cd-msg { padding: 40px 20px; text-align: center; color: var(--muted, #7A7D83); }
+  /* Celular: encabezado en una sola fila y botones compactos, para que el corte se vea de inmediato. */
+  @media (max-width: 600px) {
+    .top-bar { flex-wrap: nowrap !important; gap: 6px; }
+    .top-bar h1 { font-size: 18px; white-space: nowrap; }
+    .top-bar .acc-top .btn { padding: 7px 10px; font-size: 13px; min-height: 0; }
+    .top-bar .acc-top .txt-l { display: none; }
+    .cd-cab { padding: 12px 14px !important; }
+    .cd-cab h2 { font-size: 18px !important; }
+    .cd-cab .acc { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 6px !important; }
+    .cd-cab .acc .btn { padding: 8px 6px; font-size: 13px; min-height: 0; width: 100%; justify-content: center; }
+  }
 </style>
 </head>
 <body>
@@ -22,9 +33,9 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>📊 Corte de caja</h1></div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <a class="btn btn-secondary" href="cortes.html">📚 Historial de cortes</a>
-      <a class="btn btn-secondary" href="caja-turno.html">← Corte de Caja</a>
+    <div class="acc-top" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <a class="btn btn-secondary" href="cortes.html" title="Historial de cortes">📚<span class="txt-l"> Historial de cortes</span></a>
+      <a class="btn btn-secondary" href="caja-turno.html" title="Corte de Caja">←<span class="txt-l"> Corte de Caja</span></a>
     </div>
   </div>
 

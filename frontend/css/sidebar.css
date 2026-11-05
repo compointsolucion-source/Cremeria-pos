@@ -177,6 +177,8 @@ body.con-sidebar {
   transition: padding-left 0.18s ease;
 }
 
+/* En celular el cambio claro/oscuro también está dentro del menú (☰): el círculo flotante tapaba números. */
+body.con-sidebar .boton-tema-flotante { display: none !important; }
 /* El estado de conexión ya se ve como un puntito en tu avatar del menú; el
    círculo flotante solo se queda donde no hay menú visible (celular). */
 @media (min-width: 901px) {

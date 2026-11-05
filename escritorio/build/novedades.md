@@ -1,3 +1,5 @@
+- El corte te dice por qué no cuadra: si falta dinero de verdad o solo no se escribió la tarjeta o la transferencia.
+- Báscula: eliges el puerto COM, el peso se escribe solo en Mostrador y también sale en Caja Avanzada.
 - Corte de Caja renovado: abre tu turno y ve cómo va el día en un solo lugar.
 - Nuevo «Historial de cortes»: por turno, día o mes, y el botón «Solo con diferencia».
 - Cada corte muestra cuánto debía haber, cuánto se contó y la diferencia.
