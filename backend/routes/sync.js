@@ -242,7 +242,18 @@ router.get('/licencia', claveODueno, async (req, res) => {
 router.post('/completo/iniciar', autenticar, async (req, res) => {
   try {
     const m = await estructura();
-    await pool.query(`TRUNCATE ${m.tablas.map(q).join(', ')}`);
+    // Tablas que solo existen en la nube (términos aceptados, códigos para recuperar contraseña) apuntan a
+    // «usuarios». PostgreSQL no deja vaciar una tabla a la que otra apunta si esa otra no se vacía junto con
+    // ella, así que se vacían también (son datos de la nube que se vuelven a generar solos al entrar).
+    const espejo = new Set(m.tablas);
+    const rf = await pool.query(`SELECT DISTINCT c.conrelid::regclass::text AS hijo, c.confrelid::regclass::text AS padre
+      FROM pg_constraint c WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace`);
+    const extra = new Set();
+    for (const r of rf.rows) {
+      const h = r.hijo.replace(/"/g, ''); const p = r.padre.replace(/"/g, '');
+      if (espejo.has(p) && !espejo.has(h) && h !== 'sync_vinculo') extra.add(h);
+    }
+    await pool.query(`TRUNCATE ${[...m.tablas, ...extra].map(q).join(', ')}`);
     res.json({ ok: true });
   } catch (e) {
     console.error('sync/completo/iniciar:', e.message);

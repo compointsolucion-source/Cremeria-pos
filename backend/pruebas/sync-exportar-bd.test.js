@@ -362,3 +362,17 @@ test('GET /api/licencia muestra desde_nube y no revela el serial', async () => {
   assert.equal(r.json.serial, undefined);
   await limpiar();
 });
+
+test('copia completa: la nube se vacía aunque haya tablas propias de la nube que apuntan a usuarios (términos, recuperar contraseña)', async () => {
+  const v = await api('POST', '/api/sync/vincular', null, tokenDueno);
+  assert.equal(v.status, 200);
+  const clave = v.json.clave;
+  // En una nube nueva el dueño ya aceptó términos: esa fila apunta a usuarios.
+  const u = (await pool.query("SELECT id FROM usuarios WHERE usuario = 'dueno'")).rows[0];
+  await pool.query("INSERT INTO terminos_aceptaciones (usuario_id, version, huella) VALUES ($1, 'prueba', 'x')", [u.id]);
+  const r = await api('POST', '/api/sync/completo/iniciar', null, null, { 'X-Sync-Key': clave });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM usuarios')).rows[0].n, 0);
+  // La clave de sincronización se conserva (sync_vinculo no se toca).
+  assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM sync_vinculo')).rows[0].n, 1);
+});
