@@ -111,6 +111,8 @@ app.use('/api/tickets', require('./routes/tickets'));
 // Pedidos a domicilio / para recoger / programados + módulo del repartidor.
 const rutaPedidos = require('./routes/pedidos');
 app.use('/api/pedidos', rutaPedidos);
+// Tienda en línea: la parte pública (sin sesión) para los clientes del negocio y la configuración (con sesión).
+app.use('/api/tienda', require('./routes/tienda'));
 app.use('/api/turnos', require('./routes/turnos'));
 app.use('/api/movimientos', require('./routes/movimientos'));
 app.use('/api/kits', require('./routes/kits'));

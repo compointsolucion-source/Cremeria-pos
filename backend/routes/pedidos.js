@@ -454,6 +454,10 @@ async function transicionar(req, id, nuevo, datos = {}, opciones = {}) {
             WHERE id = $1`, [id, metodo, monto]);
       }
     }
+    // Pedido de la tienda en línea: al mandarlo a preparar (o directo a listo) queda CONFIRMADO por la tienda.
+    if (nuevo !== 'cancelado' && ped.origen === 'en_linea' && !ped.confirmado_en) {
+      await conexion.query('UPDATE pedidos SET confirmado_en = NOW() WHERE id = $1 AND confirmado_en IS NULL', [id]);
+    }
     await registrarBitacora(conexion, {
       usuario_id: req.usuario.id, accion: 'pedido_' + nuevo, modulo: 'pedidos', referencia_id: id,
       valor_anterior: { estado: actual }, valor_nuevo: { estado: nuevo, motivo: datos.motivo || undefined }
@@ -1462,3 +1466,5 @@ module.exports = router;
 module.exports.iniciarTemporizador = iniciarTemporizador;
 module.exports.avanzarProgramados = avanzarProgramados;
 module.exports.generarFijosDelDia = generarFijosDelDia;
+// Para la tienda en línea (routes/tienda.js): crear el pedido con las mismas reglas que en Mostrador.
+module.exports.interno = { crearPedidoCore, resolverCliente, resolverDireccion, ErrorHttp, emitir };

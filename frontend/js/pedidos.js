@@ -88,8 +88,14 @@ const PT = (function () {
   // ------------------------------------------------------------------ estado
   const E = { tab: 'hoy', hoy: null, pedidos: [], resumen: null, reps: [], agendaFecha: null, agenda: [], produccion: null, semana: [], fijos: [], zonas: null, verTodosEntregados: false };
 
+  // Pedido que el cliente hizo desde la tienda en línea y que nadie ha aceptado todavía.
+  const porConfirmar = (p) => p.origen === 'en_linea' && !p.confirmado_en && p.estado === 'programado';
+  const SI_FALTA_TXT = { parecido: 'Si falta algo: cambiarlo por algo parecido', llamar: 'Si falta algo: llamar al cliente', quitar: 'Si falta algo: quitarlo' };
+  const PAGO_TXT = { efectivo: 'Paga en efectivo', tarjeta: 'Paga con tarjeta: llevar terminal', cuenta: 'Se anota a su cuenta' };
+
   const COLUMNAS = [
-    { id: 'programado', titulo: 'Programados', icono: '📅', estados: ['programado'] },
+    { id: 'confirmar', titulo: 'Por confirmar', icono: '🌐', filtro: porConfirmar, soloSiHay: true },
+    { id: 'programado', titulo: 'Programados', icono: '📅', estados: ['programado'], filtro: (p) => p.estado === 'programado' && !porConfirmar(p) },
     { id: 'preparando', titulo: 'Preparando', icono: '👨‍🍳', estados: ['preparando'] },
     { id: 'listo', titulo: 'Listos', icono: '✅', estados: ['listo'] },
     { id: 'en_camino', titulo: 'En camino', icono: '🛵', estados: ['en_camino'] },
@@ -206,7 +212,23 @@ const PT = (function () {
       && (!q || norm([p.nombre_contacto, p.etiqueta, p.folio, p.colonia, p.calle, p.telefono].join(' ')).includes(q)));
   }
 
+  function tarjetaPorConfirmar(p) {
+    const donde = lleno(p.colonia) ? 'Col. ' + esc(p.colonia) : esc(p.calle || '');
+    return `<div class="pt-card e-linea" onclick="PT.abrir(${p.id})">
+      <div class="pt-card-top"><span class="pt-et">${esc(p.etiqueta)}</span><span class="pt-t linea">🌐 En línea</span><span class="pt-t ${p.pago_previsto === 'cuenta' ? 'credito' : 'cobrar'}">${esc(PAGO_TXT[p.pago_previsto] ? (p.pago_previsto === 'cuenta' ? 'A su cuenta' : p.pago_previsto === 'tarjeta' ? 'Tarjeta' : 'Efectivo') : 'Cobrar')}</span></div>
+      <div class="pt-nombre">${esc(p.nombre_contacto)}</div>
+      <div class="pt-sub">${donde}</div>
+      <div class="pt-hora">🕓 Lo pidió a las ${esc(horaLocal(p.creado_en))}</div>
+      ${p.si_falta ? `<div class="pt-sub">${esc(SI_FALTA_TXT[p.si_falta] || '')}</div>` : ''}
+      ${p.pago_previsto === 'efectivo' && Number(p.paga_con) > 0 ? `<div class="pt-sub">Paga con ${dinero(p.paga_con)}: llevar cambio de ${dinero(Number(p.paga_con) - Number(p.total_neto))}</div>` : ''}
+      <div class="pt-pie-card"><b>${dinero(p.total_neto)}</b></div>
+      <div class="pt-dos-acc"><button type="button" class="btn btn-primary pt-accion" onclick="event.stopPropagation(); PT.accion(${p.id}, 'preparando')">✓ Confirmar</button>
+        <button type="button" class="btn btn-secondary pt-accion pt-rechazar" onclick="event.stopPropagation(); PT.rechazar(${p.id})">✕ Rechazar</button></div>
+    </div>`;
+  }
+
   function tarjeta(p) {
+    if (porConfirmar(p)) return tarjetaPorConfirmar(p);
     const [clasePago, textoPago] = tagPago(p);
     const acc = accionPrincipal(p);
     const prep = p.estado === 'programado'
@@ -252,14 +274,17 @@ const PT = (function () {
       <div class="pt-kpi"><b>${dinero(k.entregado_hoy)}</b><span>Entregado hoy</span></div>`;
     const lista = filtrados();
     let h = '';
+    const hayEnLinea = lista.some(porConfirmar);
+    $('tablero').classList.toggle('con-linea', hayEnLinea);
     COLUMNAS.forEach((c) => {
-      let items = lista.filter((p) => c.estados.includes(p.estado));
+      if (c.soloSiHay && !hayEnLinea) return;
+      let items = lista.filter((p) => (c.filtro ? c.filtro(p) : c.estados.includes(p.estado)));
       if (c.id === 'entregado') {
         items.sort((a, b) => (a.estado === b.estado ? String(b.entregado_en || '').localeCompare(String(a.entregado_en || '')) : (a.estado === 'no_entregado' ? -1 : 1)));
       }
       const total = items.length;
       if (c.id === 'entregado' && !E.verTodosEntregados) items = items.slice(0, 8);
-      h += `<div class="pt-col"><h3><span>${c.icono} ${c.titulo}</span><span class="n">${total}</span></h3>`
+      h += `<div class="pt-col ${c.id === 'confirmar' ? 'col-linea' : ''}"><h3><span>${c.icono} ${c.titulo}</span><span class="n">${total}</span></h3>`
         + (items.length ? items.map(tarjeta).join('') : '<div class="pt-vacia">Nada por aquí</div>')
         + (c.id === 'entregado' && total > 8 ? `<div class="pt-mas"><a class="pd-link" onclick="PT.verTodosEntregados()">${E.verTodosEntregados ? 'Ver menos' : `+ ${total - 8} más · ver todos`}</a></div>` : '')
         + '</div>';
@@ -363,6 +388,15 @@ const PT = (function () {
     }
   }
 
+  // Pedido en línea que la tienda no puede atender: se cancela y el cliente ve el motivo en su seguimiento.
+  async function rechazar(id) {
+    const motivo = await solicitarTexto('¿Por qué no puedes atender este pedido? El cliente verá este mensaje.', 'Por ahora no podemos atender tu pedido. Escríbenos por WhatsApp.');
+    if (motivo === null || motivo === undefined) return null;
+    const r = await avisoError(() => apiFetch(`/pedidos/${id}/estado`, { method: 'POST', body: JSON.stringify({ estado: 'cancelado', motivo: String(motivo).trim() || 'La tienda no pudo atender tu pedido.' }) }));
+    if (r) { mostrarToast('Pedido rechazado. Al cliente le aparece cancelado.', 'exito'); recargar(); }
+    return r;
+  }
+
   async function noEntregado(id) {
     const motivo = await solicitarTexto('¿Por qué no se pudo entregar? (ej. no estaba, dirección incorrecta)');
     if (!motivo) return null;
@@ -429,7 +463,7 @@ const PT = (function () {
 
   function pintarDetalle(m, p) {
     const [clasePago, textoPago] = tagPago(p);
-    m.titulo(`${esc(p.etiqueta)} · ${esc(ESTADO_TXT[p.estado] || p.estado)} <span class="pt-t ${clasePago}" style="margin-left:8px">${textoPago}</span>${p.tipo === 'recoger' ? ' <span class="pt-t recoger">🏪 recoger</span>' : ''}${p.origen === 'fijo' ? ' <span class="pt-t fijo">🔁 fijo</span>' : ''}`);
+    m.titulo(`${esc(p.etiqueta)} · ${esc(ESTADO_TXT[p.estado] || p.estado)} <span class="pt-t ${clasePago}" style="margin-left:8px">${textoPago}</span>${p.tipo === 'recoger' ? ' <span class="pt-t recoger">🏪 recoger</span>' : ''}${p.origen === 'fijo' ? ' <span class="pt-t fijo">🔁 fijo</span>' : ''}${p.origen === 'en_linea' ? ' <span class="pt-t linea">🌐 en línea</span>' : ''}`);
     const tel = lleno(p.telefono) ? `<div class="pt-botonera"><a class="btn btn-secondary" href="${esc(UBICACION.urlLlamar(p.telefono) || '#')}">📞 Llamar</a><a class="btn btn-secondary" target="_blank" rel="noopener" href="${esc(UBICACION.urlWhatsApp(p.telefono) || '#')}">💬 WhatsApp</a></div>` : '';
     const direccion = p.tipo === 'domicilio' ? `
       <div class="pt-bloque"><h4>Dirección de entrega</h4>
@@ -680,7 +714,10 @@ const PT = (function () {
     socket.on('connect', () => { socket.emit('unirse_sucursal', usuarioPedidos.sucursal_id); vivo(true); refrescarSuave(); });
     socket.on('disconnect', () => vivo(false));
     socket.on('pedido_actualizado', (d) => {
-      if (d && d.nuevo) { mostrarToast('🛵 Llegó un pedido nuevo', 'info'); beep(); }
+      if (d && d.nuevo && d.en_linea) {
+        mostrarToast(`🌐 ¡Nuevo pedido en línea! ${d.nombre || ''}${d.colonia ? ', ' + d.colonia : ''}${d.total ? ' · ' + dinero(d.total) : ''}. Confírmalo en «Por confirmar».`, 'info', 9000);
+        beep(); setTimeout(beep, 300); setTimeout(beep, 600);
+      } else if (d && d.nuevo) { mostrarToast('🛵 Llegó un pedido nuevo', 'info'); beep(); }
       refrescarSuave();
     });
     ['nuevo_ticket', 'ticket_pagado', 'ticket_actualizado'].forEach((ev) => socket.on(ev, refrescarSuave));
@@ -706,7 +743,7 @@ const PT = (function () {
 
   const API_PT = {
     estado: E, u: { esc, dinero, hora12, horaLocal, fechaLarga, fechaBonita, sumarDias, abrirModal, avisoError, iniciales, primerNombre, norm, lleno, ESTADO_TXT, tagPago, esAdmin },
-    tab, recargar, filtrar, abrir, accion, noEntregado, cancelar, deshacerEntrega, asignar, irADia, cambiarFechaAgenda, verEvidencia, verTodosEntregados, mensajeCliente, mensajeRepartidor, pedirMetodoCobro, iniciar
+    tab, recargar, filtrar, abrir, accion, rechazar, noEntregado, cancelar, deshacerEntrega, asignar, irADia, cambiarFechaAgenda, verEvidencia, verTodosEntregados, mensajeCliente, mensajeRepartidor, pedirMetodoCobro, iniciar
   };
   return API_PT;
 })();

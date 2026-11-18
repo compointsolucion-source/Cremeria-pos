@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Tienda en línea - Compoint Punto</title>
+<link rel="stylesheet" href="../css/app-theme.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/vistas-admin.css">
+<script src="../js/tema.js"></script>
+<style>
+  .contenido { max-width: 1100px; }
+  .rejilla2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .caja { padding: 16px; margin-bottom: 14px; }
+  .caja h2 { font-size: 17px; margin: 0 0 4px; }
+  .caja .ayuda { font-size: 13px; color: var(--muted, #7A7D83); margin: 0 0 12px; }
+  .encendido { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .encendido b { font-size: 18px; display: block; }
+  .encendido input.interruptor { transform: scale(1.35); }
+  .estado-tienda { font-size: 14px; color: var(--muted, #7A7D83); margin-top: 2px; }
+  .estado-tienda.ok { color: var(--ok-texto, #2E7D32); font-weight: 700; }
+  .compartir { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border, #E4E6E9); }
+  .compartir canvas { width: 170px !important; height: 170px !important; border-radius: 10px; background: #fff; padding: 6px; }
+  .enlace { display: flex; gap: 8px; margin-bottom: 8px; }
+  .enlace input { flex: 1; min-width: 0; }
+  .botones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .campo { display: grid; gap: 4px; margin-bottom: 10px; }
+  .campo label { font-weight: 700; font-size: 13.5px; }
+  .campo small { color: var(--muted, #7A7D83); font-size: 12.5px; }
+  .horario { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .horario input[type="time"] { width: 120px; }
+  .horario .dia { font-weight: 700; font-size: 14px; }
+  .opcion-check { padding: 8px 2px; }
+  .opcion-check small { display: block; color: var(--muted, #7A7D83); font-size: 12px; font-weight: 400; }
+  .aviso { background: #FFF3CD; color: #6B4E00; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 12px; }
+  .aviso a { color: inherit; font-weight: 700; }
+  .lista-p { max-height: 420px; overflow-y: auto; border-top: 1px solid var(--border, #E4E6E9); }
+  .fila-p { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .fila-p .n { flex: 1; min-width: 0; }
+  .fila-p .n b { display: block; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fila-p .n small { color: var(--muted, #7A7D83); font-size: 12px; }
+  .fila-p.oculto .n b { color: var(--muted, #7A7D83); text-decoration: line-through; }
+  .guardar-fijo { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; }
+  @media (max-width: 860px) { .rejilla2 { grid-template-columns: 1fr; } .compartir { grid-template-columns: 1fr; justify-items: center; } .horario { grid-template-columns: 1fr auto; } }
+  @media print {
+    body > *:not(#cartel) { display: none !important; }
+    #cartel { display: block !important; text-align: center; font-family: system-ui, sans-serif; padding-top: 40px; }
+    #cartel h1 { font-size: 46px; margin: 0 0 6px; }
+    #cartel p { font-size: 24px; margin: 0 0 24px; }
+    #cartel canvas { width: 420px !important; height: 420px !important; }
+    #cartel .url { font-size: 18px; margin-top: 16px; word-break: break-all; }
+  }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex; align-items:center; gap:4px;"><button class="btn-abrir-sidebar" onclick="abrirSidebarMovil()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>🌐 Tienda en línea</h1></div>
+    <a class="btn btn-secondary" href="../pedidos.html">Ver pedidos</a>
+  </div>
+
+  <div class="contenido" id="contenido"><div class="caja">Cargando…</div></div>
+  <div id="cartel" style="display:none"></div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/estado-conexion.js"></script>
+<script src="../js/ui-components.js"></script>
+<script src="../js/vendor/qrcode.min.js"></script>
+<script src="../js/sidebar-nav.js"></script>
+<script>
+requiereLogin();
+const usuarioTienda = getUsuario();
+if (usuarioTienda && !['dueno', 'gerente', 'jefe_general'].includes(usuarioTienda.rol)) window.location.replace('../mostrador.html');
+
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dinero = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+let cfg = null;
+let fiado = [];
+let temporizadorBusca = null;
+
+function copiarTexto(texto, mensaje) {
+  const listo = () => mostrarToast(mensaje || 'Copiado', 'exito', 1500);
+  if (navigator.clipboard) navigator.clipboard.writeText(texto).then(listo, () => mostrarToast('No se pudo copiar', 'error'));
+  else { const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); listo(); }
+}
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-copiar]'); if (b) copiarTexto(b.dataset.copiar, b.dataset.msg); });
+
+// El enlace usa la dirección de esta página. Si se abrió desde la red de la tienda (http://192.168…), los clientes no la alcanzan desde su casa.
+const esDireccionLocal = () => location.protocol !== 'https:' || /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+const enlaceTienda = () => `${location.origin}/tienda.html?s=${cfg.sucursal_id}`;
+const enlaceFiado = (c) => `${enlaceTienda()}&c=${encodeURIComponent(c.enlace_tienda)}`;
+const wa = (tel, texto) => `https://wa.me/${tel ? '52' + String(tel).replace(/\D/g, '').slice(-10) : ''}?text=${encodeURIComponent(texto)}`;
+
+async function cargar() {
+  try {
+    cfg = await apiFetch('/tienda/config');
+    fiado = await apiFetch('/tienda/fiado');
+    pintar();
+    buscarProductos('');
+  } catch (err) {
+    document.getElementById('contenido').innerHTML = `<div class="caja">No se pudo abrir la configuración: ${esc(err.message)}</div>`;
+  }
+}
+
+function tramo(k, nombre, valor) {
+  const abre = Array.isArray(valor);
+  return `<div class="horario"><span class="dia">${nombre}</span>
+    <label class="opcion-check" style="padding:0;gap:6px">Abre <input type="checkbox" class="interruptor" id="h-${k}-abre" ${abre ? 'checked' : ''} onchange="document.getElementById('h-${k}-de').disabled = document.getElementById('h-${k}-a').disabled = !this.checked"></label>
+    <input type="time" id="h-${k}-de" value="${abre ? valor[0] : '09:00'}" ${abre ? '' : 'disabled'} aria-label="${nombre}: abre a las">
+    <input type="time" id="h-${k}-a" value="${abre ? valor[1] : '14:00'}" ${abre ? '' : 'disabled'} aria-label="${nombre}: cierra a las"></div>`;
+}
+
+function pintar() {
+  const c = cfg;
+  const h = c.horario || {};
+  document.getElementById('contenido').innerHTML = `
+    <div class="caja">
+      <div class="encendido"><div><b>Recibir pedidos por internet</b>
+        <div class="estado-tienda ${c.activo ? 'ok' : ''}">${c.activo ? '✓ Tu tienda está publicada. ' + esc(c.horario_texto) : 'Apagada: nadie puede hacer pedidos todavía.'}</div></div>
+        <input type="checkbox" class="interruptor" id="cActivo" ${c.activo ? 'checked' : ''} onchange="guardar({ activo: this.checked })" aria-label="Recibir pedidos por internet"></div>
+      ${!c.zonas ? '<div class="aviso" style="margin-top:12px">Todavía no tienes colonias con su costo de envío. Agrégalas en <a href="../pedidos.html">Pedidos → Ajustes → Zonas</a> para que el cliente elija la suya.</div>' : ''}
+      ${c.activo ? `<div class="compartir"><canvas id="qr" width="340" height="340" aria-label="Código QR de tu tienda"></canvas><div>
+        <div style="font-weight:700;margin-bottom:6px">Comparte este enlace con tus clientes</div>
+        ${esDireccionLocal() ? '<div class="aviso">Estás viendo esta página desde la red de tu negocio. Para compartir el enlace ábrela desde tu dirección en internet (la que termina en compoint.com.mx).</div>' : ''}
+        <div class="enlace"><input type="text" readonly value="${esc(enlaceTienda())}" aria-label="Enlace de tu tienda"><button class="btn btn-secondary" data-copiar="${esc(enlaceTienda())}" data-msg="Enlace copiado">Copiar</button></div>
+        <div class="botones"><a class="btn btn-primary" target="_blank" rel="noopener" href="${esc(wa('', '¡Ya puedes pedir a domicilio desde tu celular! Entra aquí: ' + enlaceTienda()))}">Mandar por WhatsApp</a>
+          <a class="btn btn-secondary" target="_blank" rel="noopener" href="${esc(enlaceTienda())}">Ver mi tienda</a>
+          <button class="btn btn-secondary" onclick="imprimirCartel()">Imprimir cartel con QR</button></div></div></div>` : ''}
+    </div>
+
+    <div class="rejilla2">
+      <div>
+        <div class="caja"><h2>Datos de tu tienda</h2><p class="ayuda">Así te ven tus clientes arriba de la página.</p>
+          <div class="campo"><label for="cGiro">¿Qué vendes?</label><input type="text" id="cGiro" maxlength="120" placeholder="Ej. Pañales, abarrotes y lácteos" value="${esc(c.giro || '')}"></div>
+          <div class="campo"><label for="cTiempo">¿En cuánto tiempo llega?</label><input type="text" id="cTiempo" maxlength="40" placeholder="Ej. 30 a 45 min" value="${esc(c.tiempo_entrega || '')}"></div>
+          <div class="campo"><label for="cMinimo">Pedido mínimo en productos</label><input type="number" id="cMinimo" min="0" max="100000" step="1" value="${Number(c.pedido_minimo) || 0}"><small>0 = sin mínimo</small></div>
+        </div>
+        <div class="caja"><h2>¿A qué hora recibes pedidos?</h2><p class="ayuda">Fuera de este horario la página dice «Cerrado» y no deja pedir.</p>
+          ${tramo('semana', 'Lunes a sábado', h.semana)}${tramo('domingo', 'Domingo', h.domingo)}
+        </div>
+      </div>
+      <div>
+        <div class="caja"><h2>Opciones</h2>
+          <label class="opcion-check"><span>Aceptar tarjeta al entregar<small>Solo si tu repartidor lleva terminal</small></span><input type="checkbox" class="interruptor" id="cTarjeta" ${c.acepta_tarjeta ? 'checked' : ''}></label>
+          <label class="opcion-check"><span>Esconder productos agotados<small>Los que tienen inventario en 0</small></span><input type="checkbox" class="interruptor" id="cAgotados" ${c.ocultar_sin_existencia ? 'checked' : ''}></label>
+          <label class="opcion-check"><span>Dejar pedir «a su cuenta» (fiado)<small>Solo clientes con crédito y con su enlace personal</small></span><input type="checkbox" class="interruptor" id="cFiado" ${c.fiado_en_linea ? 'checked' : ''} onchange="document.getElementById('cajaFiado').style.display = this.checked ? '' : 'none'"></label>
+          <div class="campo" style="margin-top:8px"><label for="cMaxPend">Pedidos sin confirmar por teléfono</label><input type="number" id="cMaxPend" min="1" max="20" value="${c.max_pendientes_por_telefono}"><small>Evita pedidos de broma: después de este número espera a que confirmes</small></div>
+        </div>
+        <div class="caja" id="cajaFiado" style="${c.fiado_en_linea ? '' : 'display:none'}"><h2>Enlaces personales para fiado</h2><p class="ayuda">Cada cliente con crédito tiene su propio enlace: con él ve cuánto debe y puede pedir a su cuenta.</p>
+          <div id="listaFiado">${pintarFiado()}</div></div>
+      </div>
+    </div>
+
+    <div class="caja"><h2>¿Qué productos se ven en la tienda?</h2><p class="ayuda">Apaga los que no quieras vender por internet. ${c.productos_ocultos ? `Tienes <b>${c.productos_ocultos}</b> escondidos.` : 'Ahora se ven todos los que tienen precio.'}</p>
+      <div class="campo"><input type="search" id="buscaProd" placeholder="Buscar producto…" aria-label="Buscar producto" oninput="clearTimeout(temporizadorBusca); temporizadorBusca = setTimeout(() => buscarProductos(this.value), 300)"></div>
+      <div class="lista-p" id="listaProd"></div></div>
+
+    <div class="guardar-fijo"><button class="btn btn-primary btn-grande" onclick="guardar()">Guardar cambios</button></div>`;
+  if (c.activo && typeof QRCode !== 'undefined') QRCode.toCanvas(document.getElementById('qr'), enlaceTienda(), { width: 340, margin: 1 }, () => {});
+}
+
+function pintarFiado() {
+  if (!fiado.length) return '<p class="ayuda">No tienes clientes con crédito. Dale un límite de crédito a tu cliente en Clientes/Créditos.</p>';
+  return fiado.map((c) => `<div class="fila-p"><div class="n"><b>${esc(c.nombre)}</b><small>Debe ${dinero(c.saldo_actual)} de ${dinero(c.limite_credito)}</small></div>
+    ${c.enlace_tienda
+      ? `<button class="btn btn-secondary btn-chico" data-copiar="${esc(enlaceFiado(c))}" data-msg="Enlace de ${esc(c.nombre)} copiado">Copiar</button>
+         <a class="btn btn-primary btn-chico" target="_blank" rel="noopener" href="${esc(wa(c.telefono, `Hola ${String(c.nombre).split(' ')[0]}, este es tu enlace para pedir a domicilio y anotarlo a tu cuenta. Es solo para ti, no lo compartas: ${enlaceFiado(c)}`))}">WhatsApp</a>
+         <button class="btn btn-secondary btn-chico" title="El enlace anterior deja de servir" onclick="crearEnlace(${c.id}, true)">Cambiar</button>`
+      : `<button class="btn btn-secondary btn-chico" onclick="crearEnlace(${c.id}, false)">Crear enlace</button>`}</div>`).join('');
+}
+
+async function crearEnlace(id, nuevo) {
+  if (nuevo && !(await confirmarAccion('¿Cambiar el enlace? El que ya tiene el cliente deja de servir y tendrás que mandarle el nuevo.'))) return;
+  try {
+    const r = await apiFetch(`/tienda/fiado/${id}/enlace`, { method: 'POST', body: JSON.stringify({ nuevo }) });
+    const c = fiado.find((x) => x.id === id); if (c) c.enlace_tienda = r.enlace_tienda;
+    document.getElementById('listaFiado').innerHTML = pintarFiado();
+    mostrarToast(nuevo ? 'Enlace cambiado' : 'Enlace creado', 'exito');
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+
+function leerTramo(k) {
+  if (!document.getElementById(`h-${k}-abre`).checked) return null;
+  return [document.getElementById(`h-${k}-de`).value, document.getElementById(`h-${k}-a`).value];
+}
+
+async function guardar(soloEsto) {
+  const cuerpo = soloEsto || {
+    activo: document.getElementById('cActivo').checked,
+    giro: document.getElementById('cGiro').value,
+    tiempo_entrega: document.getElementById('cTiempo').value,
+    pedido_minimo: Number(document.getElementById('cMinimo').value) || 0,
+    max_pendientes_por_telefono: Number(document.getElementById('cMaxPend').value) || 2,
+    acepta_tarjeta: document.getElementById('cTarjeta').checked,
+    ocultar_sin_existencia: document.getElementById('cAgotados').checked,
+    fiado_en_linea: document.getElementById('cFiado').checked,
+    horario: { semana: leerTramo('semana'), domingo: leerTramo('domingo') }
+  };
+  try {
+    const r = await apiFetch('/tienda/config', { method: 'PUT', body: JSON.stringify(cuerpo) });
+    cfg = Object.assign(cfg, r);
+    mostrarToast(soloEsto ? (r.activo ? 'Tu tienda está publicada' : 'Tienda apagada') : 'Cambios guardados', 'exito');
+    if (soloEsto) pintar(); else { const est = document.querySelector('.estado-tienda'); if (est && cfg.activo) est.textContent = '✓ Tu tienda está publicada. ' + cfg.horario_texto; }
+    if (soloEsto) buscarProductos('');
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+    if (soloEsto) document.getElementById('cActivo').checked = !!cfg.activo;
+  }
+}
+
+async function buscarProductos(q) {
+  const el = document.getElementById('listaProd'); if (!el) return;
+  try {
+    const l = await apiFetch('/tienda/productos' + (q ? '?q=' + encodeURIComponent(q) : ''));
+    el.innerHTML = l.length ? l.map((p) => `<div class="fila-p ${p.en_tienda ? '' : 'oculto'}" id="fp-${p.id}"><div class="n"><b>${esc(p.nombre)}</b><small>${dinero(p.precio)}${p.precio > 0 ? '' : ' · sin precio, no se ve'}${p.con_foto ? '' : ' · sin foto'}</small></div>
+      <input type="checkbox" class="interruptor" ${p.en_tienda ? 'checked' : ''} aria-label="Mostrar ${esc(p.nombre)} en la tienda" onchange="cambiarProducto(${p.id}, this)"></div>`).join('')
+      : '<p class="ayuda" style="padding:10px 0">No hay productos con ese nombre.</p>';
+  } catch (err) { el.innerHTML = `<p class="ayuda">${esc(err.message)}</p>`; }
+}
+
+async function cambiarProducto(id, chk) {
+  try {
+    await apiFetch(`/tienda/productos/${id}`, { method: 'PUT', body: JSON.stringify({ en_tienda: chk.checked }) });
+    document.getElementById('fp-' + id).classList.toggle('oculto', !chk.checked);
+  } catch (err) { chk.checked = !chk.checked; mostrarToast(err.message, 'error'); }
+}
+
+async function imprimirCartel() {
+  let negocio = '';
+  try { negocio = (await (await fetch('/api/tienda/publico/info?s=' + cfg.sucursal_id)).json()).negocio || ''; } catch (e) { /* sin nombre */ }
+  const c = document.getElementById('cartel');
+  c.innerHTML = `<h1>${esc(negocio || 'Pide a domicilio')}</h1><p>Escanea y haz tu pedido desde tu celular</p><canvas id="qrGrande" width="840" height="840"></canvas><div class="url">${esc(enlaceTienda())}</div>`;
+  QRCode.toCanvas(document.getElementById('qrGrande'), enlaceTienda(), { width: 840, margin: 1 }, () => window.print());
+}
+
+cargar();
+</script>
+</body>
+</html>

@@ -19,6 +19,7 @@ const ICONOS_SIDEBAR = {
   paquete: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/>',
   grafica_barras: '<path d="M4 20V10M12 20V4M20 20v-7"/>',
   portapapeles: '<rect x="6" y="4" width="12" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/>',
+  globo: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/>',
   camion: '<rect x="2" y="7" width="12" height="9" rx="1"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="6.5" cy="18" r="1.7"/><circle cx="16.5" cy="18" r="1.7"/>',
   usuarios: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14c2.5.3 4.5 2.5 4.5 6"/>',
   tendencia: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
@@ -82,6 +83,7 @@ const GRUPOS_SIDEBAR = [
     items: [
       { icono: 'carrito', texto: 'Mostrador', href: 'mostrador.html', permiso: 'VENTAS_CREAR' },
       { icono: 'camion', texto: 'Pedidos a domicilio', href: 'pedidos.html', permiso: 'VENTAS_CREAR' },
+      { icono: 'globo', texto: 'Tienda en línea', href: 'tienda-en-linea.html', roles: ROLES_ADMIN_SIDEBAR },
       { icono: 'billetera', texto: 'Caja', href: 'caja.html', permiso: ['CAJA_ABRIR', 'CAJA_MOVIMIENTO', 'CAJA_CERRAR'] },
       { icono: 'monitor', texto: 'Caja Avanzada', href: 'caja-avanzada.html', permiso: ['CAJA_ABRIR', 'CAJA_MOVIMIENTO', 'CAJA_CERRAR'] },
       { icono: 'deshacer', texto: 'Devoluciones', href: 'devoluciones.html', permiso: 'VENTAS_DEVOLVER' },
