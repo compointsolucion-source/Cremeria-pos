@@ -415,7 +415,7 @@ function exportarReporteCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `reporte-inventario-${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `reporte-inventario-${_fechaLocalISO()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

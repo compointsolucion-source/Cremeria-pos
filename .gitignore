@@ -2,3 +2,13 @@ node_modules/
 .env
 *.log
 .DS_Store
+
+# Nunca subir llaves, respaldos ni volcados de base de datos
+.env.*
+*.pem
+*.key
+*.cptkey
+*.cptbak
+*.dump
+*.sql.bak
+backups/

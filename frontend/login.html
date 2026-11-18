@@ -189,7 +189,7 @@
       <div class="vista" id="vistaRec2" hidden>
         <div class="pasos"><i class="on"></i><i class="on"></i><i></i></div>
         <h2>Revisa tu correo</h2>
-        <p class="sub">Enviamos un código de 6 dígitos a <b id="correoMask"></b>. Vale <span id="minVigencia">15</span> minutos.</p>
+        <p class="sub">Si el usuario es <b>dueño</b> y tiene correo registrado, le enviamos un código de 6 dígitos<span id="correoMask"></span>. Vale <span id="minVigencia">15</span> minutos. ¿No te llega? Revisa la carpeta de spam o <a href="https://wa.me/523325907090?text=Hola%2C%20no%20me%20llega%20el%20c%C3%B3digo%20para%20recuperar%20mi%20contrase%C3%B1a%20de%20Compoint%20Punto" target="_blank" rel="noopener" style="color:inherit"><b>escríbenos por WhatsApp</b></a>.</p>
         <label for="cod0">Código</label>
         <div class="codigo" id="cajasCodigo">
           <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="1" id="cod0" aria-label="Dígito 1">
@@ -386,7 +386,7 @@ async function pedirCodigo(desdeReenvio) {
     const r = await apiFetch('/auth/recuperar/solicitar', { method: 'POST', body: JSON.stringify({ usuario }) });
     if (r.sin_correo) { ver('vistaRec1'); $('sinCorreo').hidden = false; return; }
     estado.usuario = usuario;
-    $('correoMask').textContent = r.correo || 'tu correo';
+    $('correoMask').textContent = r.correo ? ' a ' + r.correo : '';
     $('minVigencia').textContent = r.minutos || 15;
     cajas.forEach((i) => { i.value = ''; });
     mostrarError('errRec2', '');

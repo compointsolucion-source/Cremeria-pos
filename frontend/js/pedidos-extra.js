@@ -375,7 +375,7 @@ const PTX = (function () {
 
   // =================================================================== REPORTE DE REPARTIDORES
   async function abrirReporte() {
-    const hoy = PT.estado.hoy || new Date().toISOString().slice(0, 10);
+    const hoy = PT.estado.hoy || _fechaLocalISO();
     const m = abrirModal({ titulo: '📊 Reporte de repartidores', ancho: 900 });
     let desde = U.sumarDias(hoy, -6), hasta = hoy;
     async function cargar() {

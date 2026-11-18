@@ -127,17 +127,15 @@ test('usuario sin correo o que no existe: misma respuesta (nadie averigua usuari
   const a = await pedir('cajera');
   const b = await pedir('no-existe');
   assert.equal(a.status, 200); assert.equal(b.status, 200);
-  assert.deepEqual(a.json, { ok: true, sin_correo: true });
+  assert.deepEqual(a.json, { ok: true, enviado: true, minutos: 15 });
   assert.deepEqual(b.json, a.json);
   assert.equal(correos.length, antes);
 });
 
-test('pedir el código: llega al correo del usuario, la respuesta NO trae el código y el correo va enmascarado', async () => {
+test('pedir el código: llega al correo del dueño y la respuesta es igual a la de cualquier otro usuario (sin correo ni código)', async () => {
   const r = await pedir('rosa');
   assert.equal(r.status, 200, JSON.stringify(r.json));
-  assert.equal(r.json.enviado, true);
-  assert.match(r.json.correo, /^ro.+@abarrotesesperanza\.com$/);
-  assert.ok(!r.json.correo.includes('rosa@'), 'el correo va enmascarado');
+  assert.deepEqual(r.json, { ok: true, enviado: true, minutos: 15 }, 'misma respuesta que un usuario que no existe');
   const m = correos[correos.length - 1];
   assert.equal(m.correo, 'rosa@abarrotesesperanza.com');
   assert.match(m.codigo, /^\d{6}$/);
@@ -150,10 +148,12 @@ test('pedir el código: llega al correo del usuario, la respuesta NO trae el có
   assert.equal(fila.codigo_hash.length, 64);
 });
 
-test('pedir otro código antes de un minuto se rechaza', async () => {
+test('pedir otro código antes de un minuto no manda otro (y responde igual, sin delatar al dueño)', async () => {
+  const antes = correos.length;
   const r = await pedir('rosa');
-  assert.equal(r.status, 429);
-  assert.match(r.json.error, /minuto/);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { ok: true, enviado: true, minutos: 15 });
+  assert.equal(correos.length, antes, 'no se mandó otro correo');
 });
 
 // ---------------------------------------------------------------- verificar y restablecer
@@ -236,7 +236,7 @@ test('un usuario desactivado o eliminado no puede recuperar', async () => {
   await pool.query('UPDATE usuarios SET activo = false WHERE id = $1', [U.gerente]);
   const antes = correos.length;
   const r = await pedir('gerente');
-  assert.deepEqual(r.json, { ok: true, sin_correo: true });
+  assert.deepEqual(r.json, { ok: true, enviado: true, minutos: 15 });
   assert.equal(correos.length, antes);
   await pool.query('UPDATE usuarios SET activo = true WHERE id = $1', [U.gerente]);
 });
@@ -264,7 +264,7 @@ test('un empleado (no dueño) NO puede recuperar su contraseña por correo, aunq
   const antes = correos.length;
   const a = await pedir('empleado');
   assert.equal(a.status, 200);
-  assert.deepEqual(a.json, { ok: true, sin_correo: true }, 'misma respuesta que un usuario que no existe');
+  assert.deepEqual(a.json, { ok: true, enviado: true, minutos: 15 }, 'misma respuesta que un usuario que no existe');
   assert.equal(correos.length, antes, 'no se mandó ningún correo');
   // aunque alguien meta un código válido a mano en la base, no sirve para un empleado
   const codigo = '123456';

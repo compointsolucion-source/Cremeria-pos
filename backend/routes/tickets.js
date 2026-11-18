@@ -28,6 +28,9 @@ async function generarFolio(db, sucursalId) {
   throw Object.assign(new Error(msg), { status: 503, error: msg });
 }
 
+// Día de hoy (AAAA-MM-DD) en la zona del negocio.
+const hoyNegocio = () => new Intl.DateTimeFormat('en-CA', { timeZone: process.env.TZ_NEGOCIO || 'America/Mexico_City' }).format(new Date());
+
 // Revisión de renglones (catálogo, precios mínimos, nombres limpios): utils/renglones.js
 const { revisarRenglones: revisarConUsuario } = require('../utils/renglones');
 
@@ -359,7 +362,8 @@ router.get('/ultimo-pagado', verificarToken, async (req, res) => {
 router.get('/historial-dia', verificarToken, async (req, res) => {
   try {
     const { fecha, cajero_id } = req.query;
-    const fechaConsulta = fecha || new Date().toISOString().split('T')[0];
+    // Sin fecha: el día de HOY en el negocio (México), no el de Londres (después de las 6 pm ya era «mañana»).
+    const fechaConsulta = /^\d{4}-\d{2}-\d{2}$/.test(String(fecha || '')) ? fecha : hoyNegocio();
 
     const result = await pool.query(
       `SELECT t.id, t.folio, t.total, t.estado, t.metodo_pago, t.referencia_pago, t.fecha_pago, t.fecha_creacion,

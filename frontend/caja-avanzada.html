@@ -1583,7 +1583,7 @@ let ticketSeleccionadoHistorial = null;
 
 async function abrirHistorialVentas() {
   document.getElementById('modalHistorial').style.display = 'flex';
-  document.getElementById('fechaHistorial').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fechaHistorial').value = _fechaLocalISO(); // fecha de aquí (no la de Londres: después de las 6 pm era «mañana»)
   await cargarCajerosFiltroHistorial();
   await cargarHistorialVentas();
   setTimeout(() => document.getElementById('fechaHistorial').focus(), 0);

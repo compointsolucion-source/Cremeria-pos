@@ -707,7 +707,7 @@ let ticketHistorialCaja = null;
 
 function abrirHistorialCaja() {
   document.getElementById('modalHistorialCaja').style.display = 'flex';
-  document.getElementById('fechaHistorialCaja').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fechaHistorialCaja').value = _fechaLocalISO(); // fecha de aquí (no la de Londres: después de las 6 pm era «mañana»)
   cargarHistorialCaja();
 }
 function cerrarHistorialCaja() {

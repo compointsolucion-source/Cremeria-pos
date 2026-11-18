@@ -150,7 +150,7 @@ router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER
     ).join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="ventas-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="ventas-${new Intl.DateTimeFormat('en-CA', { timeZone: process.env.TZ_NEGOCIO || 'America/Mexico_City' }).format(new Date())}.csv"`);
     res.send(encabezado + filas);
   } catch (err) {
     console.error(err);

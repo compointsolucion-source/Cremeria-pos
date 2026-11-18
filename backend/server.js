@@ -28,10 +28,12 @@ app.disable('x-powered-by');
 // En la computadora del negocio NO hay proxy: ahí no se confía en el encabezado X-Forwarded-For
 // (si se confiara, cualquiera en la red podría inventarse una IP nueva en cada intento).
 const ES_LOCAL = !!process.env.COMPOINT_ID_EQUIPO;
+const reloj = require('./utils/reloj');
 app.set('trust proxy', ES_LOCAL ? false : 1);
 
 // Encabezados de seguridad para todas las respuestas.
 app.use((req, res, next) => {
+  if (ES_LOCAL) reloj.avisoEnRespuesta(req, res, () => {}); // hora de la computadora mal → aviso
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('X-Frame-Options', 'SAMEORIGIN');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -40,7 +42,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({ exposedHeaders: ['X-Licencia-Estado', 'X-Licencia-Tipo', 'X-Licencia-Dias', 'X-Licencia-Vence', 'X-Sesion-Nueva'] }));
+app.use(cors({ exposedHeaders: ['X-Licencia-Estado', 'X-Licencia-Tipo', 'X-Licencia-Dias', 'X-Licencia-Vence', 'X-Sesion-Nueva', 'X-Reloj-Desfase'] }));
 // Tamaño máximo de lo que se manda: 2 MB en general; 15 MB solo donde se suben fotos, archivos
 // o listas grandes (así nadie puede saturar el servidor mandando datos enormes al login, por ejemplo).
 const jsonNormal = express.json({ limit: '2mb' });
@@ -182,6 +184,8 @@ migrar()
     console.log(`Servidor corriendo en puerto ${PORT}`);
     // Solicitudes de licencia que no se pudieron mandar por falta de internet: se reintentan solas.
     require('./utils/licenciaEnvio').iniciarReintentos(process.env.COMPOINT_ID_EQUIPO ? 'local' : 'nube');
+    // En la computadora del negocio: revisar que su hora esté bien (contra la hora de internet).
+    if (ES_LOCAL && process.env.NODE_ENV !== 'test') reloj.iniciar();
     // Licencia central (solo en la nube y solo si Compoint puso COMPOINT_LICENCIA_TOKEN): consulta cada hora a compoint.com.mx.
     require('./utils/licenciaCentral').iniciar();
     // Pedidos programados que ya toca preparar y pedidos fijos de tiendas (cada minuto).

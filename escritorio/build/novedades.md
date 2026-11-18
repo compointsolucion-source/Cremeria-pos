@@ -3,3 +3,5 @@
 - La sincronización y los respaldos no pierden información si algo falla a la mitad; si un respaldo falla, te avisa junto al reloj.
 - Más rápido con meses de ventas, sin folios repetidos y sin turnos de caja duplicados.
 - Tu sesión se renueva sola mientras trabajas y se cierra tras 30 días sin usarla.
+- Si la hora de la computadora está mal (por ejemplo, después de que se fue la luz), sale una barra roja para corregirla.
+- «Ventas del día» ya abre con la fecha correcta también después de las 6 de la tarde.

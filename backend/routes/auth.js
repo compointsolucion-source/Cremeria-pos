@@ -231,17 +231,17 @@ router.post('/recuperar/solicitar', limitadorPedirCodigo, async (req, res) => {
     const r = await pool.query(
       `SELECT id, nombre, correo FROM usuarios WHERE usuario = $1 AND rol = 'dueno' AND activo = true AND eliminado_en IS NULL`, [usuario]);
     const u = r.rows[0];
-    // Solo el DUEÑO puede recuperar su contraseña por correo. Para cualquier otro usuario (o uno que no existe)
-    // la respuesta es la misma, así nadie averigua quién es quién.
-    if (!u || !u.correo || !recuperacion.correoValido(u.correo)) return res.json({ ok: true, sin_correo: true });
+    // La respuesta es SIEMPRE la misma (exista o no el usuario, sea o no dueño, tenga o no correo, o si ya se le
+    // mandó uno hace un momento): así nadie puede averiguar qué usuarios son dueños probando nombres.
+    // El código solo se manda de verdad al dueño con correo registrado.
+    const respuestaIgual = { ok: true, enviado: true, minutos: recuperacion.MINUTOS_VIGENCIA };
+    if (!u || !u.correo || !recuperacion.correoValido(u.correo)) return res.json(respuestaIgual);
 
-    // Un código nuevo como máximo cada minuto por usuario.
+    // Un código nuevo como máximo cada minuto por usuario (el anterior sigue sirviendo).
     const reciente = await pool.query(
       `SELECT 1 FROM recuperacion_codigos WHERE usuario_id = $1 AND creado_en > NOW() - ($2 || ' seconds')::interval LIMIT 1`,
       [u.id, String(recuperacion.ESPERA_ENTRE_ENVIOS_SEG)]);
-    if (reciente.rows.length) {
-      return res.status(429).json({ error: 'Ya te enviamos un código hace un momento. Espera un minuto para pedir otro.' });
-    }
+    if (reciente.rows.length) return res.json(respuestaIgual);
 
     const codigo = recuperacion.generarCodigo();
     await pool.query('UPDATE recuperacion_codigos SET usado = true WHERE usuario_id = $1 AND usado = false', [u.id]);
@@ -261,7 +261,7 @@ router.post('/recuperar/solicitar', limitadorPedirCodigo, async (req, res) => {
       await pool.query('UPDATE recuperacion_codigos SET usado = true WHERE id = $1', [ins.rows[0].id]);
       return res.status(502).json({ error: envio.error });
     }
-    res.json({ ok: true, enviado: true, correo: recuperacion.enmascarar(u.correo), minutos: recuperacion.MINUTOS_VIGENCIA });
+    res.json(respuestaIgual);
   } catch (err) {
     console.error('Recuperar contraseña (solicitar):', err.message);
     res.status(500).json({ error: 'No se pudo enviar el código. Intenta de nuevo.' });

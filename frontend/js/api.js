@@ -123,6 +123,35 @@ function licenciaSoloConsulta() {
   return !!(i && i.estado === 'solo_consulta');
 }
 
+// ---------- Hora mal puesta (por ejemplo, después de que se fue la luz) ----------
+// Dos revisiones: 1) el servidor del negocio avisa (X-Reloj-Desfase) si SU hora no coincide con la de internet;
+// 2) se compara la hora de ESTA computadora con la del servidor (encabezado Date). Si alguna está mal por
+// 5 minutos o más, sale una barra roja: las ventas se guardarían con la hora equivocada.
+function revisarHoraDesdeRespuesta(response) {
+  const tiempo = (m) => { m = Math.abs(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h} h${r ? ' ' + r + ' min' : ''}` : `${r} minutos`; };
+  try {
+    let mensaje = '';
+    const servidor = Number(response.headers.get('X-Reloj-Desfase'));
+    if (Number.isFinite(servidor) && Math.abs(servidor) >= 5) {
+      mensaje = `La hora de la computadora del servidor está ${servidor > 0 ? 'adelantada' : 'atrasada'} ${tiempo(servidor)}.`;
+    } else {
+      const fechaServidor = Date.parse(response.headers.get('Date') || '');
+      const min = Number.isFinite(fechaServidor) ? Math.round((Date.now() - fechaServidor) / 60000) : 0;
+      if (Math.abs(min) >= 5) mensaje = `La hora de esta computadora está ${min > 0 ? 'adelantada' : 'atrasada'} ${tiempo(min)}.`;
+    }
+    let barra = document.getElementById('avisoHoraMal');
+    if (!mensaje) { if (barra) barra.remove(); return; }
+    if (!barra) {
+      barra = document.createElement('div');
+      barra.id = 'avisoHoraMal';
+      barra.setAttribute('role', 'alert');
+      barra.style.cssText = 'position:fixed; bottom:0; left:0; right:0; z-index:10000; background:#C62828; color:#fff; padding:8px 14px; font:600 14px sans-serif; text-align:center; box-shadow:0 -2px 8px rgba(0,0,0,.3);';
+      (document.body || document.documentElement).appendChild(barra);
+    }
+    barra.textContent = '⚠️ ' + mensaje + ' Corrígela: clic derecho en el reloj de Windows → «Ajustar fecha y hora» → «Sincronizar ahora». Si no, las ventas se guardan con la hora equivocada.';
+  } catch (e) { /* nada */ }
+}
+
 function _fechaLocalISO(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -439,6 +468,8 @@ async function apiFetch(endpoint, options = {}) {
 
   // Barra de licencia (prueba, por vencer, gracia, solo consulta): se actualiza con cada respuesta.
   actualizarLicenciaDesdeRespuesta(response);
+
+  revisarHoraDesdeRespuesta(response);
 
   // Sesión renovada por el servidor (una vez al día mientras se trabaja): se guarda para no salir a media venta.
   const sesionNueva = response.headers.get('X-Sesion-Nueva');
