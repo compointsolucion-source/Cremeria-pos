@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+// Las rutas async que fallan mandan su error al manejador general (no se quedan colgadas).
+const { esErrorDeBase } = require('./utils/errores-async');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,6 +10,12 @@ const { verificarLicencia } = require('./middleware/licencia');
 const { migrar } = require('./utils/migrar');
 
 const app = express();
+
+// La llave que firma las sesiones debe ser larga y al azar. No se detiene el servidor (para no dejar sin
+// sistema a un cliente), pero queda el aviso en los Logs para corregirla.
+if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).length < 32) {
+  console.error(`[${new Date().toISOString()}] AVISO DE SEGURIDAD: JWT_SECRET falta o es muy corta (mínimo 32 caracteres). Cámbiala por una larga y al azar.`);
+}
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 1e6 });
 const jwt = require('jsonwebtoken');
@@ -32,7 +40,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({ exposedHeaders: ['X-Licencia-Estado', 'X-Licencia-Tipo', 'X-Licencia-Dias', 'X-Licencia-Vence'] }));
+app.use(cors({ exposedHeaders: ['X-Licencia-Estado', 'X-Licencia-Tipo', 'X-Licencia-Dias', 'X-Licencia-Vence', 'X-Sesion-Nueva'] }));
 // Tamaño máximo de lo que se manda: 2 MB en general; 15 MB solo donde se suben fotos, archivos
 // o listas grandes (así nadie puede saturar el servidor mandando datos enormes al login, por ejemplo).
 const jsonNormal = express.json({ limit: '2mb' });
@@ -70,7 +78,7 @@ app.use((req, res, next) => {
 io.use((socket, next) => {
   const token = socket.handshake && socket.handshake.auth && socket.handshake.auth.token;
   if (!token || typeof token !== 'string') return next(new Error('Sesión requerida'));
-  jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
+  jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }, (err, usuario) => {
     if (err) return next(new Error('Sesión no válida'));
     datosActuales(usuario.id).then((d) => {
       if (d && (!d.activo || (Number(usuario.tv) || 0) !== d.tv)) return next(new Error('Sesión no válida'));
@@ -157,6 +165,7 @@ app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Lo que se mandó es demasiado grande' });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Datos mal formados' });
+  if (esErrorDeBase(err)) return res.status(503).json({ error: 'No hay conexión con la base de datos en este momento. Espera unos segundos e intenta de nuevo.' });
   res.status(500).json({ error: 'Ocurrió un error inesperado en el servidor' });
 });
 

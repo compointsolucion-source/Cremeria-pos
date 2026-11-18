@@ -44,13 +44,29 @@ function rutaPermitidaParaRepartidor(url) {
   return PREFIJOS_REPARTIDOR.some((p) => ruta === p || ruta.startsWith(p + '/'));
 }
 
+// La sesión dura 30 días SIN USO. Mientras se trabaja se renueva sola (una vez al día manda una sesión
+// nueva en el encabezado X-Sesion-Nueva y la página la guarda), así que nadie se sale a media venta;
+// pero una sesión olvidada o robada deja de servir en un mes (antes duraba un año).
+// "ini" guarda cuándo se escribió la contraseña: no cambia al renovar. Después de 90 días ya no se renueva
+// (hay que volver a entrar) y lo delicado (vincular la nube) sigue pidiendo una entrada reciente.
+const DURACION_SESION = '30d';
+const RENOVAR_DESPUES_SEG = 24 * 60 * 60;
+const MAXIMO_SIN_CONTRASENA_SEG = 90 * 24 * 60 * 60;
+function firmarSesion(datos) {
+  const { iat, exp, nbf, ...resto } = datos || {};
+  if (!resto.ini) resto.ini = Math.floor(Date.now() / 1000);
+  return jwt.sign(resto, process.env.JWT_SECRET, { expiresIn: DURACION_SESION, algorithm: 'HS256' });
+}
+const inicioDeSesion = (u) => Number(u && (u.ini || u.iat)) || 0;
+
 function verificarToken(req, res, next) {
   const header = req.headers['authorization'];
   const token = header && header.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Token requerido' });
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
+  jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }, (err, usuario) => {
     if (err) return res.status(401).json({ error: 'Token inválido o expirado' });
+    const original = usuario;
     datosActuales(usuario.id).then((d) => {
       if (d) {
         if (!d.activo) return res.status(401).json({ error: 'Tu usuario ya no está activo' });
@@ -61,6 +77,12 @@ function verificarToken(req, res, next) {
         return res.status(403).json({ error: 'Tu usuario de repartidor solo puede usar el módulo de entregas' });
       }
       req.usuario = usuario;
+      const ahora = Date.now() / 1000;
+      if (d && ahora - (Number(original.iat) || 0) > RENOVAR_DESPUES_SEG && ahora - inicioDeSesion(original) < MAXIMO_SIN_CONTRASENA_SEG) {
+        try {
+          res.set('X-Sesion-Nueva', firmarSesion({ ...original, ini: inicioDeSesion(original), rol: d.rol, sucursal_id: d.sucursal_id, permisos: d.permisos }));
+        } catch (e) { /* sin renovar: la sesión actual sigue sirviendo */ }
+      }
       next();
     });
   });
@@ -146,4 +168,4 @@ function requierePermiso(permiso) {
 }
 
 module.exports = {
-  datosActuales, _limpiarMemoriaActivos: () => _activos.clear(), verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };
+  firmarSesion, inicioDeSesion, DURACION_SESION, datosActuales, _limpiarMemoriaActivos: () => _activos.clear(), verificarToken, requiereRol, requiereSucursalId, requierePermiso, tienePermiso, PERMISOS_BASE_POR_ROL, TODOS_LOS_PERMISOS };

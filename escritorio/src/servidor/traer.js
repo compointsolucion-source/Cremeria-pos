@@ -75,7 +75,7 @@ async function estructuraLocal(c) {
 // Baja las tablas de la nube y las escribe en la base local (que ya debe tener sus tablas).
 async function importar({ url, sesion, avisar = () => {}, log = () => {}, lote: tamLote = LOTE }) {
   const { api, token, estructura: nube } = sesion;
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   const recibidas = {};
   try {

@@ -205,7 +205,15 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
     try { clave = descifrar(c.clave_cifrada); } catch (e) { return null; }
     return clave ? { api: c.api, texto: c.texto || c.api, clave } : null;
   };
-  const getPool = () => (pool || (pool = new Pool({ connectionString: url, max: 2 })));
+  const getPool = () => {
+    if (!pool) {
+      pool = new Pool({ connectionString: url, max: 2, connectionTimeoutMillis: 15000 });
+      // Si la base local se detiene, la conexión que estaba esperando avisa con un error: se registra
+      // en vez de tumbar el programa (y la siguiente vuelta de sincronización vuelve a intentar).
+      pool.on('error', (e) => console.error('[sync] conexión con la base local perdida:', e && e.message));
+    }
+    return pool;
+  };
 
   // ----- disparadores en la base local
   async function tablasConPk() {
@@ -267,13 +275,31 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
   }
 
   // ----- envío
-  async function reencolar(fallidos) {
+  async function reencolar(fallidos, db) {
     if (!fallidos.length) return;
-    const p = getPool();
+    const p = db || getPool();
     for (const f of fallidos) {
       const k = f.t + '|' + f.pk;
       intentos.set(k, (intentos.get(k) || 0) + 1);
       await p.query(`INSERT INTO ${ESQ}.cola (tabla, pk) VALUES ($1, $2)`, [f.t, f.pk]);
+    }
+  }
+
+  // Quita de la cola lo ya enviado y vuelve a anotar al final lo que falló, TODO junto: si algo falla a la
+  // mitad (se detuvo la base, se fue la luz) no se pierde ningún pendiente — o se hace todo o no se hace nada.
+  async function sacarDeLaCola(ids, falla) {
+    if (!ids.length && !falla.length) return;
+    const cx = await getPool().connect();
+    try {
+      await cx.query('BEGIN');
+      await reencolar(falla, cx);
+      if (ids.length) await cx.query(`DELETE FROM ${ESQ}.cola WHERE id = ANY($1)`, [ids]);
+      await cx.query('COMMIT');
+    } catch (e) {
+      await cx.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      cx.release();
     }
   }
 
@@ -309,8 +335,7 @@ function crearSincronizador({ url, rutas, log, obtenerConfig, descifrar = (t) =>
       }
       // Los que fallaron salen del frente y se anotan al final de la cola (se reintentan después).
       const idsMalos = falla.flatMap((x) => x.ids);
-      if (idsOk.length || idsMalos.length) await p.query(`DELETE FROM ${ESQ}.cola WHERE id = ANY($1)`, [[...idsOk, ...idsMalos]]);
-      await reencolar(falla);
+      await sacarDeLaCola([...idsOk, ...idsMalos], falla);
       (resp.fallidos || []).forEach((f) => fallidosTotal.push(f));
       enviados += idsOk.length ? usados.length - falla.length : 0;
       if (falla.length === usados.length) break; // nada avanzó: no insistir en esta vuelta

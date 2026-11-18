@@ -15,9 +15,17 @@ router.use(verificarToken, requiereSucursalId);
 // Generar folio corto único: S<sucursal><timestamp base36>, sin guion: muchos
 // lectores de código de barras cambian el "-" por otro carácter según la
 // distribución del teclado. (Los tickets viejos con guion se siguen encontrando.)
-function generarFolio(sucursalId) {
-  const base = Date.now().toString(36).toUpperCase().slice(-6);
-  return `S${sucursalId}${base}`;
+// El reloj en base 36 da la vuelta cada ~25 días, así que con meses de ventas un folio nuevo podría
+// repetir uno viejo (y la venta fallaría): se revisa que no exista y, si existe, se toma otro.
+async function generarFolio(db, sucursalId) {
+  for (let i = 0; i < 8; i++) {
+    const folio = `S${sucursalId}${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const ya = await db.query('SELECT 1 FROM tickets WHERE folio = $1', [folio]);
+    if (!ya.rows.length) return folio;
+    await new Promise((ok) => setTimeout(ok, 2 + Math.floor(Math.random() * 5)));
+  }
+  const msg = 'No se pudo generar el folio del ticket. Intenta de nuevo.';
+  throw Object.assign(new Error(msg), { status: 503, error: msg });
 }
 
 // Revisión de renglones (catálogo, precios mínimos, nombres limpios): utils/renglones.js
@@ -44,7 +52,7 @@ router.post('/', verificarToken, requierePermiso('VENTAS_CREAR'), async (req, re
     // Cada renglón se redondea a centavos (y respeta el importe exacto si fue venta por importe).
     const subtotales = items.map(subtotalRenglon);
     const total = r2(subtotales.reduce((sum, s) => sum + s, 0));
-    const folio = generarFolio(req.sucursalId);
+    const folio = await generarFolio(cliente, req.sucursalId);
 
     const ticketResult = await cliente.query(
       `INSERT INTO tickets (folio, sucursal_id, mostrador_usuario_id, estado, total)
@@ -360,7 +368,8 @@ router.get('/historial-dia', verificarToken, async (req, res) => {
        FROM tickets t
        LEFT JOIN usuarios u ON t.cajero_usuario_id = u.id
        WHERE t.sucursal_id = $1
-         AND COALESCE(t.fecha_pago, t.fecha_creacion)::date = $2
+         AND COALESCE(t.fecha_pago, t.fecha_creacion) >= $2::date
+         AND COALESCE(t.fecha_pago, t.fecha_creacion) < $2::date + 1
          AND t.estado IN ('pagado', 'cancelado')
          AND ($3::int IS NULL OR t.cajero_usuario_id = $3)
        ORDER BY COALESCE(t.fecha_pago, t.fecha_creacion) DESC`,

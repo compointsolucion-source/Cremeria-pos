@@ -9,6 +9,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { Pool, Client } = require('pg');
 const { pipeline } = require('stream/promises');
+const { once } = require('events');
 const { leerJson, guardarJson } = require('./rutas');
 
 const MAX_LOCALES = 30;
@@ -24,30 +25,45 @@ const comillas = (n) => '"' + String(n).replace(/"/g, '""') + '"';
 // ---------------------------------------------------------------- volcado
 async function volcar(url, destino, log) {
   const pool = new Pool({ connectionString: url, max: 1 });
-  const c = await pool.connect();
+  pool.on('error', (e) => console.error('[respaldo] conexión con la base perdida:', e && e.message));
   const tablas = {};
+  let c = null;
   try {
+    c = await pool.connect();
     await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const lista = (await c.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")).rows.map(r => r.tablename);
     const gz = zlib.createGzip({ level: 6 });
     const salida = fs.createWriteStream(destino);
+    // Si el disco se llena o la USB se desconecta a medio respaldo, "fin" falla: se detiene el respaldo
+    // en ese momento (en vez de seguir escribiendo a la nada) y queda marcado como fallido.
     const fin = pipeline(gz, salida);
-    gz.write(`{"formato":${FORMATO},"creado":${JSON.stringify(new Date().toISOString())},"tablas":{`);
+    let errorEscritura = null;
+    fin.catch((e) => { errorEscritura = e; });
+    const escribir = async (texto) => {
+      if (errorEscritura) throw errorEscritura;
+      // Si el archivo no alcanza a escribirse tan rápido, se espera (no se junta todo el respaldo en memoria).
+      if (!gz.write(texto)) await Promise.race([once(gz, 'drain'), fin]);
+      if (errorEscritura) throw errorEscritura;
+    };
+    await escribir(`{"formato":${FORMATO},"creado":${JSON.stringify(new Date().toISOString())},"tablas":{`);
     let primera = true;
     for (const t of lista) {
       const r = await c.query(`SELECT row_to_json(x)::text AS j FROM ${comillas(t)} x`);
       tablas[t] = r.rows.length;
-      gz.write((primera ? '' : ',') + JSON.stringify(t) + ':[' + r.rows.map(f => f.j).join(',') + ']');
+      await escribir((primera ? '' : ',') + JSON.stringify(t) + ':[' + r.rows.map(f => f.j).join(',') + ']');
       primera = false;
     }
-    gz.write('}}');
+    await escribir('}}');
     gz.end();
     await fin;
     await c.query('COMMIT');
   } catch (e) {
-    await c.query('ROLLBACK').catch(() => {});
+    if (c) await c.query('ROLLBACK').catch(() => {});
     throw e;
-  } finally { c.release(); await pool.end(); }
+  } finally {
+    if (c) c.release();
+    await pool.end().catch(() => {});
+  }
   return tablas;
 }
 
@@ -224,7 +240,7 @@ function crearGestor({ rutas, urlBase, obtenerNegocio, obtenerNube, log }) {
 async function restaurarRespaldo({ url, archivo, dirServidor, log }) {
   const datos = JSON.parse(zlib.gunzipSync(fs.readFileSync(archivo)).toString('utf8'));
   if (datos.formato !== FORMATO || !datos.tablas) throw new Error('Este archivo no es un respaldo válido de Compoint Punto.');
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     await c.query('BEGIN');

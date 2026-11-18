@@ -1,9 +1,5 @@
-- El corte te dice por qué no cuadra: si falta dinero de verdad o solo no se escribió la tarjeta o la transferencia.
-- Báscula: eliges el puerto COM, el peso se escribe solo en Mostrador y también sale en Caja Avanzada.
-- Corte de Caja renovado: abre tu turno y ve cómo va el día en un solo lugar.
-- Nuevo «Historial de cortes»: por turno, día o mes, y el botón «Solo con diferencia».
-- Cada corte muestra cuánto debía haber, cuánto se contó y la diferencia.
-- Menú más sencillo: una sola opción de cortes.
-- Tema nuevo «Compoint»: íconos de línea, letra más clara y el total grande como display. Escógelo en Configuración → Temas completos.
-- Facturación: copia los datos con un clic, sube el PDF y el XML, y avísale a tu cliente por WhatsApp para que la descargue.
-- Recargas: nueva pestaña «Paquetes» y colores por compañía.
+- Más seguro: solo el dueño general puede conectar la sincronización con la nube.
+- El programa ya no se cierra si la base de datos se detiene; la caja recibe un mensaje claro en vez de quedarse esperando.
+- La sincronización y los respaldos no pierden información si algo falla a la mitad; si un respaldo falla, te avisa junto al reloj.
+- Más rápido con meses de ventas, sin folios repetidos y sin turnos de caja duplicados.
+- Tu sesión se renueva sola mientras trabajas y se cierra tras 30 días sin usarla.

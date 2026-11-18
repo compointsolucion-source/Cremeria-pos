@@ -13,7 +13,7 @@ function urlConexion({ puerto, password }, base = BASE) {
 }
 
 async function responde(cfg) {
-  const c = new Client({ connectionString: urlConexion(cfg, 'postgres'), connectionTimeoutMillis: 1500 });
+  const c = new Client({ connectionString: urlConexion(cfg, 'postgres'), connectionTimeoutMillis: 1500 }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   try { await c.connect(); await c.query('SELECT 1'); return true; } catch (e) { return false; } finally { c.end().catch(() => {}); }
 }
 
@@ -46,7 +46,7 @@ async function iniciarPostgres({ dirDatos, puerto, password, log, opcionesExtra 
 
   if (nuevo) { try { await pg.createDatabase(BASE); } catch (e) { log && log('createDatabase: ' + e.message); } }
   // Si la base no existe (instalación a medias), se crea.
-  const c = new Client({ connectionString: urlConexion(cfg, 'postgres') });
+  const c = new Client({ connectionString: urlConexion(cfg, 'postgres') }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     const ya = await c.query('SELECT 1 FROM pg_database WHERE datname = $1', [BASE]);

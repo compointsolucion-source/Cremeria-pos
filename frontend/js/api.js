@@ -440,6 +440,12 @@ async function apiFetch(endpoint, options = {}) {
   // Barra de licencia (prueba, por vencer, gracia, solo consulta): se actualiza con cada respuesta.
   actualizarLicenciaDesdeRespuesta(response);
 
+  // Sesión renovada por el servidor (una vez al día mientras se trabaja): se guarda para no salir a media venta.
+  const sesionNueva = response.headers.get('X-Sesion-Nueva');
+  if (sesionNueva && token && getToken() === token) {
+    try { localStorage.setItem('token', sesionNueva); } catch (e) { /* sin almacenamiento: sigue la sesión actual */ }
+  }
+
   if (response.status === 402) {
     const d402 = await response.json().catch(() => ({}));
     // Modo "solo consulta": se puede seguir viendo todo; lo que registra o cambia se rechaza con este aviso.

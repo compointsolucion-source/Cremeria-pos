@@ -269,6 +269,8 @@ router.post('/abrir', verificarToken, requierePermiso('CAJA_ABRIR'), async (req,
 
     res.json(result.rows[0]);
   } catch (err) {
+    // Doble clic o dos pestañas al mismo tiempo: el candado de la base deja solo un turno abierto.
+    if (err && err.code === '23505') return res.status(400).json({ error: 'Ya tienes un turno abierto' });
     console.error(err);
     res.status(500).json({ error: 'Error al abrir el turno' });
   }

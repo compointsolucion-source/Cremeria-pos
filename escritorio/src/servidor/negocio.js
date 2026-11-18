@@ -18,7 +18,7 @@ const GIROS = {
 };
 
 async function baseVacia(url) {
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     const r = await c.query("SELECT count(*)::int n FROM information_schema.tables WHERE table_schema = 'public'");
@@ -69,7 +69,7 @@ async function aplicarMigraciones(c, dirServidor) {
 
 // Deja la base lista (tablas y migraciones) pero SIN datos del negocio: es donde se pone lo que viene de la nube.
 async function prepararBase(url, dirServidor) {
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     await c.query('BEGIN');
@@ -85,7 +85,7 @@ async function prepararBase(url, dirServidor) {
 // Borra todo lo de la base (queda como recién creada). Se usa si algo falla a la mitad de traer la nube,
 // para que el siguiente intento empiece limpio en lugar de quedarse con un negocio a medias.
 async function vaciarBase(url) {
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     await c.query('DROP SCHEMA IF EXISTS compoint_sync CASCADE');
@@ -97,7 +97,7 @@ async function vaciarBase(url) {
 async function crearNegocio(url, d, dirServidor) {
   const errores = validar(d);
   if (errores.length) throw new Error(errores.join(' '));
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     await c.query('BEGIN');

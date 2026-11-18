@@ -63,6 +63,22 @@ function log(texto) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'log.txt'), new Date().toISOString() + ' ' + texto + '\n'); } catch (e) { /* sin log */ }
 }
 
+// Un error que nadie atrapó NO debe enseñarle a la cajera una ventana técnica ni dejar el programa a medias.
+// Los de conexión con la base (se detuvo PostgreSQL, se cambió a la nube, se fue la luz) solo se anotan:
+// la siguiente operación vuelve a conectar sola. Los demás se anotan y se avisa con un mensaje sencillo.
+const ES_ERROR_DE_CONEXION = /ECONNREFUSED|ECONNRESET|EPIPE|ETIMEDOUT|terminat(ed|ing) connection|Connection terminated|57P0[123]|server closed the connection/i;
+process.on('uncaughtException', (err) => {
+  const texto = String((err && (err.stack || err.message)) || err);
+  log('Error no atrapado: ' + texto);
+  if (ES_ERROR_DE_CONEXION.test(texto) || (err && /^57P0/.test(String(err.code || '')))) return;
+  try {
+    dialog.showErrorBox('Compoint Punto', 'Ocurrió un problema inesperado, pero tu información está a salvo.\n\nSi algo no responde, cierra y vuelve a abrir el programa. Si se repite, avisa a Compoint.');
+  } catch (e) { /* sin ventana */ }
+});
+process.on('unhandledRejection', (razon) => {
+  log('Promesa rechazada sin manejar: ' + String((razon && (razon.stack || razon.message)) || razon));
+});
+
 // Carpetas elegidas en el instalador (modo servidor): información del negocio, respaldos y copia extra.
 function carpetasElegidas() {
   const c = configuracion();
@@ -745,12 +761,22 @@ async function respaldarAhora() {
 }
 
 // Respaldo automático: al salir del sistema y, por si la PC se apaga sin cerrarlo, cada 12 h.
+let ultimoAvisoRespaldo = 0;
 function programarRespaldos() {
   const revisar = async () => {
     if (!servidorLocal || cerrandoServidor) return;
     try {
-      if (servidorLocal.respaldos.tocaRespaldo(12)) await servidorLocal.respaldos.hacerRespaldo('automatico');
-      else await servidorLocal.respaldos.reintentarNube();
+      if (servidorLocal.respaldos.tocaRespaldo(12)) {
+        const r = await servidorLocal.respaldos.hacerRespaldo('automatico');
+        // Si el respaldo automático falla, el dueño TIENE que enterarse (no solo queda en el log).
+        // Se avisa junto al reloj, como máximo una vez cada 6 horas para no estorbar.
+        if (r && !r.ok && Date.now() - ultimoAvisoRespaldo > 6 * 60 * 60 * 1000) {
+          ultimoAvisoRespaldo = Date.now();
+          try {
+            if (tray) tray.displayBalloon({ title: 'No se pudo guardar el respaldo', content: 'El respaldo automático falló: ' + String(r.error || '').slice(0, 120) + '. Abre "Panel del servidor y respaldos" o avisa a Compoint.', iconType: 'error' });
+          } catch (e2) { /* ignorar */ }
+        }
+      } else await servidorLocal.respaldos.reintentarNube();
       servidorLocal.respaldos.reintentarExtra();
     } catch (e) { log('Revisión de respaldos: ' + e.message); }
   };

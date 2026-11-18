@@ -33,17 +33,21 @@ async function guardarVentaOffline(venta, almacen = 'ventas') {
   db.close();
 }
 
-async function listarVentasOffline(almacen = 'ventas') {
+// Lee lo guardado sin internet. Si el navegador no deja leerlo, LANZA el error (no finge que no hay nada).
+async function leerVentasOffline(almacen = 'ventas') {
+  const db = await abrirBaseVentasOffline();
   try {
-    const db = await abrirBaseVentasOffline();
-    const lista = await new Promise((resolve) => {
+    const lista = await new Promise((resolve, reject) => {
       const r = db.transaction(almacen, 'readonly').objectStore(almacen).getAll();
       r.onsuccess = () => resolve(r.result || []);
-      r.onerror = () => resolve([]);
+      r.onerror = () => reject(r.error || new Error('No se pudo leer'));
     });
-    db.close();
     return lista.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
-  } catch (e) { return []; }
+  } finally { db.close(); }
+}
+
+async function listarVentasOffline(almacen = 'ventas') {
+  try { return await leerVentasOffline(almacen); } catch (e) { return []; }
 }
 
 async function borrarVentaOffline(folio, almacen = 'ventas') {
@@ -136,8 +140,10 @@ async function sincronizarVentasOffline() {
 // ---------- Aviso en pantalla ----------
 async function pintarAvisoVentasOffline() {
   let el = document.getElementById('avisoVentasOffline');
-  const lista = [...await listarVentasOffline('ventas'), ...await listarVentasOffline('tickets')];
-  if (!lista.length) { if (el) el.remove(); return; }
+  let lista, sinLeer = false;
+  try { lista = [...await leerVentasOffline('ventas'), ...await leerVentasOffline('tickets')]; }
+  catch (e) { lista = []; sinLeer = true; }
+  if (!lista.length && !sinLeer) { if (el) el.remove(); return; }
   if (!el) {
     el = document.createElement('div');
     el.id = 'avisoVentasOffline';
@@ -150,7 +156,11 @@ async function pintarAvisoVentasOffline() {
     document.body.appendChild(el);
   }
   const conError = lista.filter(v => v.error).length;
-  if (conError) {
+  if (sinLeer) {
+    // Puede haber ventas sin subir que no se pudieron revisar: que se note (no se esconde el aviso).
+    el.style.background = '#C62828'; el.style.color = '#fff';
+    el.textContent = '⚠️ No se pudieron revisar las ventas guardadas sin internet — no borres los datos del navegador y avisa a Compoint';
+  } else if (conError) {
     el.style.background = '#C62828'; el.style.color = '#fff';
     el.textContent = `⚠️ ${conError} registro(s) sin internet con problema — toca para ver`;
   } else {

@@ -53,7 +53,7 @@ function esperarSalud(puerto, intentos = 60) {
 
 // Nombre del negocio y cuántas sucursales trae la información que acaba de bajar de la nube.
 async function datosDelNegocio(url) {
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     const r = await c.query('SELECT nombre FROM sucursales ORDER BY id');
@@ -63,7 +63,7 @@ async function datosDelNegocio(url) {
 
 // ¿Hay información capturada en esta computadora? (para no vaciar la nube por error)
 async function resumenLocal(url) {
-  const c = new Client({ connectionString: url });
+  const c = new Client({ connectionString: url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message));
   await c.connect();
   try {
     const n = async (t) => { try { return Number((await c.query(`SELECT COUNT(*) AS n FROM ${t}`)).rows[0].n); } catch (e) { return 0; } };
@@ -278,7 +278,7 @@ async function crearServidor({ app, dirServidor, pedirDatosNegocio, avisar = () 
       const dn = await datosDelNegocio(bd.url);
       guardarCfg({ negocio: dn.nombre, max_sucursales: Math.max(cfg.max_sucursales || 1, dn.sucursales), traido_de_nube: new Date().toISOString(), licencia_nube_pendiente: sesion.licencia || null });
       try { // lo que se anotó en la cola antes ya no sirve: todo viene de la nube
-        const c = new Client({ connectionString: bd.url }); await c.connect();
+        const c = new Client({ connectionString: bd.url }); c.on('error', (e) => console.error('[pg] conexión perdida:', e && e.message)); await c.connect();
         try { await c.query('DELETE FROM compoint_sync.cola'); } catch (e) { /* sin cola */ } finally { await c.end().catch(() => {}); }
       } catch (e) { /* ignorar */ }
       sync.marcarAlDia();

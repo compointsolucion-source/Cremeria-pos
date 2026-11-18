@@ -277,10 +277,24 @@ test('un empleado (no dueño) NO puede recuperar su contraseña por correo, aunq
   assert.equal(sigue.status, 200, 'su contraseña no cambió');
 });
 
-test('sesión: dura un año (no se vence sola) y deja de servir si desactivan al usuario', async () => {
+test('sesión: 30 días que se renuevan solos al usarla (sin perder cuándo se entró) y deja de servir si desactivan al usuario', async () => {
   const login = await api(null, 'POST', '/api/auth/login', { usuario: 'empleado', password: 'Clave-Vieja-1' });
   const d = JSON.parse(Buffer.from(login.json.token.split('.')[1], 'base64').toString());
-  assert.ok((d.exp - d.iat) / 86400 >= 364, 'sesión de ~365 días');
+  assert.ok(Math.abs((d.exp - d.iat) / 86400 - 30) < 0.01, 'sesión de 30 días');
+  assert.ok(d.ini && Math.abs(d.ini - d.iat) < 5, 'guarda cuándo se escribió la contraseña');
+  // Una sesión de más de un día se renueva sola: llega una nueva en X-Sesion-Nueva con el mismo "ini".
+  const jwt = require('jsonwebtoken');
+  const { iat, exp, ...resto } = d;
+  const vieja = jwt.sign({ ...resto, iat: iat - 2 * 86400 }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  const rVieja = await fetch(base + '/api/auth/mi-correo', { headers: { Authorization: 'Bearer ' + vieja } });
+  const nueva = rVieja.headers.get('x-sesion-nueva');
+  assert.ok(nueva, 'manda la sesión renovada');
+  const dn = JSON.parse(Buffer.from(nueva.split('.')[1], 'base64').toString());
+  assert.equal(dn.ini, d.ini);
+  assert.ok(dn.exp > d.exp - 5);
+  // Una recién hecha no se renueva (no hace falta).
+  const rNueva = await fetch(base + '/api/auth/mi-correo', { headers: { Authorization: 'Bearer ' + login.json.token } });
+  assert.equal(rNueva.headers.get('x-sesion-nueva'), null);
   const uid = U.empleado;
   const tok = login.json.token;
   T.empleado_sesion = tok;

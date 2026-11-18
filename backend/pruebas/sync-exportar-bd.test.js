@@ -110,6 +110,25 @@ test('exportar: sin sesión 401, cajero 403, dueño 200', async () => {
   assert.equal((await api('GET', '/api/sync/licencia', null, tokenCajero)).status, 403);
 });
 
+test('con varias sucursales, el dueño de UNA sucursal no puede vincular ni bajar todo; el jefe general sí', async () => {
+  const s2 = (await pool.query("INSERT INTO sucursales (nombre, activo) VALUES ('Sucursal B', true) RETURNING id")).rows[0].id;
+  const hash = await bcrypt.hash('Clave-Prueba-1', 4);
+  await pool.query("INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo) VALUES ($1,'Dueño B','duenob',$2,'dueno',true)", [s2, hash]);
+  await pool.query("INSERT INTO usuarios (sucursal_id, nombre, usuario, password_hash, rol, activo) VALUES (NULL,'Jefe','jefe',$1,'jefe_general',true)", [hash]);
+  try {
+    const tDuenoB = await entrar('duenob', 'Clave-Prueba-1');
+    assert.equal((await api('POST', '/api/sync/vincular', {}, tDuenoB)).status, 403);
+    assert.equal((await api('GET', '/api/sync/exportar/estructura', null, tDuenoB)).status, 403);
+    assert.equal((await api('GET', '/api/sync/exportar/usuarios', null, tDuenoB)).status, 403);
+    const tJefe = await entrar('jefe', 'Clave-Prueba-1');
+    assert.equal((await api('GET', '/api/sync/exportar/estructura', null, tJefe)).status, 200);
+  } finally {
+    await pool.query("DELETE FROM bitacora WHERE usuario_id IN (SELECT id FROM usuarios WHERE usuario IN ('duenob','jefe'))");
+    await pool.query("DELETE FROM usuarios WHERE usuario IN ('duenob','jefe')");
+    await pool.query('DELETE FROM sucursales WHERE id = $1', [s2]);
+  }
+});
+
 test('exportar/estructura: tablas, llaves, columnas y conteos; sin licencia ni claves de la nube', async () => {
   const r = await api('GET', '/api/sync/exportar/estructura', null, tokenDueno);
   assert.equal(r.json.ok, true);

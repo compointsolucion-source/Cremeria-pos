@@ -16,8 +16,9 @@
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
-const { verificarToken, requiereRol } = require('../middleware/auth');
+const { verificarToken, requiereRol, inicioDeSesion } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 // sync_vinculo guarda la clave de ESTA nube: nunca se copia ni se vacía con el espejo.
@@ -45,6 +46,35 @@ async function hashGuardado() {
   await asegurarTabla();
   const r = await pool.query('SELECT clave_hash FROM sync_vinculo WHERE id = 1');
   return r.rows.length ? String(r.rows[0].clave_hash || '') : '';
+}
+
+// Intentos con clave EQUIVOCADA: máx. 30 por dirección cada 15 min (las subidas buenas no cuentan).
+const limitadorSync = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skipSuccessfulRequests: true,
+  requestWasSuccessful: (req, res) => res.statusCode !== 401, // solo cuentan las claves equivocadas
+  message: { error: 'Demasiados intentos con una clave de sincronización equivocada. Espera unos minutos.' }
+});
+router.use(limitadorSync);
+
+// Solo el DUEÑO DE TODO el negocio puede vincular o bajar la información completa: el jefe general, o el
+// dueño cuando el negocio tiene una sola sucursal. El dueño de UNA sucursal (en un negocio con varias) no,
+// porque la clave de sincronización da acceso a todas las sucursales y a todos los usuarios.
+async function esDuenoGeneral(usuario) {
+  if (!usuario) return false;
+  if (usuario.rol === 'jefe_general') return true;
+  if (usuario.rol !== 'dueno') return false;
+  if (!usuario.sucursal_id) return true;
+  const r = await pool.query('SELECT COUNT(*)::int AS n FROM sucursales WHERE activo IS NOT FALSE');
+  return (r.rows[0] && r.rows[0].n) <= 1;
+}
+function soloDuenoGeneral(req, res, next) {
+  esDuenoGeneral(req.usuario).then((ok) => {
+    if (ok) return next();
+    return res.status(403).json({ error: 'Solo el dueño general del negocio (el que ve todas las sucursales) puede conectar la sincronización.' });
+  }).catch((e) => {
+    console.error('sync/soloDuenoGeneral:', e.message);
+    res.status(500).json({ error: 'No se pudo revisar tu usuario. Intenta de nuevo.' });
+  });
 }
 
 async function autenticar(req, res, next) {
@@ -77,7 +107,7 @@ function claveODueno(req, res, next) {
   if (req.get('X-Sync-Key')) return autenticar(req, res, next);
   return verificarToken(req, res, (err) => {
     if (err) return next(err);
-    return requiereRol('dueno', 'jefe_general')(req, res, next);
+    return requiereRol('dueno', 'jefe_general')(req, res, () => soloDuenoGeneral(req, res, next));
   });
 }
 
@@ -138,11 +168,11 @@ async function ajustarContadores(c, m, tablas) {
 // Vincular con el usuario dueño: el panel del servidor local inicia sesión (POST /api/auth/login) y con ese
 // token pide aquí una clave nueva. Se guarda solo su hash; la clave en claro se entrega UNA vez.
 // Vincular otra vez reemplaza la clave anterior (la computadora vinculada antes deja de poder subir).
-router.post('/vincular', verificarToken, requiereRol('dueno', 'jefe_general'), async (req, res) => {
+router.post('/vincular', verificarToken, requiereRol('dueno', 'jefe_general'), soloDuenoGeneral, async (req, res) => {
   try {
     // Solo con una sesión RECIÉN abierta (el panel del servidor entra con usuario y contraseña justo antes).
     // Así una sesión vieja o robada no sirve para vincular otra computadora y copiar toda la información.
-    const edad = Date.now() / 1000 - (Number(req.usuario.iat) || 0);
+    const edad = Date.now() / 1000 - inicioDeSesion(req.usuario); // desde que escribió su contraseña (no desde la última renovación)
     if (!(edad >= 0 && edad < 60 * 60)) { // 1 hora: alcanza para bajar toda la información antes de vincular
       return res.status(403).json({ error: 'Por seguridad, vuelve a escribir tu usuario y contraseña para vincular.' });
     }

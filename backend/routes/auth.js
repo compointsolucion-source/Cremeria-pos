@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
-const { verificarToken } = require('../middleware/auth');
+const { verificarToken, firmarSesion: firmarSesionBase } = require('../middleware/auth');
 const { registrarBitacora } = require('../utils/bitacora');
 const recuperacion = require('../utils/recuperacion');
 const licencia = require('../utils/licencia');
@@ -47,22 +47,19 @@ async function frenarSiHaceFalta(u) {
 const HASH_FALSO = bcrypt.hashSync('compoint-usuario-inexistente', 10);
 
 // Crea la sesión (token) de un usuario. "tv" es su versión de sesión (ver middleware/auth.js).
+// La sesión no se vence mientras trabajan (se renueva sola cada día, ver middleware/auth.js); se termina al dar
+// «Salir», si el dueño desactiva al usuario, si cambia su contraseña, tras 30 días sin usarla o tras 90 días sin
+// volver a escribir la contraseña.
 function firmarSesion(user) {
-  return jwt.sign(
-    {
-      id: user.id,
-      nombre: user.nombre,
-      usuario: user.usuario,
-      rol: user.rol,
-      sucursal_id: user.sucursal_id,
-      permisos: user.permisos,
-      tv: Number(user.token_version) || 0
-    },
-    process.env.JWT_SECRET,
-    // La sesión no se vence sola mientras trabajan: solo termina al dar «Salir», si el dueño desactiva al usuario
-    // o si cambia su contraseña (todo eso se revisa en cada solicitud en middleware/auth.js).
-    { expiresIn: '365d' }
-  );
+  return firmarSesionBase({
+    id: user.id,
+    nombre: user.nombre,
+    usuario: user.usuario,
+    rol: user.rol,
+    sucursal_id: user.sucursal_id,
+    permisos: user.permisos,
+    tv: Number(user.token_version) || 0
+  });
 }
 
 router.post('/login', limitadorLogin, async (req, res) => {
