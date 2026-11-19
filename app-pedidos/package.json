@@ -1,0 +1,17 @@
+{
+  "name": "compoint-pedidos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App Compoint Pedidos: pide a domicilio a las tiendas que usan Compoint Punto",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "8.2.2",
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2"
+  }
+}

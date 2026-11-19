@@ -127,6 +127,14 @@ ol.pasos span{font-size:14.5px;color:var(--gis)}
 .wa{background:#1F7A44;color:#fff;border:0}
 .cargando{padding:60px 20px;text-align:center;color:var(--gis)}
 .cargando h1{font-size:24px;color:var(--tinta)}
+/* Dentro de la app «Compoint Pedidos»: barra para regresar a Mis tiendas */
+.app-bar{position:fixed;top:0;left:0;right:0;z-index:9;height:calc(46px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 8px 0;display:flex;align-items:center;gap:6px;background:#fff;border-bottom:1px solid #E2E5E1;font-weight:700;font-size:15px;color:#2F3236}
+.app-bar button{display:flex;align-items:center;gap:4px;min-height:44px;padding:0 8px;font-weight:700}
+.app-bar span{margin-left:auto;font-size:12.5px;color:#62686D;font-weight:600;display:flex;align-items:center;gap:6px}
+.app-bar img{height:26px}
+body.en-app{padding-top:calc(46px + env(safe-area-inset-top))}
+body.en-app .barra{top:calc(46px + env(safe-area-inset-top));padding-top:8px}
+body.en-app .fachada{padding-top:18px}
 </style>
 </head>
 <body>
@@ -148,6 +156,32 @@ ol.pasos span{font-size:14.5px;color:var(--gis)}
   const leer = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
   const enlaceTienda = () => 'tienda.html' + (S || C ? '?' + [S ? 's=' + encodeURIComponent(S) : '', C ? 'c=' + encodeURIComponent(C) : ''].filter(Boolean).join('&') : '');
   const qsInfo = () => '?s=' + encodeURIComponent(S) + (C ? '&c=' + encodeURIComponent(C) : '');
+
+  // ---------------------------------------------------------------- dentro de la app «Compoint Pedidos»
+  const EN_APP = /CompointPedidosApp\//.test(navigator.userAgent);
+  const prellenado = {};
+  if (/app_[nt]=/.test(location.hash)) {          // la app manda nombre y teléfono después del # (no llegan al servidor)
+    const h = new URLSearchParams(location.hash.slice(1));
+    prellenado.nombre = (h.get('app_n') || '').slice(0, 150);
+    prellenado.telefono = (h.get('app_t') || '').slice(0, 20);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  let ultimoSeguimiento = null;
+  function volverALaApp() {
+    const sid = (E.info && E.info.sucursal_id) || S;
+    const hist = sid ? leer('tienda:' + sid + ':pedidos', []) : [];
+    if (ultimoSeguimiento && !hist.some((x) => x.k === ultimoSeguimiento.k)) hist.unshift(ultimoSeguimiento);
+    const d = { h: location.host, s: String(sid || ''), c: C, n: (E.info && E.info.negocio) || (ultimoSeguimiento && ultimoSeguimiento.negocio) || '', p: hist.slice(0, 10).map((x) => ({ k: x.k, n: x.n, t: x.t })) };
+    location.href = 'https://localhost/index.html#volver=' + encodeURIComponent(JSON.stringify(d));
+  }
+  if (EN_APP) {
+    document.body.classList.add('en-app');
+    const barra = document.createElement('div');
+    barra.className = 'app-bar';
+    barra.innerHTML = '<button type="button" aria-label="Regresar a Mis tiendas"><span aria-hidden="true" style="font-size:24px;margin:0">‹</span> Mis tiendas</button><span>Pedidos por <img src="iconos/icono-192.png" alt="Compoint"></span>';
+    barra.querySelector('button').onclick = volverALaApp;
+    document.body.insertBefore(barra, document.body.firstChild);
+  }
   const ICONO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 18h28l-3 22H13z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M18 18v-4a6 6 0 0 1 12 0v4" fill="none" stroke="currentColor" stroke-width="3"/></svg>';
 
   async function pedir(ruta, opciones) {
@@ -197,6 +231,8 @@ ol.pasos span{font-size:14.5px;color:var(--gis)}
       carrito = leer(clave + ':carrito', {});
       datos = Object.assign({ si_falta: 'parecido', pago: 'efectivo', paga_con: '' }, leer(clave + ':datos', {}));
       if (E.info.cuenta && !datos.nombre) datos.nombre = E.info.cuenta.nombre;
+      if (!datos.nombre && prellenado.nombre) datos.nombre = prellenado.nombre;
+      if (!datos.telefono && prellenado.telefono) datos.telefono = prellenado.telefono;
       if (!E.info.cuenta && datos.pago === 'cuenta') datos.pago = 'efectivo';
       if (!E.info.acepta_tarjeta && datos.pago === 'tarjeta') datos.pago = 'efectivo';
       Object.keys(carrito).forEach((id) => { if (!E.porId.has(Number(id))) delete carrito[id]; });
@@ -414,8 +450,11 @@ ol.pasos span{font-size:14.5px;color:var(--gis)}
         })
       });
       guardar(clave + ':ultimo', { items: ls.map((x) => ({ producto_id: x.p.id, cantidad: x.cant, precio: precioDe(x.p, x.cant) })) });
+      const hist = leer(clave + ':pedidos', []);
+      hist.unshift({ k: r.seguimiento, n: r.numero, t: Date.now() });
+      guardar(clave + ':pedidos', hist.slice(0, 10));
       carrito = {}; guardarCarrito();
-      location.replace('tienda.html?p=' + encodeURIComponent(r.seguimiento) + (S ? '&s=' + encodeURIComponent(S) : '') + (C ? '&c=' + encodeURIComponent(C) : ''));
+      location.replace('tienda.html?p=' + encodeURIComponent(r.seguimiento) + '&s=' + encodeURIComponent(E.info.sucursal_id) + (C ? '&c=' + encodeURIComponent(C) : ''));
     } catch (e) {
       E.enviando = false; E.error = e.message;
       if (e.status === 409) { try { await cargarCatalogo(); } catch (e2) { /* se queda lo que había */ } }
@@ -432,6 +471,7 @@ ol.pasos span{font-size:14.5px;color:var(--gis)}
       clearTimeout(reloj); if (e.status !== 404) reloj = setTimeout(() => seguimiento(cl), 30000); return;
     }
     document.title = d.negocio + ' · Tu pedido';
+    ultimoSeguimiento = { k: cl, n: d.numero, t: Date.now(), negocio: d.negocio };
     const rep = d.repartidor ? esc(d.repartidor.nombre) : '';
     const pagoTxt = d.pago_previsto === 'cuenta' ? `Se anota ${pesos(d.total)} a tu cuenta`
       : d.pago_previsto === 'tarjeta' ? `Pagas ${pesos(d.total)} con tarjeta`

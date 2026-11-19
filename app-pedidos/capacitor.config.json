@@ -1,0 +1,15 @@
+{
+  "appId": "mx.com.compoint.pedidos",
+  "appName": "Compoint Pedidos",
+  "webDir": "www",
+  "android": {
+    "appendUserAgent": "CompointPedidosApp/1"
+  },
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["*.compoint.com.mx"]
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

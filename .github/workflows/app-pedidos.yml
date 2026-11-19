@@ -1,0 +1,63 @@
+# Arma la app de Android «Compoint Pedidos» (app-pedidos/).
+# Sube a un pre-release:
+#   - compoint-pedidos-prueba.apk   → para instalar directo en un celular y probar
+#   - compoint-pedidos-sin-firma.aab → se firma con la llave de Compoint antes de subirlo a Google Play
+name: App Compoint Pedidos (Android)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app-pedidos/**'
+      - '.github/workflows/app-pedidos.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app-pedidos
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar dependencias y copiar la app a Android
+        run: |
+          npm ci
+          npx cap sync android
+
+      - name: Compilar
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug bundleRelease
+          mkdir -p ../salida
+          cp app/build/outputs/apk/debug/app-debug.apk ../salida/compoint-pedidos-prueba.apk
+          cp app/build/outputs/bundle/release/app-release.aab ../salida/compoint-pedidos-sin-firma.aab
+
+      - name: Publicar en un pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="pedidos-app-1.0.${{ github.run_number }}"
+          gh release create "$TAG" salida/* \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Compoint Pedidos 1.0.${{ github.run_number }} (Android)" \
+            --notes "App de pedidos a domicilio. El .apk es para probar; el .aab se firma antes de subirlo a Google Play."

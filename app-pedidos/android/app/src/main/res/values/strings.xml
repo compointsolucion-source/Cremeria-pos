@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Compoint Pedidos</string>
+    <string name="title_activity_main">Compoint Pedidos</string>
+    <string name="package_name">mx.com.compoint.pedidos</string>
+    <string name="custom_url_scheme">mx.com.compoint.pedidos</string>
+</resources>
