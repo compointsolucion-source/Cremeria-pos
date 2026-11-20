@@ -87,6 +87,18 @@
   .colores .sw button[aria-pressed="true"] { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1B1D1C; }
   .colores input[type="color"] { width: 46px; height: 40px; border: 1px solid var(--border, #E4E6E9); border-radius: 10px; padding: 2px; background: #fff; cursor: pointer; }
   @media (max-width: 860px) { .colores { grid-template-columns: 1fr; } }
+  /* Red de tiendas (preparación) */
+  .pronto { display: inline-block; background: #FFE81A; color: #1B1D1C; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-left: 8px; vertical-align: 3px; }
+  .red-ubi { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .red-punto { border: 1.5px solid var(--border, #E4E6E9); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; align-content: start; }
+  .red-punto .ok { color: #1F7A3A; font-weight: 700; }
+  .red-punto .no { color: var(--muted, #6B6F76); }
+  .red-ops { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  .red-ops label { border: 1.5px solid var(--border, #E4E6E9); border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-size: 13.5px; min-height: 44px; }
+  .red-ops label:has(input:checked) { border-color: #1B1D1C; }
+  .red-ops b { display: block; font-size: 14.5px; }
+  .red-ops small { color: var(--muted, #6B6F76); }
+  @media (max-width: 860px) { .red-ubi, .red-ops { grid-template-columns: 1fr; } }
   .guardar-fijo { display: flex; justify-content: flex-end; margin: -4px 0 14px; }
   @media (max-width: 860px) { .rejilla2 { grid-template-columns: 1fr; } .compartir { grid-template-columns: 1fr; justify-items: center; } .horario { grid-template-columns: 1fr auto; } }
   @media print {
@@ -115,6 +127,7 @@
 <script src="../js/api.js"></script>
 <script src="../js/estado-conexion.js"></script>
 <script src="../js/ui-components.js"></script>
+<script src="../js/ubicacion.js"></script>
 <script src="../js/vendor/qrcode.min.js"></script>
 <script src="../js/sidebar-nav.js"></script>
 <script>
@@ -213,8 +226,11 @@ function pintar() {
         <div class="filtro" role="group" aria-label="Mostrar" id="filtroProd"></div></div>
       <div class="masivo" id="masivo"></div>
       <div id="listaProd"><p class="vacio-p">Cargando productos…</p></div></div>
+
+    <div class="caja" id="red"></div>
 `;
   pintarTemas();
+  pintarRed();
   if (c.activo && typeof QRCode !== 'undefined') QRCode.toCanvas(document.getElementById('qr'), enlaceTienda(), { width: 340, margin: 1 }, () => {});
 }
 
@@ -273,6 +289,73 @@ async function guardarApariencia(cambios, aviso) {
 }
 function elegirTema(id) { if (id !== (cfg.tema || 'letrero')) guardarApariencia({ tema: id }, 'Tema cambiado. Ábrela con «Ver mi tienda»'); }
 function elegirColor(campo, valor) { guardarApariencia({ [campo]: String(valor).toUpperCase() }, 'Color guardado'); }
+
+// ----- Red de tiendas de Compoint Pedidos (preparación: se prende cuando haya más tiendas) -----
+let redPunto = null;   // {lat, lng} mientras el dueño lo cambia, antes de guardar
+function pintarRed() {
+  const el = document.getElementById('red'); if (!el) return;
+  const c = cfg;
+  if (!redPunto && c.red_lat != null) redPunto = { lat: Number(c.red_lat), lng: Number(c.red_lng) };
+  const p = redPunto;
+  const mapa = p ? `https://www.google.com/maps?q=${p.lat},${p.lng}` : '';
+  el.innerHTML = `<h2>Aparecer en Compoint Pedidos <span class="pronto">Próximamente</span></h2>
+    <p class="ayuda">Cuando haya más tiendas, los clientes de tu colonia te van a encontrar en la app sin tener tu QR. Déjalo listo desde hoy; nadie lo ve todavía.</p>
+    <label class="opcion-check"><span><b>Sí, quiero aparecer en el mapa</b><small>Puedes quitarlo cuando quieras</small></span>
+      <input type="checkbox" class="interruptor" id="rVisible" ${c.red_visible ? 'checked' : ''}></label>
+    <div class="red-ubi">
+      <div class="campo"><label for="rDir">¿Dónde está tu tienda?</label>
+        <input type="text" id="rDir" maxlength="200" placeholder="Ej. Calle Fontaneros 527, Col. Centro" value="${esc(c.red_direccion || '')}">
+        <label for="rLink" style="margin-top:6px">Pega aquí el enlace de Google Maps de tu tienda</label>
+        <input type="text" id="rLink" placeholder="https://www.google.com/maps/…" oninput="leerEnlaceRed(this.value)">
+        <small id="rLinkAyuda">Abre Google Maps, busca tu tienda, toca «Compartir» y copia el enlace.</small></div>
+      <div class="red-punto">
+        ${p ? `<span class="ok">✓ Ubicación lista</span><a href="${esc(mapa)}" target="_blank" rel="noopener">Ver en Google Maps para revisar</a>`
+            : '<span class="no">Todavía no pones la ubicación.</span>'}
+        <button type="button" class="btn btn-secondary" onclick="usarUbicacionRed()">Usar la ubicación de esta computadora</button>
+        <small style="color:var(--muted,#6B6F76)">Úsalo solo si estás en la tienda.</small>
+      </div>
+    </div>
+    <div class="red-ops">
+      <label><input type="checkbox" class="chk" id="rDomicilio" ${c.red_domicilio ? 'checked' : ''}><span><b>A domicilio</b><small>Con tus colonias y costos de envío</small></span></label>
+      <label><input type="checkbox" class="chk" id="rRecoger" ${c.red_recoger ? 'checked' : ''}><span><b>Pasar a recoger</b><small>El cliente va a tu tienda</small></span></label>
+      <label><input type="checkbox" class="chk" id="rBuscar" ${c.red_buscar ? 'checked' : ''}><span><b>Que mis productos salgan al buscar</b><small>Solo los que tienen existencia</small></span></label>
+    </div>
+    <button class="btn btn-primary" onclick="guardarRed()">Guardar</button>`;
+}
+function leerEnlaceRed(texto) {
+  const ayuda = document.getElementById('rLinkAyuda');
+  if (!texto.trim()) return;
+  const x = window.UBICACION && UBICACION.extraerCoordenadas(texto);
+  if (x) { redPunto = { lat: x.latitud, lng: x.longitud }; guardarBorradorRed(); pintarRed(); mostrarToast('Ubicación leída. Presiona Guardar', 'exito', 1800); return; }
+  ayuda.textContent = window.UBICACION && UBICACION.esEnlaceCorto(texto)
+    ? 'Ese enlace corto no trae la ubicación. Ábrelo en el navegador y copia la dirección larga que aparece arriba.'
+    : 'No encontramos la ubicación en ese texto. Revisa que sea el enlace de Google Maps.';
+}
+function usarUbicacionRed() {
+  if (!navigator.geolocation) return mostrarToast('Esta computadora no puede dar su ubicación. Pega el enlace de Google Maps.', 'error');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { redPunto = { lat: pos.coords.latitude, lng: pos.coords.longitude }; guardarBorradorRed(); pintarRed(); mostrarToast('Ubicación tomada. Revísala en Google Maps y presiona Guardar', 'exito', 2500); },
+    () => mostrarToast('No se pudo saber dónde estás. Pega el enlace de Google Maps de tu tienda.', 'error'),
+    { enableHighAccuracy: true, timeout: 15000 });
+}
+// Conserva lo escrito en las casillas cuando la caja se vuelve a pintar.
+function guardarBorradorRed() {
+  const v = (id) => document.getElementById(id);
+  if (!v('rVisible')) return;
+  Object.assign(cfg, { red_visible: v('rVisible').checked, red_direccion: v('rDir').value, red_domicilio: v('rDomicilio').checked, red_recoger: v('rRecoger').checked, red_buscar: v('rBuscar').checked });
+}
+async function guardarRed() {
+  guardarBorradorRed();
+  const cuerpo = { visible: cfg.red_visible, direccion: cfg.red_direccion, domicilio: cfg.red_domicilio, recoger: cfg.red_recoger, buscar: cfg.red_buscar };
+  if (redPunto) { cuerpo.lat = redPunto.lat; cuerpo.lng = redPunto.lng; }
+  try {
+    const r = await apiFetch('/tienda/red', { method: 'PUT', body: JSON.stringify(cuerpo) });
+    cfg = Object.assign(cfg, r);
+    redPunto = r.red_lat == null ? null : { lat: r.red_lat, lng: r.red_lng };
+    pintarRed();
+    mostrarToast(r.red_visible ? 'Listo: aparecerás cuando se abra el mapa' : 'Guardado', 'exito', 2200);
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
 
 async function crearEnlace(id, nuevo) {
   if (nuevo && !(await confirmarAccion('¿Cambiar el enlace? El que ya tiene el cliente deja de servir y tendrás que mandarle el nuevo.'))) return;

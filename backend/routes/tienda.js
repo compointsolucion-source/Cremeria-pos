@@ -392,6 +392,42 @@ router.put('/config', ...soloAdmin, async (req, res, next) => {
   } catch (e) { responder(res, e, next); }
 });
 
+// Preparación para la red de tiendas de Compoint Pedidos (todavía no se muestra a los clientes):
+// el dueño guarda dónde está su tienda y si quiere aparecer cuando se prenda.
+router.put('/red', ...soloAdmin, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const actual = await leerConfig(pool, req.sucursalId);
+    const bool = (v, def) => (typeof v === 'boolean' ? v : def);
+    let lat = actual.red_lat == null ? null : Number(actual.red_lat);
+    let lng = actual.red_lng == null ? null : Number(actual.red_lng);
+    if (b.lat !== undefined || b.lng !== undefined) {
+      if (b.lat === null && b.lng === null) { lat = null; lng = null; } else {
+        lat = Number(b.lat); lng = Number(b.lng);
+        if (b.lat === null || b.lng === null || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) {
+          throw new ErrorHttp(400, 'La ubicación no es válida. Usa el botón o pega el enlace de Google Maps de tu tienda');
+        }
+        lat = Math.round(lat * 1e6) / 1e6; lng = Math.round(lng * 1e6) / 1e6;
+      }
+    }
+    const visible = bool(b.visible, actual.red_visible);
+    if (visible && lat === null) throw new ErrorHttp(400, 'Primero pon dónde está tu tienda');
+    const domicilio = bool(b.domicilio, actual.red_domicilio);
+    const recoger = bool(b.recoger, actual.red_recoger);
+    if (visible && !domicilio && !recoger) throw new ErrorHttp(400, 'Escoge al menos una forma de entregar');
+    const r = await pool.query(
+      `UPDATE tienda_config SET red_visible = $2, red_lat = $3, red_lng = $4, red_direccion = $5, red_domicilio = $6,
+              red_recoger = $7, red_buscar = $8, actualizado_en = NOW()
+        WHERE sucursal_id = $1
+        RETURNING red_visible, red_lat, red_lng, red_direccion, red_domicilio, red_recoger, red_buscar`,
+      [req.sucursalId, visible, lat, lng, b.direccion === undefined ? actual.red_direccion : textoOnull(b.direccion, 200),
+       domicilio, recoger, bool(b.buscar, actual.red_buscar)]);
+    await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'tienda_red', modulo: 'pedidos', referencia_id: req.sucursalId, valor_nuevo: { visible } });
+    const x = r.rows[0];
+    res.json({ ...x, red_lat: x.red_lat == null ? null : Number(x.red_lat), red_lng: x.red_lng == null ? null : Number(x.red_lng) });
+  } catch (e) { responder(res, e, next); }
+});
+
 // Lista de productos para escoger cuáles se ven en la tienda.
 router.get('/productos', ...soloAdmin, async (req, res, next) => {
   try {

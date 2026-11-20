@@ -270,3 +270,23 @@ test('tema y colores: se guardan, se validan y la tienda los recibe', async () =
   assert.equal((await api(null, 'GET', '/api/tienda/publico/seguimiento/' + p.json.seguimiento)).json.tema, 'pizarron');
   await api('dueno', 'PUT', '/api/tienda/config', { tema: 'letrero', color_principal: null, color_oferta: null });
 });
+
+test('red de tiendas (preparación): el dueño guarda su ubicación y si quiere aparecer; no se publica todavía', async () => {
+  assert.equal((await api('cajera', 'PUT', '/api/tienda/red', { visible: false })).status, 403);
+  const sin = await api('dueno', 'PUT', '/api/tienda/red', { visible: true });
+  assert.equal(sin.status, 400);
+  assert.match(sin.json.error, /dónde está tu tienda/);
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/red', { lat: 200, lng: 5 })).status, 400);
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/red', { lat: 20.67, lng: null })).status, 400);
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/red', { visible: true, lat: 20.6736, lng: -103.344, domicilio: false, recoger: false })).status, 400);
+  const r = await api('dueno', 'PUT', '/api/tienda/red', { visible: true, lat: 20.6736123, lng: -103.3440456, direccion: 'Fontaneros 527', recoger: true });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.deepEqual([r.json.red_visible, r.json.red_lat, r.json.red_lng, r.json.red_recoger, r.json.red_buscar], [true, 20.673612, -103.344046, true, true]);
+  const c = await api('dueno', 'GET', '/api/tienda/config');
+  assert.equal(c.json.red_direccion, 'Fontaneros 527');
+  const i = await api(null, 'GET', '/api/tienda/publico/info');
+  assert.ok(!('red_lat' in i.json) && !('red_visible' in i.json), 'la ubicación no sale en la tienda pública');
+  const q = await api('dueno', 'PUT', '/api/tienda/red', { visible: false, lat: null, lng: null });
+  assert.equal(q.status, 200);
+  assert.equal(q.json.red_lat, null);
+});
