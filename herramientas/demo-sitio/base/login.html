@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<script src="js/demo-mock.js"></script><script src="js/demo-mock-extra.js"></script><script src="js/demo-mock-pedidos.js"></script><script src="js/demo-mock-tienda.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="favicon.ico">
+<meta name="theme-color" content="#5FAE46">
+<title>Demo en línea - Compoint Punto</title>
+<meta name="description" content="Prueba Compoint Punto, el punto de venta para cualquier negocio de mostrador, sin instalar nada.">
+<!-- DEMO: esta pantalla de entrada es la del sistema (versión 1.3.0) con lo propio de la demo:
+     botones por rol que entran directo, "Reiniciar los datos de ejemplo" y la etiqueta DEMO EN LÍNEA. -->
+
+<link rel="stylesheet" href="css/app-theme.css">
+<script src="js/tema.js"></script>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: block; background: var(--background); color: var(--text); }
+  .pantalla { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
+
+  /* ---------- lado izquierdo: marca, logo 3D e información ---------- */
+  .izq { position: relative; overflow: hidden; color: #fff; padding: 44px 52px; display: flex; flex-direction: column;
+         background: linear-gradient(150deg, #14290f 0%, #21451a 55%, #2f6a22 100%); }
+  .izq::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+         background: radial-gradient(circle at 80% 15%, rgba(95,174,70,.35), transparent 45%), radial-gradient(circle at 10% 90%, rgba(95,174,70,.2), transparent 40%); }
+  .izq > * { position: relative; }
+  .marca { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .marca b { display: block; font-size: 24px; letter-spacing: 2px; font-weight: 800; }
+  .marca b i { font-style: normal; color: #8be06d; }
+  .marca small { letter-spacing: 3px; font-size: 11px; opacity: .72; }
+  .reloj { text-align: right; }
+  .reloj b { display: block; font-size: 34px; font-weight: 200; line-height: 1; letter-spacing: 0; }
+  .reloj span { font-size: 12px; opacity: .72; letter-spacing: 1px; }
+  .escena { position: relative; flex: 1; min-height: 240px; }
+  #escena3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .datos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dato { background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; padding: 13px 16px; backdrop-filter: blur(4px); min-width: 0; }
+  .dato small { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; opacity: .68; }
+  .dato b { display: block; margin-top: 4px; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dato[hidden] { display: none; }
+  .punto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #8be06d; margin-right: 7px; animation: latido 1.8s infinite; }
+  .punto.off { background: #f2b35a; animation: none; }
+  @keyframes latido { 50% { opacity: .35; } }
+  .consejo { margin-top: 12px; background: rgba(139,224,109,.14); border: 1px solid rgba(139,224,109,.35); border-radius: 14px; padding: 13px 16px;
+             font-size: 14px; line-height: 1.5; min-height: 70px; transition: opacity .4s ease; }
+  .consejo.oculto { opacity: 0; }
+  .consejo em { font-style: normal; font-weight: 700; color: #b6f19e; }
+  .consejo .nuevo { display: inline-block; background: #8be06d; color: #10210a; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+  .aviso-act { margin-top: 12px; background: rgba(139,224,109,.22); border: 1px solid #8be06d; border-radius: 14px; padding: 13px 16px; font-size: 14px; line-height: 1.45; }
+  .aviso-act[hidden] { display: none; }
+  .aviso-act b.t { display: block; font-size: 15px; color: #b6f19e; margin-bottom: 4px; }
+  .aviso-act ul { margin: 4px 0 10px; padding-left: 18px; }
+  .aviso-act button { background: #8be06d; color: #10210a; border: 0; border-radius: 9px; padding: 9px 14px; font-weight: 800; font-size: 14px; cursor: pointer; }
+  .aviso-act button:hover { filter: brightness(1.08); }
+  .aviso-act .despues { background: transparent; color: inherit; font-weight: 600; opacity: .8; margin-left: 6px; }
+  .pie { margin-top: 14px; font-size: 13px; opacity: .8; display: flex; gap: 18px; flex-wrap: wrap; }
+  .pie a { color: inherit; text-decoration: none; }
+
+  /* ---------- lado derecho: formulario ---------- */
+  .der { display: flex; align-items: center; justify-content: center; padding: 32px; }
+  .caja { width: 100%; max-width: 390px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 34px 32px; box-shadow: 0 18px 50px rgba(30,60,20,.10); }
+  .caja h2 { font-size: 24px; margin: 0; }
+  .caja p.sub { color: var(--muted); font-size: 14px; margin: 6px 0 20px; line-height: 1.45; }
+  .caja label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  .caja input { margin-bottom: 14px; }
+  /* ---------- ¿Quién va a entrar? (usuarios guardados en este equipo) ---------- */
+  .quien { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
+  .quien[hidden], #filaUsuario[hidden], #chipUsuario[hidden], #bloqueClave[hidden] { display: none; }
+  .persona { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px 12px; background: var(--background); border: 1.5px solid var(--border);
+             border-radius: 14px; cursor: pointer; font: inherit; color: var(--text); text-align: center; transition: border-color .15s, transform .15s, box-shadow .15s; }
+  .persona:hover, .persona:focus-visible { border-color: var(--primary); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(30,60,20,.10); outline: none; }
+  .persona .av { width: 46px; height: 46px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 19px; }
+  .persona b { font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .persona small { color: var(--muted); font-size: 12px; }
+  .persona.otro .av { background: transparent; color: var(--primary-dark); border: 2px dashed var(--border); }
+  .persona .quitar { position: absolute; top: 4px; right: 6px; border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+  .persona .quitar:hover { color: var(--danger); }
+  .chip-usuario { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 0 14px; background: var(--background); border: 1.5px solid var(--border); border-radius: 14px; }
+  .chip-usuario .av { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 17px; flex: none; }
+  .chip-usuario .dat { flex: 1; min-width: 0; line-height: 1.25; }
+  .chip-usuario .dat b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-usuario .dat small { color: var(--muted); }
+  .vista[hidden] { display: none; }
+  .error { color: var(--danger); text-align: center; font-size: 14px; min-height: 18px; margin: 0 0 10px; line-height: 1.4; }
+  .olvido { text-align: right; margin: -4px 0 14px; }
+  .enlace { background: none; border: 0; padding: 0; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--primary-dark); cursor: pointer; }
+  [data-tema="oscuro"] .enlace { color: var(--primary); }
+  .enlace:disabled { color: var(--muted); cursor: default; }
+  .btn-grande { width: 100%; min-height: 46px; font-size: 16px; font-weight: 700; }
+  .btn + .btn { margin-top: 10px; }
+  .separador { height: 1px; background: var(--border); margin: 20px 0; }
+  .ayuda { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.55; }
+  .ayuda a { color: var(--primary-dark); font-weight: 700; text-decoration: none; }
+  [data-tema="oscuro"] .ayuda a { color: var(--primary); }
+  .pasos { display: flex; gap: 6px; margin-bottom: 20px; }
+  .pasos i { flex: 1; height: 5px; border-radius: 3px; background: var(--border); }
+  .pasos i.on { background: var(--primary); }
+  .codigo { display: flex; gap: 8px; margin: 6px 0 16px; }
+  .codigo input { margin: 0; flex: 1; min-width: 0; height: 54px; text-align: center; font-size: 24px; font-weight: 700; padding: 0; }
+  .nota { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: 10px;
+          padding: 11px 13px; font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+  .fuerza { height: 6px; border-radius: 3px; background: var(--border); margin: -6px 0 14px; overflow: hidden; }
+  .fuerza i { display: block; height: 100%; width: 0; background: #E53935; transition: width .2s, background .2s; }
+  .listo { width: 64px; height: 64px; border-radius: 50%; background: color-mix(in srgb, var(--primary) 18%, var(--surface)); color: var(--primary-dark);
+           font-size: 34px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+
+  /* ---------- Solo en la demo ---------- */
+  #demoBanner, #demoChip { display: none !important; } /* en la entrada ya está todo a la vista */
+  .chip-demo { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #10210a; background: #8be06d; border-radius: 999px; padding: 4px 10px; }
+  .olvido-demo { display: none; } /* en la demo la contraseña de todos es «demo» */
+  .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
+  .rol { display: flex; align-items: center; gap: 10px; text-align: left; padding: 11px 12px; background: var(--background); border: 1.5px solid var(--border); border-radius: 14px;
+         cursor: pointer; font: inherit; color: var(--text); min-width: 0; transition: border-color .15s, transform .15s, box-shadow .15s; }
+  .rol:hover, .rol:focus-visible { border-color: var(--primary); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(30,60,20,.10); outline: none; }
+  .rol .ico { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 18px; }
+  .rol span.t { min-width: 0; line-height: 1.25; }
+  .rol b { display: block; font-size: 14.5px; }
+  .rol small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+  .o-escribe { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+  .o-escribe::before, .o-escribe::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .mini { margin-top: 14px; font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.6; }
+  .mini code { font-weight: 700; font-size: 12.5px; background: color-mix(in srgb, var(--primary) 14%, var(--surface)); color: var(--primary-dark); border-radius: 5px; padding: 1px 6px; }
+  [data-tema="oscuro"] .mini code { color: var(--primary); }
+  .reinicio { margin-top: 8px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  @media (max-width: 400px) { .roles { grid-template-columns: 1fr; } }
+
+  @media (max-width: 860px) {
+    .pantalla { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .izq { padding: 22px 22px 60px; }
+    .reloj, .datos, .consejo, .pie { display: none; }
+    .escena { flex: none; height: 210px; min-height: 210px; }
+    .marca b { font-size: 21px; }
+    .der { padding: 18px; margin-top: -36px; align-items: flex-start; position: relative; z-index: 3; }
+    .caja { padding: 26px 22px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .punto { animation: none; } .consejo { transition: none; } }
+</style>
+</head>
+<body>
+<div class="pantalla">
+  <section class="izq" aria-label="Compoint Punto">
+    <div class="marca">
+      <div><b>COMPOINT <i>PUNTO</i></b><small>PUNTO DE SOLUCIONES</small><br><span class="chip-demo">DEMO EN LÍNEA</span></div>
+      <div class="reloj" aria-hidden="true"><b id="hora">--:--</b><span id="fecha"></span></div>
+    </div>
+    <div class="escena" aria-hidden="true"><canvas id="escena3d"></canvas></div>
+    <div>
+      <div class="datos">
+        <div class="dato" id="datoNegocio"><small>Negocio</small><b id="vNegocio">Compoint Punto</b></div>
+        <div class="dato" id="datoSucursal" hidden><small>Sucursal</small><b id="vSucursal"></b></div>
+        <div class="dato" id="datoConexion"><small>Conexión</small><b><span class="punto off" id="puntoConexion"></span><span id="vConexion">Conectando…</span></b></div>
+        <div class="dato" id="datoLicencia" hidden><small>Licencia</small><b id="vLicencia"></b></div>
+      </div>
+      <div class="aviso-act" id="avisoAct" hidden aria-live="polite"></div>
+      <div class="consejo" id="consejo" aria-live="off"></div>
+      <div class="pie">
+        <a href="https://wa.me/523325907090?text=Hola%20Compoint%2C%20prob%C3%A9%20la%20demo%20de%20Compoint%20Punto%20y%20quiero%20informaci%C3%B3n." target="_blank" rel="noopener">💬 Quiero este sistema · WhatsApp 33 25 90 70 90</a>
+        <a href="../../descargas/CompointPunto.exe" download>⬇ Descargar para Windows</a>
+        <a href="https://www.compoint.com.mx/#sistemas" target="_blank" rel="noopener">compoint.com.mx</a>
+        <span id="vVersion"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="der">
+    <div class="caja">
+
+      <!-- 1. Entrar -->
+      <div class="vista" id="vistaLogin">
+        <h2>Entrar a la demo 👋</h2>
+        <p class="sub" id="subLogin">Toca cómo quieres entrar. Todo lo que captures se queda solo en tu navegador.</p>
+        <div class="roles" id="rolesDemo">
+          <button class="rol" type="button" data-u="demo"><span class="ico">📊</span><span class="t"><b>Dueño</b><small>Ve y usa todo el sistema</small></span></button>
+          <button class="rol" type="button" data-u="cajero"><span class="ico">💵</span><span class="t"><b>Cajero</b><small>Cobra y hace su corte</small></span></button>
+          <button class="rol" type="button" data-u="mostrador"><span class="ico">⚖️</span><span class="t"><b>Mostrador</b><small>Pesa e imprime el ticket</small></span></button>
+          <button class="rol" type="button" data-u="repartidor"><span class="ico">🛵</span><span class="t"><b>Repartidor</b><small>Entrega pedidos a domicilio</small></span></button>
+        </div>
+        <div class="o-escribe">o escribe el usuario</div>
+        <div class="quien" id="listaQuien" hidden></div>
+        <div id="bloqueClave">
+          <div class="chip-usuario" id="chipUsuario" hidden>
+            <div class="av" id="chipAv"></div>
+            <div class="dat"><b id="chipNombre"></b><small id="chipRol"></small></div>
+            <button type="button" class="enlace" id="btnCambiarUsuario">Cambiar</button>
+          </div>
+          <div id="filaUsuario">
+            <label for="usuario">Usuario</label>
+            <input type="text" id="usuario" placeholder="Usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
+            <div class="olvido" style="text-align:left;margin-top:-6px"><button type="button" class="enlace" id="btnVerLista" hidden>← Elegir de la lista</button></div>
+          </div>
+          <label for="password">Contraseña</label>
+          <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+        <div class="olvido olvido-demo"><button type="button" class="enlace" id="btnOlvide">¿Olvidaste tu contraseña?</button></div>
+        <div class="error" id="error" role="alert"></div>
+        <button class="btn btn-primary btn-grande" id="btnEntrar" type="button" onclick="login()">Entrar</button>
+        <div class="mini">Usuarios: <code>demo</code> · <code>cajero</code> · <code>mostrador</code> · <code>repartidor</code><br>Contraseña para todos: <code>demo</code></div>
+        <div class="reinicio">¿Quieres empezar de cero? <button type="button" class="enlace" id="btnReiniciar">Reiniciar los datos de ejemplo</button></div>
+        </div>
+        <div class="separador"></div>
+        <div class="ayuda">¿Te gustó? Te lo instalamos en tu negocio. <a href="https://wa.me/523325907090?text=Hola%20Compoint%2C%20prob%C3%A9%20la%20demo%20de%20Compoint%20Punto%20y%20quiero%20informaci%C3%B3n." target="_blank" rel="noopener">Escríbenos por WhatsApp</a></div>
+      </div>
+
+      <!-- 2. Recuperar: usuario -->
+      <div class="vista" id="vistaRec1" hidden>
+        <div class="pasos"><i class="on"></i><i></i><i></i></div>
+        <h2>Recuperar contraseña</h2>
+        <p class="sub"><b>Solo el dueño</b> puede recuperar su contraseña por correo. Escribe tu usuario y te enviaremos un código al correo que registraste.</p>
+        <label for="recUsuario">Usuario</label>
+        <input type="text" id="recUsuario" placeholder="Tu usuario" autocomplete="username" autocapitalize="none" spellcheck="false">
+        <div class="error" id="errRec1" role="alert"></div>
+        <div class="nota" id="sinCorreo" hidden>
+          No se puede recuperar la contraseña de este usuario por correo. Si eres el dueño, revisa que escribiste bien tu usuario y que registraste tu correo.
+          Si eres empleado, pídele al dueño que te cambie la contraseña desde <b>Equipo</b>, o
+          <a href="https://wa.me/523325907090?text=Hola%2C%20no%20puedo%20entrar%20a%20Compoint%20Punto%20y%20necesito%20recuperar%20mi%20contrase%C3%B1a" target="_blank" rel="noopener"><b>escríbenos por WhatsApp</b></a>.
+        </div>
+        <button class="btn btn-primary btn-grande" id="btnEnviarCodigo" type="button">Enviarme el código</button>
+        <button class="btn btn-secondary btn-grande" type="button" data-volver>← Volver</button>
+        <div class="separador"></div>
+        <div class="ayuda">¿El dueño no tiene correo registrado? <a href="https://wa.me/523325907090?text=Hola%2C%20soy%20el%20due%C3%B1o%20y%20no%20puedo%20entrar%20a%20Compoint%20Punto" target="_blank" rel="noopener">Escríbenos por WhatsApp</a></div>
+      </div>
+
+      <!-- 3. Recuperar: código -->
+      <div class="vista" id="vistaRec2" hidden>
+        <div class="pasos"><i class="on"></i><i class="on"></i><i></i></div>
+        <h2>Revisa tu correo</h2>
+        <p class="sub">Enviamos un código de 6 dígitos a <b id="correoMask"></b>. Vale <span id="minVigencia">15</span> minutos.</p>
+        <label for="cod0">Código</label>
+        <div class="codigo" id="cajasCodigo">
+          <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="1" id="cod0" aria-label="Dígito 1">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 2">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 3">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 4">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 5">
+          <input type="text" inputmode="numeric" maxlength="1" aria-label="Dígito 6">
+        </div>
+        <div class="error" id="errRec2" role="alert"></div>
+        <button class="btn btn-primary btn-grande" id="btnVerificar" type="button">Verificar código</button>
+        <div class="separador"></div>
+        <div class="ayuda">¿No llegó? Revisa <b>Spam</b> · <button type="button" class="enlace" id="btnReenviar" disabled>Reenviar código</button><br>
+          <button type="button" class="enlace" data-volver style="margin-top:8px">← Cancelar</button></div>
+      </div>
+
+      <!-- 4. Recuperar: contraseña nueva -->
+      <div class="vista" id="vistaRec3" hidden>
+        <div class="pasos"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <h2>Crea tu contraseña nueva</h2>
+        <p class="sub">Mínimo 6 caracteres. Úsala solo para este sistema.</p>
+        <label for="passNueva">Contraseña nueva</label>
+        <input type="password" id="passNueva" placeholder="Contraseña nueva" autocomplete="new-password">
+        <div class="fuerza" aria-hidden="true"><i id="barraFuerza"></i></div>
+        <label for="passRepite">Repite la contraseña</label>
+        <input type="password" id="passRepite" placeholder="Escríbela otra vez" autocomplete="new-password">
+        <div class="error" id="errRec3" role="alert"></div>
+        <button class="btn btn-primary btn-grande" id="btnGuardarNueva" type="button">Guardar contraseña</button>
+      </div>
+
+      <!-- 5. Listo -->
+      <div class="vista" id="vistaRec4" hidden>
+        <div class="listo" aria-hidden="true">✓</div>
+        <h2 style="text-align:center">¡Listo!</h2>
+        <p class="sub" style="text-align:center">Tu contraseña se cambió. Ya puedes entrar con tu usuario y la contraseña nueva.</p>
+        <button class="btn btn-primary btn-grande" id="btnIrLogin" type="button">Ir a iniciar sesión</button>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/estado-conexion.js"></script>
+<script src="js/logo3d.js"></script>
+<script src="js/novedades.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+
+/* ====================== Entrar ====================== */
+async function login() {
+  const usuario = $('usuario').value.trim();
+  const password = $('password').value;
+  const errorDiv = $('error');
+  errorDiv.textContent = '';
+
+  if (!usuario || !password) {
+    errorDiv.textContent = 'Ingresa usuario y contraseña';
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ usuario, password })
+    });
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('usuario', JSON.stringify(data.usuario));
+    guardarPersona(usuario, data.usuario);
+
+    // Si dejó un turno de caja abierto: continuarlo o hacer el corte (aviso).
+    if (await elegirTurnoAlEntrar() === 'cerrar') { window.location.href = 'admin/caja-turno.html?cerrar=1'; return; }
+
+    // Redirigir según rol. jefe_general no tiene una sola sucursal fija —
+    // entra primero a elegir con cuál va a trabajar (o ver el resumen de
+    // todas), antes que a cualquier pantalla que ya asuma una sucursal.
+    if (data.usuario.rol === 'jefe_general') window.location.href = 'admin/sucursales.html';
+    else if (data.usuario.rol === 'mostrador') window.location.href = 'mostrador.html';
+    else if (data.usuario.rol === 'cajero') window.location.href = 'caja.html';
+    else if (data.usuario.rol === 'repartidor') window.location.href = 'repartidor.html';
+    else window.location.href = 'admin/dashboard.html';
+  } catch (err) {
+    errorDiv.textContent = err.message;
+  }
+}
+
+$('password').addEventListener('keyup', (e) => { if (e.key === 'Enter') login(); });
+
+/* ====================== Solo en la demo: entrar por rol y reiniciar datos ====================== */
+document.querySelectorAll('#rolesDemo .rol').forEach((b) => b.addEventListener('click', () => {
+  elegirOtro();
+  $('usuario').value = b.dataset.u;
+  $('password').value = 'demo';
+  $('btnEntrar').textContent = 'Entrando como ' + b.querySelector('b').textContent + '…';
+  login().finally(() => { setTimeout(() => { $('btnEntrar').textContent = 'Entrar'; }, 1500); });
+}));
+$('btnReiniciar').addEventListener('click', () => {
+  if (!confirm('¿Reiniciar la demo? Se borrarán tus cambios y volverán los datos de ejemplo.')) return;
+  if (typeof window.reiniciarDemo === 'function') window.reiniciarDemo();
+});
+$('usuario').addEventListener('keyup', (e) => { if (e.key === 'Enter') $('password').focus(); });
+
+
+/* ====================== ¿Quién va a entrar? ====================== */
+// Los usuarios que ya entraron en ESTE equipo quedan guardados aquí (solo usuario, nombre y puesto; nunca la contraseña).
+const ROLES = { dueno: 'Dueño', jefe_general: 'Jefe general', gerente: 'Gerente', cajero: 'Cajero', mostrador: 'Mostrador', repartidor: 'Repartidor' };
+// La lista de usuarios SOLO existe en el programa de escritorio (Compoint Punto.exe). En la web se entra escribiendo el usuario.
+const ES_ESCRITORIO = !!(window.compointDesktop && compointDesktop.esEscritorio);
+function leerPersonas() { if (!ES_ESCRITORIO) return []; try { const l = JSON.parse(localStorage.getItem('usuarios_guardados') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+function escribirPersonas(l) { if (!ES_ESCRITORIO) return; try { localStorage.setItem('usuarios_guardados', JSON.stringify(l.slice(0, 12))); } catch (e) { /* sin almacenamiento */ } }
+function guardarPersona(usuario, datos) {
+  if (!ES_ESCRITORIO) return;
+  const l = leerPersonas().filter((p) => p.usuario !== usuario);
+  l.unshift({ usuario, nombre: datos.nombre || usuario, rol: datos.rol || '' });
+  escribirPersonas(l);
+}
+const esc = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inicial = (n) => (String(n || '?').trim()[0] || '?').toUpperCase();
+function rolBonito(r) { return ROLES[r] || (r ? String(r).replace(/_/g, ' ') : ''); }
+
+function mostrarLista() {
+  const l = leerPersonas();
+  $('error').textContent = ''; $('password').value = '';
+  if (!l.length) { elegirOtro(); return; }
+  $('subLogin').textContent = '¿Quién va a entrar?';
+  $('listaQuien').innerHTML = l.map((p, i) => `<div class="persona" role="button" tabindex="0" data-i="${i}">
+      <button type="button" class="quitar" data-q="${i}" title="Quitar de la lista" aria-label="Quitar a ${esc(p.nombre)} de la lista">×</button>
+      <div class="av">${esc(inicial(p.nombre))}</div><b>${esc(p.nombre)}</b><small>${esc(rolBonito(p.rol))}</small></div>`).join('')
+    + '<div class="persona otro" role="button" tabindex="0" data-otro="1"><div class="av">+</div><b>Otro usuario</b><small>Escribir usuario</small></div>';
+  $('listaQuien').hidden = false; $('bloqueClave').hidden = true;
+}
+function elegirPersona(p) {
+  $('usuario').value = p.usuario;
+  $('chipAv').textContent = inicial(p.nombre); $('chipNombre').textContent = p.nombre; $('chipRol').textContent = rolBonito(p.rol);
+  $('subLogin').textContent = 'Escribe tu contraseña para entrar.';
+  $('listaQuien').hidden = true; $('bloqueClave').hidden = false;
+  $('chipUsuario').hidden = false; $('filaUsuario').hidden = true;
+  setTimeout(() => $('password').focus(), 30);
+}
+function elegirOtro() {
+  $('usuario').value = '';
+  $('subLogin').textContent = 'Toca cómo quieres entrar. Todo lo que captures se queda solo en tu navegador.';
+  $('listaQuien').hidden = true; $('bloqueClave').hidden = false;
+  $('chipUsuario').hidden = true; $('filaUsuario').hidden = false;
+  $('btnVerLista').hidden = !leerPersonas().length;
+  setTimeout(() => $('usuario').focus(), 30);
+}
+$('listaQuien').addEventListener('click', (e) => {
+  const q = e.target.closest('[data-q]');
+  if (q) { e.stopPropagation(); const l = leerPersonas(); l.splice(Number(q.dataset.q), 1); escribirPersonas(l); mostrarLista(); return; }
+  const t = e.target.closest('.persona'); if (!t) return;
+  if (t.dataset.otro) elegirOtro(); else { const p = leerPersonas()[Number(t.dataset.i)]; if (p) elegirPersona(p); }
+});
+$('listaQuien').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('persona')) { e.preventDefault(); e.target.click(); } });
+$('btnCambiarUsuario').addEventListener('click', mostrarLista);
+$('btnVerLista').addEventListener('click', mostrarLista);
+mostrarLista();
+
+/* ====================== Recuperar contraseña ====================== */
+const VISTAS = ['vistaLogin', 'vistaRec1', 'vistaRec2', 'vistaRec3', 'vistaRec4'];
+function ver(id, foco) {
+  VISTAS.forEach((v) => { $(v).hidden = (v !== id); });
+  if (foco) setTimeout(() => { const f = $(foco); if (f) f.focus(); }, 30);
+}
+const estado = { usuario: '', codigo: '', temporizador: null };
+const cajas = Array.from(document.querySelectorAll('#cajasCodigo input'));
+
+function mostrarError(id, texto) { $(id).textContent = texto || ''; }
+function ocupado(btn, si, textoOcupado) {
+  if (si) { btn.dataset.txt = btn.textContent; btn.textContent = textoOcupado || 'Un momento…'; btn.disabled = true; }
+  else { btn.textContent = btn.dataset.txt || btn.textContent; btn.disabled = false; }
+}
+
+$('btnOlvide').addEventListener('click', () => {
+  $('recUsuario').value = $('usuario').value.trim();
+  mostrarError('errRec1', ''); $('sinCorreo').hidden = true;
+  ver('vistaRec1', 'recUsuario');
+});
+document.querySelectorAll('[data-volver]').forEach((b) => b.addEventListener('click', () => {
+  clearInterval(estado.temporizador);
+  ver('vistaLogin');
+  if (!$('filaUsuario').hidden && !$('usuario').value) $('usuario').value = estado.usuario || $('recUsuario').value.trim();
+  if ($('listaQuien').hidden) setTimeout(() => { const f = $('filaUsuario').hidden ? $('password') : $('usuario'); f.focus(); }, 30);
+}));
+
+function arrancarEspera(segundos) {
+  const btn = $('btnReenviar');
+  clearInterval(estado.temporizador);
+  let falta = segundos;
+  const pintar = () => {
+    btn.disabled = falta > 0;
+    btn.textContent = falta > 0 ? `Reenviar código (0:${String(falta).padStart(2, '0')})` : 'Reenviar código';
+  };
+  pintar();
+  estado.temporizador = setInterval(() => { falta -= 1; pintar(); if (falta <= 0) clearInterval(estado.temporizador); }, 1000);
+}
+
+async function pedirCodigo(desdeReenvio) {
+  const usuario = (desdeReenvio ? estado.usuario : $('recUsuario').value.trim());
+  const errId = desdeReenvio ? 'errRec2' : 'errRec1';
+  mostrarError(errId, ''); $('sinCorreo').hidden = true;
+  if (!usuario) { mostrarError('errRec1', 'Escribe tu usuario'); return; }
+  const btn = desdeReenvio ? $('btnReenviar') : $('btnEnviarCodigo');
+  if (desdeReenvio) { btn.disabled = true; btn.textContent = 'Enviando…'; } else ocupado(btn, true, 'Enviando código…');
+  try {
+    const r = await apiFetch('/auth/recuperar/solicitar', { method: 'POST', body: JSON.stringify({ usuario }) });
+    if (r.sin_correo) { ver('vistaRec1'); $('sinCorreo').hidden = false; return; }
+    estado.usuario = usuario;
+    $('correoMask').textContent = r.correo || 'tu correo';
+    $('minVigencia').textContent = r.minutos || 15;
+    cajas.forEach((i) => { i.value = ''; });
+    mostrarError('errRec2', '');
+    ver('vistaRec2', 'cod0');
+    arrancarEspera(60);
+  } catch (err) {
+    mostrarError(errId, err.message);
+    if (desdeReenvio) { btn.disabled = false; btn.textContent = 'Reenviar código'; }
+  } finally {
+    if (!desdeReenvio) ocupado(btn, false);
+  }
+}
+
+$('btnEnviarCodigo').addEventListener('click', () => pedirCodigo(false));
+$('recUsuario').addEventListener('keyup', (e) => { if (e.key === 'Enter') pedirCodigo(false); });
+$('btnReenviar').addEventListener('click', () => pedirCodigo(true));
+
+/* --- las 6 cajitas del código --- */
+function codigoEscrito() { return cajas.map((c) => c.value).join(''); }
+cajas.forEach((caja, i) => {
+  caja.addEventListener('input', () => {
+    caja.value = caja.value.replace(/\D/g, '').slice(-1);
+    if (caja.value && i < cajas.length - 1) cajas[i + 1].focus();
+    if (codigoEscrito().length === 6) verificarCodigo();
+  });
+  caja.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !caja.value && i > 0) { cajas[i - 1].focus(); cajas[i - 1].value = ''; }
+    if (e.key === 'Enter') verificarCodigo();
+  });
+  caja.addEventListener('paste', (e) => {
+    const texto = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!texto) return;
+    e.preventDefault();
+    texto.split('').forEach((d, k) => { if (cajas[k]) cajas[k].value = d; });
+    (cajas[Math.min(texto.length, 5)]).focus();
+    if (texto.length === 6) verificarCodigo();
+  });
+});
+
+let verificando = false;
+async function verificarCodigo() {
+  const codigo = codigoEscrito();
+  mostrarError('errRec2', '');
+  if (codigo.length < 6) { mostrarError('errRec2', 'Escribe los 6 dígitos del código'); return; }
+  if (verificando) return;
+  verificando = true;
+  ocupado($('btnVerificar'), true, 'Comprobando…');
+  try {
+    await apiFetch('/auth/recuperar/verificar', { method: 'POST', body: JSON.stringify({ usuario: estado.usuario, codigo }) });
+    estado.codigo = codigo;
+    $('passNueva').value = ''; $('passRepite').value = ''; mostrarError('errRec3', ''); pintarFuerza();
+    ver('vistaRec3', 'passNueva');
+  } catch (err) {
+    mostrarError('errRec2', err.message);
+    cajas.forEach((c) => { c.value = ''; }); cajas[0].focus();
+  } finally {
+    verificando = false;
+    ocupado($('btnVerificar'), false);
+  }
+}
+$('btnVerificar').addEventListener('click', verificarCodigo);
+
+/* --- contraseña nueva --- */
+function pintarFuerza() {
+  const p = $('passNueva').value;
+  let n = 0;
+  if (p.length >= 6) n++;
+  if (p.length >= 10) n++;
+  if (/[A-Za-z]/.test(p) && /\d/.test(p)) n++;
+  if (p.length >= 12 || (/[A-Z]/.test(p) && /[^A-Za-z0-9]/.test(p))) n++;
+  const barra = $('barraFuerza');
+  barra.style.width = (p ? Math.max(1, n) * 25 : 0) + '%';
+  barra.style.background = ['#E53935', '#E53935', '#F9A825', '#7CB342', '#2E9E3F'][p ? Math.max(1, n) : 0];
+}
+$('passNueva').addEventListener('input', pintarFuerza);
+
+async function guardarNueva() {
+  const nueva = $('passNueva').value, repite = $('passRepite').value;
+  mostrarError('errRec3', '');
+  if (nueva.length < 6) { mostrarError('errRec3', 'La contraseña debe tener al menos 6 caracteres'); return; }
+  if (nueva !== repite) { mostrarError('errRec3', 'Las dos contraseñas no coinciden'); return; }
+  ocupado($('btnGuardarNueva'), true, 'Guardando…');
+  try {
+    await apiFetch('/auth/recuperar/restablecer', { method: 'POST', body: JSON.stringify({ usuario: estado.usuario, codigo: estado.codigo, password_nueva: nueva }) });
+    estado.codigo = '';
+    $('passNueva').value = ''; $('passRepite').value = '';
+    ver('vistaRec4', 'btnIrLogin');
+  } catch (err) {
+    mostrarError('errRec3', err.message);
+  } finally {
+    ocupado($('btnGuardarNueva'), false);
+  }
+}
+$('btnGuardarNueva').addEventListener('click', guardarNueva);
+$('passRepite').addEventListener('keyup', (e) => { if (e.key === 'Enter') guardarNueva(); });
+$('btnIrLogin').addEventListener('click', () => {
+  $('password').value = ''; $('error').textContent = ''; ver('vistaLogin');
+  const p = leerPersonas().find((x) => x.usuario === estado.usuario);
+  if (p) elegirPersona(p); else { elegirOtro(); $('usuario').value = estado.usuario; setTimeout(() => $('password').focus(), 40); }
+});
+
+/* ====================== Información en vivo del lado izquierdo ====================== */
+function pintarHora() {
+  const d = new Date();
+  $('hora').textContent = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  $('fecha').textContent = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '');
+}
+pintarHora(); setInterval(pintarHora, 15000);
+
+function textoLicencia(l) {
+  if (!l) return '';
+  const d = l.dias;
+  switch (l.estado) {
+    case 'activa': return (l.tipo === 'permanente' || d == null) ? 'Permanente' : `Vigente · ${d} ${d === 1 ? 'día' : 'días'}`;
+    case 'por_vencer': return `Vence en ${d} ${d === 1 ? 'día' : 'días'}`;
+    case 'demo': return `Prueba · ${d} ${d === 1 ? 'día' : 'días'}`;
+    case 'gracia': return 'Vencida · en gracia';
+    case 'solo_consulta': return 'Solo consulta';
+    default: return '';
+  }
+}
+function ponerConexion(enLinea) {
+  $('puntoConexion').classList.toggle('off', !enLinea);
+  $('vConexion').textContent = enLinea ? 'En línea' : 'Sin conexión';
+}
+async function cargarInfo() {
+  if (!navigator.onLine) { ponerConexion(false); return; }
+  try {
+    const r = await fetch(API_URL + '/auth/info-login', { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error('x');
+    const i = await r.json();
+    ponerConexion(true);
+    if (i.negocio) $('vNegocio').textContent = i.negocio;
+    $('datoSucursal').hidden = !i.sucursal; if (i.sucursal) $('vSucursal').textContent = i.sucursal;
+    const lic = textoLicencia(i.licencia);
+    $('datoLicencia').hidden = !lic; $('vLicencia').textContent = lic;
+    if (i.version && !(window.compointDesktop && window.compointDesktop.version)) $('vVersion').textContent = 'Versión ' + i.version;
+  } catch (e) { ponerConexion(false); }
+}
+cargarInfo(); setInterval(cargarInfo, 60000);
+window.addEventListener('online', cargarInfo);
+window.addEventListener('offline', () => ponerConexion(false));
+
+/* ¿Sabías que…? — primero lo nuevo de esta versión y luego trucos revueltos (sin repetirse seguido) */
+const NOV = window.CompointNovedades;
+const filaConsejos = [];
+async function prepararConsejos() {
+  const v = await NOV.version();
+  if (v) $('vVersion').textContent = 'Versión ' + v;
+  const n = v ? NOV.novedadesDe(v) : null;
+  if (n) n.puntos.forEach((p) => filaConsejos.push('<span class="nuevo">NUEVO ' + v + '</span>' + p));
+}
+function pintarConsejo() {
+  const texto = filaConsejos.length ? filaConsejos.shift() : NOV.siguienteConsejo();
+  $('consejo').innerHTML = '<em>💡 Sabías que…</em> ' + texto;
+}
+prepararConsejos().then(pintarConsejo);
+setInterval(() => {
+  const c = $('consejo'); c.classList.add('oculto');
+  setTimeout(() => { pintarConsejo(); c.classList.remove('oculto'); }, 420);
+}, 9000);
+
+/* Programa de Windows: versión nueva ya descargada → «Actualizar ahora» (cada quien decide cuándo) */
+let actPospuesta = '';
+NOV.alCambiarActualizacion((e) => {
+  const caja = $('avisoAct');
+  if (!NOV.hayActualizacion(e) || actPospuesta === e.nueva) { caja.hidden = true; return; }
+  caja.innerHTML = '<b class="t">⬆️ Hay una versión nueva: ' + e.nueva.replace(/[^0-9.]/g, '') + '</b>' +
+    (NOV.notasHTML(e) || 'Trae mejoras y correcciones.') +
+    '<button type="button" id="btnActualizar">Actualizar ahora</button><button type="button" class="despues" id="btnDespues">Después</button>';
+  caja.hidden = false;
+  $('btnActualizar').onclick = () => NOV.instalar();
+  $('btnDespues').onclick = () => { actPospuesta = e.nueva; caja.hidden = true; };
+});
+
+/* Logo 3D */
+try { Logo3D($('escena3d')); } catch (e) { /* si el navegador no puede dibujarlo, la pantalla funciona igual */ }
+</script>
+<script src="js/ojito-password.js"></script>
+</body>
+</html>

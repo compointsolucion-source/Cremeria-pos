@@ -1,0 +1,68 @@
+COMPOINT PUNTO - DEMO EN LINEA (sin servidor, sin base de datos)
+===============================================================
+
+Direccion:  https://www.compoint.com.mx/demos/punto/
+Version:    1.3.0 (20-nov-2026): todo lo anterior + Tienda en linea (la tienda
+            del negocio para que sus clientes pidan desde el celular).
+
+LO NUEVO EN ESTA DEMO (1.2.1)
+ - Recargas y pago de servicios en MODO PRACTICA (Caja -> boton "Recargas"):
+   recargas, Paquetes (Amigo Sin Limite, etc.) y servicios (luz, agua, cable).
+   No se manda saldo real y no cuentan en el corte. Un numero que termina en
+   0000 sale "rechazado" para ver ese caso. La pantalla dice "En construccion".
+ - Corte de caja renovado: Corte de Caja, Historial de cortes (por turno, dia
+   o mes) y el corte completo. Trae un corte de ejemplo que NO cuadra (no se
+   escribio lo de tarjeta y faltan $100 en efectivo) para ver la explicacion
+   automatica "Por que no cuadra?".
+ - "Sabias que...?" y la version visible en la pantalla de entrada y en el menu.
+ - Facturacion: subir el PDF y el XML de la factura (archivos chicos, hasta
+   400 KB en la demo). La solicitud ya facturada trae PDF y XML de ejemplo.
+ - Licencia con paquete Negocio y la lista oficial de precios.
+ - Los terminos y condiciones ya salen aceptados (la ventana no aparece).
+
+COMO FUNCIONA
+ Es el mismo sistema Compoint Punto, pero el "servidor" vive dentro del
+ navegador de quien lo prueba (js/demo-mock.js y js/demo-mock-*.js). Nada se
+ envia a ningun lado: cada visitante tiene su propia copia de los datos de
+ ejemplo y puede reiniciarlos cuando quiera.
+
+USUARIOS (contrasena de todos: demo)
+   demo        Dueno: ve y usa todo el sistema
+   cajero      Caja, recargas y su propio corte
+   mostrador   Mostrador (pesar e imprimir ticket)
+   repartidor  App del repartidor (pedidos a domicilio)
+ En la pantalla de entrada hay un boton por cada rol que entra directo.
+
+QUE TRAE DE EJEMPLO
+ - 26 productos (quesos, lacteos, carnes frias, carnes, abarrotes), 3 kits,
+   promociones, 3 clientes (Maria Gonzalez tiene un fiado), 3 proveedores.
+ - Ventas de hoy, un ticket pendiente para cobrar en Caja y 12 dias de
+   historial con cortes cerrados (Reportes y Cortes de caja se ven llenos).
+ - Pedidos a domicilio del dia con zonas de envio y un repartidor.
+ - Prueba gratis (siempre muestra dias restantes) y 3 solicitudes de factura.
+
+QUE NO FUNCIONA EN LA DEMO (a proposito)
+ - Bascula, impresora y cajon: no funcionan en la demo. El peso se teclea;
+   la impresion es simulada.
+ - Recargas reales (solo practica), activar licencias, importar Excel, venta
+   sin internet, mas de una sucursal, descargar constancias, recuperar la
+   contrasena por correo.
+ - "Quiero contratar" (Licencia): arma el mensaje y lo manda por WhatsApp
+   a Compoint (33 25 90 70 90); no se envia por correo.
+
+PARA REINICIAR LOS DATOS
+ Boton "Reiniciar demo" en la barra verde de abajo o "Reiniciar los datos de
+ ejemplo" en la entrada. Los datos se guardan en el navegador con la clave
+ compoint_demo_db_v1 (version 3 de los datos de ejemplo: quien ya habia
+ entrado antes recibe los datos nuevos automaticamente).
+
+PARA ARMAR LA DEMO DE UNA VERSION NUEVA
+ python3 herramientas/demo-sitio/armar-demo.py <salida>   (en el repositorio:
+ copia el frontend, mete el servidor de la demo en
+ cada pagina y hace el ZIP). El ZIP se descomprime dentro de demos/punto/.
+
+TIENDA EN LINEA (version 1.3.0)
+ Menu Ventas -> Tienda en linea: QR, temas, productos que se venden por internet
+ y «Aparecer en Compoint Pedidos». «Ver mi tienda» abre la tienda de ejemplo
+ (tienda.html); lo que se pide ahi llega a Pedidos -> «Por confirmar».
+ Cada dia aparece un pedido de ejemplo «Por confirmar» (Laura Gomez).
