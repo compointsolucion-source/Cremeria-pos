@@ -1,7 +1,4 @@
-- Más seguro: solo el dueño general puede conectar la sincronización con la nube.
-- El programa ya no se cierra si la base de datos se detiene; la caja recibe un mensaje claro en vez de quedarse esperando.
-- La sincronización y los respaldos no pierden información si algo falla a la mitad; si un respaldo falla, te avisa junto al reloj.
-- Más rápido con meses de ventas, sin folios repetidos y sin turnos de caja duplicados.
-- Tu sesión se renueva sola mientras trabajas y se cierra tras 30 días sin usarla.
-- Si la hora de la computadora está mal (por ejemplo, después de que se fue la luz), sale una barra roja para corregirla.
-- «Ventas del día» ya abre con la fecha correcta también después de las 6 de la tarde.
+- Nueva Tienda en línea: tus clientes piden desde su celular con tu enlace o tu código QR, y el pedido llega a Pedidos → Por confirmar.
+- Escoge cómo se ve tu tienda: 10 estilos (abarrotes, cremería, farmacia, panadería, ferretería…) o tus propios colores.
+- Escoge qué productos se venden por internet por departamento, con búsqueda y recuadros.
+- Próximamente: aparece en el mapa de la app Compoint Pedidos. Ve a Tienda en línea y pon dónde está tu tienda.

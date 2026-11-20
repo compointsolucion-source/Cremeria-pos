@@ -9,6 +9,15 @@
 
   const NOVEDADES = [
     {
+      version: '1.3.0', fecha: '2026-11-20',
+      puntos: [
+        '🌐 Nueva <b>Tienda en línea</b>: tus clientes piden desde su celular con tu enlace o tu código QR, y el pedido llega a <b>Pedidos → Por confirmar</b>.',
+        '🎨 Escoge cómo se ve tu tienda: <b>10 estilos</b> (abarrotes, cremería, farmacia, panadería, ferretería…) o <b>tus propios colores</b>.',
+        '✅ Escoge qué productos se venden por internet <b>por departamento</b>, con búsqueda y recuadros.',
+        '📍 <b>Próximamente</b>: aparece en el mapa de la app <b>Compoint Pedidos</b>. Ve a Tienda en línea y pon dónde está tu tienda.'
+      ]
+    },
+    {
       version: '1.2.1', fecha: '2026-11-05',
       puntos: [
         '🔎 El corte te dice <b>por qué no cuadra</b>: si falta dinero de verdad o solo no se escribió la tarjeta o la transferencia.',
@@ -42,6 +51,8 @@
   ];
 
   const CONSEJOS = [
+    'En <b>Tienda en línea</b> imprimes un <b>cartel con tu QR</b> para pegarlo en el mostrador: tus clientes lo escanean y piden desde casa.',
+    'En <b>Tienda en línea → ¿Cómo se ve tu tienda?</b> cambias el estilo de tu página y tus clientes lo ven al momento.',
     'En <b>Caja</b>, <b>F4</b> cobra el ticket que tienes abierto y <b>F2</b> abre la cámara para escanear.',
     'En <b>Mostrador</b>, <b>F1</b> te lleva directo al buscador de productos y <b>F4</b> genera el ticket.',
     'En <b>Caja Avanzada</b>: <b>Insert</b> = varios, <b>Supr</b> borra el artículo, <b>F11</b> pone precio de mayoreo.',
