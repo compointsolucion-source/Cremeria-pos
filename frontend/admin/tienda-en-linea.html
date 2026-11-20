@@ -46,6 +46,7 @@
   /* Productos por departamento con recuadros */
   .herr { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
   .herr input[type="search"] { flex: 1; min-width: 220px; }
+  .herr select { min-width: 210px; max-width: 100%; height: 44px; font-weight: 600; }
   .filtro { display: inline-flex; background: var(--bg-secondary, #F1F2F4); border-radius: 10px; padding: 3px; gap: 3px; }
   .filtro button { border: 0; background: none; border-radius: 8px; padding: 8px 12px; font-weight: 600; font-size: 13.5px; color: var(--muted, #6B6F76); cursor: pointer; white-space: nowrap; }
   .filtro button[aria-pressed="true"] { background: #fff; color: var(--text, #1B1D1C); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
@@ -54,7 +55,7 @@
   .masivo .sep { flex: 1; }
   .depto { border-bottom: 1px solid var(--border, #E4E6E9); }
   .d-cab { display: flex; align-items: center; gap: 10px; padding: 12px 2px; position: sticky; top: 0; background: var(--card-bg, #fff); z-index: 1; }
-  .d-cab label { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; font-weight: 700; font-size: 15px; }
+  .d-nom { flex: 1; text-align: left; border: 0; background: none; cursor: pointer; font-weight: 700; font-size: 15px; color: inherit; padding: 8px 0; }
   .d-cab .cuenta { font-size: 13px; color: var(--muted, #6B6F76); font-variant-numeric: tabular-nums; }
   .d-cab .plegar { border: 0; background: var(--bg-secondary, #F1F2F4); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: transform .15s ease-out; }
   .d-cab .plegar[aria-expanded="false"] { transform: rotate(-90deg); }
@@ -185,6 +186,7 @@ function pintar() {
 
     <div class="caja"><h2>¿Qué productos se ven en la tienda?</h2><p class="ayuda">Palomea los que quieres vender por internet. Con el recuadro del departamento marcas o quitas todo el departamento. Se guarda solo.</p>
       <div class="herr"><input type="search" id="buscaProd" placeholder="Buscar producto…" aria-label="Buscar producto" oninput="clearTimeout(temporizadorBusca); temporizadorBusca = setTimeout(() => { prodBusca = this.value; pintarProductos(); }, 200)">
+        <select id="deptoProd" aria-label="Departamento" onchange="prodDepto = this.value; pintarProductos()"></select>
         <div class="filtro" role="group" aria-label="Mostrar" id="filtroProd"></div></div>
       <div class="masivo" id="masivo"></div>
       <div id="listaProd"><p class="vacio-p">Cargando productos…</p></div></div>
@@ -245,7 +247,8 @@ async function guardar(soloEsto) {
 let prods = [];
 let prodBusca = '';
 let prodFiltro = 'todos';            // todos | si | no
-const deptosCerrados = new Set();
+let prodDepto = '';                  // '' = todos los departamentos
+const deptosAbiertos = new Set();     // cerrados al inicio para que la lista no sea enorme
 const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 async function buscarProductos() {
@@ -255,27 +258,34 @@ async function buscarProductos() {
 
 function prodsVisibles() {
   const b = normal(prodBusca);
-  return prods.filter((p) => (!b || normal(p.nombre).includes(b)) && (prodFiltro === 'todos' || (prodFiltro === 'si') === p.en_tienda));
+  return prods.filter((p) => (!prodDepto || p.departamento === prodDepto) && (!b || normal(p.nombre).includes(b)) && (prodFiltro === 'todos' || (prodFiltro === 'si') === p.en_tienda));
 }
 
 function pintarProductos() {
   const el = document.getElementById('listaProd'); if (!el) return;
-  const si = prods.filter((p) => p.en_tienda).length;
-  document.getElementById('filtroProd').innerHTML = [['todos', `Todos (${prods.length})`], ['si', `Se ven (${si})`], ['no', `Escondidos (${prods.length - si})`]]
+  const deptos = [...new Set(prods.map((p) => p.departamento))].sort((a, b) => a.localeCompare(b, 'es'));
+  if (prodDepto && !deptos.includes(prodDepto)) prodDepto = '';
+  document.getElementById('deptoProd').innerHTML = `<option value="">Todos los departamentos</option>` + deptos.map((d) => {
+    const l = prods.filter((p) => p.departamento === d);
+    return `<option value="${esc(d)}" ${d === prodDepto ? 'selected' : ''}>${esc(d)} (${l.filter((p) => p.en_tienda).length} de ${l.length})</option>`;
+  }).join('');
+  const base = prodDepto ? prods.filter((p) => p.departamento === prodDepto) : prods;
+  const si = base.filter((p) => p.en_tienda).length;
+  document.getElementById('filtroProd').innerHTML = [['todos', `Todos (${base.length})`], ['si', `Se ven (${si})`], ['no', `Escondidos (${base.length - si})`]]
     .map(([v, t]) => `<button type="button" aria-pressed="${prodFiltro === v}" onclick="prodFiltro='${v}'; pintarProductos()">${t}</button>`).join('');
   const vis = prodsVisibles();
   document.getElementById('masivo').innerHTML = vis.length
-    ? `<span>${prodBusca || prodFiltro !== 'todos' ? `Encontrados: <b>${vis.length}</b>` : `<b>${si}</b> de ${prods.length} se ven en la tienda`}</span><span class="sep"></span>
-       <button type="button" class="btn btn-secondary btn-chico" onclick="cambiarVarios(prodsVisibles(), true)">Marcar ${prodBusca || prodFiltro !== 'todos' ? 'estos' : 'todos'}</button>
-       <button type="button" class="btn btn-secondary btn-chico" onclick="cambiarVarios(prodsVisibles(), false)">Quitar ${prodBusca || prodFiltro !== 'todos' ? 'estos' : 'todos'}</button>` : '';
+    ? `<span>${prodBusca || prodFiltro !== 'todos' ? `Encontrados: <b>${vis.length}</b>` : `<b>${si}</b> de ${base.length} se ven en la tienda${prodDepto ? ' en ' + esc(prodDepto) : ''}`}</span><span class="sep"></span>
+       <button type="button" class="btn btn-secondary btn-chico" onclick="cambiarVarios(prodsVisibles(), true)">Marcar ${prodBusca || prodFiltro !== 'todos' || prodDepto ? 'estos' : 'todos'}</button>
+       <button type="button" class="btn btn-secondary btn-chico" onclick="cambiarVarios(prodsVisibles(), false)">Quitar ${prodBusca || prodFiltro !== 'todos' || prodDepto ? 'estos' : 'todos'}</button>` : '';
   if (!vis.length) { el.innerHTML = `<p class="vacio-p">${prods.length ? 'No hay productos con esa búsqueda.' : 'Todavía no tienes productos dados de alta.'}</p>`; return; }
   const grupos = new Map();
   vis.forEach((p) => { if (!grupos.has(p.departamento)) grupos.set(p.departamento, []); grupos.get(p.departamento).push(p); });
-  const abrirTodo = !!prodBusca;
+  const abrirTodo = !!prodBusca || !!prodDepto;
   el.innerHTML = [...grupos].map(([d, l], gi) => {
     const n = l.filter((p) => p.en_tienda).length;
-    const abierto = abrirTodo || !deptosCerrados.has(d);
-    return `<section class="depto"><div class="d-cab"><label><input type="checkbox" class="chk" data-grupo="${gi}" ${n === l.length ? 'checked' : ''} aria-label="Todo ${esc(d)}"><span>${esc(d)}</span></label>
+    const abierto = abrirTodo || deptosAbiertos.has(d);
+    return `<section class="depto"><div class="d-cab"><input type="checkbox" class="chk" data-grupo="${gi}" ${n === l.length ? 'checked' : ''} aria-label="Todo ${esc(d)}"><button type="button" class="d-nom" data-plegar="${esc(d)}">${esc(d)}</button>
       <span class="cuenta">${n} de ${l.length}</span><button type="button" class="plegar" aria-expanded="${abierto}" aria-label="${abierto ? 'Cerrar' : 'Abrir'} ${esc(d)}" data-plegar="${esc(d)}">▾</button></div>
       ${abierto ? `<div class="d-lista">${l.map((p) => `<label class="prod-chk ${p.en_tienda ? '' : 'no'}"><input type="checkbox" class="chk" data-id="${p.id}" ${p.en_tienda ? 'checked' : ''}><span class="n"><b>${esc(p.nombre)}</b><small>${p.precio > 0 ? dinero(p.precio) : 'sin precio, no se ve'}${p.con_foto ? '' : ' · sin foto'}</small></span></label>`).join('')}</div>` : ''}</section>`;
   }).join('');
@@ -287,7 +297,7 @@ function pintarProductos() {
     c.onchange = () => cambiarVarios(l, c.checked);
   });
   el.querySelectorAll('input[data-id]').forEach((c) => { c.onchange = () => cambiarVarios(prods.filter((p) => p.id === Number(c.dataset.id)), c.checked); });
-  el.querySelectorAll('[data-plegar]').forEach((b) => { b.onclick = () => { const d = b.dataset.plegar; if (deptosCerrados.has(d)) deptosCerrados.delete(d); else deptosCerrados.add(d); pintarProductos(); }; });
+  el.querySelectorAll('[data-plegar]').forEach((b) => { b.onclick = () => { const d = b.dataset.plegar; if (deptosAbiertos.has(d)) deptosAbiertos.delete(d); else deptosAbiertos.add(d); pintarProductos(); }; });
 }
 
 async function cambiarVarios(lista, valor) {
