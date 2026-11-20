@@ -237,3 +237,22 @@ test('fuera de horario no se reciben pedidos', async () => {
   assert.equal(r.status, 409);
   await api('dueno', 'PUT', '/api/tienda/config', { horario: TODO_EL_DIA });
 });
+
+test('administración: lista por departamento y prender/apagar varios de un jalón (solo de su sucursal)', async () => {
+  const l = await api('dueno', 'GET', '/api/tienda/productos');
+  assert.equal(l.status, 200);
+  assert.ok(l.json.every((p) => typeof p.departamento === 'string'));
+  const ids = [panalesId, lecheId];
+  assert.equal((await api('cajera', 'PUT', '/api/tienda/productos', { ids, en_tienda: false })).status, 403);
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/productos', { ids: [], en_tienda: false })).status, 400);
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/productos', { ids: ['x'], en_tienda: false })).status, 400);
+  const otra = (await pool.query("INSERT INTO sucursales (nombre, activo) VALUES ('Otra', true) RETURNING id")).rows[0].id;
+  const ajeno = (await pool.query("INSERT INTO productos (sucursal_id, nombre, precio, tipo_venta, en_tienda) VALUES ($1, 'Ajeno', 10, 'unidad', true) RETURNING id", [otra])).rows[0].id;
+  const r = await api('dueno', 'PUT', '/api/tienda/productos', { ids: [...ids, ajeno], en_tienda: false });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.cambiados, 2, 'el producto de otra sucursal no se toca');
+  assert.equal((await pool.query('SELECT en_tienda FROM productos WHERE id = $1', [ajeno])).rows[0].en_tienda, true);
+  const p = await api(null, 'GET', '/api/tienda/publico/productos');
+  assert.ok(!p.json.some((x) => ids.includes(x.id)));
+  await api('dueno', 'PUT', '/api/tienda/productos', { ids, en_tienda: true });
+});

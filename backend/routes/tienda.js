@@ -386,10 +386,25 @@ router.get('/productos', ...soloAdmin, async (req, res, next) => {
   try {
     const q = textoOnull(req.query.q, 80);
     const r = await pool.query(
-      `SELECT p.id, p.nombre, p.precio, p.en_tienda, (p.imagen_url IS NOT NULL AND p.imagen_url <> '') AS con_foto
-         FROM productos p WHERE p.sucursal_id = $1 AND p.activo = true ${q ? 'AND p.nombre ILIKE $2' : ''}
-        ORDER BY p.en_tienda ASC, p.nombre LIMIT 200`, q ? [req.sucursalId, `%${q.replace(/[%_\\]/g, '\\$&')}%`] : [req.sucursalId]);
+      `SELECT p.id, p.nombre, p.precio, p.en_tienda, (p.imagen_url IS NOT NULL AND p.imagen_url <> '') AS con_foto,
+              COALESCE(c.nombre, 'Otros') AS departamento
+         FROM productos p LEFT JOIN categorias c ON c.id = p.categoria_id
+        WHERE p.sucursal_id = $1 AND p.activo = true ${q ? 'AND p.nombre ILIKE $2' : ''}
+        ORDER BY COALESCE(c.nombre, 'Otros'), p.nombre LIMIT 5000`, q ? [req.sucursalId, `%${q.replace(/[%_\\]/g, '\\$&')}%`] : [req.sucursalId]);
     res.json(r.rows.map((p) => ({ ...p, precio: Number(p.precio) })));
+  } catch (e) { next(e); }
+});
+
+// Varios de un jalón (un departamento completo o lo que salió en la búsqueda).
+router.put('/productos', ...soloAdmin, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const ids = Array.isArray(b.ids) ? [...new Set(b.ids.map(Number))] : [];
+    if (typeof b.en_tienda !== 'boolean' || !ids.length || ids.length > 5000 || ids.some((i) => !Number.isInteger(i) || i <= 0 || i > 2147483647)) {
+      return res.status(400).json({ error: 'Datos inválidos' });
+    }
+    const r = await pool.query('UPDATE productos SET en_tienda = $3 WHERE id = ANY($1::int[]) AND sucursal_id = $2', [ids, req.sucursalId, b.en_tienda]);
+    res.json({ cambiados: r.rowCount });
   } catch (e) { next(e); }
 });
 

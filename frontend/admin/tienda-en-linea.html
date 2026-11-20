@@ -43,7 +43,31 @@
   .fila-p .n b { display: block; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fila-p .n small { color: var(--muted, #7A7D83); font-size: 12px; }
   .fila-p.oculto .n b { color: var(--muted, #7A7D83); text-decoration: line-through; }
-  .guardar-fijo { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; }
+  /* Productos por departamento con recuadros */
+  .herr { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .herr input[type="search"] { flex: 1; min-width: 220px; }
+  .filtro { display: inline-flex; background: var(--bg-secondary, #F1F2F4); border-radius: 10px; padding: 3px; gap: 3px; }
+  .filtro button { border: 0; background: none; border-radius: 8px; padding: 8px 12px; font-weight: 600; font-size: 13.5px; color: var(--muted, #6B6F76); cursor: pointer; white-space: nowrap; }
+  .filtro button[aria-pressed="true"] { background: #fff; color: var(--text, #1B1D1C); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .masivo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted, #6B6F76); padding: 8px 0 12px; border-bottom: 1px solid var(--border, #E4E6E9); }
+  .masivo b { color: var(--text, #1B1D1C); }
+  .masivo .sep { flex: 1; }
+  .depto { border-bottom: 1px solid var(--border, #E4E6E9); }
+  .d-cab { display: flex; align-items: center; gap: 10px; padding: 12px 2px; position: sticky; top: 0; background: var(--card-bg, #fff); z-index: 1; }
+  .d-cab label { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; font-weight: 700; font-size: 15px; }
+  .d-cab .cuenta { font-size: 13px; color: var(--muted, #6B6F76); font-variant-numeric: tabular-nums; }
+  .d-cab .plegar { border: 0; background: var(--bg-secondary, #F1F2F4); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: transform .15s ease-out; }
+  .d-cab .plegar[aria-expanded="false"] { transform: rotate(-90deg); }
+  .d-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 2px 18px; padding: 0 2px 12px 32px; }
+  .prod-chk { display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-radius: 8px; cursor: pointer; min-height: 44px; }
+  .prod-chk:hover { background: var(--bg-secondary, #F5F6F7); }
+  .prod-chk .n { flex: 1; min-width: 0; line-height: 1.25; }
+  .prod-chk .n b { display: block; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prod-chk .n small { color: var(--muted, #7A7D83); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .prod-chk.no .n b { color: var(--muted, #8A8E94); }
+  input.chk { width: 22px; height: 22px; accent-color: #1D6A3A; flex: none; cursor: pointer; margin: 0; }
+  .vacio-p { padding: 18px 2px; color: var(--muted, #6B6F76); }
+  .guardar-fijo { display: flex; justify-content: flex-end; margin: -4px 0 14px; }
   @media (max-width: 860px) { .rejilla2 { grid-template-columns: 1fr; } .compartir { grid-template-columns: 1fr; justify-items: center; } .horario { grid-template-columns: 1fr auto; } }
   @media print {
     body > *:not(#cartel) { display: none !important; }
@@ -102,7 +126,7 @@ async function cargar() {
     cfg = await apiFetch('/tienda/config');
     fiado = await apiFetch('/tienda/fiado');
     pintar();
-    buscarProductos('');
+    buscarProductos();
   } catch (err) {
     document.getElementById('contenido').innerHTML = `<div class="caja">No se pudo abrir la configuración: ${esc(err.message)}</div>`;
   }
@@ -157,11 +181,14 @@ function pintar() {
       </div>
     </div>
 
-    <div class="caja"><h2>¿Qué productos se ven en la tienda?</h2><p class="ayuda">Apaga los que no quieras vender por internet. ${c.productos_ocultos ? `Tienes <b>${c.productos_ocultos}</b> escondidos.` : 'Ahora se ven todos los que tienen precio.'}</p>
-      <div class="campo"><input type="search" id="buscaProd" placeholder="Buscar producto…" aria-label="Buscar producto" oninput="clearTimeout(temporizadorBusca); temporizadorBusca = setTimeout(() => buscarProductos(this.value), 300)"></div>
-      <div class="lista-p" id="listaProd"></div></div>
+    <div class="guardar-fijo"><button class="btn btn-primary btn-grande" onclick="guardar()">Guardar datos y horario</button></div>
 
-    <div class="guardar-fijo"><button class="btn btn-primary btn-grande" onclick="guardar()">Guardar cambios</button></div>`;
+    <div class="caja"><h2>¿Qué productos se ven en la tienda?</h2><p class="ayuda">Palomea los que quieres vender por internet. Con el recuadro del departamento marcas o quitas todo el departamento. Se guarda solo.</p>
+      <div class="herr"><input type="search" id="buscaProd" placeholder="Buscar producto…" aria-label="Buscar producto" oninput="clearTimeout(temporizadorBusca); temporizadorBusca = setTimeout(() => { prodBusca = this.value; pintarProductos(); }, 200)">
+        <div class="filtro" role="group" aria-label="Mostrar" id="filtroProd"></div></div>
+      <div class="masivo" id="masivo"></div>
+      <div id="listaProd"><p class="vacio-p">Cargando productos…</p></div></div>
+`;
   if (c.activo && typeof QRCode !== 'undefined') QRCode.toCanvas(document.getElementById('qr'), enlaceTienda(), { width: 340, margin: 1 }, () => {});
 }
 
@@ -207,28 +234,76 @@ async function guardar(soloEsto) {
     cfg = Object.assign(cfg, r);
     mostrarToast(soloEsto ? (r.activo ? 'Tu tienda está publicada' : 'Tienda apagada') : 'Cambios guardados', 'exito');
     if (soloEsto) pintar(); else { const est = document.querySelector('.estado-tienda'); if (est && cfg.activo) est.textContent = '✓ Tu tienda está publicada. ' + cfg.horario_texto; }
-    if (soloEsto) buscarProductos('');
+    if (soloEsto) buscarProductos();
   } catch (err) {
     mostrarToast(err.message, 'error');
     if (soloEsto) document.getElementById('cActivo').checked = !!cfg.activo;
   }
 }
 
-async function buscarProductos(q) {
-  const el = document.getElementById('listaProd'); if (!el) return;
-  try {
-    const l = await apiFetch('/tienda/productos' + (q ? '?q=' + encodeURIComponent(q) : ''));
-    el.innerHTML = l.length ? l.map((p) => `<div class="fila-p ${p.en_tienda ? '' : 'oculto'}" id="fp-${p.id}"><div class="n"><b>${esc(p.nombre)}</b><small>${dinero(p.precio)}${p.precio > 0 ? '' : ' · sin precio, no se ve'}${p.con_foto ? '' : ' · sin foto'}</small></div>
-      <input type="checkbox" class="interruptor" ${p.en_tienda ? 'checked' : ''} aria-label="Mostrar ${esc(p.nombre)} en la tienda" onchange="cambiarProducto(${p.id}, this)"></div>`).join('')
-      : '<p class="ayuda" style="padding:10px 0">No hay productos con ese nombre.</p>';
-  } catch (err) { el.innerHTML = `<p class="ayuda">${esc(err.message)}</p>`; }
+// ----- Productos de la tienda: por departamento, con búsqueda y recuadros -----
+let prods = [];
+let prodBusca = '';
+let prodFiltro = 'todos';            // todos | si | no
+const deptosCerrados = new Set();
+const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+async function buscarProductos() {
+  try { prods = await apiFetch('/tienda/productos'); pintarProductos(); }
+  catch (err) { const el = document.getElementById('listaProd'); if (el) el.innerHTML = `<p class="vacio-p">${esc(err.message)}</p>`; }
 }
 
-async function cambiarProducto(id, chk) {
+function prodsVisibles() {
+  const b = normal(prodBusca);
+  return prods.filter((p) => (!b || normal(p.nombre).includes(b)) && (prodFiltro === 'todos' || (prodFiltro === 'si') === p.en_tienda));
+}
+
+function pintarProductos() {
+  const el = document.getElementById('listaProd'); if (!el) return;
+  const si = prods.filter((p) => p.en_tienda).length;
+  document.getElementById('filtroProd').innerHTML = [['todos', `Todos (${prods.length})`], ['si', `Se ven (${si})`], ['no', `Escondidos (${prods.length - si})`]]
+    .map(([v, t]) => `<button type="button" aria-pressed="${prodFiltro === v}" onclick="prodFiltro='${v}'; pintarProductos()">${t}</button>`).join('');
+  const vis = prodsVisibles();
+  document.getElementById('masivo').innerHTML = vis.length
+    ? `<span>${prodBusca || prodFiltro !== 'todos' ? `Encontrados: <b>${vis.length}</b>` : `<b>${si}</b> de ${prods.length} se ven en la tienda`}</span><span class="sep"></span>
+       <button type="button" class="btn btn-secondary btn-chico" onclick="cambiarVarios(prodsVisibles(), true)">Marcar ${prodBusca || prodFiltro !== 'todos' ? 'estos' : 'todos'}</button>
+       <button type="button" class="btn btn-secondary btn-chico" onclick="cambiarVarios(prodsVisibles(), false)">Quitar ${prodBusca || prodFiltro !== 'todos' ? 'estos' : 'todos'}</button>` : '';
+  if (!vis.length) { el.innerHTML = `<p class="vacio-p">${prods.length ? 'No hay productos con esa búsqueda.' : 'Todavía no tienes productos dados de alta.'}</p>`; return; }
+  const grupos = new Map();
+  vis.forEach((p) => { if (!grupos.has(p.departamento)) grupos.set(p.departamento, []); grupos.get(p.departamento).push(p); });
+  const abrirTodo = !!prodBusca;
+  el.innerHTML = [...grupos].map(([d, l], gi) => {
+    const n = l.filter((p) => p.en_tienda).length;
+    const abierto = abrirTodo || !deptosCerrados.has(d);
+    return `<section class="depto"><div class="d-cab"><label><input type="checkbox" class="chk" data-grupo="${gi}" ${n === l.length ? 'checked' : ''} aria-label="Todo ${esc(d)}"><span>${esc(d)}</span></label>
+      <span class="cuenta">${n} de ${l.length}</span><button type="button" class="plegar" aria-expanded="${abierto}" aria-label="${abierto ? 'Cerrar' : 'Abrir'} ${esc(d)}" data-plegar="${esc(d)}">▾</button></div>
+      ${abierto ? `<div class="d-lista">${l.map((p) => `<label class="prod-chk ${p.en_tienda ? '' : 'no'}"><input type="checkbox" class="chk" data-id="${p.id}" ${p.en_tienda ? 'checked' : ''}><span class="n"><b>${esc(p.nombre)}</b><small>${p.precio > 0 ? dinero(p.precio) : 'sin precio, no se ve'}${p.con_foto ? '' : ' · sin foto'}</small></span></label>`).join('')}</div>` : ''}</section>`;
+  }).join('');
+  // recuadro a medias cuando el departamento tiene unos sí y otros no
+  el.querySelectorAll('input[data-grupo]').forEach((c) => {
+    const l = [...grupos.values()][Number(c.dataset.grupo)];
+    const n = l.filter((p) => p.en_tienda).length;
+    c.indeterminate = n > 0 && n < l.length;
+    c.onchange = () => cambiarVarios(l, c.checked);
+  });
+  el.querySelectorAll('input[data-id]').forEach((c) => { c.onchange = () => cambiarVarios(prods.filter((p) => p.id === Number(c.dataset.id)), c.checked); });
+  el.querySelectorAll('[data-plegar]').forEach((b) => { b.onclick = () => { const d = b.dataset.plegar; if (deptosCerrados.has(d)) deptosCerrados.delete(d); else deptosCerrados.add(d); pintarProductos(); }; });
+}
+
+async function cambiarVarios(lista, valor) {
+  const cambiar = lista.filter((p) => p.en_tienda !== valor);
+  if (!cambiar.length) { pintarProductos(); return; }
+  if (cambiar.length > 20 && !(await confirmarAccion(`¿${valor ? 'Mostrar' : 'Esconder'} ${cambiar.length} productos en la tienda?`))) { pintarProductos(); return; }
+  cambiar.forEach((p) => { p.en_tienda = valor; });
+  pintarProductos();
   try {
-    await apiFetch(`/tienda/productos/${id}`, { method: 'PUT', body: JSON.stringify({ en_tienda: chk.checked }) });
-    document.getElementById('fp-' + id).classList.toggle('oculto', !chk.checked);
-  } catch (err) { chk.checked = !chk.checked; mostrarToast(err.message, 'error'); }
+    await apiFetch('/tienda/productos', { method: 'PUT', body: JSON.stringify({ ids: cambiar.map((p) => p.id), en_tienda: valor }) });
+    if (cambiar.length > 1) mostrarToast(`${cambiar.length} productos ${valor ? 'ahora se ven' : 'escondidos'}`, 'exito', 1800);
+  } catch (err) {
+    cambiar.forEach((p) => { p.en_tienda = !valor; });
+    pintarProductos();
+    mostrarToast(err.message, 'error');
+  }
 }
 
 async function imprimirCartel() {
