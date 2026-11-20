@@ -190,6 +190,8 @@ migrar()
     if (ES_LOCAL && process.env.NODE_ENV !== 'test') reloj.iniciar();
     // Licencia central (solo en la nube y solo si Compoint puso COMPOINT_LICENCIA_TOKEN): consulta cada hora a compoint.com.mx.
     require('./utils/licenciaCentral').iniciar();
+    // Red de tiendas de Compoint Pedidos: avisa al directorio qué tiendas quieren aparecer (misma licencia central).
+    require('./utils/redTiendas').iniciar();
     // Pedidos programados que ya toca preparar y pedidos fijos de tiendas (cada minuto).
     rutaPedidos.iniciarTemporizador(io);
   }));

@@ -290,3 +290,23 @@ test('red de tiendas (preparación): el dueño guarda su ubicación y si quiere 
   assert.equal(q.status, 200);
   assert.equal(q.json.red_lat, null);
 });
+
+test('red de tiendas: lo que se manda al directorio (solo tiendas que quieren aparecer, sin agotados)', async () => {
+  const red = require('../utils/redTiendas');
+  assert.deepEqual(await red.armarTiendas(pool), [], 'sin «Aparecer en el mapa» no se manda nada');
+  await api('dueno', 'PUT', '/api/tienda/red', { visible: true, lat: 20.6736, lng: -103.344, recoger: true, buscar: true });
+  let t = await red.armarTiendas(pool);
+  assert.equal(t.length, 1);
+  assert.equal(t[0].lat, 20.6736);
+  assert.equal(t[0].recoger, true);
+  assert.ok(t[0].productos.length > 0);
+  assert.ok(t[0].productos.every((p) => typeof p.n === 'string' && typeof p.p === 'number'));
+  await pool.query('UPDATE productos SET en_tienda = false WHERE id = $1', [lecheId]);
+  t = await red.armarTiendas(pool);
+  assert.ok(!t[0].productos.some((p) => p.id === lecheId), 'lo escondido no sale al buscar');
+  await pool.query('UPDATE productos SET en_tienda = true WHERE id = $1', [lecheId]);
+  await api('dueno', 'PUT', '/api/tienda/red', { buscar: false });
+  assert.deepEqual((await red.armarTiendas(pool))[0].productos, [], 'sin «salir al buscar» no se mandan productos');
+  await api('dueno', 'PUT', '/api/tienda/red', { visible: false, buscar: true });
+  assert.deepEqual(await red.armarTiendas(pool), []);
+});

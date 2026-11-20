@@ -375,10 +375,11 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
   // ---------------------------------------------------------------- dentro de la app «Compoint Pedidos»
   const EN_APP = /CompointPedidosApp\//.test(navigator.userAgent);
   const prellenado = {};
-  if (/app_[nt]=/.test(location.hash)) {          // la app manda nombre y teléfono después del # (no llegan al servidor)
+  if (/app_[ntq]=/.test(location.hash)) {         // la app manda nombre y teléfono después del # (no llegan al servidor)
     const h = new URLSearchParams(location.hash.slice(1));
     prellenado.nombre = (h.get('app_n') || '').slice(0, 150);
     prellenado.telefono = (h.get('app_t') || '').slice(0, 20);
+    prellenado.busca = (h.get('app_q') || '').slice(0, 60);   // viene de «Buscar» en la app: abre ya filtrada
     history.replaceState(null, '', location.pathname + location.search);
   }
   let ultimoSeguimiento = null;
@@ -406,7 +407,7 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
     return d;
   }
 
-  const E = { info: null, productos: [], porId: new Map(), depto: 'Todo', busca: '', vista: 'tienda', error: '', errorCampo: '', enviando: false, editarDir: false };
+  const E = { info: null, productos: [], porId: new Map(), depto: 'Todo', busca: prellenado.busca || '', vista: 'tienda', error: '', errorCampo: '', enviando: false, editarDir: false };
   let clave = '';
   let carrito = {};
   let datos = {};

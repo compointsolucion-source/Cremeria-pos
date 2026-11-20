@@ -93,6 +93,43 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
 .encontrada span.e{font-size:14.5px}
 .grid2{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
 .cargando{color:var(--gris);padding:6px 0 14px}
+/* Red de tiendas (se ve solo cuando el directorio de Compoint dice que ya se prendió) */
+.nav.cuatro{grid-template-columns:repeat(4,1fr)}
+.perm{min-height:calc(100vh - 20px);display:flex;flex-direction:column;padding:24px 22px max(24px,env(safe-area-inset-bottom))}
+.perm .ilus{height:min(300px,38vh);border-radius:22px;background:#151716;position:relative;overflow:hidden}
+.perm .ilus svg{position:absolute;inset:0;width:100%;height:100%}
+.perm h2{font-size:28px;line-height:1.1;margin:26px 0 8px;letter-spacing:-.3px;font-weight:760;text-wrap:balance}
+.perm p{color:var(--gris);font-size:16px;margin:0;text-wrap:pretty}
+.perm .acc{margin-top:auto;padding-top:22px;display:grid;gap:10px}
+.perm .nota{font-size:13px;color:var(--gris2);text-align:center;margin-top:4px}
+.perm .saltar{min-height:44px;color:var(--gris);font-weight:650}
+.mapa{margin:14px 16px 0;height:200px;border-radius:16px;position:relative;overflow:hidden;background:#EEF0EA}
+.mapa svg{position:absolute;inset:0;width:100%;height:100%}
+.mapa .zona{position:absolute;right:10px;bottom:10px;background:#fff;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:650;box-shadow:0 1px 4px rgba(0,0,0,.12);max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mapa .cambiar{position:absolute;left:10px;bottom:10px;background:#fff;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.12);min-height:32px}
+.dist{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chips{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.chip{font-size:12.5px;font-weight:650;padding:2px 8px;border-radius:6px;background:var(--fondo);color:#3c413e}
+.chip.d{background:#E3F1E7;color:#1F5E33}
+.seccion.con-acc{display:flex;justify-content:space-between;align-items:baseline}
+.seccion.con-acc button{color:var(--verde);font-weight:700;font-size:14px;min-height:36px}
+.pocas{margin:14px 16px 0;padding:14px 16px;border-radius:14px;background:var(--fondo);font-size:14.5px;color:#3c413e}
+.pocas b{display:block;color:var(--tinta);font-size:15.5px;margin-bottom:2px}
+.buscar-g{margin:12px 16px 0;height:54px;border-radius:14px;border:1.5px solid var(--tinta);display:flex;align-items:center;gap:10px;padding:0 14px}
+.buscar-g input{flex:1;min-width:0;border:0;outline:0;font-size:17px;background:none}
+.filtro{display:flex;gap:8px;margin:12px 16px 0;overflow-x:auto}
+.filtro button{font-size:14px;font-weight:650;padding:7px 12px;border-radius:999px;background:var(--fondo);white-space:nowrap;min-height:36px}
+.filtro button[aria-pressed=true]{background:var(--tinta);color:#fff}
+.res{padding:14px 22px;border-bottom:1px solid var(--raya);display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center}
+.res .t{font-size:16.5px;font-weight:680}
+.res .ti{font-size:14px;color:var(--gris);display:flex;align-items:center;gap:6px}
+.res .mini{width:18px;height:18px;border-radius:5px;color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;font-stretch:75%;flex:none}
+.res .pr{font-size:19px;font-weight:780;font-stretch:80%;font-variant-numeric:tabular-nums;text-align:right}
+.res .pr small{display:block;font-size:12.5px;font-weight:600;color:var(--gris);font-stretch:100%}
+.res .acc{grid-column:1/-1;display:flex;gap:8px;margin-top:8px}
+.res .acc button{font-size:14px;font-weight:700;padding:8px 12px;border-radius:10px;background:var(--fondo);min-height:40px}
+.res .acc button.p{background:var(--tinta);color:#fff}
+.mejor{display:inline-block;background:var(--cartulina);font-size:12px;font-weight:750;padding:1px 7px;border-radius:5px;margin-left:6px;vertical-align:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -100,6 +137,7 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
 <main id="app"></main>
 <nav class="nav oculto" id="nav" aria-label="Secciones">
   <button type="button" data-vista="tiendas"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg>Tiendas</button>
+  <button type="button" data-vista="buscar" class="oculto" id="navBuscar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>Buscar</button>
   <button type="button" data-vista="pedidos"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18l-2.5-1.6L12 21l-2.5-1.6L7 21z"/><path d="M10 8h4M10 12h4"/></svg>Pedidos</button>
   <button type="button" data-vista="datos"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"/></svg>Mis datos</button>
 </nav>
@@ -149,7 +187,7 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
     if (m) return { h: 'cp' + m[1] + '.compoint.com.mx', s: m[2] || '', c: '' };
     return null;
   }
-  function urlTienda(t, extra) {
+  function urlTienda(t, extra, busca) {
     const q = new URLSearchParams();
     if (t.s) q.set('s', t.s);
     if (t.c) q.set('c', t.c);
@@ -158,6 +196,7 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
     const h = new URLSearchParams();
     if (datos.nombre) h.set('app_n', datos.nombre);
     if (datos.telefono) h.set('app_t', datos.telefono);
+    if (busca) h.set('app_q', busca);               // viene de «Buscar»: la tienda abre ya filtrada
     return `https://${t.h}/tienda.html${q.toString() ? '?' + q : ''}${h.toString() ? '#' + h : ''}`;
   }
   async function api(t, ruta) {
@@ -204,13 +243,188 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
   }
   const letra = (t, nombre) => `<span class="letra" style="background:${esc(t.color || COLORES[0])}" aria-hidden="true">${esc(inicial(nombre))}${t.logo ? `<img src="${esc(t.logo)}" alt="" onerror="this.remove()">` : ''}</span>`;
 
+  // ------------------------------------------------ red de tiendas (se prende sola desde compoint.com.mx)
+  // Mientras el directorio diga «activa: false» la app se ve igual que siempre. Cuando Compoint pase de
+  // 100 negocios que pagan, el directorio contesta «activa: true» y aparecen «Cerca de ti» y «Buscar».
+  // La ubicación del cliente solo se manda al directorio de Compoint (redondeada, ~100 m) y nunca a las tiendas.
+  const RED = 'https://www.compoint.com.mx/punto/red.php';
+  const red = leer('red', { activa: false });
+  let ubic = leer('ubic', null);                    // {lat, lng, etq}
+  let cerca = null;                                 // respuesta de ?accion=cerca
+  let verTodasCerca = false;
+  const busq = { q: '', filtro: 'todas', res: null, cargando: false, error: '' };
+  async function apiRed(params) {
+    const ctl = new AbortController();
+    const reloj = setTimeout(() => ctl.abort(), 12000);
+    try {
+      const r = await fetch(RED + '?' + new URLSearchParams(params), { signal: ctl.signal, headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('red');
+      return await r.json();
+    } finally { clearTimeout(reloj); }
+  }
+  async function revisarRed() {
+    try {
+      const d = await apiRed({ accion: 'estado' });
+      const antes = red.activa;
+      red.activa = !!(d && d.activa);
+      guardar('red', red);
+      if (red.activa !== antes && !capa.innerHTML) pintar();
+    } catch (e) { /* sin internet: se queda como estaba */ }
+  }
+  const redondo = (x) => Math.round(x * 1000) / 1000;
+  async function cargarCerca() {
+    if (!red.activa || !ubic) return;
+    try {
+      cerca = await apiRed({ accion: 'cerca', lat: ubic.lat, lng: ubic.lng });
+      if (cerca && cerca.activa === false) { red.activa = false; guardar('red', red); }
+    } catch (e) { cerca = cerca || { error: true }; }
+    if (!capa.innerHTML && (vista === 'tiendas' || vista === 'buscar')) pintar();
+  }
+  function ponerUbicacion(lat, lng, etq) {
+    ubic = { lat: redondo(lat), lng: redondo(lng), etq: String(etq || '').slice(0, 80) };
+    guardar('ubic', ubic);
+    cerca = null; busq.res = null;
+    cerrarHoja(); vista = vista === 'buscar' ? 'buscar' : 'tiendas'; pintar();
+    cargarCerca();
+  }
+  function usarUbicacion() {
+    if (!navigator.geolocation) { hojaColonia('Tu celular no deja usar la ubicación. Escribe tu colonia.'); return; }
+    capa.innerHTML = '<div class="velo"><div class="hoja" role="dialog" aria-modal="true" aria-label="Buscando tu ubicación"><h2>Buscando dónde estás…</h2><p class="cargando">Un momento.</p></div></div>';
+    navigator.geolocation.getCurrentPosition(
+      (p) => ponerUbicacion(p.coords.latitude, p.coords.longitude, 'Cerca de ti'),
+      () => { cerrarHoja(); hojaColonia('No pudimos saber dónde estás. Escribe tu colonia.'); },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 });
+  }
+  function hojaColonia(error) {
+    capa.innerHTML = `<div class="velo" data-cerrar="1"><div class="hoja" role="dialog" aria-modal="true" aria-labelledby="hcol"><h2 id="hcol">¿En qué colonia estás?</h2>
+      <p style="margin:0 0 10px;color:var(--gris);font-size:15px">Escribe tu colonia y tu ciudad.</p>
+      <form class="codigo" id="formCol" style="margin:0"><input id="colonia" autocomplete="off" maxlength="80" placeholder="Ej. Centro, Guadalajara" aria-label="Colonia y ciudad"><button type="submit">Buscar</button></form>
+      <div class="error" role="alert" style="margin:8px 0 0">${esc(error || '')}</div></div></div>`;
+    const i = document.getElementById('colonia'); i.focus();
+    document.getElementById('formCol').onsubmit = async (e) => {
+      e.preventDefault();
+      const txt = i.value.trim();
+      if (txt.length < 3) return;
+      try {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({ format: 'jsonv2', countrycodes: 'mx', limit: '1', 'accept-language': 'es', q: txt }), { headers: { Accept: 'application/json' } });
+        const d = await r.json();
+        if (!Array.isArray(d) || !d.length) { hojaColonia('No encontramos esa colonia. Escribe también la ciudad.'); return; }
+        ponerUbicacion(Number(d[0].lat), Number(d[0].lon), txt);
+      } catch (err) { hojaColonia('No hay conexión. Revisa tu internet.'); }
+    };
+  }
+  const h12 = (h) => { const [a, b] = String(h || '').split(':').map(Number); if (!Number.isFinite(a)) return ''; const x = a % 12 || 12; return `${x}${b ? ':' + String(b).padStart(2, '0') : ''} ${a >= 12 ? 'pm' : 'am'}`; };
+  const km = (x) => (x < 1 ? Math.round(x * 1000 / 50) * 50 + ' m' : x.toFixed(1).replace('.0', '') + ' km');
+  const colorDe = (t, i) => t.color || COLORES[i % COLORES.length];
+
+  function pintarPermiso() {
+    nav.classList.add('oculto');
+    const pin = (x, y, c, l) => `<rect x="${x}" y="${y}" width="32" height="32" rx="9" fill="${c}" stroke="#fff" stroke-width="2.5"/><text x="${x + 16}" y="${y + 21}">${l}</text>`;
+    app.innerHTML = `<div class="perm"><div class="ilus"><svg viewBox="0 0 338 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <g stroke="rgba(255,255,255,.08)" stroke-width="10" fill="none"><path d="M-10 90H350M-10 210H350M90-10V310M240-10V310"/></g>
+        <g stroke="rgba(255,255,255,.05)" stroke-width="5"><path d="M-10 150H350M165-10V310M30-10L330 310"/></g>
+        <circle cx="169" cy="152" r="70" fill="rgba(47,111,224,.16)"/><circle cx="169" cy="152" r="11" fill="#2F6FE0" stroke="#fff" stroke-width="4"/>
+        <g font-family="Ar,sans-serif" font-weight="800" font-size="15" text-anchor="middle" fill="#fff">${pin(70, 60, '#1D6A3A', 'A')}${pin(232, 88, '#A33E6E', 'F')}${pin(196, 214, '#7A4E22', 'P')}${pin(58, 196, '#2F5D8C', 'C')}</g></svg></div>
+      <h2>Ve las tiendas que tienes cerca</h2>
+      <p>Te mostramos las tiendas de tu colonia que llevan a domicilio o donde puedes pasar a recoger.</p>
+      <div class="acc"><button type="button" class="btn p" data-red="ubicacion">Usar mi ubicación</button>
+        <button type="button" class="btn s" data-red="colonia">Escribir mi colonia</button>
+        <button type="button" class="saltar" data-red="omitir">Ahora no, tengo el QR de mi tienda</button>
+        <div class="nota">Tu ubicación no se le comparte a ninguna tienda.</div></div></div>`;
+  }
+
+  // Mapa sencillo: tú al centro, las tiendas alrededor a su distancia real. Se acerca solo según qué tan
+  // lejos está la tienda más lejana (para que los puntos no se encimen cuando todas están a pocas cuadras).
+  function mapaCerca(lista) {
+    const W = 358, H = 200, R = 84;
+    const cx = W / 2, cy = H / 2;
+    const k = Math.cos(ubic.lat * Math.PI / 180);
+    const muestra = lista.slice(0, 12);
+    const lejos = Math.max(0.3, ...muestra.map((t) => t.km || 0)) * 1.1;
+    const escala = (kmX) => (kmX / lejos) * R;
+    const pins = muestra.map((t, i) => {
+      const x = cx + Math.max(-1.9, Math.min(1.9, escala((t.lng - ubic.lng) * 111 * k) / R)) * R;
+      const y = cy - Math.max(-1.05, Math.min(1.05, escala((t.lat - ubic.lat) * 111) / R)) * R;
+      return `<g><line x1="${x}" y1="${y}" x2="${x}" y2="${y + 8}" stroke="#1B1D1C" stroke-width="2"/><rect x="${x - 15}" y="${y - 30}" width="30" height="30" rx="9" fill="${esc(colorDe(t, i))}" stroke="#fff" stroke-width="2.5"/><text x="${x}" y="${y - 10}">${esc(inicial(t.negocio))}</text></g>`;
+    }).join('');
+    return `<div class="mapa"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa de tiendas cerca de ti">
+      <g fill="none" stroke="#D5DAD2" stroke-dasharray="4 5"><circle cx="${cx}" cy="${cy}" r="${R / 2}"/><circle cx="${cx}" cy="${cy}" r="${R}"/></g>
+      <text x="${cx + R + 4}" y="${cy - 4}" font-size="11" fill="#7F8582" font-family="Ar,sans-serif">${esc(km(lejos))}</text>
+      <circle cx="${cx}" cy="${cy}" r="18" fill="rgba(47,111,224,.18)"/><circle cx="${cx}" cy="${cy}" r="8" fill="#2F6FE0" stroke="#fff" stroke-width="3"/>
+      <g font-family="Ar,sans-serif" font-weight="800" font-size="14" text-anchor="middle" fill="#fff">${pins}</g></svg>
+      <button type="button" class="cambiar" data-red="cambiar">Cambiar</button><div class="zona">${esc(ubic.etq || 'Cerca de ti')}</div></div>`;
+  }
+  function filaCerca(t, i) {
+    const estado = t.abierta ? `<i class="punto"></i>Abierta${t.tiempo ? ' · ' + esc(t.tiempo) : ''}` : `<i class="punto c"></i>Cerrada${t.hora ? ' · abre ' + esc(h12(t.hora)) : ''}`;
+    const chips = `${t.domicilio ? '<span class="chip d">A domicilio</span>' : ''}${t.recoger ? '<span class="chip">Pasar a recoger</span>' : ''}`;
+    return `<button type="button" class="fila-t" data-cerca="${i}">${letra({ color: colorDe(t, i) }, t.negocio)}<span class="n"><b>${esc(t.negocio)}</b><span>${estado}</span><span class="chips">${chips}</span></span><span class="dist">${km(t.km)}</span></button>`;
+  }
+  function bloqueCerca() {
+    if (!red.activa) return '';
+    if (!ubic) return `<div class="pocas"><b>Tiendas cerca de ti</b>Te mostramos las tiendas de tu colonia. <button type="button" class="agregar-b" style="margin:6px 0 0;min-height:40px" data-red="permiso">Ver tiendas cerca</button></div>`;
+    if (!cerca) return `<div class="seccion">Cerca de ti</div><p class="cargando" style="padding:6px 22px">Buscando tiendas…</p>`;
+    if (cerca.error) return `<div class="pocas"><b>Sin conexión</b>No pudimos ver las tiendas cerca. Revisa tu internet.</div>`;
+    if (cerca.pocas || !cerca.tiendas || !cerca.tiendas.length) {
+      return `<div class="pocas"><b>Todavía hay pocas tiendas cerca de ${esc(ubic.etq && ubic.etq !== 'Cerca de ti' ? ubic.etq : 'ti')}</b>Pronto habrá más. Mientras, escanea el QR de tu tienda. <button type="button" class="agregar-b" style="margin:6px 0 0;min-height:40px" data-red="cambiar">Cambiar mi colonia</button></div>`;
+    }
+    const lista = verTodasCerca ? cerca.tiendas : cerca.tiendas.slice(0, 5);
+    return `${mapaCerca(cerca.tiendas)}<div class="seccion con-acc">Cerca de ti${cerca.tiendas.length > 5 ? `<button type="button" data-red="todas">${verTodasCerca ? 'Ver menos' : 'Ver todas (' + cerca.tiendas.length + ')'}</button>` : ''}</div>
+      <div>${lista.map(filaCerca).join('')}</div>`;
+  }
+
+  function pintarBuscar() {
+    const res = busq.res && busq.res.productos ? busq.res.productos.filter((p) => busq.filtro === 'todas' || (busq.filtro === 'domicilio' ? p.tienda.domicilio : p.tienda.abierta)) : [];
+    const tiendasDistintas = new Set(res.map((p) => p.tienda.h + '|' + p.tienda.s)).size;
+    let cuerpo = '';
+    if (!ubic) cuerpo = `<div class="pocas"><b>¿Dónde estás?</b>Para buscar en las tiendas cerca necesitamos tu colonia. <button type="button" class="agregar-b" style="margin:6px 0 0;min-height:40px" data-red="permiso">Poner mi ubicación</button></div>`;
+    else if (busq.cargando) cuerpo = '<p class="cargando" style="padding:14px 22px">Buscando…</p>';
+    else if (busq.error) cuerpo = `<div class="pocas"><b>Sin conexión</b>${esc(busq.error)}</div>`;
+    else if (busq.res && busq.res.pocas) cuerpo = '<div class="pocas"><b>Todavía hay pocas tiendas cerca</b>Pronto habrá más. Mientras, escanea el QR de tu tienda.</div>';
+    else if (busq.res && !res.length) cuerpo = `<div class="pocas"><b>No lo encontramos cerca</b>Solo salen tiendas a menos de 3 km que tienen el producto. Prueba con otra palabra.</div>`;
+    else if (busq.res) {
+      cuerpo = `<div class="seccion">${tiendasDistintas === 1 ? '1 tienda cerca lo tiene' : tiendasDistintas + ' tiendas cerca lo tienen'}</div>` + res.map((p, i) => {
+        const t = p.tienda;
+        return `<div class="res"><div><div class="t">${esc(p.nombre)}${i === 0 && tiendasDistintas > 1 ? '<span class="mejor">Más barata</span>' : ''}</div>
+          <div class="ti"><span class="mini" style="background:${esc(t.color || COLORES[0])}">${esc(inicial(t.negocio))}</span>${esc(t.negocio)} · ${km(t.km)}${t.abierta ? '' : ' · Cerrada'}</div></div>
+          <div class="pr num">$${Number(p.precio).toLocaleString('es-MX', { maximumFractionDigits: 2 })}<small>${p.por_peso ? 'el kilo' : 'c/u'}</small></div>
+          <div class="acc"><button type="button" class="p" data-res="${i}" data-modo="pedir">Pedir aquí</button><button type="button" data-res="${i}" data-modo="ver">Ver tienda</button></div></div>`;
+      }).join('');
+    }
+    app.innerHTML = `<div class="b-head"><h1>Buscar</h1></div>
+      <form class="buscar-g" id="formBusq" role="search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input id="busq" type="search" enterkeyhint="search" maxlength="60" placeholder="¿Qué buscas? Ej. leche" aria-label="Buscar producto en las tiendas cerca" value="${esc(busq.q)}"></form>
+      <div class="filtro" role="group" aria-label="Filtrar">${[['todas', 'Todas'], ['domicilio', 'A domicilio'], ['abiertas', 'Abiertas ahora']].map(([k, n]) => `<button type="button" data-filtro="${k}" aria-pressed="${busq.filtro === k}">${n}</button>`).join('')}</div>
+      ${cuerpo}`;
+    busq.lista = res;
+    document.getElementById('formBusq').onsubmit = (e) => { e.preventDefault(); hacerBusqueda(document.getElementById('busq').value); };
+  }
+  async function hacerBusqueda(q) {
+    busq.q = String(q || '').trim().slice(0, 60);
+    if (busq.q.length < 2 || !ubic) { pintar(); return; }
+    busq.cargando = true; busq.error = ''; pintar();
+    try { busq.res = await apiRed({ accion: 'buscar', q: busq.q, lat: ubic.lat, lng: ubic.lng }); }
+    catch (e) { busq.res = null; busq.error = 'No pudimos buscar. Revisa tu internet.'; }
+    busq.cargando = false;
+    if (vista === 'buscar') pintar();
+  }
+  function abrirDeLaRed(t, busca) {
+    const nueva = { h: t.h, s: String(t.s || ''), c: '', negocio: t.negocio, color: t.color || undefined };
+    agregarTienda(nueva);
+    location.href = urlTienda(nueva, null, busca);
+  }
+
   // ------------------------------------------------ pantallas
   function pintar() {
-    if (!tiendas.length && vista === 'tiendas') return pintarInicio();
+    const omitio = leer('red_omitido', false);
+    if (red.activa && !ubic && !omitio && (vista === 'tiendas' || vista === 'buscar') && !tiendas.length) return pintarPermiso();
+    if (!tiendas.length && vista === 'tiendas' && !(red.activa && ubic)) return pintarInicio();
     nav.classList.remove('oculto');
+    nav.classList.toggle('cuatro', !!red.activa);
+    document.getElementById('navBuscar').classList.toggle('oculto', !red.activa);
+    if (vista === 'buscar' && !red.activa) vista = 'tiendas';
     nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-current', b.dataset.vista === vista ? 'page' : 'false'));
     if (vista === 'pedidos') return pintarPedidos();
     if (vista === 'datos') return pintarDatos();
+    if (vista === 'buscar') return pintarBuscar();
     return pintarTiendas();
   }
 
@@ -224,6 +438,7 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
       <div class="o">o escribe el código de la tienda</div>
       <form class="codigo" id="formCodigo"><input id="codigo" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="Ej. 1007" aria-label="Código de la tienda"><button type="submit">Buscar</button></form>
       <div class="error" role="alert">${esc(errorCodigo)}</div>
+      ${red.activa ? '<button type="button" class="btn s esc" data-red="permiso">Ver tiendas cerca de mí</button>' : ''}
       <div class="a-pie">Funciona con las tiendas que usan Compoint Punto</div></div>`;
     document.getElementById('formCodigo').onsubmit = (e) => { e.preventDefault(); buscar(document.getElementById('codigo').value); };
   }
@@ -251,10 +466,11 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
   }
 
   function pintarTiendas() {
-    app.innerHTML = `<div class="b-head"><h1>Mis tiendas</h1><button type="button" class="redondo" data-acc="escanear" aria-label="Escanear QR de otra tienda">${ESCANER}</button></div>
+    app.innerHTML = `<div class="b-head"><h1>${red.activa ? 'Tiendas' : 'Mis tiendas'}</h1><button type="button" class="redondo" data-acc="escanear" aria-label="Escanear QR de otra tienda">${ESCANER}</button></div>
       ${tarjetaActiva()}
-      <div class="seccion">${pedidos.length ? 'Pide otra vez' : 'Tus tiendas'}</div>
-      <div>${tiendas.map(filaTienda).join('')}</div>
+      ${bloqueCerca()}
+      ${tiendas.length ? `<div class="seccion">${red.activa ? 'Mis tiendas' : pedidos.length ? 'Pide otra vez' : 'Tus tiendas'}</div>
+      <div>${tiendas.map(filaTienda).join('')}</div>` : ''}
       <button type="button" class="agregar-b" data-acc="escanear"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Agregar otra tienda</button>`;
   }
 
@@ -353,8 +569,20 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
   }
 
   document.addEventListener('click', (ev) => {
-    const el = ev.target.closest('[data-acc],[data-tienda],[data-pedido],[data-vista],[data-quitar],[data-cerrar]');
+    const el = ev.target.closest('[data-acc],[data-tienda],[data-pedido],[data-vista],[data-quitar],[data-cerrar],[data-red],[data-cerca],[data-res],[data-filtro]');
     if (!el) return;
+    if (el.dataset.red) {
+      const r = el.dataset.red;
+      if (r === 'ubicacion') usarUbicacion();
+      else if (r === 'colonia' || r === 'cambiar') hojaColonia();
+      else if (r === 'omitir') { guardar('red_omitido', true); vista = 'tiendas'; pintar(); }
+      else if (r === 'permiso') { guardar('red_omitido', false); if (!ubic) { vista = vista === 'buscar' ? 'buscar' : 'tiendas'; pintarPermiso(); } else pintar(); }
+      else if (r === 'todas') { verTodasCerca = !verTodasCerca; pintar(); }
+      return;
+    }
+    if (el.dataset.cerca !== undefined) { const t = cerca && cerca.tiendas && cerca.tiendas[Number(el.dataset.cerca)]; if (t) abrirDeLaRed({ ...t, color: colorDe(t, Number(el.dataset.cerca)) }); return; }
+    if (el.dataset.res !== undefined) { const p = busq.lista && busq.lista[Number(el.dataset.res)]; if (p) abrirDeLaRed(p.tienda, el.dataset.modo === 'pedir' ? p.nombre : ''); return; }
+    if (el.dataset.filtro) { busq.filtro = el.dataset.filtro; pintar(); return; }
     if (el.dataset.cerrar !== undefined && !el.dataset.acc) { if (ev.target === el) cerrarHoja(); return; }
     if (el.dataset.vista) { vista = el.dataset.vista; pintar(); window.scrollTo(0, 0); return; }
     if (el.dataset.tienda) { const t = tiendas.find((x) => claveT(x) === el.dataset.tienda); if (t) { agregarTienda(t); location.href = urlTienda(t); } return; }
@@ -368,6 +596,7 @@ h1.tit{font-size:28px;margin:6px 22px 8px;font-weight:760;letter-spacing:-.3px}
   recibirRegreso();
   pintar();
   refrescar();
+  revisarRed().then(() => { if (ubic) cargarCerca(); });
   setInterval(() => { if (!document.hidden) refrescar(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescar(); });
 })();

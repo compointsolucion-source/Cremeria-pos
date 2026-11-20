@@ -388,6 +388,7 @@ router.put('/config', ...soloAdmin, async (req, res, next) => {
        bool(b.ocultar_sin_existencia, actual.ocultar_sin_existencia), bool(b.imprimir_al_confirmar, actual.imprimir_al_confirmar), bool(b.sonido, actual.sonido),
        b.tema === undefined ? (actual.tema || 'letrero') : b.tema, color('color_principal'), color('color_oferta')]);
     await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'tienda_config', modulo: 'pedidos', referencia_id: req.sucursalId, valor_nuevo: { activo: r.rows[0].activo } });
+    require('../utils/redTiendas').avisar();
     res.json({ ...r.rows[0], pedido_minimo: Number(r.rows[0].pedido_minimo), horario_texto: estadoHorario(r.rows[0].horario).texto });
   } catch (e) { responder(res, e, next); }
 });
@@ -423,6 +424,7 @@ router.put('/red', ...soloAdmin, async (req, res, next) => {
       [req.sucursalId, visible, lat, lng, b.direccion === undefined ? actual.red_direccion : textoOnull(b.direccion, 200),
        domicilio, recoger, bool(b.buscar, actual.red_buscar)]);
     await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'tienda_red', modulo: 'pedidos', referencia_id: req.sucursalId, valor_nuevo: { visible } });
+    require('../utils/redTiendas').avisar();   // manda el cambio al directorio de Compoint en un momento
     const x = r.rows[0];
     res.json({ ...x, red_lat: x.red_lat == null ? null : Number(x.red_lat), red_lng: x.red_lng == null ? null : Number(x.red_lng) });
   } catch (e) { responder(res, e, next); }
@@ -451,6 +453,7 @@ router.put('/productos', ...soloAdmin, async (req, res, next) => {
       return res.status(400).json({ error: 'Datos inválidos' });
     }
     const r = await pool.query('UPDATE productos SET en_tienda = $3 WHERE id = ANY($1::int[]) AND sucursal_id = $2', [ids, req.sucursalId, b.en_tienda]);
+    require('../utils/redTiendas').avisar();
     res.json({ cambiados: r.rowCount });
   } catch (e) { next(e); }
 });
@@ -489,3 +492,6 @@ router.post('/fiado/:id/enlace', ...soloAdmin, async (req, res, next) => {
 
 module.exports = router;
 module.exports._estadoHorario = estadoHorario;
+// Para la red de tiendas de Compoint Pedidos (utils/redTiendas.js).
+module.exports._productosVisibles = productosVisibles;
+module.exports._datosNegocio = datosNegocio;
