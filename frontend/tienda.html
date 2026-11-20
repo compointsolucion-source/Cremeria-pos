@@ -8,10 +8,11 @@
 <link rel="icon" href="favicon.ico">
 <style>
 @font-face{font-family:"Ar";src:url(fuentes/archivo-wdth.woff2) format("woff2");font-weight:100 900;font-stretch:62% 125%;font-display:swap}
-:root{--tinta:#1B1D1C;--gris:#5E6461;--gris2:#7F8582;--raya:#E4E6E3;--fondo:#F3F4F2;--tienda:#1D6A3A;--tienda-claro:#E3EFE6;--cartulina:#FFE81A;--wa:#1F8F4E;--rojo:#B3261E}
+:root{--tinta:#1B1D1C;--gris:#5E6461;--gris2:#7F8582;--raya:#E4E6E3;--fondo:#F3F4F2;--tienda:#1D6A3A;--tienda-claro:#E3EFE6;--cartulina:#FFE81A;--wa:#1F8F4E;--rojo:#B3261E;
+  --pagina:#fff;--superficie:#fff;--boton:var(--tinta);--boton-texto:#fff;--accion:var(--tienda);--accion-texto:#fff;--enlace:var(--tienda);--letrero-texto:#fff;--cartulina-texto:#1B1D1C;--mano:Ar}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
-body{margin:0;background:#fff;font:16px/1.4 Ar,system-ui,-apple-system,"Segoe UI",sans-serif;font-stretch:100%;color:var(--tinta);min-height:100vh}
+body{margin:0;background:var(--pagina);font:16px/1.4 Ar,system-ui,-apple-system,"Segoe UI",sans-serif;font-stretch:100%;color:var(--tinta);min-height:100vh}
 button,input,select{font:inherit;color:inherit}
 button{border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:0}
 a{color:inherit}
@@ -19,7 +20,7 @@ a{color:inherit}
 .envoltura{max-width:620px;margin:0 auto}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .num,.precio{font-variant-numeric:tabular-nums}
-.letrero{background:var(--tienda);color:#fff;padding:18px 20px 46px;padding-top:max(18px,env(safe-area-inset-top))}
+.letrero{background:var(--tienda);color:var(--letrero-texto);padding:18px 20px 46px;padding-top:max(18px,env(safe-area-inset-top))}
 .letrero .envoltura{display:flex;gap:12px;align-items:flex-start}
 .letrero .logo{width:48px;height:48px;border-radius:10px;background:#fff;object-fit:cover;flex:none}
 .letrero .txt{flex:1;min-width:0}
@@ -28,21 +29,21 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .letrero .estado{margin-top:12px;display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600}
 .punto{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7CE29B;box-shadow:0 0 0 3px rgba(124,226,155,.25);flex:none}
 .cerrado .punto{background:#FFB4AB;box-shadow:0 0 0 3px rgba(255,180,171,.25)}
-.wa-redondo{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;color:#fff;flex:none;text-decoration:none}
-.buscar{margin:-28px 16px 0;position:relative;height:54px;border-radius:14px;background:#fff;display:flex;align-items:center;gap:10px;padding:0 16px;color:var(--gris2);box-shadow:0 1px 2px rgba(0,0,0,.08),0 6px 18px rgba(0,0,0,.10)}
+.wa-redondo{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;color:inherit;flex:none;text-decoration:none}
+.buscar{margin:-28px 16px 0;position:relative;height:54px;border-radius:14px;background:var(--superficie);display:flex;align-items:center;gap:10px;padding:0 16px;color:var(--gris2);box-shadow:0 1px 2px rgba(0,0,0,.08),0 6px 18px rgba(0,0,0,.10)}
 .buscar input{flex:1;border:0;outline:0;background:none;font-size:16px;height:100%;min-width:0;color:var(--tinta)}
 .buscar input::placeholder{color:var(--gris2)}
 .siempre{margin:14px 16px 0;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--fondo)}
 .siempre .n{flex:1;min-width:0;font-size:14px;color:var(--gris);line-height:1.35}
 .siempre .n b{display:block;color:var(--tinta);font-size:15.5px;font-weight:700}
 .siempre .n em{display:block;font-style:normal;color:var(--rojo);font-size:13px;margin-top:3px}
-.siempre button{background:var(--tinta);color:#fff;border-radius:10px;padding:0 12px;min-height:44px;font-weight:700;font-size:14.5px;white-space:nowrap}
+.siempre button{background:var(--boton);color:var(--boton-texto);border-radius:10px;padding:0 12px;min-height:44px;font-weight:700;font-size:14.5px;white-space:nowrap}
 .tit-s{display:flex;justify-content:space-between;align-items:baseline;margin:22px 20px 10px}
 .tit-s h2{margin:0;font-size:20px;font-weight:760}
 .tit-s span{font-size:13.5px;color:var(--gris)}
 .tags{display:flex;gap:10px;padding:0 16px 2px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
 .tags::-webkit-scrollbar,.tabs::-webkit-scrollbar{display:none}
-.tag{flex:none;width:168px;scroll-snap-align:start;background:var(--cartulina);border-radius:6px;padding:12px 12px 12px 26px;position:relative;text-align:left;transition:transform .15s ease-out}
+.tag{flex:none;width:168px;scroll-snap-align:start;background:var(--cartulina);color:var(--cartulina-texto);border-radius:6px;padding:12px 12px 12px 26px;position:relative;text-align:left;transition:transform .15s ease-out}
 .tag:active{transform:scale(.97)}
 .tag:before{content:"";position:absolute;left:9px;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.18)}
 .tag .p{display:block;font-size:13px;line-height:1.25;font-weight:600;height:33px;overflow:hidden}
@@ -51,7 +52,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .tag .an{display:block;font-size:12.5px;margin-top:2px}
 .tag .an s{opacity:.7}
 .tag .ya{display:block;font-size:12.5px;margin-top:2px;font-weight:700}
-.tabs{display:flex;gap:22px;padding:0 20px;margin-top:20px;border-bottom:1px solid var(--raya);overflow-x:auto;scrollbar-width:none;position:sticky;top:0;background:#fff;z-index:3}
+.tabs{display:flex;gap:22px;padding:0 20px;margin-top:20px;border-bottom:1px solid var(--raya);overflow-x:auto;scrollbar-width:none;position:sticky;top:0;background:var(--pagina);z-index:3}
 .tabs button{padding:12px 0 11px;white-space:nowrap;font-size:15.5px;font-weight:650;color:var(--gris);min-height:44px}
 .tabs button[aria-pressed=true]{color:var(--tinta);box-shadow:inset 0 -3px 0 var(--tinta)}
 .lista{padding-bottom:110px}
@@ -68,24 +69,24 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .precio{font-size:22px;font-weight:820;font-stretch:66%;line-height:1;white-space:nowrap}
 .precio small{font-size:13px;font-weight:600;font-stretch:90%;color:var(--gris)}
 .precio s{font-size:13px;font-weight:600;font-stretch:90%;color:var(--gris);margin-right:4px}
-.mas{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--tinta);display:grid;place-items:center;transition:transform .12s ease-out,background-color .12s ease-out}
+.mas{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--tinta);color:var(--tinta);display:grid;place-items:center;transition:transform .12s ease-out,background-color .12s ease-out}
 .mas:active{transform:scale(.94);background:var(--fondo)}
-.paso{display:flex;align-items:center;height:42px;border-radius:21px;background:var(--tinta);color:#fff}
-.paso button{width:40px;height:42px;font-size:21px;font-weight:600;color:#fff}
+.paso{display:flex;align-items:center;height:42px;border-radius:21px;background:var(--boton);color:var(--boton-texto)}
+.paso button{width:40px;height:42px;font-size:21px;font-weight:600;color:inherit}
 .paso output{min-width:28px;text-align:center;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
 .paso.chico{height:34px}
 .paso.chico button{width:34px;height:34px;font-size:18px}
 .paso.chico output{font-size:14px}
 .vacio{text-align:center;color:var(--gris);padding:36px 24px}
-.carrito{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--raya);padding:12px 16px max(16px,env(safe-area-inset-bottom));z-index:6}
+.carrito{position:fixed;left:0;right:0;bottom:0;background:var(--superficie);border-top:1px solid var(--raya);padding:12px 16px max(16px,env(safe-area-inset-bottom));z-index:6}
 .carrito .envoltura{display:flex;align-items:center;gap:14px}
 .carrito .n{flex:1;font-size:13.5px;color:var(--gris)}
 .carrito .n b{display:block;font-size:24px;color:var(--tinta);font-weight:820;font-stretch:66%;font-variant-numeric:tabular-nums;line-height:1.1}
-.carrito .ver{background:var(--tienda);color:#fff;border-radius:14px;min-height:52px;padding:0 22px;display:flex;align-items:center;font-weight:700;font-size:16.5px}
-.cabeza{display:flex;align-items:center;gap:6px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));border-bottom:1px solid var(--raya);background:#fff;position:sticky;top:0;z-index:4}
+.carrito .ver{background:var(--accion);color:var(--accion-texto);border-radius:14px;min-height:52px;padding:0 22px;display:flex;align-items:center;font-weight:700;font-size:16.5px}
+.cabeza{display:flex;align-items:center;gap:6px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));border-bottom:1px solid var(--raya);background:var(--pagina);position:sticky;top:0;z-index:4}
 .cabeza button.atras{width:44px;height:44px;display:grid;place-items:center}
 .cabeza h1{font-size:21px;margin:0;font-weight:750;flex:1}
-.cabeza .agregar{color:var(--tienda);font-weight:700;font-size:15px;min-height:44px;padding:0 8px}
+.cabeza .agregar{color:var(--enlace);font-weight:700;font-size:15px;min-height:44px;padding:0 8px}
 .nota{padding:6px 20px 0}
 .renglon{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:12px 0;border-bottom:1px solid var(--raya)}
 .renglon .nom{font-size:15.5px;font-weight:600;line-height:1.3}
@@ -103,31 +104,31 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .chiquito{font-size:13.5px;color:var(--gris);margin-top:6px;text-wrap:pretty}
 .gratis{margin-top:12px;font-size:14px;color:var(--tinta)}
 .barrita{height:6px;border-radius:3px;background:var(--fondo);margin-top:6px;overflow:hidden}
-.barrita i{display:block;height:100%;background:var(--tienda);transition:width .25s ease-out}
+.barrita i{display:block;height:100%;background:var(--accion);transition:width .25s ease-out}
 .bloque{padding:16px 20px 6px;border-top:8px solid var(--fondo);margin-top:16px}
 .bloque + .bloque{margin-top:0}
 .bloque h2{font-size:16.5px;margin:0 0 10px;font-weight:720}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--fondo);border-radius:12px;padding:4px;gap:4px}
 .seg button{min-height:46px;border-radius:9px;font-size:14px;font-weight:650;color:var(--gris);line-height:1.15;padding:0 6px;transition:background-color .15s ease-out,color .15s ease-out}
-.seg button[aria-checked=true]{background:#fff;color:var(--tinta);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg button[aria-checked=true]{background:var(--superficie);color:var(--tinta);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .direc{display:flex;gap:12px;align-items:flex-start;font-size:15px;line-height:1.35}
-.direc .ic{width:40px;height:40px;border-radius:10px;background:var(--tienda-claro);color:var(--tienda);display:grid;place-items:center;flex:none}
+.direc .ic{width:40px;height:40px;border-radius:10px;background:var(--fondo);color:var(--enlace);display:grid;place-items:center;flex:none}
 .direc .t{flex:1;min-width:0}
 .direc b{display:block;font-weight:680}
 .direc span{color:var(--gris);font-size:14px}
-.direc button{color:var(--tienda);font-weight:700;font-size:14.5px;min-height:40px}
+.direc button{color:var(--enlace);font-weight:700;font-size:14.5px;min-height:40px}
 label.l,.l{display:block;font-weight:650;font-size:14.5px;margin:12px 0 6px}
-input.c,select.c{width:100%;height:52px;border:1.5px solid #B9BFBB;border-radius:12px;padding:0 14px;font-size:16px;background:#fff;color:var(--tinta)}
+input.c,select.c{width:100%;height:52px;border:1.5px solid #B9BFBB;border-radius:12px;padding:0 14px;font-size:16px;background:var(--superficie);color:var(--tinta)}
 input.c:focus,select.c:focus{border-color:var(--tinta);outline:0}
 input.c::placeholder{color:var(--gris2)}
 .malo{border-color:var(--rojo)!important;background:#FFF7F6!important}
-.ubic{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--tienda);font-weight:700;font-size:15px;min-height:44px}
+.ubic{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--enlace);font-weight:700;font-size:15px;min-height:44px}
 .billetes{display:flex;gap:8px}
 .billetes button{flex:1;min-height:46px;border:1.5px solid #C3C8C5;border-radius:12px;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
-.billetes button[aria-pressed=true]{border-color:var(--tinta);background:var(--tinta);color:#fff}
+.billetes button[aria-pressed=true]{border-color:var(--boton);background:var(--boton);color:var(--boton-texto)}
 .error{background:#FDECEA;color:var(--rojo);border-radius:12px;padding:12px 14px;margin:14px 20px 0;font-weight:600;font-size:15px}
-.pedir-btn{position:fixed;left:0;right:0;bottom:0;padding:10px 16px max(16px,env(safe-area-inset-bottom));background:linear-gradient(rgba(255,255,255,0),#fff 30%);z-index:6}
-.pedir-btn button{max-width:588px;margin:0 auto;width:100%;min-height:58px;border-radius:15px;background:var(--tienda);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-weight:720;font-size:17px;transition:transform .12s ease-out}
+.pedir-btn{position:fixed;left:0;right:0;bottom:0;padding:10px 16px max(16px,env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--pagina) 30%);z-index:6}
+.pedir-btn button{max-width:588px;margin:0 auto;width:100%;min-height:58px;border-radius:15px;background:var(--accion);color:var(--accion-texto);display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-weight:720;font-size:17px;transition:transform .12s ease-out}
 .pedir-btn button:active{transform:scale(.98)}
 .pedir-btn button[disabled]{background:#9AA19D;cursor:default;transform:none}
 .pedir-btn b{font-size:24px;font-weight:850;font-stretch:66%;font-variant-numeric:tabular-nums}
@@ -139,10 +140,10 @@ input.c::placeholder{color:var(--gris2)}
 .ruta li{display:grid;grid-template-columns:26px 1fr auto;gap:12px;padding-bottom:18px;position:relative;font-size:15.5px}
 .ruta li:not(:last-child):before{content:"";position:absolute;left:12px;top:24px;bottom:2px;width:2px;background:var(--raya)}
 .ruta li.ok:before{background:var(--tinta)}
-.bola{width:26px;height:26px;border-radius:50%;border:2px solid #C3C8C5;background:#fff;display:grid;place-items:center;position:relative;z-index:1}
-.ruta li.ok .bola{background:var(--tinta);border-color:var(--tinta);color:#fff}
-.ruta li.ahora .bola{border-color:var(--tienda);box-shadow:0 0 0 5px var(--tienda-claro)}
-.ruta li.ahora .bola:after{content:"";width:10px;height:10px;border-radius:50%;background:var(--tienda)}
+.bola{width:26px;height:26px;border-radius:50%;border:2px solid #C3C8C5;background:var(--pagina);display:grid;place-items:center;position:relative;z-index:1}
+.ruta li.ok .bola{background:var(--boton);border-color:var(--boton);color:var(--boton-texto)}
+.ruta li.ahora .bola{border-color:var(--accion);box-shadow:0 0 0 5px var(--fondo)}
+.ruta li.ahora .bola:after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accion)}
 .ruta li b{font-weight:680}
 .ruta li.pend b{color:var(--gris2);font-weight:600}
 .ruta .h{color:var(--gris);font-size:13.5px;font-variant-numeric:tabular-nums}
@@ -153,10 +154,10 @@ input.c::placeholder{color:var(--gris2)}
 .e-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 16px 0}
 .e-btns a{min-height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15.5px;text-decoration:none;background:var(--fondo)}
 .e-btns a.wa{background:var(--wa);color:#fff}
-.otra{display:block;text-align:center;margin:18px 0 30px;color:var(--tienda);font-weight:700;min-height:44px;line-height:44px;text-decoration:none}
+.otra{display:block;text-align:center;margin:18px 0 30px;color:var(--enlace);font-weight:700;min-height:44px;line-height:44px;text-decoration:none}
 .cargando{padding:70px 24px;text-align:center;color:var(--gris)}
 .cargando h1{font-size:24px;color:var(--tinta);margin:0 0 8px}
-.cargando a,.cargando button{display:inline-flex;align-items:center;justify-content:center;margin-top:18px;min-height:50px;padding:0 22px;border-radius:12px;background:var(--tinta);color:#fff;font-weight:700;text-decoration:none}
+.cargando a,.cargando button{display:inline-flex;align-items:center;justify-content:center;margin-top:18px;min-height:50px;padding:0 22px;border-radius:12px;background:var(--boton);color:var(--boton-texto);font-weight:700;text-decoration:none}
 .app-bar{position:fixed;top:0;left:0;right:0;z-index:9;height:calc(46px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 8px 0;display:flex;align-items:center;gap:6px;background:#fff;border-bottom:1px solid var(--raya);font-size:15px}
 .app-bar button{display:flex;align-items:center;gap:2px;min-height:44px;padding:0 6px;font-weight:650}
 .app-bar span{margin-left:auto;font-size:12px;color:var(--gris2);display:flex;align-items:center;gap:6px;padding-right:6px}
@@ -166,6 +167,177 @@ body.en-app{padding-top:calc(46px + env(safe-area-inset-top))}
 body.en-app .cabeza{top:calc(46px + env(safe-area-inset-top));padding-top:8px}
 body.en-app .letrero{padding-top:18px}
 body.en-app .tabs{top:calc(46px + env(safe-area-inset-top))}
+
+/* ================= TEMAS (cada negocio escoge el suyo en Tienda en línea) ================= */
+@font-face{font-family:"Kalam";src:url(fuentes/kalam-700.woff2) format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Sello";src:url(fuentes/special-elite.woff2) format("woff2");font-display:swap}
+.tabs small,.cod{display:none}
+/* Libreta: cuaderno de la tienda, pluma azul */
+body[data-tema=libreta]{--tienda:#1E3A8A;--tinta:#1F2A44;--gris:#4A5778;--raya:#D5E2F2;--fondo:#EEF3FB;--boton:#1E3A8A;--accion:#1E3A8A;--enlace:#1E3A8A;--letrero-texto:#1E3A8A;--cartulina:#FFF27A;--mano:Kalam;--pagina:#FDFDFB;
+  background-image:linear-gradient(90deg,transparent 30px,#E9A3A3 30px,#E9A3A3 31.5px,transparent 31.5px),repeating-linear-gradient(180deg,transparent 0 33px,#D5E2F2 33px 34px)}
+[data-tema=libreta] .letrero{background:transparent;padding-bottom:14px}
+[data-tema=libreta] .letrero h1{font-family:Kalam;font-stretch:100%;font-size:38px;transform:rotate(-1deg);transform-origin:left}
+[data-tema=libreta] .letrero .estado .punto{box-shadow:none}
+[data-tema=libreta] .wa-redondo{background:#E6EDF8}
+[data-tema=libreta] .buscar{margin:0 16px;box-shadow:none;border:1.5px solid #1E3A8A}
+[data-tema=libreta] .tit-s h2{font-family:Kalam;color:#B42318;font-size:24px;transform:rotate(-1.2deg)}
+[data-tema=libreta] .tag{border-radius:2px;transform:rotate(-2deg);box-shadow:0 8px 14px -8px rgba(0,0,0,.3)}
+[data-tema=libreta] .tag:nth-child(even){background:#C9F0E0;transform:rotate(1.5deg)}
+[data-tema=libreta] .tag:before{display:none}
+[data-tema=libreta] .tag{padding-left:12px}
+[data-tema=libreta] .tag .pr{font-family:Kalam;font-stretch:100%;color:#B42318;font-size:34px}
+[data-tema=libreta] .tabs{background:transparent}
+[data-tema=libreta] .tabs button[aria-pressed=true]{box-shadow:inset 0 -3px 0 #B42318}
+[data-tema=libreta] .prod{grid-template-columns:1fr auto;background:transparent}
+[data-tema=libreta] .ficha{display:none}
+[data-tema=libreta] .precio,[data-tema=libreta] .carrito .n b,[data-tema=libreta] .total b,[data-tema=libreta] .pedir-btn b{font-family:Kalam;font-stretch:100%;color:#1E3A8A}
+[data-tema=libreta] .pedir-btn b{color:#fff}
+[data-tema=libreta] .mas{border-color:#1E3A8A;color:#1E3A8A}
+/* Minisúper: etiquetas de anaquel en cuadrícula */
+body[data-tema=minisuper]{--tienda:#D52B1E;--accion:#D52B1E;--enlace:#B3261E;--cartulina:#FFD400;--pagina:#F4F4F2;--boton:#1B1B1B;--letrero-texto:#1B1B1B}
+[data-tema=minisuper] .letrero{background:#fff;border-bottom:4px solid #D52B1E}
+[data-tema=minisuper] .letrero h1{font-size:28px;font-stretch:80%}
+[data-tema=minisuper] .letrero .giro{opacity:.75}
+[data-tema=minisuper] .wa-redondo{background:#F1F1EF}
+[data-tema=minisuper] .tag{border-radius:8px}
+[data-tema=minisuper] .tag:before{display:none}
+[data-tema=minisuper] .tag{padding-left:14px}
+[data-tema=minisuper] .tabs{gap:8px;border:0;padding:4px 16px}
+[data-tema=minisuper] .tabs button{padding:0 14px;border-radius:8px;background:#fff;border:1px solid #E1E1DE;color:#1B1B1B;font-size:14px;min-height:40px;align-self:center}
+[data-tema=minisuper] .tabs button[aria-pressed=true]{background:#D52B1E;border-color:#D52B1E;color:#fff;box-shadow:none}
+[data-tema=minisuper] .lista{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 16px 110px;align-items:start}
+[data-tema=minisuper] .prod{grid-template-columns:1fr;gap:8px;padding:0 0 10px;background:#fff;border:1px solid #E6E6E3;border-radius:10px;overflow:hidden}
+[data-tema=minisuper] .ficha{width:100%;height:92px;border-radius:0}
+[data-tema=minisuper] .ficha b{font-size:30px}
+[data-tema=minisuper] .prod .n{padding:0 10px;min-height:52px}
+[data-tema=minisuper] .prod .n b{font-size:14px}
+[data-tema=minisuper] .der{flex-direction:row;justify-content:space-between;align-items:center;padding:0 10px}
+[data-tema=minisuper] .precio{border:2px solid #1B1B1B;border-radius:6px;padding:4px 8px}
+[data-tema=minisuper] .precio s{display:none}
+[data-tema=minisuper] .vacio{grid-column:1/-1}
+/* Tianguis: cada departamento es un puesto de color */
+body[data-tema=tianguis]{--tienda:#111;--boton:#111;--accion:#111;--enlace:#111;--cartulina:#E5097F;--cartulina-texto:#fff}
+[data-tema=tianguis] .letrero{position:relative;padding-bottom:52px}
+[data-tema=tianguis] .letrero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:linear-gradient(90deg,#E5097F 0 20%,#00A19A 20% 40%,#F28C00 40% 60%,#6B3FA0 60% 80%,#E2C200 80%)}
+[data-tema=tianguis] .buscar{border-radius:27px;box-shadow:none;border:2px solid #111}
+[data-tema=tianguis] .tag:before{display:none}
+[data-tema=tianguis] .tag{padding-left:14px;border-radius:12px}
+[data-tema=tianguis] .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border:0;padding:4px 16px 12px;position:static;overflow:visible}
+[data-tema=tianguis] .tabs button{height:74px;border-radius:12px;background:var(--dep,#111);color:#fff;text-align:left;padding:10px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;white-space:normal;line-height:1.1;font-size:15px;font-weight:800}
+[data-tema=tianguis] .tabs button small{display:block;font-size:12px;font-weight:600;opacity:.9}
+[data-tema=tianguis] .tabs button[aria-pressed=true]{box-shadow:0 0 0 3px #fff inset,0 0 0 2px #111}
+[data-tema=tianguis] .prod{grid-template-columns:6px 1fr auto}
+[data-tema=tianguis] .ficha{width:6px;height:52px;border-radius:3px;background:var(--dep)!important;padding:0}
+[data-tema=tianguis] .ficha *{display:none}
+[data-tema=tianguis] .mas{background:#111;color:#fff;border:0}
+[data-tema=tianguis] .carrito .ver,[data-tema=tianguis] .pedir-btn button{border-radius:30px}
+/* Tu color: el negocio escoge sus colores (se ponen desde la configuración) */
+[data-tema=color] .tag{border-radius:10px}
+[data-tema=color] .tag:before{display:none}
+[data-tema=color] .tag{padding-left:14px}
+[data-tema=color] .ficha{background:var(--tienda-claro)!important;color:var(--tienda)}
+[data-tema=color] .ficha small{color:inherit;opacity:.7}
+[data-tema=color] .mas{background:var(--tienda);border-color:var(--tienda);color:var(--accion-texto)}
+/* Pizarrón: carnicería y cremería */
+body[data-tema=pizarron]{--pagina:#24302A;--superficie:#2C3A33;--tinta:#F3F1EA;--gris:#C9D1CB;--gris2:#9FAAA3;--raya:rgba(255,255,255,.16);--fondo:#1E2924;--tienda:#24302A;--boton:#F6E27A;--boton-texto:#24302A;--accion:#F6E27A;--accion-texto:#24302A;--enlace:#F6E27A;--cartulina:transparent;--cartulina-texto:#fff;--mano:Kalam;
+  background-image:radial-gradient(120% 60% at 30% 10%,rgba(255,255,255,.06),transparent 60%)}
+[data-tema=pizarron] .letrero{padding-bottom:16px}
+[data-tema=pizarron] .letrero h1{font-family:Kalam;font-stretch:100%;font-size:40px}
+[data-tema=pizarron] .letrero .giro{font-family:Kalam;color:#F6E27A;opacity:1;font-size:18px}
+[data-tema=pizarron] .buscar{margin:0 16px;background:transparent;box-shadow:none;border:1.5px dashed rgba(255,255,255,.45)}
+[data-tema=pizarron] .buscar input{color:#fff}
+[data-tema=pizarron] .siempre{background:rgba(255,255,255,.07)}
+[data-tema=pizarron] .tit-s h2{font-family:Kalam;color:#F6E27A;font-size:26px}
+[data-tema=pizarron] .tag{border:2px dashed #F6E27A;padding-left:12px}
+[data-tema=pizarron] .tag:before{display:none}
+[data-tema=pizarron] .tag .pr{font-family:Kalam;font-stretch:100%;color:#FF9C8A}
+[data-tema=pizarron] .tabs button[aria-pressed=true]{box-shadow:inset 0 -3px 0 #F6E27A}
+[data-tema=pizarron] .prod{grid-template-columns:1fr auto;border-bottom-style:dashed}
+[data-tema=pizarron] .ficha{display:none}
+[data-tema=pizarron] .prod .n b{font-family:Kalam;font-size:21px;font-weight:700}
+[data-tema=pizarron] .precio,[data-tema=pizarron] .carrito .n b,[data-tema=pizarron] .total b{font-family:Kalam;font-stretch:100%}
+[data-tema=pizarron] .precio s,[data-tema=pizarron] .quitar{color:#FF9C8A}
+[data-tema=pizarron] .mas{border-color:#fff;color:#fff}
+[data-tema=pizarron] .renglon,[data-tema=pizarron] .leader i{border-color:rgba(255,255,255,.2)}
+[data-tema=pizarron] .total{border-top-color:#F3F1EA}
+[data-tema=pizarron] input.c,[data-tema=pizarron] select.c{border-color:rgba(255,255,255,.3)}
+/* Receta: farmacia */
+body[data-tema=receta]{--tienda:#0E6B73;--tinta:#0B3B40;--gris:#4D6B6E;--raya:#E5EEEE;--fondo:#EEF5F5;--boton:#0E6B73;--accion:#0E6B73;--enlace:#0E6B73;--letrero-texto:#0B3B40;--cartulina:#E2F1F1;--cartulina-texto:#0B3B40}
+[data-tema=receta] .letrero{background:#fff;border-bottom:3px double #0E6B73;padding-bottom:16px}
+[data-tema=receta] .letrero .envoltura:before{content:"Rx";flex:none;width:46px;height:46px;border-radius:50%;border:2px solid #0E6B73;color:#0E6B73;display:grid;place-items:center;font-weight:800;font-size:20px;font-style:italic}
+[data-tema=receta] .letrero h1{font-size:26px;font-stretch:90%}
+[data-tema=receta] .letrero .estado{color:#0E6B73}
+[data-tema=receta] .letrero .punto{background:#0E9F6E;box-shadow:none}
+[data-tema=receta] .wa-redondo{background:#EEF5F5}
+[data-tema=receta] .buscar{margin:14px 16px 0;border-radius:27px;box-shadow:none;background:#EEF5F5}
+[data-tema=receta] .tag{border-radius:12px}
+[data-tema=receta] .tag:before{display:none}
+[data-tema=receta] .tag{padding-left:14px}
+[data-tema=receta] .tabs{gap:8px;border:0;padding:4px 16px}
+[data-tema=receta] .tabs button{padding:0 14px;border-radius:20px;border:1.5px solid #CFE0E1;color:#2E5457;font-size:14px;min-height:40px;align-self:center}
+[data-tema=receta] .tabs button[aria-pressed=true]{background:#0E6B73;border-color:#0E6B73;color:#fff;box-shadow:none}
+[data-tema=receta] .ficha{background:#EEF5F5!important;color:#0E6B73}
+[data-tema=receta] .mas{border-radius:10px;background:#0E6B73;border-color:#0E6B73;color:#fff}
+/* Cuadritos: pañalera */
+body[data-tema=cuadritos]{--tienda:#2B3A55;--tinta:#2B3A55;--gris:#5A6782;--raya:#E8EEF6;--fondo:#F2F6FB;--boton:#2B3A55;--accion:#2B3A55;--enlace:#C2416A;--cartulina:#FDE1E8;--pagina:#FFFDF9;--letrero-texto:#2B3A55}
+[data-tema=cuadritos] .letrero{background:repeating-linear-gradient(0deg,rgba(120,170,220,.55) 0 14px,transparent 14px 28px),repeating-linear-gradient(90deg,rgba(120,170,220,.55) 0 14px,transparent 14px 28px),#fff;padding:26px 16px 54px}
+[data-tema=cuadritos] .letrero .envoltura{background:#fff;border-radius:18px;padding:14px 16px;border:2px dashed #F2A7B8;box-shadow:0 10px 24px -10px rgba(40,70,110,.35)}
+[data-tema=cuadritos] .letrero h1{font-size:28px;font-stretch:80%}
+[data-tema=cuadritos] .letrero .punto{background:#3FB37F;box-shadow:none}
+[data-tema=cuadritos] .wa-redondo{background:#FDE1E8}
+[data-tema=cuadritos] .buscar{border-radius:27px}
+[data-tema=cuadritos] .tag{border-radius:16px}
+[data-tema=cuadritos] .tag:before{display:none}
+[data-tema=cuadritos] .tag{padding-left:14px}
+[data-tema=cuadritos] .tabs{gap:8px;border:0;padding:4px 16px;background:var(--pagina)}
+[data-tema=cuadritos] .tabs button{padding:0 16px;border-radius:22px;background:#F2F6FB;color:#2B3A55;min-height:42px;align-self:center}
+[data-tema=cuadritos] .tabs button[aria-pressed=true]{background:#2B3A55;color:#fff;box-shadow:none}
+[data-tema=cuadritos] .prod{margin:0 16px 10px;border:1.5px solid #E8EEF6;border-radius:16px;background:#fff;padding:10px 12px}
+[data-tema=cuadritos] .ficha{border-radius:50%}
+[data-tema=cuadritos] .mas{background:#F2A7B8;border-color:#F2A7B8;color:#2B3A55}
+[data-tema=cuadritos] .carrito .ver,[data-tema=cuadritos] .pedir-btn button{border-radius:30px}
+/* Estraza: panadería y tortillería */
+body[data-tema=estraza]{--pagina:#CDB48F;--superficie:#F6EDDD;--tinta:#3B2A17;--gris:#6B5232;--gris2:#86704F;--raya:rgba(91,64,32,.3);--fondo:rgba(255,255,255,.35);--tienda:#B0302A;--boton:#3B2A17;--boton-texto:#FFE2A8;--accion:#3B2A17;--accion-texto:#FFE2A8;--enlace:#8E2620;--letrero-texto:#B0302A;--cartulina:#F6EDDD;--cartulina-texto:#3B2A17;
+  background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.08) 0 1px,transparent 1.5px),radial-gradient(circle at 70% 60%,rgba(80,50,20,.08) 0 1px,transparent 1.5px);background-size:7px 7px,9px 9px}
+[data-tema=estraza] .letrero{background:transparent;padding-bottom:18px}
+[data-tema=estraza] .letrero .txt{border:3px solid #B0302A;border-radius:12px;padding:10px 12px;text-align:center;transform:rotate(-1.5deg)}
+[data-tema=estraza] .letrero h1{font-family:Sello;font-weight:400;font-stretch:100%;font-size:30px}
+[data-tema=estraza] .letrero .giro{font-family:Sello;opacity:1}
+[data-tema=estraza] .letrero .estado{justify-content:center;color:#4A3720}
+[data-tema=estraza] .wa-redondo{background:rgba(255,255,255,.5);color:#3B2A17}
+[data-tema=estraza] .buscar{margin:0 16px;box-shadow:none;background:rgba(255,255,255,.6)}
+[data-tema=estraza] .tit-s h2{font-family:Sello;font-weight:400}
+[data-tema=estraza] .tag{border:2px dashed #B0302A}
+[data-tema=estraza] .tag .pr{font-family:Sello;font-weight:400;font-stretch:100%;color:#B0302A;font-size:32px}
+[data-tema=estraza] .tabs{background:var(--pagina)}
+[data-tema=estraza] .lista{margin:6px 16px 0;background:rgba(255,255,255,.62);border-radius:14px;padding:0 0 4px}
+[data-tema=estraza] .prod{grid-template-columns:1fr auto;border-bottom-style:dashed;padding:12px 14px}
+[data-tema=estraza] .ficha{display:none}
+[data-tema=estraza] .prod .n b{font-family:Sello;font-weight:400;font-size:17px}
+[data-tema=estraza] .precio{font-family:Sello;font-weight:400;font-stretch:100%;color:#B0302A}
+[data-tema=estraza] .mas{border-color:#3B2A17}
+[data-tema=estraza] .carrito{background:#3B2A17;border:0}
+[data-tema=estraza] .carrito .n{color:#E5D2B0}[data-tema=estraza] .carrito .n b{color:#fff}
+[data-tema=estraza] .carrito .ver{background:#FFC86B;color:#3B2A17}
+/* Taller: ferretería y tlapalería */
+body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accion:#F2C200;--accion-texto:#1B1C1D;--enlace:#2A2D2F;--cartulina:#F2C200}
+[data-tema=taller] .letrero{position:relative;padding-bottom:58px}
+[data-tema=taller] .letrero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:12px;background:repeating-linear-gradient(-45deg,#F2C200 0 14px,#1B1C1D 14px 28px)}
+[data-tema=taller] .letrero h1{font-size:30px;font-stretch:70%;letter-spacing:.3px}
+[data-tema=taller] .buscar{border-radius:6px;box-shadow:none;border:2px solid #2A2D2F;margin-top:-22px}
+[data-tema=taller] .tag{border-radius:4px;border:2px solid #2A2D2F}
+[data-tema=taller] .tag:before{display:none}
+[data-tema=taller] .tag{padding-left:12px}
+[data-tema=taller] .tabs{background:var(--pagina)}
+[data-tema=taller] .tabs button[aria-pressed=true]{box-shadow:inset 0 -4px 0 #F2C200}
+[data-tema=taller] .prod{grid-template-columns:1fr auto;margin:8px 16px 0;background:#fff;border:0;border-left:6px solid #2A2D2F;border-radius:6px}
+[data-tema=taller] .ficha{display:none}
+[data-tema=taller] .cod{display:block!important;font-size:12px;color:#6C7073;font-weight:650;margin-top:2px}
+[data-tema=taller] .mas{border-radius:6px;background:#F2C200;border:2px solid #2A2D2F;color:#1B1C1D}
+[data-tema=taller] .paso{border-radius:6px}
+[data-tema=taller] .carrito{background:#2A2D2F;border:0}
+[data-tema=taller] .carrito .n{color:#C7CACC}[data-tema=taller] .carrito .n b{color:#fff}
+[data-tema=taller] .carrito .ver,[data-tema=taller] .pedir-btn button{border-radius:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -277,12 +449,34 @@ body.en-app .tabs{top:calc(46px + env(safe-area-inset-top))}
         chico = p.departamento || '';
       }
     }
-    return `<span class="ficha" style="background:${tinte(p.departamento)}" aria-hidden="true"><b>${esc(grande)}</b>${chico ? `<small>${esc(chico)}</small>` : ''}${p.imagen_url ? `<img src="${esc(p.imagen_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>`;
+    return `<span class="ficha" style="background:${tinte(p.departamento)};--dep:${fuerte(p.departamento)}" aria-hidden="true"><b>${esc(grande)}</b>${chico ? `<small>${esc(chico)}</small>` : ''}${p.imagen_url ? `<img src="${esc(p.imagen_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>`;
   }
+
+  // Tema y colores que escogió el negocio
+  const claro = (hex) => { const n = parseInt(String(hex).slice(1), 16); const [r, g, b] = [n >> 16 & 255, n >> 8 & 255, n & 255]; return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62; };
+  function aplicarTema(x) {
+    const t = /^[a-z]+$/.test(String(x.tema || '')) ? x.tema : 'letrero';
+    document.body.dataset.tema = t;
+    const r = document.documentElement.style;
+    if (t === 'color') {
+      const c = /^#[0-9A-F]{6}$/i.test(x.color_principal || '') ? x.color_principal : '#1D6A3A';
+      const o = /^#[0-9A-F]{6}$/i.test(x.color_oferta || '') ? x.color_oferta : '#FFE81A';
+      r.setProperty('--tienda', c); r.setProperty('--accion', c); r.setProperty('--enlace', claro(c) ? '#1B1D1C' : c);
+      r.setProperty('--letrero-texto', claro(c) ? '#1B1D1C' : '#fff'); r.setProperty('--accion-texto', claro(c) ? '#1B1D1C' : '#fff');
+      r.setProperty('--tienda-claro', `color-mix(in srgb, ${c} 14%, white)`);
+      r.setProperty('--cartulina', o); r.setProperty('--cartulina-texto', claro(o) ? '#1B1D1C' : '#fff');
+    }
+    const meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.content = getComputedStyle(document.body).getPropertyValue('--tienda').trim() || '#1D6A3A';
+  }
+  // Colores fuertes por departamento (tema Tianguis)
+  const PUESTOS = ['#E5097F', '#00A19A', '#F28C00', '#6B3FA0', '#2B6CC4', '#B8860B', '#C0392B', '#2E7D32'];
+  function fuerte(d) { let h = 0; for (const c of String(d || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PUESTOS[h % PUESTOS.length]; }
 
   async function cargarCatalogo() {
     const [info, prods] = await Promise.all([pedir('/info' + qsInfo()), pedir('/productos?s=' + encodeURIComponent(S))]);
     E.info = info; E.productos = prods; E.porId = new Map(prods.map((p) => [p.id, p]));
+    aplicarTema(info);
   }
 
   async function iniciar() {
@@ -327,7 +521,7 @@ body.en-app .tabs{top:calc(46px + env(safe-area-inset-top))}
       : p.promo && p.promo.desde > 1 ? `<span class="ofe">Llevando ${p.promo.desde}: ${pesos(p.promo.precio)} c/u</span>`
       : (p.departamento ? `<span>${esc(p.departamento)}</span>` : '');
     const precio = oferta ? `<s>${pesos(p.precio)}</s>${pesos(p.promo.precio)}` : pesos(p.precio);
-    return `<div class="prod">${ficha(p)}<span class="n"><b>${esc(p.nombre)}</b>${sub}</span>
+    return `<div class="prod">${ficha(p)}<span class="n"><b>${esc(p.nombre)}</b>${sub}<span class="cod">COD ${p.id}</span></span>
       <span class="der"><span class="precio">${precio}${p.por_peso ? '<small> kg</small>' : ''}</span>${control(p)}</span></div>`;
   }
 
@@ -385,7 +579,7 @@ body.en-app .tabs{top:calc(46px + env(safe-area-inset-top))}
           return `<button type="button" class="tag" role="listitem" data-mas="${p.id}" aria-label="Agregar ${esc(p.nombre)} en oferta"><span class="p">${esc(p.nombre)}</span>
             <span class="pr num">${varios ? `${p.promo.desde} x ${pesos(p.promo.precio * p.promo.desde)}` : pesos(p.promo.precio)}${p.por_peso ? '<small>/kg</small>' : ''}</span>
             ${enPedido || `<span class="an">${varios ? 'solo' : 'antes'} <s>${pesos(p.precio)}</s></span>`}</button>`; }).join('')}</div>` : ''}
-      ${deptos.length > 2 ? `<nav class="tabs" aria-label="Departamentos">${deptos.map((d) => `<button type="button" data-depto="${esc(d)}" aria-pressed="${d === E.depto}">${esc(d)}</button>`).join('')}</nav>` : '<div style="height:16px"></div>'}
+      ${deptos.length > 2 ? `<nav class="tabs" aria-label="Departamentos">${deptos.map((d) => { const n = d === 'Todo' ? E.productos.length : d === 'Ofertas' ? E.productos.filter((p) => p.promo).length : E.productos.filter((p) => p.departamento === d).length; return `<button type="button" data-depto="${esc(d)}" aria-pressed="${d === E.depto}" style="--dep:${d === 'Todo' ? '#111' : d === 'Ofertas' ? '#E5097F' : fuerte(d)}">${esc(d)}<small>${n} ${n === 1 ? 'producto' : 'productos'}</small></button>`; }).join('')}</nav>` : '<div style="height:16px"></div>'}
       <section class="lista" id="lista" aria-label="Productos"></section></div><div id="pie"></div>`;
     pintarLista();
     const b = document.getElementById('busca');
@@ -555,6 +749,7 @@ body.en-app .tabs{top:calc(46px + env(safe-area-inset-top))}
       clearTimeout(reloj); if (e.status !== 404) reloj = setTimeout(() => seguimiento(cl), 30000); return;
     }
     document.title = d.negocio + ' · Tu pedido';
+    aplicarTema(d);
     ultimoSeguimiento = { k: cl, n: d.numero, t: Date.now(), negocio: d.negocio };
     const rep = d.repartidor ? d.repartidor.nombre : '';
     const pagoTxt = d.pago_previsto === 'cuenta' ? `Se anota ${pesos(d.total)} a tu cuenta`

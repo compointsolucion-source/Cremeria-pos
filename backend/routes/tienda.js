@@ -138,7 +138,7 @@ router.get('/publico/info', limiteLectura, async (req, res, next) => {
     const cli = cfg.fiado_en_linea ? await clienteDelEnlace(pool, cfg.sucursal_id, req.query.c) : null;
     res.set('Cache-Control', 'no-store');
     res.json({
-      sucursal_id: cfg.sucursal_id,
+      sucursal_id: cfg.sucursal_id, ...aparienciaPublica(cfg),
       negocio: neg.negocio, giro: cfg.giro, telefono: neg.telefono, logo_url: neg.logo_url,
       horario: estadoHorario(cfg.horario), tiempo_entrega: cfg.tiempo_entrega,
       pedido_minimo: Number(cfg.pedido_minimo), acepta_tarjeta: cfg.acepta_tarjeta,
@@ -309,6 +309,7 @@ router.get('/publico/seguimiento/:clave', limiteSeguimiento, async (req, res, ne
     const items = await pool.query(
       'SELECT nombre_producto, cantidad, subtotal, producto_id FROM ticket_detalle WHERE ticket_id = $1 ORDER BY id', [p.ticket_id]);
     const neg = await datosNegocio(pool, p.sucursal_id, p.sucursal_nombre);
+    const apar = (await pool.query('SELECT tema, color_principal, color_oferta FROM tienda_config WHERE sucursal_id = $1', [p.sucursal_id])).rows[0] || {};
     const paso = p.estado === 'cancelado' ? 'cancelado'
       : p.estado === 'entregado' ? 'entregado'
       : p.estado === 'en_camino' ? 'en_camino'
@@ -319,7 +320,7 @@ router.get('/publico/seguimiento/:clave', limiteSeguimiento, async (req, res, ne
     const total = r2(Number(p.total) - Number(p.descuento_monto || 0));
     res.set('Cache-Control', 'no-store');
     res.json({
-      numero: numeroPedido(p.id), negocio: neg.negocio, telefono_tienda: neg.telefono, nombre: p.nombre_contacto,
+      numero: numeroPedido(p.id), negocio: neg.negocio, telefono_tienda: neg.telefono, nombre: p.nombre_contacto, ...aparienciaPublica(apar),
       paso, motivo_cancelacion: paso === 'cancelado' ? p.motivo_cancelacion : null,
       horas: { recibido: hora(p.creado_en), confirmado: hora(p.confirmado_en), salio: hora(p.salio_en), entregado: hora(p.entregado_en) },
       repartidor: p.repartidor_nombre ? { nombre: String(p.repartidor_nombre).split(' ')[0], telefono: paso === 'en_camino' ? (p.repartidor_telefono || null) : null } : null,
@@ -355,6 +356,10 @@ function validarTramo(t) {
   return t;
 }
 
+const TEMAS = ['letrero', 'libreta', 'minisuper', 'tianguis', 'color', 'pizarron', 'receta', 'cuadritos', 'estraza', 'taller'];
+const colorValido = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toUpperCase() : null);
+const aparienciaPublica = (cfg) => ({ tema: TEMAS.includes(cfg.tema) ? cfg.tema : 'letrero', color_principal: cfg.color_principal || null, color_oferta: cfg.color_oferta || null });
+
 router.put('/config', ...soloAdmin, async (req, res, next) => {
   try {
     const b = req.body || {};
@@ -367,15 +372,21 @@ router.put('/config', ...soloAdmin, async (req, res, next) => {
     if (!Number.isFinite(minimo) || minimo < 0 || minimo > 100000) throw new ErrorHttp(400, 'El pedido mínimo no es válido');
     const maxPend = b.max_pendientes_por_telefono === undefined ? actual.max_pendientes_por_telefono : Number(b.max_pendientes_por_telefono);
     if (!Number.isInteger(maxPend) || maxPend < 1 || maxPend > 20) throw new ErrorHttp(400, 'El máximo de pedidos sin confirmar debe ser de 1 a 20');
+    if (b.tema !== undefined && !TEMAS.includes(b.tema)) throw new ErrorHttp(400, 'Ese tema no existe');
+    for (const k of ['color_principal', 'color_oferta']) {
+      if (b[k] !== undefined && b[k] !== null && b[k] !== '' && !colorValido(b[k])) throw new ErrorHttp(400, 'El color debe ser como #1D6A3A');
+    }
+    const color = (k) => (b[k] === undefined ? actual[k] || null : colorValido(b[k]));
     const r = await pool.query(
       `UPDATE tienda_config SET activo = $2, giro = $3, horario = $4, tiempo_entrega = $5, pedido_minimo = $6,
               max_pendientes_por_telefono = $7, acepta_tarjeta = $8, fiado_en_linea = $9, ocultar_sin_existencia = $10,
-              imprimir_al_confirmar = $11, sonido = $12, actualizado_en = NOW()
+              imprimir_al_confirmar = $11, sonido = $12, tema = $13, color_principal = $14, color_oferta = $15, actualizado_en = NOW()
         WHERE sucursal_id = $1 RETURNING *`,
       [req.sucursalId, bool(b.activo, actual.activo), b.giro === undefined ? actual.giro : textoOnull(b.giro, 120), JSON.stringify(horario),
        textoOnull(b.tiempo_entrega, 40) || actual.tiempo_entrega, r2(minimo), maxPend,
        bool(b.acepta_tarjeta, actual.acepta_tarjeta), bool(b.fiado_en_linea, actual.fiado_en_linea),
-       bool(b.ocultar_sin_existencia, actual.ocultar_sin_existencia), bool(b.imprimir_al_confirmar, actual.imprimir_al_confirmar), bool(b.sonido, actual.sonido)]);
+       bool(b.ocultar_sin_existencia, actual.ocultar_sin_existencia), bool(b.imprimir_al_confirmar, actual.imprimir_al_confirmar), bool(b.sonido, actual.sonido),
+       b.tema === undefined ? (actual.tema || 'letrero') : b.tema, color('color_principal'), color('color_oferta')]);
     await registrarBitacora(pool, { usuario_id: req.usuario.id, accion: 'tienda_config', modulo: 'pedidos', referencia_id: req.sucursalId, valor_nuevo: { activo: r.rows[0].activo } });
     res.json({ ...r.rows[0], pedido_minimo: Number(r.rows[0].pedido_minimo), horario_texto: estadoHorario(r.rows[0].horario).texto });
   } catch (e) { responder(res, e, next); }

@@ -68,6 +68,25 @@
   .prod-chk.no .n b { color: var(--muted, #8A8E94); }
   input.chk { width: 22px; height: 22px; accent-color: #1D6A3A; flex: none; cursor: pointer; margin: 0; }
   .vacio-p { padding: 18px 2px; color: var(--muted, #6B6F76); }
+  /* Temas de la tienda */
+  @font-face { font-family: "Kalam"; src: url(../fuentes/kalam-700.woff2) format("woff2"); font-weight: 700; }
+  @font-face { font-family: "Sello"; src: url(../fuentes/special-elite.woff2) format("woff2"); }
+  .temas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tema { border: 2px solid var(--border, #E4E6E9); border-radius: 12px; overflow: hidden; background: #fff; cursor: pointer; text-align: left; padding: 0; font: inherit; color: inherit; transition: border-color .15s ease-out, transform .12s ease-out; }
+  .tema:active { transform: scale(.98); }
+  .tema[aria-checked="true"] { border-color: #1B1D1C; box-shadow: 0 0 0 2px #1B1D1C; }
+  .tema .muestra { height: 74px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+  .tema .muestra b { font-size: 16px; line-height: 1; }
+  .tema .muestra i { font-style: normal; font-size: 20px; font-weight: 800; align-self: flex-start; padding: 2px 8px; border-radius: 4px; }
+  .tema .pie { padding: 8px 10px 10px; }
+  .tema .pie b { display: block; font-size: 14px; }
+  .tema .pie small { color: var(--muted, #6B6F76); font-size: 12px; }
+  .colores { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border, #E4E6E9); display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .colores .sw { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .colores .sw button { width: 38px; height: 38px; border-radius: 10px; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+  .colores .sw button[aria-pressed="true"] { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1B1D1C; }
+  .colores input[type="color"] { width: 46px; height: 40px; border: 1px solid var(--border, #E4E6E9); border-radius: 10px; padding: 2px; background: #fff; cursor: pointer; }
+  @media (max-width: 860px) { .colores { grid-template-columns: 1fr; } }
   .guardar-fijo { display: flex; justify-content: flex-end; margin: -4px 0 14px; }
   @media (max-width: 860px) { .rejilla2 { grid-template-columns: 1fr; } .compartir { grid-template-columns: 1fr; justify-items: center; } .horario { grid-template-columns: 1fr auto; } }
   @media print {
@@ -159,6 +178,10 @@ function pintar() {
           <button class="btn btn-secondary" onclick="imprimirCartel()">Imprimir cartel con QR</button></div></div></div>` : ''}
     </div>
 
+    <div class="caja"><h2>¿Cómo se ve tu tienda?</h2><p class="ayuda">Escoge el estilo que va con tu negocio. Tus clientes lo ven al momento.</p>
+      <div class="temas" role="radiogroup" aria-label="Tema de la tienda" id="temas"></div>
+      <div id="colores"></div></div>
+
     <div class="rejilla2">
       <div>
         <div class="caja"><h2>Datos de tu tienda</h2><p class="ayuda">Así te ven tus clientes arriba de la página.</p>
@@ -191,6 +214,7 @@ function pintar() {
       <div class="masivo" id="masivo"></div>
       <div id="listaProd"><p class="vacio-p">Cargando productos…</p></div></div>
 `;
+  pintarTemas();
   if (c.activo && typeof QRCode !== 'undefined') QRCode.toCanvas(document.getElementById('qr'), enlaceTienda(), { width: 340, margin: 1 }, () => {});
 }
 
@@ -203,6 +227,52 @@ function pintarFiado() {
          <button class="btn btn-secondary btn-chico" title="El enlace anterior deja de servir" onclick="crearEnlace(${c.id}, true)">Cambiar</button>`
       : `<button class="btn btn-secondary btn-chico" onclick="crearEnlace(${c.id}, false)">Crear enlace</button>`}</div>`).join('');
 }
+
+// ----- Temas -----
+const TEMAS = [
+  ['letrero', 'Letrero', 'Abarrotes', 'background:#1D6A3A;color:#fff', 'background:#FFE81A;color:#1B1D1C', ''],
+  ['libreta', 'Libreta', 'Tiendita y cremería', 'background:#FDFDFB repeating-linear-gradient(180deg,transparent 0 15px,#D5E2F2 15px 16px);color:#1E3A8A', 'background:#FFF27A;color:#B42318;font-family:Kalam', 'font-family:Kalam'],
+  ['minisuper', 'Minisúper', 'Minisúper', 'background:#fff;color:#1B1B1B;border-bottom:4px solid #D52B1E', 'background:#FFD400;color:#1B1B1B;border:2px solid #1B1B1B', ''],
+  ['tianguis', 'Tianguis', 'Muchos productos', 'background:#111;color:#fff;border-bottom:6px solid #E5097F', 'background:#00A19A;color:#fff', ''],
+  ['pizarron', 'Pizarrón', 'Carnicería y cremería', 'background:#24302A;color:#fff', 'color:#F6E27A;font-family:Kalam;border:2px dashed #F6E27A', 'font-family:Kalam'],
+  ['receta', 'Receta', 'Farmacia', 'background:#fff;color:#0B3B40;border-bottom:3px double #0E6B73', 'background:#0E6B73;color:#fff', ''],
+  ['cuadritos', 'Cuadritos', 'Pañalera y bebé', 'background:repeating-linear-gradient(0deg,rgba(120,170,220,.5) 0 8px,transparent 8px 16px),repeating-linear-gradient(90deg,rgba(120,170,220,.5) 0 8px,transparent 8px 16px),#fff;color:#2B3A55', 'background:#F2A7B8;color:#2B3A55;border-radius:12px', ''],
+  ['estraza', 'Estraza', 'Panadería y tortillería', 'background:#CDB48F;color:#B0302A', 'border:2px solid #B0302A;color:#B0302A;font-family:Sello', 'font-family:Sello'],
+  ['taller', 'Taller', 'Ferretería y tlapalería', 'background:#2A2D2F;color:#fff;border-bottom:6px solid #F2C200', 'background:#F2C200;color:#1B1C1D;border:2px solid #1B1C1D', ''],
+  ['color', 'Tu color', 'Tú escoges los colores', '', '', '']
+];
+const PRINCIPALES = ['#1D6A3A', '#7A2E8E', '#B3261E', '#1F4E9C', '#C2410C', '#0F766E', '#1B1D1C'];
+const OFERTAS = ['#FFE81A', '#FF9B4A', '#7FE3C5', '#FFB4D0', '#B8E0FF', '#FFFFFF'];
+
+function pintarTemas() {
+  const el = document.getElementById('temas'); if (!el) return;
+  const actual = cfg.tema || 'letrero';
+  const cp = cfg.color_principal || '#1D6A3A', co = cfg.color_oferta || '#FFE81A';
+  el.innerHTML = TEMAS.map(([id, nombre, giro, fondo, precio, letra]) => {
+    const f = id === 'color' ? `background:${cp};color:#fff` : fondo;
+    const pr = id === 'color' ? `background:${co};color:#1B1D1C` : precio;
+    return `<button type="button" class="tema" role="radio" aria-checked="${id === actual}" onclick="elegirTema('${id}')">
+      <span class="muestra" style="${f}"><b style="${letra}">Mi tienda</b><i style="${pr}">$29</i></span>
+      <span class="pie"><b>${nombre}</b><small>${giro}</small></span></button>`;
+  }).join('');
+  const col = document.getElementById('colores');
+  col.innerHTML = actual !== 'color' ? '' : `<div class="colores">
+    <div><div style="font-weight:700;margin-bottom:8px">Color principal</div><div class="sw">${PRINCIPALES.map((c) => `<button type="button" aria-label="Color ${c}" aria-pressed="${c === cp.toUpperCase()}" style="background:${c}" onclick="elegirColor('color_principal','${c}')"></button>`).join('')}
+      <input type="color" value="${cp}" aria-label="Otro color principal" onchange="elegirColor('color_principal', this.value)"></div></div>
+    <div><div style="font-weight:700;margin-bottom:8px">Color de las ofertas</div><div class="sw">${OFERTAS.map((c) => `<button type="button" aria-label="Color ${c}" aria-pressed="${c === co.toUpperCase()}" style="background:${c}" onclick="elegirColor('color_oferta','${c}')"></button>`).join('')}
+      <input type="color" value="${co}" aria-label="Otro color de ofertas" onchange="elegirColor('color_oferta', this.value)"></div></div></div>`;
+}
+
+async function guardarApariencia(cambios, aviso) {
+  try {
+    const r = await apiFetch('/tienda/config', { method: 'PUT', body: JSON.stringify(cambios) });
+    cfg = Object.assign(cfg, r);
+    pintarTemas();
+    mostrarToast(aviso, 'exito', 1500);
+  } catch (err) { mostrarToast(err.message, 'error'); }
+}
+function elegirTema(id) { if (id !== (cfg.tema || 'letrero')) guardarApariencia({ tema: id }, 'Tema cambiado. Ábrela con «Ver mi tienda»'); }
+function elegirColor(campo, valor) { guardarApariencia({ [campo]: String(valor).toUpperCase() }, 'Color guardado'); }
 
 async function crearEnlace(id, nuevo) {
   if (nuevo && !(await confirmarAccion('¿Cambiar el enlace? El que ya tiene el cliente deja de servir y tendrás que mandarle el nuevo.'))) return;

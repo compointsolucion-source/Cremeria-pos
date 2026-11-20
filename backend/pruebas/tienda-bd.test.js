@@ -256,3 +256,17 @@ test('administraciÃ³n: lista por departamento y prender/apagar varios de un jalÃ
   assert.ok(!p.json.some((x) => ids.includes(x.id)));
   await api('dueno', 'PUT', '/api/tienda/productos', { ids, en_tienda: true });
 });
+
+test('tema y colores: se guardan, se validan y la tienda los recibe', async () => {
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/config', { tema: 'disco' })).status, 400);
+  assert.equal((await api('dueno', 'PUT', '/api/tienda/config', { tema: 'color', color_principal: 'rojo' })).status, 400);
+  const r = await api('dueno', 'PUT', '/api/tienda/config', { tema: 'color', color_principal: '#7a2e8e', color_oferta: '#FF9B4A' });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const i = await api(null, 'GET', '/api/tienda/publico/info');
+  assert.deepEqual([i.json.tema, i.json.color_principal, i.json.color_oferta], ['color', '#7A2E8E', '#FF9B4A']);
+  await api('dueno', 'PUT', '/api/tienda/config', { tema: 'pizarron' });
+  assert.equal((await api(null, 'GET', '/api/tienda/publico/info')).json.tema, 'pizarron');
+  const p = await api(null, 'POST', '/api/tienda/publico/pedido', pedido());
+  assert.equal((await api(null, 'GET', '/api/tienda/publico/seguimiento/' + p.json.seguimiento)).json.tema, 'pizarron');
+  await api('dueno', 'PUT', '/api/tienda/config', { tema: 'letrero', color_principal: null, color_oferta: null });
+});
