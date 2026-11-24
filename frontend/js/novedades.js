@@ -12,7 +12,9 @@
       version: '1.3.1', fecha: '2026-11-24',
       puntos: [
         '⚖️ <b>Báscula: Automático o Manual</b> (programa de Windows). En Automático el programa busca sola la báscula en todos los puertos COM; en Manual eliges el puerto de la lista o lo escribes tú (COM3, COM5…).',
-        '🔌 La lista de puertos ahora sale directo de Windows: aparecen todos, aunque Chrome no los mostraba.'
+        '🔌 La lista de puertos ahora sale directo de Windows: aparecen todos, aunque Chrome no los mostraba.',
+        '🏪 <b>Tienda en línea</b>: tus clientes escogen <b>A domicilio</b> o <b>Paso a recoger</b> (sin envío) y pueden cambiar cuando quieran.',
+        '🏠 Tus clientes guardan <b>varias direcciones</b>: Casa, Oficina u Otro (ej. «Casa de mi mamá»). El repartidor ve cuál es.'
       ]
     },
     {

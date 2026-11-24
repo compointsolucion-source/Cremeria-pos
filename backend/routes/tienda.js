@@ -78,10 +78,13 @@ async function datosNegocio(db, sucursalId, sucursalNombre) {
   const cfg = c.rows[0] || {};
   let dn = {};
   try { dn = (await db.query('SELECT negocio, telefono, whatsapp FROM datos_negocio WHERE id = 1')).rows[0] || {}; } catch (e) { /* sin tabla */ }
+  let direccion = null; // aparte: si la columna faltara, no se pierden el teléfono ni el nombre
+  try { direccion = (await db.query('SELECT direccion FROM datos_negocio WHERE id = 1')).rows[0]?.direccion || null; } catch (e) { /* sin columna */ }
   return {
     negocio: cfg.nombre_negocio || dn.negocio || sucursalNombre || 'Nuestra tienda',
     telefono: soloDigitos(dn.whatsapp || cfg.telefono || dn.telefono || '').slice(-10) || null,
-    logo_url: cfg.logo_url || null
+    logo_url: cfg.logo_url || null,
+    direccion
   };
 }
 
@@ -142,6 +145,8 @@ router.get('/publico/info', limiteLectura, async (req, res, next) => {
       negocio: neg.negocio, giro: cfg.giro, telefono: neg.telefono, logo_url: neg.logo_url,
       horario: estadoHorario(cfg.horario), tiempo_entrega: cfg.tiempo_entrega,
       pedido_minimo: Number(cfg.pedido_minimo), acepta_tarjeta: cfg.acepta_tarjeta,
+      // El cliente puede escoger «Paso a recoger» (los pedidos para recoger sirven en cualquier paquete).
+      recoger: true, direccion_tienda: textoOnull(cfg.red_direccion, 200) || textoOnull(neg.direccion, 200),
       zonas: z.rows.map((x) => ({ id: x.id, nombre: x.nombre, costo: Number(x.costo),
         envio_gratis_desde: x.envio_gratis_desde === null ? (gratisGeneral || null) : Number(x.envio_gratis_desde) })),
       cuenta: cli && Number(cli.limite_credito) > 0
@@ -170,27 +175,32 @@ router.post('/publico/pedido', limitePedido, async (req, res, next) => {
     const hor = estadoHorario(cfg.horario);
     if (!hor.abierto) throw new ErrorHttp(409, hor.texto);
 
-    // --- quién y a dónde
+    // --- quién y a dónde (a domicilio o «paso a recoger»)
+    const tipo = b.tipo === 'recoger' ? 'recoger' : 'domicilio';
     const nombre = textoOnull(b.nombre, 150);
     const telefono = soloDigitos(b.telefono).slice(-10);
     if (!nombre || nombre.length < 2) throw new ErrorHttp(400, 'Escribe tu nombre');
     if (telefono.length !== 10) throw new ErrorHttp(400, 'Escribe tu WhatsApp a 10 números');
-    const calle = textoOnull(b.calle, 200);
-    if (!calle) throw new ErrorHttp(400, 'Escribe tu calle y número');
-    const zonaId = Number(b.zona_id) || null;
-    const zonas = await conexion.query('SELECT id, nombre FROM zonas_envio WHERE sucursal_id = $1 AND activo = true', [cfg.sucursal_id]);
-    let zona = null;
-    if (zonas.rows.length) {
-      zona = zonas.rows.find((z) => z.id === zonaId);
-      if (!zona) throw new ErrorHttp(400, 'Elige tu colonia');
+    let calle = null, zona = null;
+    if (tipo === 'domicilio') {
+      calle = textoOnull(b.calle, 200);
+      if (!calle) throw new ErrorHttp(400, 'Escribe tu calle y número');
+      const zonaId = Number(b.zona_id) || null;
+      const zonas = await conexion.query('SELECT id, nombre FROM zonas_envio WHERE sucursal_id = $1 AND activo = true', [cfg.sucursal_id]);
+      if (zonas.rows.length) {
+        zona = zonas.rows.find((z) => z.id === zonaId);
+        if (!zona) throw new ErrorHttp(400, 'Elige tu colonia');
+      }
     }
+    // «Casa», «Oficina» o el nombre que el cliente le puso (ej. «Casa de mi mamá»): le sirve al repartidor.
+    const etiqueta = tipo === 'domicilio' ? textoOnull(String(b.etiqueta || '').replace(/[:\n\r]/g, ' '), 40) : null;
     const siFalta = ['parecido', 'llamar', 'quitar'].includes(b.si_falta) ? b.si_falta : 'llamar';
 
     // --- forma de pago
     const pago = ['efectivo', 'tarjeta', 'cuenta'].includes(b.pago) ? b.pago : 'efectivo';
     if (pago === 'tarjeta' && !cfg.acepta_tarjeta) throw new ErrorHttp(400, 'Esta tienda no acepta tarjeta en la entrega');
     let pagaCon = null;
-    if (pago === 'efectivo' && b.paga_con !== undefined && b.paga_con !== null && b.paga_con !== '') {
+    if (tipo === 'domicilio' && pago === 'efectivo' && b.paga_con !== undefined && b.paga_con !== null && b.paga_con !== '') {
       pagaCon = Number(b.paga_con);
       if (!Number.isFinite(pagaCon) || pagaCon < 0 || pagaCon > 100000) throw new ErrorHttp(400, 'El monto con el que pagas no es válido');
     }
@@ -255,19 +265,24 @@ router.post('/publico/pedido', limitePedido, async (req, res, next) => {
     const cliente = clienteCuenta
       ? (await conexion.query('SELECT * FROM clientes WHERE id = $1', [clienteCuenta.id])).rows[0]
       : (await resolverCliente(conexion, cfg.sucursal_id, { nombre_contacto: nombre, telefono })).cliente;
-    const dir = await resolverDireccion(conexion, cfg.sucursal_id, cliente, {
-      // Desde internet no se tocan las direcciones guardadas del cliente: la dirección va solo en este pedido.
-      guardar_direccion: false,
-      direccion: { calle, colonia: zona ? zona.nombre : textoOnull(b.colonia, 120), referencias: textoOnull(b.referencias, 300),
-        latitud: b.latitud, longitud: b.longitud, zona_id: zona ? zona.id : null }
-    });
+    // Desde internet no se tocan las direcciones guardadas del cliente: la dirección va solo en este pedido.
+    const referencias = textoOnull(b.referencias, 300);
+    const dir = tipo === 'domicilio'
+      ? await resolverDireccion(conexion, cfg.sucursal_id, cliente, {
+        guardar_direccion: false,
+        direccion: { calle, colonia: zona ? zona.nombre : textoOnull(b.colonia, 120),
+          referencias: etiqueta ? textoOnull(etiqueta + (referencias ? ': ' + referencias : ''), 300) : referencias,
+          latitud: b.latitud, longitud: b.longitud, zona_id: zona ? zona.id : null }
+      })
+      : { direccion: null, direccion_id: null };
     const notas = [
+      tipo === 'recoger' ? 'Pasa a recoger a la tienda' : null,
       siFalta === 'parecido' ? 'Si falta algo: cambiarlo por algo parecido (mismo precio o menos)' : siFalta === 'quitar' ? 'Si falta algo: quitarlo del pedido' : 'Si falta algo: llamar al cliente',
-      pago === 'tarjeta' ? 'Paga con tarjeta: llevar terminal' : null
+      pago === 'tarjeta' ? (tipo === 'recoger' ? 'Paga con tarjeta al recoger' : 'Paga con tarjeta: llevar terminal') : null
     ].filter(Boolean).join('. ');
 
     const creado = await crearPedidoCore(conexion, {
-      sucursalId: cfg.sucursal_id, usuarioId: null, items, tipo: 'domicilio', zona_id: zona ? zona.id : null,
+      sucursalId: cfg.sucursal_id, usuarioId: null, items, tipo, zona_id: zona ? zona.id : null,
       cliente, direccion: dir.direccion, direccion_id: dir.direccion_id, nombre_contacto: nombre, telefono,
       pago_modo: pago === 'cuenta' ? 'credito' : 'al_recibir', paga_con: pagaCon, programado_para: null,
       enviar: false, notas, origen: 'en_linea'
@@ -276,12 +291,12 @@ router.post('/publico/pedido', limitePedido, async (req, res, next) => {
     await conexion.query('UPDATE pedidos SET seguimiento = $2, si_falta = $3, pago_previsto = $4 WHERE id = $1', [creado.pedido_id, clave, siFalta, pago]);
     await registrarBitacora(conexion, {
       usuario_id: null, accion: 'pedido_en_linea', modulo: 'pedidos', referencia_id: creado.pedido_id,
-      valor_nuevo: { total: creado.total, pago }
+      valor_nuevo: { total: creado.total, pago, tipo }
     });
     await conexion.query('COMMIT');
 
     emitir(req.app.get('io'), cfg.sucursal_id, 'pedido_actualizado', {
-      id: creado.pedido_id, estado: 'programado', nuevo: true, en_linea: true, nombre, colonia: zona ? zona.nombre : null, total: creado.total
+      id: creado.pedido_id, estado: 'programado', nuevo: true, en_linea: true, nombre, colonia: zona ? zona.nombre : null, total: creado.total, tipo
     });
     res.json({ ok: true, seguimiento: clave, numero: numeroPedido(creado.pedido_id), total: creado.total, costo_envio: creado.costo_envio });
   } catch (e) {
@@ -298,7 +313,7 @@ router.get('/publico/seguimiento/:clave', limiteSeguimiento, async (req, res, ne
     const clave = String(req.params.clave || '');
     if (!/^[A-Za-z0-9_-]{16,40}$/.test(clave)) return res.status(404).json({ error: 'No encontramos ese pedido' });
     const r = await pool.query(
-      `SELECT p.id, p.sucursal_id, p.ticket_id, p.estado, p.confirmado_en, p.creado_en, p.salio_en, p.entregado_en,
+      `SELECT p.id, p.sucursal_id, p.ticket_id, p.tipo, p.estado, p.confirmado_en, p.creado_en, p.salio_en, p.entregado_en,
               p.paga_con, p.pago_previsto, p.motivo_cancelacion, p.nombre_contacto,
               t.total, t.descuento_monto, u.nombre AS repartidor_nombre, u.telefono AS repartidor_telefono,
               (SELECT su.nombre FROM sucursales su WHERE su.id = p.sucursal_id) AS sucursal_nombre
@@ -309,7 +324,7 @@ router.get('/publico/seguimiento/:clave', limiteSeguimiento, async (req, res, ne
     const items = await pool.query(
       'SELECT nombre_producto, cantidad, subtotal, producto_id FROM ticket_detalle WHERE ticket_id = $1 ORDER BY id', [p.ticket_id]);
     const neg = await datosNegocio(pool, p.sucursal_id, p.sucursal_nombre);
-    const apar = (await pool.query('SELECT tema, color_principal, color_oferta FROM tienda_config WHERE sucursal_id = $1', [p.sucursal_id])).rows[0] || {};
+    const apar = (await pool.query('SELECT tema, color_principal, color_oferta, red_direccion FROM tienda_config WHERE sucursal_id = $1', [p.sucursal_id])).rows[0] || {};
     const paso = p.estado === 'cancelado' ? 'cancelado'
       : p.estado === 'entregado' ? 'entregado'
       : p.estado === 'en_camino' ? 'en_camino'
@@ -321,6 +336,8 @@ router.get('/publico/seguimiento/:clave', limiteSeguimiento, async (req, res, ne
     res.set('Cache-Control', 'no-store');
     res.json({
       numero: numeroPedido(p.id), negocio: neg.negocio, telefono_tienda: neg.telefono, nombre: p.nombre_contacto, ...aparienciaPublica(apar),
+      tipo: p.tipo === 'recoger' ? 'recoger' : 'domicilio',
+      direccion_tienda: p.tipo === 'recoger' ? (textoOnull(apar.red_direccion, 200) || textoOnull(neg.direccion, 200)) : null,
       paso, motivo_cancelacion: paso === 'cancelado' ? p.motivo_cancelacion : null,
       horas: { recibido: hora(p.creado_en), confirmado: hora(p.confirmado_en), salio: hora(p.salio_en), entregado: hora(p.entregado_en) },
       repartidor: p.repartidor_nombre ? { nombre: String(p.repartidor_nombre).split(' ')[0], telefono: paso === 'en_camino' ? (p.repartidor_telefono || null) : null } : null,

@@ -1,2 +1,4 @@
 - Báscula: Automático o Manual. En Automático el programa busca sola la báscula en todos los puertos COM; en Manual eliges el puerto de la lista o lo escribes tú (COM3, COM5…).
 - La lista de puertos ahora sale directo de Windows: aparecen todos, aunque Chrome no los mostraba.
+- Tienda en línea: tus clientes escogen A domicilio o Paso a recoger (sin envío) y pueden cambiar cuando quieran.
+- Tus clientes guardan varias direcciones: Casa, Oficina u Otro. El repartidor ve cuál es.

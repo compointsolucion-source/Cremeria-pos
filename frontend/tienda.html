@@ -116,7 +116,27 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .direc .t{flex:1;min-width:0}
 .direc b{display:block;font-weight:680}
 .direc span{color:var(--gris);font-size:14px}
-.direc button{color:var(--enlace);font-weight:700;font-size:14.5px;min-height:40px}
+.direc button,.direc a{color:var(--enlace);font-weight:700;font-size:14.5px;min-height:40px}
+.direc a{display:flex;align-items:center;text-decoration:none;flex:none}
+.seg button .i{width:18px;height:18px;margin-right:6px;vertical-align:-3px}
+/* Varias direcciones (Casa, Oficina, Otro) */
+.dirs{display:grid;gap:8px}
+.dircard{display:flex;align-items:stretch;border:1.5px solid var(--raya);border-radius:14px;background:var(--superficie);overflow:hidden}
+.dircard:has(.sel[aria-checked=true]){border-color:var(--enlace);box-shadow:0 0 0 1px var(--enlace)}
+.dircard .sel{flex:1;min-width:0;display:flex;gap:12px;align-items:flex-start;text-align:left;padding:12px;font-size:15px;line-height:1.35}
+.dircard .ic{width:40px;height:40px;border-radius:10px;background:var(--fondo);color:var(--enlace);display:grid;place-items:center;flex:none}
+.dircard .t{flex:1;min-width:0}
+.dircard b{display:block;font-weight:680}
+.dircard .t span{color:var(--gris);font-size:14px}
+.dircard .marca{width:22px;height:22px;border-radius:50%;border:2px solid var(--gris2);flex:none;margin-top:9px}
+.dircard .sel[aria-checked=true] .marca{border:7px solid var(--enlace)}
+.dircard .ed{color:var(--enlace);font-weight:700;font-size:14.5px;padding:0 14px;min-height:44px}
+.otra-dir{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--enlace);font-weight:700;font-size:15px;min-height:44px}
+.dir-btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.dir-btns button{min-height:46px;border-radius:12px;padding:0 18px;font-weight:700;font-size:15px}
+.dir-btns .ok{background:var(--accion);color:var(--accion-texto)}
+.dir-btns .no{color:var(--enlace)}
+.dir-btns .borrar{color:var(--rojo);margin-left:auto}
 label.l,.l{display:block;font-weight:650;font-size:14.5px;margin:12px 0 6px}
 input.c,select.c{width:100%;height:52px;border:1.5px solid #B9BFBB;border-radius:12px;padding:0 14px;font-size:16px;background:var(--superficie);color:var(--tinta)}
 input.c:focus,select.c:focus{border-color:var(--tinta);outline:0}
@@ -369,8 +389,15 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
     tel: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
     pin: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
     gps: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg>',
-    ok: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;stroke-width:3"><path d="M5 12l4 4 10-10"/></svg>'
+    ok: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;stroke-width:3"><path d="M5 12l4 4 10-10"/></svg>',
+    casa: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>',
+    oficina: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/></svg>',
+    tienda: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10l2-5h12l2 5z"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg>',
+    moto: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M9 17h6l-2-6h-3M13 11l2-4h3M15 7h-2"/></svg>',
+    persona: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>'
   };
+  const TIPOS_DIR = { casa: 'Casa', oficina: 'Oficina', otro: 'Otro' };
+  const ICO_TIPO = { casa: ICO.casa, oficina: ICO.oficina, otro: ICO.pin };
 
   // ---------------------------------------------------------------- dentro de la app «Compoint Pedidos»
   const EN_APP = /CompointPedidosApp\//.test(navigator.userAgent);
@@ -407,7 +434,8 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
     return d;
   }
 
-  const E = { info: null, productos: [], porId: new Map(), depto: 'Todo', busca: prellenado.busca || '', vista: 'tienda', error: '', errorCampo: '', enviando: false, editarDir: false };
+  // editarDir: id de la dirección que se está escribiendo (null = se ven las tarjetas); editarContacto: nombre y WhatsApp abiertos
+  const E = { info: null, productos: [], porId: new Map(), depto: 'Todo', busca: prellenado.busca || '', vista: 'tienda', error: '', errorCampo: '', enviando: false, editarDir: null, editarContacto: false };
   let clave = '';
   let carrito = {};
   let datos = {};
@@ -417,8 +445,29 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
   const precioDe = (p, cant) => (p.promo && cant >= p.promo.desde ? p.promo.precio : p.precio);
   const lineas = () => Object.keys(carrito).map((id) => ({ p: E.porId.get(Number(id)), cant: carrito[id] })).filter((x) => x.p && x.cant > 0);
   const subtotal = () => Math.round(lineas().reduce((s, x) => s + precioDe(x.p, x.cant) * x.cant, 0) * 100) / 100;
-  const zonaElegida = () => (E.info.zonas || []).find((z) => z.id === Number(datos.zona_id)) || null;
+  // ¿A domicilio o paso a recoger? y la dirección elegida (puede haber varias: Casa, Oficina, Otro)
+  const esRecoger = () => datos.entrega === 'recoger';
+  const dirActual = () => (datos.direcciones || []).find((d) => d.id === datos.dirSel) || null;
+  const nombreDir = (d) => (d.tipo === 'otro' ? (String(d.otro || '').trim() || 'Otro lugar') : TIPOS_DIR[d.tipo] || 'Casa');
+  const zonaDe = (d) => (d ? (E.info.zonas || []).find((z) => z.id === Number(d.zona_id)) || null : null);
+  const dirCompleta = (d) => !!(d && String(d.calle || '').trim() && (!(E.info.zonas || []).length || zonaDe(d)));
+  const contactoListo = () => !!(datos.nombre && String(datos.nombre).trim().length >= 2 && tel10(datos.telefono).length === 10);
+  function nuevaDireccion() {
+    const d = { id: Date.now(), tipo: (datos.direcciones || []).some((x) => x.tipo === 'casa') ? 'oficina' : 'casa', otro: '', zona_id: '', calle: '', referencias: '', lat: null, lon: null };
+    datos.direcciones = (datos.direcciones || []).concat(d);
+    datos.dirSel = d.id; guardarDatos();
+    return d;
+  }
+  // Se quitan las direcciones que quedaron en blanco (menos la que se está escribiendo).
+  function limpiarDirecciones() {
+    const antes = (datos.direcciones || []).length;
+    datos.direcciones = (datos.direcciones || []).filter((d) => d.id === E.editarDir || String(d.calle || '').trim());
+    if (!dirActual() && datos.direcciones.length) datos.dirSel = datos.direcciones[0].id;
+    if (datos.direcciones.length !== antes) guardarDatos();
+  }
+  const zonaElegida = () => (esRecoger() ? null : zonaDe(dirActual()));
   function envio() {
+    if (esRecoger()) return 0;
     const z = zonaElegida(); if (!z) return null;
     if (z.envio_gratis_desde && subtotal() >= z.envio_gratis_desde) return 0;
     return z.costo;
@@ -486,7 +535,15 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
       await cargarCatalogo();
       clave = 'tienda:' + E.info.sucursal_id;
       carrito = leer(clave + ':carrito', {});
-      datos = Object.assign({ si_falta: 'parecido', pago: 'efectivo', paga_con: '' }, leer(clave + ':datos', {}));
+      datos = Object.assign({ si_falta: 'parecido', pago: 'efectivo', paga_con: '', entrega: 'domicilio' }, leer(clave + ':datos', {}));
+      if (datos.entrega !== 'recoger') datos.entrega = 'domicilio';
+      // Antes se guardaba UNA dirección suelta: pasa a ser la «Casa» de la lista de direcciones.
+      if (!Array.isArray(datos.direcciones)) {
+        datos.direcciones = datos.calle ? [{ id: 1, tipo: 'casa', otro: '', zona_id: datos.zona_id || '', calle: datos.calle, referencias: datos.referencias || '', lat: datos.lat || null, lon: datos.lon || null }] : [];
+        datos.dirSel = datos.direcciones.length ? 1 : null;
+        ['calle', 'zona_id', 'referencias', 'lat', 'lon'].forEach((k) => delete datos[k]);
+        guardarDatos();
+      }
       if (E.info.cuenta && !datos.nombre) datos.nombre = E.info.cuenta.nombre;
       if (!datos.nombre && prellenado.nombre) datos.nombre = prellenado.nombre;
       if (!datos.telefono && prellenado.telefono) datos.telefono = prellenado.telefono;
@@ -616,12 +673,59 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
   // ---------------------------------------------------------------- tu pedido
   const campoMalo = (id) => (E.errorCampo === id ? ' malo' : '');
   const segmento = (grupo, opciones, etiqueta) => `<div class="seg" role="radiogroup" aria-label="${esc(etiqueta)}">${opciones.map(([v, t]) => `<button type="button" role="radio" data-grupo="${grupo}" data-valor="${esc(v)}" aria-checked="${String(datos[grupo]) === String(v)}">${t}</button>`).join('')}</div>`;
-  const direccionLista = () => datos.nombre && tel10(datos.telefono).length === 10 && datos.calle && (!(E.info.zonas || []).length || zonaElegida());
+  // ---- Entrega: quién recibe + a domicilio (varias direcciones) o paso a recoger
+  function htmlContacto() {
+    if (contactoListo() && !E.editarContacto && !['f-nombre', 'f-tel'].includes(E.errorCampo)) {
+      return `<div class="direc" style="margin-top:14px"><span class="ic">${ICO.persona}</span><span class="t"><b>${esc(datos.nombre)}</b><span>WhatsApp ${esc(datos.telefono)}</span></span><button type="button" id="cambiarContacto">Cambiar</button></div>`;
+    }
+    return `<label class="l" for="f-nombre">Tu nombre</label><input class="c${campoMalo('f-nombre')}" id="f-nombre" data-campo="nombre" autocomplete="name" maxlength="150" value="${esc(datos.nombre || '')}">
+      <label class="l" for="f-tel">Tu WhatsApp</label><input class="c${campoMalo('f-tel')}" id="f-tel" data-campo="telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="10 números" value="${esc(datos.telefono || '')}">`;
+  }
+  function htmlRecoger() {
+    const i = E.info; const dt = i.direccion_tienda;
+    return `<div class="direc" style="margin-top:16px"><span class="ic">${ICO.tienda}</span><span class="t"><b>Recoges en ${esc(i.negocio)}</b><span>${dt ? esc(dt) + '<br>' : ''}Te avisamos en tu pantalla de seguimiento cuando esté listo.</span></span>${dt ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dt)}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}</div>`;
+  }
+  function htmlDirecciones() {
+    const i = E.info; const zonas = i.zonas || [];
+    const dirs = datos.direcciones || [];
+    const ed = dirs.find((d) => d.id === E.editarDir);
+    if (!ed) {
+      return `<div class="l" id="t-dirs">¿A dónde te lo llevamos?</div>
+        <div class="dirs" role="radiogroup" aria-labelledby="t-dirs">${dirs.filter(dirCompleta).map((d) => {
+          const z = zonaDe(d);
+          const linea2 = [d.calle, z ? 'Col. ' + z.nombre : ''].filter(Boolean).join(' · ');
+          return `<div class="dircard"><button type="button" class="sel" role="radio" data-dirsel="${d.id}" aria-checked="${d.id === datos.dirSel}"><span class="ic">${ICO_TIPO[d.tipo] || ICO.pin}</span>
+            <span class="t"><b>${esc(nombreDir(d))}</b><span>${esc(linea2)}${d.referencias ? '<br>' + esc(d.referencias) : ''}</span></span><span class="marca" aria-hidden="true"></span></button>
+            <button type="button" class="ed" data-dired="${d.id}" aria-label="Editar ${esc(nombreDir(d))}">Editar</button></div>`; }).join('')}</div>
+        <button type="button" class="otra-dir" id="otraDir">${ICO.mas}Agregar otra dirección</button>`;
+    }
+    const lugar = ed.tipo === 'oficina' ? 'tu oficina' : ed.tipo === 'otro' ? 'el lugar' : 'tu casa';
+    const otras = dirs.filter((d) => d.id !== ed.id && dirCompleta(d));
+    const esNueva = E.dirNueva === ed.id;
+    const botones = [
+      '<button type="button" class="ok" id="dirListo">Listo</button>',
+      esNueva && otras.length ? '<button type="button" class="no" id="dirCancelar">Cancelar</button>' : '',
+      !esNueva && otras.length ? '<button type="button" class="borrar" id="dirBorrar">Borrar esta dirección</button>' : ''
+    ].join('');
+    return `<div class="l" id="t-tipo">Esta dirección es de tu…</div>
+      <div class="seg" role="radiogroup" aria-labelledby="t-tipo">${Object.keys(TIPOS_DIR).map((v) => `<button type="button" role="radio" data-dirtipo="${v}" aria-checked="${ed.tipo === v}">${ICO_TIPO[v]}${TIPOS_DIR[v]}</button>`).join('')}</div>
+      ${ed.tipo === 'otro' ? `<label class="l" for="f-otro">¿Cómo le llamas?</label><input class="c" id="f-otro" data-dir="otro" maxlength="40" placeholder="Ej. Casa de mi mamá" value="${esc(ed.otro || '')}">` : ''}
+      ${zonas.length ? `<label class="l" for="f-zona">Colonia</label><select class="c${campoMalo('f-zona')}" id="f-zona" data-dir="zona_id"><option value="">Elige tu colonia</option>${zonas.map((zz) => `<option value="${zz.id}" ${Number(ed.zona_id) === zz.id ? 'selected' : ''}>${esc(zz.nombre)} · ${zz.costo > 0 ? 'envío ' + pesos(zz.costo) : 'envío gratis'}</option>`).join('')}</select>` : ''}
+      <label class="l" for="f-calle">Calle y número</label><input class="c${campoMalo('f-calle')}" id="f-calle" data-dir="calle" autocomplete="street-address" maxlength="200" value="${esc(ed.calle || '')}">
+      <label class="l" for="f-ref">¿Cómo encontramos ${lugar}?</label><input class="c" id="f-ref" data-dir="referencias" maxlength="300" placeholder="${ed.tipo === 'oficina' ? 'Ej. edificio azul, piso 3' : 'Ej. portón negro junto a la farmacia'}" value="${esc(ed.referencias || '')}">
+      <button type="button" class="ubic" id="ubicacion">${ICO.gps}${ed.lat ? 'Ubicación guardada' : 'Mandar mi ubicación'}</button>
+      ${botones ? `<div class="dir-btns">${botones}</div>` : ''}`;
+  }
 
   function pintarPedido() {
     const i = E.info;
     const ls = lineas();
     if (!ls.length) { ir('tienda'); return; }
+    const recoger = esRecoger();
+    limpiarDirecciones();
+    // A domicilio sin ninguna dirección guardada: se abre directo el formulario (como antes).
+    if (!recoger && !(datos.direcciones || []).length) E.editarDir = nuevaDireccion().id;
+    if (!recoger && E.editarDir === null && !dirCompleta(dirActual())) E.editarDir = (dirActual() || nuevaDireccion()).id;
     const sub = subtotal();
     const env = envio();
     const z = zonaElegida();
@@ -642,7 +746,9 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
     const billetes = [''].concat([50, 100, 200, 500, 1000].filter((b) => b >= total)).slice(0, 3);
     const cambio = datos.paga_con ? Number(datos.paga_con) - total : 0;
     const cta = !i.horario.abierto ? 'La tienda está cerrada' : faltaMinimo ? `Mínimo ${pesos(minimo)} en productos` : E.enviando ? 'Enviando…' : 'Pedir';
-    const verDir = direccionLista() && !E.editarDir && E.errorCampo === '';
+    const lineaEnvio = recoger ? '<div class="leader"><span>Recoges en la tienda</span><i></i><b>sin envío</b></div>'
+      : `<div class="leader"><span>${z ? 'Envío a ' + esc(z.nombre) : 'Envío'}</span><i></i><b>${env === null ? ((i.zonas || []).length ? 'elige tu colonia' : 'gratis') : env === 0 ? 'gratis' : pesos(env)}</b></div>`;
+    const textoTotal = datos.pago === 'cuenta' ? 'Se anota a tu cuenta' : recoger ? 'Total al recoger' : 'Total al recibir';
     app.innerHTML = `
       <div class="cabeza"><button type="button" class="atras" id="regresar" aria-label="Regresar a la tienda">${ICO.atras}</button><h1>Tu pedido</h1><button type="button" class="agregar" id="agregarMas">Agregar más</button></div>
       <div class="envoltura">
@@ -650,27 +756,24 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
         ${ls.map((x) => { const pu = precioDe(x.p, x.cant); return `<div class="renglon"><span class="nom">${esc(x.p.nombre)}<span>${x.p.por_peso ? pesos(pu) + ' el kg · se pesa al surtir' : (x.p.promo && x.cant >= x.p.promo.desde ? 'oferta ' : '') + pesos(pu) + (x.cant > 1 ? ' c/u' : '')}</span></span><span class="imp">${pesos(pu * x.cant)}</span>
           <span class="acc">${control(x.p, true)}<button type="button" class="quitar" data-quitar="${x.p.id}">Quitar</button></span></div>`; }).join('')}
         <div class="leader prim"><span>Productos</span><i></i><b>${pesos(sub)}</b></div>
-        <div class="leader"><span>${z ? 'Envío a ' + esc(z.nombre) : 'Envío'}</span><i></i><b>${env === null ? ((i.zonas || []).length ? 'elige tu colonia' : 'gratis') : env === 0 ? 'gratis' : pesos(env)}</b></div>
-        <div class="total"><span>${datos.pago === 'cuenta' ? 'Se anota a tu cuenta' : 'Total al recibir'}</span><b>${pesos(total)}</b></div>
+        ${lineaEnvio}
+        <div class="total"><span>${textoTotal}</span><b>${pesos(total)}</b></div>
         ${ls.some((x) => x.p.por_peso) ? '<div class="chiquito">Lo que va por kilo puede variar un poco al pesarlo.</div>' : ''}
         ${gratis}
       </div>
       ${faltaMinimo ? `<div class="error" role="status">El pedido mínimo es de ${pesos(minimo)} en productos. Te faltan ${pesos(minimo - sub)}.</div>` : ''}
       <section class="bloque"><h2>Si algo no hay</h2>${segmento('si_falta', [['parecido', 'Algo parecido'], ['llamar', 'Llámenme'], ['quitar', 'Quítenlo']], 'Si algo no hay')}</section>
       <section class="bloque"><h2>Entrega</h2>
-        ${verDir ? `<div class="direc"><span class="ic">${ICO.pin}</span><span class="t"><b>${esc(datos.calle)}</b><span>${z ? 'Col. ' + esc(z.nombre) : ''}${datos.referencias ? ' · ' + esc(datos.referencias) : ''}<br>${esc(datos.nombre)} · ${esc(datos.telefono)}</span></span><button type="button" id="cambiarDir">Cambiar</button></div>`
-        : `<label class="l" for="f-nombre">Tu nombre</label><input class="c${campoMalo('f-nombre')}" id="f-nombre" data-campo="nombre" autocomplete="name" maxlength="150" value="${esc(datos.nombre || '')}">
-        <label class="l" for="f-tel">Tu WhatsApp</label><input class="c${campoMalo('f-tel')}" id="f-tel" data-campo="telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="10 números" value="${esc(datos.telefono || '')}">
-        ${(i.zonas || []).length ? `<label class="l" for="f-zona">Colonia</label><select class="c${campoMalo('f-zona')}" id="f-zona" data-campo="zona_id"><option value="">Elige tu colonia</option>${i.zonas.map((zz) => `<option value="${zz.id}" ${Number(datos.zona_id) === zz.id ? 'selected' : ''}>${esc(zz.nombre)} · ${zz.costo > 0 ? 'envío ' + pesos(zz.costo) : 'envío gratis'}</option>`).join('')}</select>` : ''}
-        <label class="l" for="f-calle">Calle y número</label><input class="c${campoMalo('f-calle')}" id="f-calle" data-campo="calle" autocomplete="street-address" maxlength="200" value="${esc(datos.calle || '')}">
-        <label class="l" for="f-ref">¿Cómo encontramos tu casa?</label><input class="c" id="f-ref" data-campo="referencias" maxlength="300" placeholder="Ej. portón negro junto a la farmacia" value="${esc(datos.referencias || '')}">
-        <button type="button" class="ubic" id="ubicacion">${ICO.gps}${datos.lat ? 'Ubicación guardada' : 'Mandar mi ubicación'}</button>`}
+        ${segmento('entrega', [['domicilio', ICO.moto + 'A domicilio'], ['recoger', ICO.tienda + 'Paso a recoger']], '¿Cómo quieres tu pedido?')}
+        ${htmlContacto()}
+        ${recoger ? htmlRecoger() : htmlDirecciones()}
       </section>
       <section class="bloque"><h2>Pago</h2>${pagos.length > 1 ? segmento('pago', pagos, 'Forma de pago') : ''}
-        ${datos.pago === 'efectivo' ? `<div class="l" id="t-billete" style="margin-top:${pagos.length > 1 ? '14px' : '0'}">¿Con cuánto pagas?</div>
+        ${datos.pago === 'efectivo' && recoger ? `<div class="chiquito" style="margin-top:${pagos.length > 1 ? '10px' : '0'}">Pagas en la tienda cuando pases por tu pedido.</div>`
+        : datos.pago === 'efectivo' ? `<div class="l" id="t-billete" style="margin-top:${pagos.length > 1 ? '14px' : '0'}">¿Con cuánto pagas?</div>
           <div class="billetes" role="group" aria-labelledby="t-billete">${billetes.map((b) => `<button type="button" data-billete="${b}" aria-pressed="${String(datos.paga_con || '') === String(b)}">${b === '' ? 'Exacto' : pesos(b)}</button>`).join('')}</div>
           ${cambio > 0 ? `<div class="chiquito">Te llevamos <b class="num" style="color:var(--tinta)">${pesos(cambio)}</b> de cambio</div>` : ''}`
-        : datos.pago === 'tarjeta' ? '<div class="chiquito">El repartidor lleva terminal.</div>'
+        : datos.pago === 'tarjeta' ? `<div class="chiquito">${recoger ? 'Pagas con tarjeta en la tienda.' : 'El repartidor lleva terminal.'}</div>`
         : `<div class="chiquito">Debes ${pesos(i.cuenta.saldo)} de ${pesos(i.cuenta.limite)}. Te quedan ${pesos(dispo)}.</div>`}
       </section>
       ${E.error ? `<div class="error" role="alert" id="errorPedido">${esc(E.error)}</div>` : ''}
@@ -679,15 +782,45 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
 
     document.getElementById('regresar').onclick = () => ir('tienda');
     document.getElementById('agregarMas').onclick = () => ir('tienda');
-    const cd = document.getElementById('cambiarDir'); if (cd) cd.onclick = () => { E.editarDir = true; pintarPedido(); };
-    app.querySelectorAll('[data-grupo]').forEach((b) => { b.onclick = () => { datos[b.dataset.grupo] = b.dataset.valor; guardarDatos(); pintarPedido(); }; });
+    const cc = document.getElementById('cambiarContacto'); if (cc) cc.onclick = () => { E.editarContacto = true; pintarPedido(); };
+    app.querySelectorAll('[data-grupo]').forEach((b) => { b.onclick = () => {
+      datos[b.dataset.grupo] = b.dataset.valor; guardarDatos();
+      if (b.dataset.grupo === 'entrega') { E.error = ''; E.errorCampo = ''; }
+      pintarPedido();
+    }; });
     app.querySelectorAll('[data-billete]').forEach((b) => { b.onclick = () => { datos.paga_con = b.dataset.billete; guardarDatos(); pintarPedido(); }; });
     app.querySelectorAll('[data-campo]').forEach((c) => {
+      c.addEventListener('input', () => { datos[c.dataset.campo] = c.value; guardarDatos(); c.classList.remove('malo'); });
+    });
+    // Direcciones: escoger, editar, agregar, tipo (Casa/Oficina/Otro), listo, cancelar, borrar
+    const enEdicion = (datos.direcciones || []).find((d) => d.id === E.editarDir);
+    app.querySelectorAll('[data-dir]').forEach((c) => {
       c.addEventListener(c.tagName === 'SELECT' ? 'change' : 'input', () => {
-        datos[c.dataset.campo] = c.value; guardarDatos(); c.classList.remove('malo');
-        if (c.tagName === 'SELECT') { E.editarDir = true; pintarPedido(); }
+        if (!enEdicion) return;
+        enEdicion[c.dataset.dir] = c.value; guardarDatos(); c.classList.remove('malo');
+        if (c.tagName === 'SELECT') pintarPedido(); // cambia el costo de envío
       });
     });
+    app.querySelectorAll('[data-dirsel]').forEach((b) => { b.onclick = () => { datos.dirSel = Number(b.dataset.dirsel); guardarDatos(); pintarPedido(); }; });
+    app.querySelectorAll('[data-dired]').forEach((b) => { b.onclick = () => { E.editarDir = Number(b.dataset.dired); E.dirNueva = null; datos.dirSel = E.editarDir; guardarDatos(); pintarPedido(); }; });
+    app.querySelectorAll('[data-dirtipo]').forEach((b) => { b.onclick = () => { if (enEdicion) { enEdicion.tipo = b.dataset.dirtipo; guardarDatos(); } pintarPedido(); }; });
+    const od = document.getElementById('otraDir'); if (od) od.onclick = () => { const d = nuevaDireccion(); E.editarDir = d.id; E.dirNueva = d.id; pintarPedido(); };
+    const dl = document.getElementById('dirListo'); if (dl) dl.onclick = () => {
+      if (!String(enEdicion.calle || '').trim()) { E.errorCampo = 'f-calle'; E.error = 'Escribe tu calle y número'; pintarPedido(); return; }
+      if ((E.info.zonas || []).length && !zonaDe(enEdicion)) { E.errorCampo = 'f-zona'; E.error = 'Elige tu colonia'; pintarPedido(); return; }
+      datos.dirSel = enEdicion.id; E.editarDir = null; E.dirNueva = null; E.error = ''; E.errorCampo = ''; guardarDatos(); pintarPedido();
+    };
+    const dc = document.getElementById('dirCancelar'); if (dc) dc.onclick = () => {
+      datos.direcciones = datos.direcciones.filter((d) => d.id !== enEdicion.id);
+      const otra = datos.direcciones.find(dirCompleta); datos.dirSel = otra ? otra.id : null;
+      E.editarDir = null; E.dirNueva = null; E.error = ''; E.errorCampo = ''; guardarDatos(); pintarPedido();
+    };
+    const db = document.getElementById('dirBorrar'); if (db) db.onclick = () => {
+      if (!confirm('¿Borrar la dirección «' + nombreDir(enEdicion) + '»?')) return;
+      datos.direcciones = datos.direcciones.filter((d) => d.id !== enEdicion.id);
+      const otra = datos.direcciones.find(dirCompleta); datos.dirSel = otra ? otra.id : null;
+      E.editarDir = null; E.error = ''; E.errorCampo = ''; guardarDatos(); pintarPedido();
+    };
     const ub = document.getElementById('ubicacion'); if (ub) ub.onclick = ubicar;
     document.getElementById('enviar').onclick = enviar;
     if (E.errorCampo) { const c = document.getElementById(E.errorCampo); if (c) { c.scrollIntoView({ block: 'center' }); c.focus({ preventScroll: true }); } }
@@ -696,10 +829,12 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
 
   function ubicar() {
     const b = document.getElementById('ubicacion');
+    const d = (datos.direcciones || []).find((x) => x.id === E.editarDir) || dirActual();
+    if (!d) return;
     if (!navigator.geolocation) { b.innerHTML = ICO.gps + 'Tu celular no permite ubicación'; return; }
     b.innerHTML = ICO.gps + 'Buscando tu ubicación…';
     navigator.geolocation.getCurrentPosition((pos) => {
-      datos.lat = Math.round(pos.coords.latitude * 1e6) / 1e6; datos.lon = Math.round(pos.coords.longitude * 1e6) / 1e6; guardarDatos();
+      d.lat = Math.round(pos.coords.latitude * 1e6) / 1e6; d.lon = Math.round(pos.coords.longitude * 1e6) / 1e6; guardarDatos();
       b.innerHTML = ICO.gps + 'Ubicación guardada';
     }, () => { b.innerHTML = ICO.gps + 'No se pudo. Con tu dirección basta'; }, { enableHighAccuracy: true, timeout: 15000 });
   }
@@ -707,24 +842,33 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
   function validar() {
     if (!datos.nombre || String(datos.nombre).trim().length < 2) return ['f-nombre', 'Escribe tu nombre'];
     if (tel10(datos.telefono).length !== 10) return ['f-tel', 'Escribe tu WhatsApp a 10 números'];
-    if ((E.info.zonas || []).length && !zonaElegida()) return ['f-zona', 'Elige tu colonia'];
-    if (!datos.calle || !String(datos.calle).trim()) return ['f-calle', 'Escribe tu calle y número'];
+    if (esRecoger()) return null;
+    const a = dirActual();
+    if ((E.info.zonas || []).length && !zonaDe(a)) return ['f-zona', 'Elige tu colonia'];
+    if (!a || !String(a.calle || '').trim()) return ['f-calle', 'Escribe tu calle y número'];
     return null;
   }
 
   async function enviar() {
     if (E.enviando) return;
     const mal = validar();
-    if (mal) { E.errorCampo = mal[0]; E.error = mal[1]; E.editarDir = true; pintarPedido(); return; }
+    if (mal) {
+      E.errorCampo = mal[0]; E.error = mal[1];
+      if (mal[0] === 'f-nombre' || mal[0] === 'f-tel') E.editarContacto = true;
+      else E.editarDir = (dirActual() || nuevaDireccion()).id;
+      pintarPedido(); return;
+    }
     E.enviando = true; E.error = ''; E.errorCampo = ''; pintarPedido();
     const ls = lineas();
+    const recoger = esRecoger();
+    const a = recoger ? null : dirActual();
     try {
       const r = await pedir('/pedido', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          s: E.info.sucursal_id, c: C || undefined, nombre: datos.nombre, telefono: datos.telefono, zona_id: datos.zona_id || null,
-          calle: datos.calle, referencias: datos.referencias || null, latitud: datos.lat || null, longitud: datos.lon || null,
-          si_falta: datos.si_falta, pago: datos.pago, paga_con: datos.pago === 'efectivo' && datos.paga_con ? Number(datos.paga_con) : null,
+          s: E.info.sucursal_id, c: C || undefined, nombre: datos.nombre, telefono: datos.telefono, tipo: recoger ? 'recoger' : 'domicilio',
+          ...(a ? { zona_id: a.zona_id || null, calle: a.calle, referencias: a.referencias || null, latitud: a.lat || null, longitud: a.lon || null, etiqueta: nombreDir(a) } : {}),
+          si_falta: datos.si_falta, pago: datos.pago, paga_con: !recoger && datos.pago === 'efectivo' && datos.paga_con ? Number(datos.paga_con) : null,
           items: ls.map((x) => ({ producto_id: x.p.id, cantidad: x.cant }))
         })
       });
@@ -753,24 +897,36 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
     aplicarTema(d);
     ultimoSeguimiento = { k: cl, n: d.numero, t: Date.now(), negocio: d.negocio };
     const rep = d.repartidor ? d.repartidor.nombre : '';
+    const rec = d.tipo === 'recoger';
+    const dt = d.direccion_tienda || '';
     const pagoTxt = d.pago_previsto === 'cuenta' ? `Se anota ${pesos(d.total)} a tu cuenta`
-      : d.pago_previsto === 'tarjeta' ? `Pagas ${pesos(d.total)} con tarjeta`
+      : d.pago_previsto === 'tarjeta' ? `Pagas ${pesos(d.total)} con tarjeta${rec ? ' en la tienda' : ''}`
+      : rec ? `Pagas ${pesos(d.total)} en efectivo en la tienda`
       : `Pagas ${pesos(d.total)} en efectivo${d.cambio ? `, con ${pesos(d.paga_con)} y te llevan ${pesos(d.cambio)} de cambio` : ''}`;
-    const pasos = [
+    const aceptado = { t: d.horas.confirmado ? 'La tienda lo aceptó' : 'Esperando que la tienda lo acepte', h: hora(d.horas.confirmado), det: d.horas.confirmado ? '' : 'Normalmente en unos minutos' };
+    const pasos = rec ? [
       { t: 'Pedido recibido', h: hora(d.horas.recibido) },
-      { t: d.horas.confirmado ? 'La tienda lo aceptó' : 'Esperando que la tienda lo acepte', h: hora(d.horas.confirmado), det: d.horas.confirmado ? '' : 'Normalmente en unos minutos' },
+      aceptado,
+      { t: 'Surtiendo', h: '' },
+      { t: 'Listo para recoger', h: '', det: dt ? 'En ' + dt : 'Pasa a la tienda' },
+      { t: 'Recogido', h: hora(d.horas.entregado), det: pagoTxt }
+    ] : [
+      { t: 'Pedido recibido', h: hora(d.horas.recibido) },
+      aceptado,
       { t: d.paso === 'listo' ? 'Listo para salir' : 'Surtiendo', h: '' },
       { t: 'En camino', h: hora(d.horas.salio), det: rep ? `Lo lleva ${rep}` : '' },
       { t: 'Entregado', h: hora(d.horas.entregado), det: pagoTxt }
     ];
-    const pos = { recibido: 1, surtiendo: 2, listo: 2, en_camino: 3, entregado: 5 }[d.paso];
+    const pos = (rec ? { recibido: 1, surtiendo: 2, listo: 3, entregado: 5 } : { recibido: 1, surtiendo: 2, listo: 2, en_camino: 3, entregado: 5 })[d.paso];
     const titulo = {
-      recibido: 'Recibimos tu pedido', surtiendo: 'Están surtiendo tu pedido', listo: 'Tu pedido está listo',
-      en_camino: rep ? `Va en camino con ${rep}` : 'Tu pedido va en camino', entregado: 'Entregado. ¡Gracias!', cancelado: 'Tu pedido se canceló', no_entregado: 'No se pudo entregar tu pedido'
+      recibido: 'Recibimos tu pedido', surtiendo: 'Están surtiendo tu pedido', listo: rec ? 'Tu pedido está listo para recoger' : 'Tu pedido está listo',
+      en_camino: rep ? `Va en camino con ${rep}` : 'Tu pedido va en camino', entregado: rec ? 'Recogido. ¡Gracias!' : 'Entregado. ¡Gracias!', cancelado: 'Tu pedido se canceló', no_entregado: 'No se pudo entregar tu pedido'
     }[d.paso] || 'Tu pedido';
     const texto = {
-      recibido: 'La tienda lo va a revisar en un momento. Esta pantalla cambia sola.', surtiendo: 'Ya están juntando tus productos. Aquí te avisamos cuando salga.',
-      listo: 'Ya está empacado y sale en breve.', en_camino: 'Ten listo tu pago. ' + pagoTxt + '.', entregado: 'Que lo disfrutes.'
+      recibido: 'La tienda lo va a revisar en un momento. Esta pantalla cambia sola.',
+      surtiendo: rec ? 'Ya están juntando tus productos. Aquí te avisamos cuando esté listo para recoger.' : 'Ya están juntando tus productos. Aquí te avisamos cuando salga.',
+      listo: rec ? `Ya puedes pasar por él${dt ? ' a ' + dt : ' a la tienda'}. ${pagoTxt}.` : 'Ya está empacado y sale en breve.',
+      en_camino: 'Ten listo tu pago. ' + pagoTxt + '.', entregado: 'Que lo disfrutes.'
     }[d.paso] || '';
     const tt = tel10(d.telefono_tienda);
     const wa = tt.length === 10 ? `https://wa.me/52${tt}?text=${encodeURIComponent('Hola, les escribo por mi pedido ' + d.numero)}` : '';
@@ -786,7 +942,7 @@ body[data-tema=taller]{--pagina:#ECEDEA;--tienda:#2A2D2F;--boton:#2A2D2F;--accio
           return `<li class="${cls}" ${cls === 'ahora' ? 'aria-current="step"' : ''}><span class="bola" aria-hidden="true">${cls === 'ok' ? ICO.ok : ''}</span><span><b>${esc(p.t)}</b>${p.det && cls !== 'ok' ? `<span class="det">${esc(p.det)}</span>` : ''}</span><span class="h">${esc(h)}</span></li>`; }).join('')}</ol>`}
       <div class="e-nota">${d.items.map((x) => `<div class="leader"><span>${esc(x.cantidad)} ${esc(x.nombre)}</span><i></i><b>${pesos(x.subtotal)}</b></div>`).join('')}
         <div class="total"><span>Total</span><b>${pesos(d.total)}</b></div></div>
-      <div class="e-btns">${wa ? `<a class="wa" href="${wa}" target="_blank" rel="noopener">${ICO.wa}WhatsApp</a>` : ''}${telLlamar ? `<a href="tel:${esc(telLlamar)}">${ICO.tel}${llamaRep ? 'Llamar a ' + esc(rep) : 'Llamar'}</a>` : ''}</div>
+      <div class="e-btns">${wa ? `<a class="wa" href="${wa}" target="_blank" rel="noopener">${ICO.wa}WhatsApp</a>` : ''}${telLlamar ? `<a href="tel:${esc(telLlamar)}">${ICO.tel}${llamaRep ? 'Llamar a ' + esc(rep) : 'Llamar'}</a>` : ''}${rec && dt && !malo ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dt)}" target="_blank" rel="noopener">${ICO.pin}Cómo llegar</a>` : ''}</div>
       <a class="otra" href="${enlaceTienda()}">Hacer otro pedido</a></div>`;
     clearTimeout(reloj);
     if (!['entregado', 'cancelado', 'no_entregado'].includes(d.paso)) reloj = setTimeout(() => seguimiento(cl), 30000);

@@ -154,6 +154,36 @@ test('pedido: precios del catálogo (no los del celular), envío por zona, queda
   assert.ok(s2.json.horas.confirmado);
 });
 
+test('paso a recoger: sin dirección ni envío; el seguimiento lo dice; «Oficina» llega en las referencias del domicilio', async () => {
+  const info = await api(null, 'GET', '/api/tienda/publico/info?s=' + sucursalId);
+  assert.equal(info.json.recoger, true);
+  assert.ok('direccion_tienda' in info.json);
+  // Para recoger: no pide calle ni colonia, no cobra envío y no guarda «con cuánto pagas».
+  const r = await api(null, 'POST', '/api/tienda/publico/pedido', pedido({ tipo: 'recoger', calle: '', zona_id: null }));
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.total, 260 + 58, 'sin envío');
+  assert.equal(r.json.costo_envio, 0);
+  const p = (await pool.query('SELECT * FROM pedidos WHERE seguimiento = $1', [r.json.seguimiento])).rows[0];
+  assert.equal(p.tipo, 'recoger');
+  assert.equal(p.calle, null);
+  assert.equal(p.zona_id, null);
+  assert.equal(p.paga_con, null);
+  assert.match(p.notas, /Pasa a recoger/);
+  const s = await api(null, 'GET', '/api/tienda/publico/seguimiento/' + r.json.seguimiento);
+  assert.equal(s.json.tipo, 'recoger');
+  // A domicilio con etiqueta: el repartidor ve «Oficina: Piso 3».
+  const d = await api(null, 'POST', '/api/tienda/publico/pedido', pedido({ tipo: 'domicilio', etiqueta: 'Oficina', referencias: 'Piso 3' }));
+  assert.equal(d.status, 200, JSON.stringify(d.json));
+  const pd = (await pool.query('SELECT * FROM pedidos WHERE seguimiento = $1', [d.json.seguimiento])).rows[0];
+  assert.equal(pd.tipo, 'domicilio');
+  assert.equal(pd.referencias, 'Oficina: Piso 3');
+  const sd = await api(null, 'GET', '/api/tienda/publico/seguimiento/' + d.json.seguimiento);
+  assert.equal(sd.json.tipo, 'domicilio');
+  // A domicilio sigue pidiendo calle.
+  const sinCalle = await api(null, 'POST', '/api/tienda/publico/pedido', pedido({ tipo: 'domicilio', calle: '' }));
+  assert.equal(sinCalle.status, 400);
+});
+
 test('reglas: mínimo, colonia, nombre y teléfono; producto oculto o agotado se rechaza; cantidades por pieza se redondean', async () => {
   assert.equal((await api(null, 'POST', '/api/tienda/publico/pedido', pedido({ items: [{ producto_id: lecheId, cantidad: 2 }] }))).status, 400); // < $100
   assert.equal((await api(null, 'POST', '/api/tienda/publico/pedido', pedido({ zona_id: null }))).status, 400);
