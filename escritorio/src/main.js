@@ -584,6 +584,65 @@ ipcMain.handle('abrir-cajon', async (e, opciones = {}) => {
   return { ok: true };
 });
 
+// ------------------------------------------------------------ báscula por puerto COM directo (Automático / Manual)
+// Ve todos los COM de Windows (aunque la lista de Chrome no los muestre) y abre uno por su nombre.
+let basculaNativa = null;
+function bascula() {
+  if (!basculaNativa) {
+    try { basculaNativa = require('./bascula-nativa').crearBasculaNativa(); } catch (err) {
+      log('Pieza de puertos COM no disponible: ' + err.message);
+      throw new Error('La conexión directa a puertos COM no está disponible en esta computadora.');
+    }
+  }
+  return basculaNativa;
+}
+// Los puertos de una pantalla se sueltan al cambiar de página o cerrar la ventana.
+const ventanasVigiladas = new WeakSet();
+function vigilarPuertos(wc) {
+  if (ventanasVigiladas.has(wc)) return;
+  ventanasVigiladas.add(wc);
+  const soltar = () => { if (basculaNativa) basculaNativa.cerrarDe(wc.id).catch(() => {}); };
+  wc.once('destroyed', soltar);
+  wc.on('did-start-navigation', (ev, url, enLugar, principal) => {
+    const esPrincipal = ev && typeof ev.isMainFrame === 'boolean' ? ev.isMainFrame : principal;
+    const mismaPagina = ev && typeof ev.isSameDocument === 'boolean' ? ev.isSameDocument : enLugar;
+    if (esPrincipal && !mismaPagina) soltar();
+  });
+}
+const enviarA = (wc, canal, ...datos) => { try { if (!wc.isDestroyed()) wc.send(canal, ...datos); } catch (e) { /* ventana cerrada */ } };
+ipcMain.handle('bascula-listar', async (e) => {
+  if (!esDelSistema(e)) throw new Error('No permitido');
+  return bascula().listar();
+});
+ipcMain.handle('bascula-buscar', async (e, rutas) => {
+  if (!esDelSistema(e)) throw new Error('No permitido');
+  const wc = e.sender;
+  vigilarPuertos(wc);
+  const r = await bascula().buscar((p) => enviarA(wc, 'bascula-progreso', p), Array.isArray(rutas) ? rutas.slice(0, 32) : undefined);
+  log('Búsqueda de báscula: ' + (r.encontrada ? `${r.encontrada.ruta} ${r.encontrada.baudRate} ${r.encontrada.formato} ${r.encontrada.comando}` : 'no encontrada') +
+    ' — ' + r.revisados.map((x) => `${x.ruta}:${x.resultado}`).join(', '));
+  return r;
+});
+ipcMain.handle('bascula-cancelar', (e) => {
+  if (!esDelSistema(e) || !basculaNativa) return false;
+  basculaNativa.cancelarBusqueda();
+  return true;
+});
+ipcMain.handle('bascula-abrir', async (e, ruta, opciones) => {
+  if (!esDelSistema(e)) throw new Error('No permitido');
+  const wc = e.sender;
+  vigilarPuertos(wc);
+  return bascula().abrir(ruta, opciones || {}, wc.id, (id, datos) => enviarA(wc, 'bascula-datos', id, datos), (id) => enviarA(wc, 'bascula-cerrado', id));
+});
+ipcMain.handle('bascula-escribir', async (e, id, bytes) => {
+  if (!esDelSistema(e) || !basculaNativa) return false;
+  return basculaNativa.escribir(id, Array.isArray(bytes) ? bytes : []);
+});
+ipcMain.handle('bascula-cerrar', async (e, id) => {
+  if (!esDelSistema(e) || !basculaNativa) return false;
+  return basculaNativa.cerrar(id);
+});
+
 ipcMain.handle('imprimir-html', async (e, html, opciones = {}) => {
   if (!esDelSistema(e)) throw new Error('No permitido');
   const anchoMM = parseInt(opciones.anchoMM, 10) === 58 ? 58 : 80;

@@ -570,7 +570,36 @@
             <div class="imp-fila"><b>Estado</b><span class="estado-impresora desconectada" id="estadoBascula">Sin conectar</span></div>
             <p id="basculaPesoActualTexto" style="text-align:center; font-size:22px; font-weight:700; display:none; margin:0;">⚖️ <span id="basculaPesoActualValor">0.000</span> kg</p>
 
-            <label class="campo"><span>Velocidad del puerto (baud rate) — solo para conexión USB</span>
+            <!-- Solo en el programa de Windows: conexión Automática o Manual por puerto COM directo -->
+            <div id="basculaNativa" style="display:none">
+              <label class="campo" style="margin-top:6px"><span>¿Cómo la conecto?</span></label>
+              <div class="segmentado" id="basculaModoSeg">
+                <button type="button" data-valor="auto" onclick="elegirModoConexionBascula('auto')">🔍 Automático</button>
+                <button type="button" data-valor="manual" onclick="elegirModoConexionBascula('manual')">✋ Manual (yo elijo el puerto)</button>
+              </div>
+              <div id="basculaPanelAuto">
+                <p class="nota" style="margin-top:10px">El programa prueba <b>todos los puertos COM</b> y las velocidades más comunes hasta encontrar la báscula. Ten la báscula prendida y, si puedes, con algo encima.</p>
+                <div class="botones">
+                  <button type="button" class="btn btn-primary" id="btnBuscarBascula" onclick="buscarBasculaUI()">🔍 Buscar báscula</button>
+                  <button type="button" class="btn btn-secondary" id="btnDetenerBusqueda" style="display:none" onclick="cancelarBusquedaBascula()">Detener</button>
+                </div>
+                <div id="basculaBusqueda" style="display:none;margin-top:10px;border:1px solid var(--border,#ddd);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.55"></div>
+                <p class="nota" id="basculaBusquedaNota" style="display:none;margin-top:8px"></p>
+              </div>
+              <div id="basculaPanelManual" style="display:none">
+                <div class="rejilla" style="margin-top:10px">
+                  <label class="campo"><span>Puerto COM</span>
+                    <select id="basculaPuertoLista" onchange="elegirPuertoListaBascula()"><option value="">Buscando puertos…</option></select>
+                  </label>
+                  <label class="campo"><span>…o escríbelo</span>
+                    <input type="text" id="basculaPuertoTexto" placeholder="COM3" maxlength="6" autocomplete="off" style="text-transform:uppercase" oninput="escribirPuertoBascula()">
+                  </label>
+                </div>
+                <p class="nota">La lista sale de Windows (todos los puertos, aunque no tengan nombre). Si el tuyo no aparece, escríbelo: COM1, COM5, COM12…</p>
+              </div>
+            </div>
+
+            <label class="campo" id="campoBaudBascula"><span>Velocidad del puerto (baud rate) — no aplica a Bluetooth</span>
               <select id="basculaBaudRate">
                 <option value="9600">9600 (la más común)</option>
                 <option value="4800">4800</option>
@@ -579,7 +608,7 @@
                 <option value="1200">1200</option>
               </select>
             </label>
-            <div class="rejilla">
+            <div class="rejilla" id="rejillaModoBascula">
               <label class="campo"><span>¿Cómo manda el peso?</span>
                 <select id="basculaComando" onchange="guardarModoBascula()">
                   <option value="auto">Automático (recomendado)</option>
@@ -598,8 +627,10 @@
             </div>
             <div id="basculaDiag" class="nota" style="background:var(--campo-fondo,#f6f7f8);border:1px dashed var(--border,#ddd);border-radius:10px;padding:8px 10px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;word-break:break-all;display:none"></div>
             <div class="botones">
-              <button class="btn btn-secondary" onclick="conectarBasculaUSB()">🔌 Conectar por USB</button>
-              <button class="btn btn-primary" onclick="conectarBasculaBT()">🔵 Conectar Bluetooth</button>
+              <button type="button" class="btn btn-secondary" id="btnActualizarPuertos" style="display:none" onclick="cargarPuertosBascula()">🔄 Actualizar lista</button>
+              <button type="button" class="btn btn-primary" id="btnConectarManual" style="display:none" onclick="conectarBasculaManualUI()">🔌 Conectar</button>
+              <button class="btn btn-secondary" id="btnConectarUSB" onclick="conectarBasculaUSB()">🔌 Conectar por USB</button>
+              <button class="btn btn-primary" id="btnConectarBT" onclick="conectarBasculaBT()">🔵 Conectar Bluetooth</button>
               <button class="btn btn-secondary" onclick="desconectarBasculaUI()">Desconectar</button>
             </div>
             <label class="opcion-check">
@@ -1115,6 +1146,123 @@ async function desconectarBasculaUI() {
   mostrarToast('Báscula desconectada', 'exito');
 }
 
+// ---- Programa de Windows: conexión Automática o Manual por puerto COM directo ----
+function iniciarBasculaNativaUI() {
+  if (typeof basculaNativaDisponible !== 'function' || !basculaNativaDisponible()) return; // Chrome: se queda como antes
+  document.getElementById('basculaNativa').style.display = '';
+  document.getElementById('btnConectarUSB').style.display = 'none';
+  document.getElementById('btnConectarBT').className = 'btn btn-secondary';
+  elegirModoConexionBascula(localStorage.getItem('bascula_modo_conexion') === 'manual' ? 'manual' : 'auto');
+}
+function elegirModoConexionBascula(modo) {
+  const manual = modo === 'manual';
+  localStorage.setItem('bascula_modo_conexion', manual ? 'manual' : 'auto');
+  document.querySelectorAll('#basculaModoSeg button').forEach((b) => b.classList.toggle('activo', b.dataset.valor === (manual ? 'manual' : 'auto')));
+  document.getElementById('basculaPanelAuto').style.display = manual ? 'none' : '';
+  document.getElementById('basculaPanelManual').style.display = manual ? '' : 'none';
+  // En Automático la búsqueda decide velocidad, formato y comando; en Manual los elige la persona.
+  document.getElementById('campoBaudBascula').style.display = manual ? '' : 'none';
+  document.getElementById('rejillaModoBascula').style.display = manual ? '' : 'none';
+  document.getElementById('btnActualizarPuertos').style.display = manual ? '' : 'none';
+  document.getElementById('btnConectarManual').style.display = manual ? '' : 'none';
+  if (manual) cargarPuertosBascula();
+}
+async function cargarPuertosBascula() {
+  const sel = document.getElementById('basculaPuertoLista');
+  const txt = document.getElementById('basculaPuertoTexto');
+  sel.innerHTML = '<option value="">Buscando puertos…</option>';
+  let lista = [];
+  try { lista = await listarPuertosBascula(); } catch (e) { lista = []; }
+  const opciones = lista.map((p) => `<option value="${escHtml(p.ruta)}">${escHtml(p.ruta + (p.nombre ? ' — ' + p.nombre : ''))}</option>`);
+  opciones.push(`<option value="">${lista.length ? 'Otro: lo escribo yo…' : 'Windows no reporta puertos: escríbelo a la derecha'}</option>`);
+  sel.innerHTML = opciones.join('');
+  const guardado = localStorage.getItem('bascula_com') || '';
+  const actual = (txt.value || guardado).trim().toUpperCase();
+  if (actual && lista.some((p) => p.ruta === actual)) sel.value = actual;
+  else if (!actual && lista.length) sel.value = lista[0].ruta;
+  else sel.value = '';
+  txt.value = actual || sel.value;
+  actualizarBotonManualBascula();
+}
+function elegirPuertoListaBascula() {
+  const sel = document.getElementById('basculaPuertoLista');
+  const txt = document.getElementById('basculaPuertoTexto');
+  if (sel.value) txt.value = sel.value; else { txt.value = ''; txt.focus(); }
+  actualizarBotonManualBascula();
+}
+function escribirPuertoBascula() {
+  const sel = document.getElementById('basculaPuertoLista');
+  const txt = document.getElementById('basculaPuertoTexto');
+  let v = txt.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (/^\d+$/.test(v)) v = 'COM' + v; // si escriben solo «4», se entiende COM4
+  txt.value = v;
+  sel.value = [...sel.options].some((o) => o.value === v) ? v : '';
+  actualizarBotonManualBascula();
+}
+function actualizarBotonManualBascula() {
+  const v = document.getElementById('basculaPuertoTexto').value.trim();
+  document.getElementById('btnConectarManual').textContent = v ? `🔌 Conectar a ${v}` : '🔌 Conectar';
+}
+async function conectarBasculaManualUI() {
+  const ruta = document.getElementById('basculaPuertoTexto').value.trim().toUpperCase();
+  if (!/^COM[1-9]\d{0,2}$/.test(ruta)) { mostrarToast('Escribe el puerto así: COM3', 'error'); return; }
+  const baud = parseInt(document.getElementById('basculaBaudRate').value || '9600');
+  const btn = document.getElementById('btnConectarManual');
+  btn.disabled = true;
+  try {
+    const abierto = await conectarBasculaNativa(ruta, baud);
+    actualizarEstadoBasculaUI(`${abierto} · ${baud}`);
+    mostrarToast(`Báscula conectada en ${abierto}. Pon algo encima para ver el peso.`, 'exito', 4500);
+  } catch (err) {
+    mostrarToast(err.message, 'error', 6000);
+  } finally { btn.disabled = false; }
+}
+async function buscarBasculaUI() {
+  const caja = document.getElementById('basculaBusqueda');
+  const nota = document.getElementById('basculaBusquedaNota');
+  const btn = document.getElementById('btnBuscarBascula');
+  const detener = document.getElementById('btnDetenerBusqueda');
+  const filas = new Map();
+  const textos = { probando: 'probando', encontrada: '✅ báscula encontrada', 'sin respuesta': 'no responde', 'datos sin peso': 'manda algo, pero no es un peso', ocupado: 'lo usa otro programa', 'no existe': 'no existe', error: 'no se pudo abrir' };
+  const pintar = () => {
+    caja.innerHTML = [...filas.values()].map((p) => {
+      const nombre = escHtml(p.ruta + (p.nombre ? ' — ' + p.nombre : ''));
+      const estado = p.estado === 'probando' ? `probando ${escHtml(p.paso || '')}…` : (textos[p.estado] || escHtml(p.estado));
+      const gris = p.estado !== 'encontrada' ? ' style="color:var(--muted,#8a8d93)"' : '';
+      return p.estado === 'encontrada' ? `<div><b>${nombre}: ${estado}</b></div>` : `<div>${nombre}: <span${gris}>${estado}</span></div>`;
+    }).join('') || 'Buscando puertos…';
+  };
+  caja.style.display = 'block'; nota.style.display = 'none';
+  caja.innerHTML = 'Buscando puertos…';
+  btn.disabled = true; btn.textContent = '🔍 Buscando…'; detener.style.display = '';
+  try {
+    const r = await buscarBasculaAutomatica((p) => { filas.set(p.ruta, p); pintar(); });
+    if (r.encontrada) {
+      const e = r.encontrada;
+      filas.set(e.ruta, { ruta: e.ruta, nombre: e.nombre, estado: 'encontrada' }); pintar();
+      caja.lastElementChild.insertAdjacentHTML('beforeend', ` <span style="color:var(--muted,#8a8d93)">(${e.baudRate} · ${escHtml(e.formato)})</span>`);
+      caja.style.borderColor = '#cfe9c6'; caja.style.background = '#f3fbf0';
+      document.getElementById('basculaBaudRate').value = String(e.baudRate);
+      document.getElementById('basculaFormato').value = e.formato;
+      actualizarEstadoBasculaUI(`${e.ruta} · ${e.baudRate}`);
+      nota.textContent = `Queda guardado: la próxima vez se conecta sola a ${e.ruta}.`;
+      nota.style.display = 'block';
+      mostrarToast(`Báscula encontrada en ${e.ruta}`, 'exito');
+    } else {
+      caja.style.borderColor = ''; caja.style.background = '';
+      if (!filas.size) caja.innerHTML = 'Windows no reporta ningún puerto COM en esta computadora.';
+      nota.textContent = r.cancelada ? 'Búsqueda detenida.'
+        : 'No se encontró. Revisa que la báscula esté prendida y conectada, que tenga instalado el controlador (driver) del cable y que ningún otro programa la esté usando. También puedes probar en Manual.';
+      nota.style.display = 'block';
+    }
+  } catch (err) {
+    mostrarToast(err.message, 'error', 6000);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Buscar báscula'; detener.style.display = 'none';
+  }
+}
+document.addEventListener('DOMContentLoaded', iniciarBasculaNativaUI);
+
 // Modo de lectura y formato del puerto (se guardan en este equipo).
 function guardarModoBascula() {
   const anterior = localStorage.getItem('bascula_formato') || '8N1';
@@ -1123,7 +1271,7 @@ function guardarModoBascula() {
   localStorage.removeItem('bascula_comando_detectado');
   if (typeof reiniciarLecturaBascula === 'function') reiniciarLecturaBascula();
   if (anterior !== document.getElementById('basculaFormato').value && typeof basculaConectada === 'function' && basculaConectada()) {
-    mostrarToast('Para cambiar el formato: Desconectar y volver a Conectar por USB', 'info', 5000);
+    mostrarToast('Para cambiar el formato: Desconectar y volver a conectar la báscula', 'info', 5000);
   }
 }
 function cargarModoBascula() {
@@ -2250,7 +2398,8 @@ setTimeout(() => {
     document.getElementById('estadoImpresoraEtiqueta').textContent = 'Conectada (reconexión automática)';
   }
   if (basculaConectada()) {
-    actualizarEstadoBasculaUI('Reconexión automática');
+    const p = basculaEstado.puertoSerial;
+    actualizarEstadoBasculaUI(p && p.nativo ? `${p.ruta} · ${localStorage.getItem('bascula_baud_rate') || '9600'}` : 'Reconexión automática');
   }
   actualizarResumenes();
 }, 1500);

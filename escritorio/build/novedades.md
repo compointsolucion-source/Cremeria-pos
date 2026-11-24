@@ -1,4 +1,2 @@
-- Nueva Tienda en línea: tus clientes piden desde su celular con tu enlace o tu código QR, y el pedido llega a Pedidos → Por confirmar.
-- Escoge cómo se ve tu tienda: 10 estilos (abarrotes, cremería, farmacia, panadería, ferretería…) o tus propios colores.
-- Escoge qué productos se venden por internet por departamento, con búsqueda y recuadros.
-- Próximamente: aparece en el mapa de la app Compoint Pedidos. Ve a Tienda en línea y pon dónde está tu tienda.
+- Báscula: Automático o Manual. En Automático el programa busca sola la báscula en todos los puertos COM; en Manual eliges el puerto de la lista o lo escribes tú (COM3, COM5…).
+- La lista de puertos ahora sale directo de Windows: aparecen todos, aunque Chrome no los mostraba.

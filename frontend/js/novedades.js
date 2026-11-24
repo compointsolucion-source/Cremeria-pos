@@ -9,6 +9,13 @@
 
   const NOVEDADES = [
     {
+      version: '1.3.1', fecha: '2026-11-24',
+      puntos: [
+        '⚖️ <b>Báscula: Automático o Manual</b> (programa de Windows). En Automático el programa busca sola la báscula en todos los puertos COM; en Manual eliges el puerto de la lista o lo escribes tú (COM3, COM5…).',
+        '🔌 La lista de puertos ahora sale directo de Windows: aparecen todos, aunque Chrome no los mostraba.'
+      ]
+    },
+    {
       version: '1.3.0', fecha: '2026-11-20',
       puntos: [
         '🌐 Nueva <b>Tienda en línea</b>: tus clientes piden desde su celular con tu enlace o tu código QR, y el pedido llega a <b>Pedidos → Por confirmar</b>.',

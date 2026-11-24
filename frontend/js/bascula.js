@@ -312,6 +312,105 @@ async function desconectarBasculaSerial() {
   avisarCrudo();
 }
 
+// ---------- Puerto COM directo (programa de Windows 1.3.1 o más nuevo) ----------
+// El programa ve TODOS los COM de Windows (aunque la lista de Chrome no los muestre) y abre uno por
+// su nombre. Aquí ese puerto se presenta igual que uno de Chrome (open/readable/writable/close),
+// así la lectura del peso, los comandos y el diagnóstico de arriba sirven sin cambios.
+function basculaNativaDisponible() {
+  return !!(typeof window !== 'undefined' && window.compointDesktop && window.compointDesktop.bascula);
+}
+const receptoresNativos = new Map();
+const suscriptoresBusqueda = [];
+let puenteNativoListo = false;
+function prepararPuenteNativo() {
+  if (puenteNativoListo || !basculaNativaDisponible()) return;
+  puenteNativoListo = true;
+  const b = window.compointDesktop.bascula;
+  b.alDatos((id, datos) => { const r = receptoresNativos.get(id); if (r) r.datos(datos); });
+  b.alCerrar((id) => { const r = receptoresNativos.get(id); receptoresNativos.delete(id); if (r) r.cerrado(); });
+  b.alProgreso((p) => suscriptoresBusqueda.forEach((cb) => { try { cb(p); } catch (e) { /* pantalla */ } }));
+}
+function crearPuertoNativo(ruta) {
+  const b = window.compointDesktop.bascula;
+  let id = null;
+  const puerto = {
+    ruta, nativo: true, readable: null, writable: null,
+    getInfo() { return {}; },
+    async open(opciones) {
+      prepararPuenteNativo();
+      const r = await b.abrir(ruta, opciones);
+      id = r.id; puerto.ruta = r.ruta;
+      puerto.readable = new ReadableStream({
+        start(c) {
+          receptoresNativos.set(id, {
+            datos: (d) => { try { c.enqueue(new Uint8Array(d)); } catch (e) { /* ya cerrado */ } },
+            cerrado: () => { try { c.close(); } catch (e) { /* ya cerrado */ } }
+          });
+        }
+      });
+      puerto.writable = new WritableStream({ write(chunk) { return b.escribir(id, Array.from(chunk)); } });
+    },
+    async close() {
+      if (id === null) return;
+      const x = id; id = null;
+      const r = receptoresNativos.get(x); receptoresNativos.delete(x);
+      if (r) r.cerrado();
+      await b.cerrar(x);
+    }
+  };
+  return puerto;
+}
+async function abrirBasculaNativa(ruta, baudRate) {
+  const puerto = crearPuertoNativo(ruta);
+  await abrirPuertoConReintentos(puerto, baudRate);
+  basculaEstado.puertoSerial = puerto;
+  basculaEstado.transporteActivo = 'serial';
+  iniciarLecturaSerial(puerto);
+  return puerto.ruta;
+}
+
+// Manual: la persona elige o escribe el COM.
+async function conectarBasculaNativa(ruta, baudRate = 9600) {
+  if (!basculaNativaDisponible()) throw new Error('Esta opción es del programa de Windows de Compoint Punto.');
+  const limpio = String(ruta || '').trim().toUpperCase();
+  if (!/^COM[1-9]\d{0,2}$/.test(limpio)) throw new Error('Escribe el puerto así: COM3');
+  if (basculaEstado.puertoSerial) await desconectarBasculaSerial();
+  const abierto = await abrirBasculaNativa(limpio, baudRate);
+  localStorage.setItem('bascula_transporte', 'nativo');
+  localStorage.setItem('bascula_com', abierto);
+  localStorage.setItem('bascula_baud_rate', String(baudRate));
+  return abierto;
+}
+function listarPuertosBascula() {
+  if (!basculaNativaDisponible()) return Promise.resolve([]);
+  return window.compointDesktop.bascula.listar();
+}
+
+// Automático: el programa prueba todos los COM, velocidades y comandos; se queda con el que contesta un peso.
+async function buscarBasculaAutomatica(alProgreso) {
+  if (!basculaNativaDisponible()) throw new Error('Esta opción es del programa de Windows de Compoint Punto.');
+  prepararPuenteNativo();
+  if (basculaEstado.puertoSerial) await desconectarBasculaSerial();
+  basculaEstado.transporteActivo = null;
+  const oyente = (p) => { if (alProgreso) alProgreso(p); };
+  suscriptoresBusqueda.push(oyente);
+  let r;
+  try { r = await window.compointDesktop.bascula.buscar(); } finally {
+    const k = suscriptoresBusqueda.indexOf(oyente); if (k !== -1) suscriptoresBusqueda.splice(k, 1);
+  }
+  if (r && r.encontrada) {
+    const e = r.encontrada;
+    localStorage.setItem('bascula_formato', e.formato === '7E1' ? '7E1' : '8N1');
+    if (e.comando) localStorage.setItem('bascula_comando_detectado', e.comando);
+    await conectarBasculaNativa(e.ruta, e.baudRate);
+  }
+  return r;
+}
+function cancelarBusquedaBascula() {
+  if (basculaNativaDisponible()) return window.compointDesktop.bascula.cancelar();
+  return Promise.resolve(false);
+}
+
 // ---------- Conexión por Bluetooth (BLE) ----------
 async function conectarBasculaBluetooth() {
   if (!basculaBluetoothDisponible()) {
@@ -408,7 +507,13 @@ async function desconectarBascula() {
 async function intentarReconexionAutomaticaBascula() {
   const transporteGuardado = localStorage.getItem('bascula_transporte');
   try {
-    if (transporteGuardado === 'serial' && basculaSerialDisponible() && navigator.serial.getPorts) {
+    if (transporteGuardado === 'nativo') {
+      // COM elegido en el programa de Windows (Automático o Manual): se abre el mismo, por su nombre.
+      const ruta = localStorage.getItem('bascula_com');
+      if (ruta && basculaNativaDisponible()) {
+        await abrirBasculaNativa(ruta, parseInt(localStorage.getItem('bascula_baud_rate') || '9600'));
+      }
+    } else if (transporteGuardado === 'serial' && basculaSerialDisponible() && navigator.serial.getPorts) {
       const puertosAutorizados = await navigator.serial.getPorts();
       if (puertosAutorizados.length > 0) {
         const baudRate = parseInt(localStorage.getItem('bascula_baud_rate') || '9600');

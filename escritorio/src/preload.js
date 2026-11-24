@@ -19,7 +19,19 @@ contextBridge.exposeInMainWorld('compointDesktop', {
   version: (() => { try { return ipcRenderer.sendSync('app-version'); } catch (e) { return ''; } })(),
   actualizacion: () => ipcRenderer.invoke('act-estado'),
   instalarActualizacion: () => ipcRenderer.invoke('act-instalar'),
-  alCambiarActualizacion: (fn) => { ipcRenderer.on('act-cambio', (_e, estado) => { try { fn(estado); } catch (err) { /* pantalla */ } }); }
+  alCambiarActualizacion: (fn) => { ipcRenderer.on('act-cambio', (_e, estado) => { try { fn(estado); } catch (err) { /* pantalla */ } }); },
+  // Báscula por puerto COM directo: todos los COM de Windows, conexión Automática o Manual.
+  bascula: {
+    listar: () => ipcRenderer.invoke('bascula-listar'),
+    buscar: (rutas) => ipcRenderer.invoke('bascula-buscar', rutas),
+    cancelar: () => ipcRenderer.invoke('bascula-cancelar'),
+    abrir: (ruta, opciones) => ipcRenderer.invoke('bascula-abrir', String(ruta || ''), opciones || {}),
+    escribir: (id, bytes) => ipcRenderer.invoke('bascula-escribir', id, Array.from(bytes || [])),
+    cerrar: (id) => ipcRenderer.invoke('bascula-cerrar', id),
+    alDatos: (fn) => { ipcRenderer.on('bascula-datos', (_e, id, datos) => { try { fn(id, datos); } catch (err) { /* pantalla */ } }); },
+    alCerrar: (fn) => { ipcRenderer.on('bascula-cerrado', (_e, id) => { try { fn(id); } catch (err) { /* pantalla */ } }); },
+    alProgreso: (fn) => { ipcRenderer.on('bascula-progreso', (_e, p) => { try { fn(p); } catch (err) { /* pantalla */ } }); }
+  }
 });
 
 // Modo servidor del negocio (solo las páginas del programa, no el sistema web).
