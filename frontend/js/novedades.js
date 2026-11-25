@@ -12,7 +12,9 @@
       version: '1.3.2', fecha: '2026-11-24',
       puntos: [
         '🛵 <b>Caja Avanzada ya toma pedidos</b>: arriba eliges <b>Venta · A domicilio · Para recoger</b> (o con la tecla <b>F10</b>). En pedido, el botón Cobrar se pone naranja y dice <b>Tomar pedido</b>: abre la misma ventana de Mostrador.',
-        '📦 En Caja Avanzada también está <b>Pedidos por preparar</b>, para los negocios que no usan Mostrador. Al terminar un pedido la caja regresa sola a «Venta».'
+        '📦 En Caja Avanzada también está <b>Pedidos por preparar</b>, para los negocios que no usan Mostrador. Al terminar un pedido la caja regresa sola a «Venta».',
+        '⌨️ Caja Avanzada: las teclas <b>F5 a F11</b> e <b>INS</b> ya funcionan aunque el cursor esté en la barra de código, y <b>F5 ya no recarga la página</b> (no se pierden las pestañas). <b>Esc</b> cierra las ventanitas de escribir.',
+        '📊 <b>Reportes y «ventas de hoy»</b>: cada día va de medianoche a medianoche. Antes las ventas después de las 6 pm salían en el día siguiente.'
       ]
     },
     {

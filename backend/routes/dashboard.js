@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requiereRol, requiereSucursalId, tienePermiso } = require('../middleware/auth');
+// «Hoy» es el día del negocio (de medianoche a medianoche en México), no el del servidor: ver utils/diaNegocio.js.
+const { TZ_NEGOCIO, sqlHoraLocal, rangoDelNegocio } = require('../utils/diaNegocio');
 
 // Dashboard consolidado, solo para jefe_general: suma todas las sucursales
 // ACTIVAS en un solo vistazo, sin tener que entrar una por una. Se define
@@ -10,9 +12,7 @@ const { verificarToken, requiereRol, requiereSucursalId, tienePermiso } = requir
 // justo lo contrario, ve todas a la vez.
 router.get('/general', verificarToken, requiereRol('jefe_general'), async (req, res) => {
   try {
-    const ahora = new Date();
-    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
+    const { desde: inicioHoy, hasta: finHoy } = await rangoDelNegocio();
 
     const porSucursal = await pool.query(
       `SELECT
@@ -74,9 +74,7 @@ router.get('/resumen', verificarToken, async (req, res) => {
   try {
     const sucursalId = req.sucursalId;
     const veDatosSensibles = tienePermiso(req.usuario, 'REPORTES_VER');
-    const ahora = new Date();
-    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
+    const { desde: inicioHoy, hasta: finHoy } = await rangoDelNegocio();
 
     // Ventas de hoy + utilidad estimada
     const ventasHoy = await pool.query(
@@ -101,10 +99,10 @@ router.get('/resumen', verificarToken, async (req, res) => {
 
     // Ventas por hora de hoy (para la barra visual)
     const ventasPorHora = await pool.query(
-      `SELECT EXTRACT(HOUR FROM fecha_pago) AS hora, COALESCE(SUM(total),0) AS total
+      `SELECT EXTRACT(HOUR FROM ${sqlHoraLocal('fecha_pago', '$4')}) AS hora, COALESCE(SUM(total),0) AS total
        FROM tickets WHERE estado = 'pagado' AND sucursal_id = $1 AND fecha_pago BETWEEN $2 AND $3
        GROUP BY hora ORDER BY hora`,
-      [sucursalId, inicioHoy, finHoy]
+      [sucursalId, inicioHoy, finHoy, TZ_NEGOCIO]
     );
 
     // Fiado total pendiente

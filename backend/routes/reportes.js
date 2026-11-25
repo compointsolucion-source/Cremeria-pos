@@ -2,25 +2,29 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { verificarToken, requierePermiso, requiereSucursalId } = require('../middleware/auth');
+const { TZ_NEGOCIO, sqlHoraLocal, rangoDelNegocio } = require('../utils/diaNegocio');
 
 // Toda ruta de este archivo ya filtra por sucursal — se resuelve una sola
 // vez aquí (req.sucursalId) en vez de repetirlo en cada endpoint.
 router.use(verificarToken, requiereSucursalId);
 
-// Resuelve el rango de fechas: si no se especifica, usa "hoy" completo.
-function resolverRango(query) {
-  const ahora = new Date();
-  const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-  const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
-
-  const desde = query.desde ? new Date(query.desde) : inicioHoy;
-  const hasta = query.hasta ? new Date(query.hasta) : finHoy;
-  return { desde, hasta };
+// Rango de fechas del reporte en días del negocio (de medianoche a medianoche en México, sin importar si el
+// servidor está en la nube o en la computadora del negocio): ver utils/diaNegocio.js. Sin fechas: hoy completo.
+// Si las fechas vienen mal escritas contesta 400 y regresa null.
+async function rangoOResponder(req, res) {
+  try {
+    return await rangoDelNegocio(req.query);
+  } catch (e) {
+    if (e.status === 400) { res.status(400).json({ error: e.message }); return null; }
+    throw e;
+  }
 }
 
 router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
-    const { desde, hasta } = resolverRango(req.query);
+    const rango = await rangoOResponder(req, res);
+    if (!rango) return;
+    const { desde, hasta } = rango;
     const sucursalId = req.sucursalId;
 
     // Resumen por método de pago
@@ -100,7 +104,7 @@ router.get('/ventas', verificarToken, requierePermiso('REPORTES_VER'), async (re
     const costoEstimado = parseFloat(ganancia.rows[0].costo_estimado);
 
     res.json({
-      rango: { desde, hasta },
+      rango: { desde: rango.diaDesde, hasta: rango.diaHasta },
       total_general: totalGeneral.rows[0],
       por_metodo_pago: porMetodo.rows,
       por_categoria: porCategoria.rows,
@@ -132,7 +136,9 @@ function celdaCsv(valor) {
 // Exportar el listado de ventas del rango a CSV (abre directo en Excel/Sheets)
 router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
-    const { desde, hasta } = resolverRango(req.query);
+    const rango = await rangoOResponder(req, res);
+    if (!rango) return;
+    const { desde, hasta } = rango;
     const sucursalId = req.sucursalId;
 
     const result = await pool.query(
@@ -161,7 +167,9 @@ router.get('/ventas/exportar-csv', verificarToken, requierePermiso('REPORTES_VER
 // Reporte de Compras: gasto por proveedor y evolución de costo por producto
 router.get('/compras', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
-    const { desde, hasta } = resolverRango(req.query);
+    const rango = await rangoOResponder(req, res);
+    if (!rango) return;
+    const { desde, hasta } = rango;
     const sucursalId = req.sucursalId;
 
     const porProveedor = await pool.query(
@@ -202,7 +210,9 @@ router.get('/compras', verificarToken, requierePermiso('REPORTES_VER'), async (r
 // Reporte de Clientes: deuda activa, abonos del rango, clientes más frecuentes
 router.get('/clientes', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
-    const { desde, hasta } = resolverRango(req.query);
+    const rango = await rangoOResponder(req, res);
+    if (!rango) return;
+    const { desde, hasta } = rango;
     const sucursalId = req.sucursalId;
 
     const deudaActiva = await pool.query(
@@ -249,11 +259,13 @@ router.get('/clientes', verificarToken, requierePermiso('REPORTES_VER'), async (
 // sin atenderse. Sirve para ver cuánto dinero y cuántos clientes se pierden.
 router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (req, res) => {
   try {
-    const { desde, hasta } = resolverRango(req.query);
+    const rango = await rangoOResponder(req, res);
+    if (!rango) return;
+    const { desde, hasta } = rango;
     const sucursalId = req.sucursalId;
 
     // Granularidad: por día hasta ~3 meses; por mes si el periodo es más largo.
-    const dias = Math.max(1, Math.round((hasta - desde) / 86400000));
+    const dias = Math.max(1, rango.dias);
     const porMes = dias > 92;
     const fmt = porMes ? 'YYYY-MM' : 'YYYY-MM-DD';
 
@@ -261,9 +273,9 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
     const canc = await pool.query(
       `SELECT t.id, t.folio, t.total, u.nombre AS usuario,
               b.valor_nuevo->>'motivo' AS motivo,
-              to_char(COALESCE(b.fecha, t.fecha_creacion), $4) AS clave,
-              to_char(COALESCE(b.fecha, t.fecha_creacion), 'HH24')::int AS hora,
-              to_char(COALESCE(b.fecha, t.fecha_creacion), 'YYYY-MM-DD HH24:MI') AS fecha
+              to_char(${sqlHoraLocal('COALESCE(b.fecha, t.fecha_creacion)', '$5')}, $4) AS clave,
+              to_char(${sqlHoraLocal('COALESCE(b.fecha, t.fecha_creacion)', '$5')}, 'HH24')::int AS hora,
+              to_char(${sqlHoraLocal('COALESCE(b.fecha, t.fecha_creacion)', '$5')}, 'YYYY-MM-DD HH24:MI') AS fecha
        FROM tickets t
        LEFT JOIN LATERAL (
          SELECT fecha, usuario_id, valor_nuevo FROM bitacora
@@ -274,35 +286,35 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
        WHERE t.estado = 'cancelado' AND t.sucursal_id = $1
          AND COALESCE(b.fecha, t.fecha_creacion) >= $2 AND COALESCE(b.fecha, t.fecha_creacion) < $3
        ORDER BY COALESCE(b.fecha, t.fecha_creacion) DESC`,
-      [sucursalId, desde, hasta, fmt]
+      [sucursalId, desde, hasta, fmt, TZ_NEGOCIO]
     );
 
     const devo = await pool.query(
       `SELECT d.monto_total, d.motivo, u.nombre AS usuario, t.folio,
-              to_char(d.fecha, $4) AS clave
+              to_char(${sqlHoraLocal('d.fecha', '$5')}, $4) AS clave
        FROM devoluciones d
        JOIN tickets t ON t.id = d.ticket_id
        LEFT JOIN usuarios u ON u.id = d.usuario_id
        WHERE t.sucursal_id = $1 AND d.fecha >= $2 AND d.fecha < $3`,
-      [sucursalId, desde, hasta, fmt]
+      [sucursalId, desde, hasta, fmt, TZ_NEGOCIO]
     );
 
     const fichas = await pool.query(
-      `SELECT to_char(fecha_creacion, $4) AS clave,
+      `SELECT to_char(${sqlHoraLocal('fecha_creacion', '$5')}, $4) AS clave,
               COUNT(*) FILTER (WHERE estado = 'cancelado')::int AS n,
               COUNT(*) FILTER (WHERE estado IN ('atendido','llamado'))::int AS atendidas
        FROM fichas
        WHERE sucursal_id = $1 AND estado IN ('cancelado','atendido','llamado') AND fecha_creacion >= $2 AND fecha_creacion < $3
        GROUP BY 1`,
-      [sucursalId, desde, hasta, fmt]
+      [sucursalId, desde, hasta, fmt, TZ_NEGOCIO]
     );
 
     const ventasSerie = await pool.query(
-      `SELECT to_char(fecha_pago, $4) AS clave, COALESCE(SUM(total),0) AS monto, COUNT(*)::int AS n
+      `SELECT to_char(${sqlHoraLocal('fecha_pago', '$5')}, $4) AS clave, COALESCE(SUM(total),0) AS monto, COUNT(*)::int AS n
        FROM tickets
        WHERE estado = 'pagado' AND sucursal_id = $1 AND fecha_pago >= $2 AND fecha_pago < $3
        GROUP BY 1`,
-      [sucursalId, desde, hasta, fmt]
+      [sucursalId, desde, hasta, fmt, TZ_NEGOCIO]
     );
 
     const vendido = await pool.query(
@@ -321,8 +333,10 @@ router.get('/perdidas', verificarToken, requierePermiso('REPORTES_VER'), async (
     // Serie con todos los periodos (los vacíos en cero)
     const serie = [];
     const mapa = {};
-    const ini = new Date(Date.UTC(desde.getUTCFullYear(), desde.getUTCMonth(), porMes ? 1 : desde.getUTCDate()));
-    for (let d = new Date(ini); d < hasta && serie.length < 400; porMes ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
+    const [ay, am, ad] = rango.diaDesde.split('-').map(Number);
+    const ini = new Date(Date.UTC(ay, am - 1, porMes ? 1 : ad));
+    const fin = new Date(rango.diaHasta + 'T00:00:00Z');
+    for (let d = new Date(ini); d < fin && serie.length < 400; porMes ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
       const iso = d.toISOString();
       const clave = porMes ? iso.slice(0, 7) : iso.slice(0, 10);
       const fila = { clave, cancelaciones: 0, monto_cancelado: 0, devoluciones: 0, monto_devuelto: 0, fichas: 0, fichas_atendidas: 0, ventas: 0, tickets_pagados: 0 };

@@ -138,6 +138,7 @@ function solicitarTexto(mensaje, valorInicial = '') {
       botonAceptar.removeEventListener('click', onAceptar);
       botonCancelar.removeEventListener('click', onCancelar);
       campo.removeEventListener('keyup', onEnter);
+      campo.removeEventListener('keydown', onEsc);
       resolve(resultado);
     };
     const botonAceptar = document.getElementById('modalInputAceptar');
@@ -145,9 +146,12 @@ function solicitarTexto(mensaje, valorInicial = '') {
     const onAceptar = () => limpiar(campo.value);
     const onCancelar = () => limpiar(null);
     const onEnter = (e) => { if (e.key === 'Enter') limpiar(campo.value); };
+    // Esc = Cancelar. Se detiene aquí para que no cierre también la ventana de atrás (ej. la de un pedido).
+    const onEsc = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); limpiar(null); } };
     botonAceptar.addEventListener('click', onAceptar);
     botonCancelar.addEventListener('click', onCancelar);
     campo.addEventListener('keyup', onEnter);
+    campo.addEventListener('keydown', onEsc);
   });
 }
 // Reemplaza confirm(): devuelve una Promise<boolean>. Uso: if (await confirmarAccion('¿Seguro?')) { ... }

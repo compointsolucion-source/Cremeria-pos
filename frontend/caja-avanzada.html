@@ -2401,22 +2401,31 @@ document.addEventListener('keydown', (e) => {
   else cambiarCantidadRenglonAv(filaSeleccionadaIndex === null ? carritoActivo().length - 1 : filaSeleccionadaIndex, k === '+' ? 1 : -1);
 }, true);
 
-// Atajos de teclado: INS abre "Varios", DEL borra el renglón seleccionado.
-// Se ignoran si el foco está en un campo de texto (para no interferir con
-// escribir normal, ej. borrar texto con la tecla Delete).
+// Atajos de teclado: INS abre "Varios", DEL borra el renglón seleccionado, F5–F11 (los de los botones).
+// Las teclas F no escriben nada, así que funcionan aunque el cursor esté en un campo: casi siempre está en la
+// barra de código (la deja lista el escáner). INS funciona en la barra de código; DEL no, porque ahí borra
+// texto (con la barra vacía lo maneja el atajo de +/−/flechas de arriba). Con una ventana abierta no hacen nada.
+const ATAJOS_F_AV = {
+  F5: () => cambiarPestanaSiguiente(),
+  F6: () => ponerPendiente(),
+  F7: () => abrirEntradaDinero(),
+  F8: () => abrirSalidaDinero(),
+  F9: () => abrirVerificadorPrecios(),
+  F11: () => aplicarMayoreoAvanzada()
+};
 document.addEventListener('keydown', (e) => {
-  const enCampoDeTexto = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
-  if (enCampoDeTexto) return;
-  if (document.querySelector('.pd-overlay.abierto, #ovPrepPedido')) return; // tomando o preparando un pedido
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // F5 nunca recarga la caja (se perderían las pestañas abiertas). Ctrl+F5 sí recarga.
+  if (e.key === 'F5') e.preventDefault();
+  const atajoF = ATAJOS_F_AV[e.key];
+  if (!atajoF && e.key !== 'Insert' && e.key !== 'Delete') return;
+  if (hayVentanaAbiertaAv()) return;
+  const enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  const enBarraCodigo = e.target.id === 'campoCodigoProducto';
 
-  if (e.key === 'Insert') { e.preventDefault(); abrirVarios(); }
-  else if (e.key === 'Delete') { e.preventDefault(); borrarFilaSeleccionadaAvanzada(); }
-  else if (e.key === 'F11') { e.preventDefault(); aplicarMayoreoAvanzada(); }
-  else if (e.key === 'F7') { e.preventDefault(); abrirEntradaDinero(); }
-  else if (e.key === 'F8') { e.preventDefault(); abrirSalidaDinero(); }
-  else if (e.key === 'F9') { e.preventDefault(); abrirVerificadorPrecios(); }
-  else if (e.key === 'F5') { e.preventDefault(); cambiarPestanaSiguiente(); }
-  else if (e.key === 'F6') { e.preventDefault(); ponerPendiente(); }
+  if (atajoF) { e.preventDefault(); atajoF(); }
+  else if (e.key === 'Insert' && (!enCampo || enBarraCodigo)) { e.preventDefault(); abrirVarios(); }
+  else if (e.key === 'Delete' && !enCampo) { e.preventDefault(); borrarFilaSeleccionadaAvanzada(); }
 });
 
 // ---------- Escáner: la barra de captura siempre lista ----------

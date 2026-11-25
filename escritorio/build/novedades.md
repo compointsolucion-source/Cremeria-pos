@@ -1,2 +1,4 @@
 - Caja Avanzada ya toma pedidos: arriba eliges Venta, A domicilio o Para recoger (o con la tecla F10). En pedido, el botón Cobrar dice Tomar pedido y abre la misma ventana de Mostrador.
 - En Caja Avanzada también está Pedidos por preparar, para los negocios que no usan Mostrador.
+- Caja Avanzada: las teclas F5 a F11 e INS ya funcionan aunque el cursor esté en la barra de código, y F5 ya no recarga la página. Esc cierra las ventanitas de escribir.
+- Reportes y ventas de hoy: cada día va de medianoche a medianoche. Antes las ventas después de las 6 pm salían en el día siguiente.
