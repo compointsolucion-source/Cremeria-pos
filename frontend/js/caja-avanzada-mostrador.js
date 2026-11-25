@@ -7,6 +7,7 @@
 //
 // Usa las variables y funciones de caja-avanzada.html (pestanas, catalogoAvanzada,
 // agregarConDecisionDeTipo, irACobrarAvanzada, etc.), por eso se carga después de ese script.
+// El botón grande cobra o toma el pedido según el modo de arriba (cobrarOPedidoAv).
 
 const CLAVE_VISTA_CAJA = 'vista_caja_avanzada';
 let vistaCajaActual = 'clasica';
@@ -69,6 +70,25 @@ function itemParaServidorAv(it) {
 
 function hayDescuentosPendientesAv(p) {
   return !!p.descuentoTicket || p.carrito.some(it => it.descuento);
+}
+
+// ---------- Cobrar o Tomar pedido (js/caja-avanzada-pedidos.js) ----------
+// Arriba se elige Venta, A domicilio o Para recoger: en modo pedido el botón grande toma el pedido en vez de cobrar.
+function modoPedidoAv() {
+  return window.PedidoDom && PedidoDom.modo !== 'mostrador' ? PedidoDom.modo : null;
+}
+function textoBotonCobrarAv() {
+  const m = modoPedidoAv();
+  return m === 'domicilio' ? '🛵 Tomar pedido' : m === 'recoger' ? '🏪 Tomar pedido' : '💰 Cobrar';
+}
+function cobrarOPedidoAv() {
+  if (modoPedidoAv()) {
+    if (window.CajaPedidos) return CajaPedidos.tomarPedido();
+    // Arriba dice pedido: nunca se cobra como venta normal por error.
+    mostrarToast('No se pudo abrir la ventana del pedido. Recarga la página o cambia a «Venta».', 'error', 6000);
+    return;
+  }
+  return irACobrarAvanzada();
 }
 
 // ---------- Captura de descuentos ----------
@@ -327,7 +347,7 @@ function renderTicketAv() {
       ${descItemsTxt}${descTicketTxt}
       <div class="vm-gran"><span>Total</span><span>$${t.neto.toFixed(2)}</span></div>
     </div>
-    <button type="button" class="btn btn-primary vm-cobrar" onclick="irACobrarAvanzada()">💰 Cobrar</button>`;
+    <button type="button" class="btn btn-primary vm-cobrar" onclick="cobrarOPedidoAv()">${textoBotonCobrarAv()}</button>`;
 }
 
 function renderVistaMostrador() {

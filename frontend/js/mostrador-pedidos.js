@@ -587,8 +587,8 @@
   }
 
   function iniciar() {
-    // Esta pantalla solo trabaja en Mostrador (donde está el botón de pedidos). En Configuración el archivo
-    // se carga únicamente por las funciones del ticket y no debe conectarse ni revisar pedidos.
+    // Esta pantalla trabaja donde está el botón de pedidos: Mostrador y Caja Avanzada. En Configuración el
+    // archivo se carga únicamente por las funciones del ticket y no debe conectarse ni revisar pedidos.
     if (!usuario || !$('btnPedidosPrep')) return;
     iniciarSocket();
     cargar();

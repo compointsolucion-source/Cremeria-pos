@@ -9,6 +9,13 @@
 
   const NOVEDADES = [
     {
+      version: '1.3.2', fecha: '2026-11-24',
+      puntos: [
+        '🛵 <b>Caja Avanzada ya toma pedidos</b>: arriba eliges <b>Venta · A domicilio · Para recoger</b> (o con la tecla <b>F10</b>). En pedido, el botón Cobrar se pone naranja y dice <b>Tomar pedido</b>: abre la misma ventana de Mostrador.',
+        '📦 En Caja Avanzada también está <b>Pedidos por preparar</b>, para los negocios que no usan Mostrador. Al terminar un pedido la caja regresa sola a «Venta».'
+      ]
+    },
+    {
       version: '1.3.1', fecha: '2026-11-24',
       puntos: [
         '⚖️ <b>Báscula: Automático o Manual</b> (programa de Windows). En Automático el programa busca sola la báscula en todos los puertos COM; en Manual eliges el puerto de la lista o lo escribes tú (COM3, COM5…).',

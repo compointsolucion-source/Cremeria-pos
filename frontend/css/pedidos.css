@@ -324,6 +324,9 @@ body[data-modo-venta="recoger"] #panelCarritoMostrador h3::after { content: ' ·
 .mp-drawer.abierto { display: block; }
 .mp-fondo { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
 .mp-panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(430px, 100%); background: var(--background, #F5F6F8); color: var(--text, #1F2023); box-shadow: -8px 0 30px rgba(0,0,0,.35); display: flex; flex-direction: column; }
+/* Con el aviso de la licencia (34 px arriba, encima de todo) la lista y las ventanas empiezan debajo: si no, tapa la ✕ */
+body.con-aviso-licencia .mp-panel { top: 34px; }
+body.con-aviso-licencia .pd-overlay, body.con-aviso-licencia .mp-ov { padding-top: 48px; }
 .mp-cab { background: var(--topbar-fondo, #1F2023); color: var(--topbar-texto, #fff); padding: 14px 18px; font-size: 17px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
 [data-tema="oscuro"] .mp-cab { background: #111214; }
 .mp-cuerpo { padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }

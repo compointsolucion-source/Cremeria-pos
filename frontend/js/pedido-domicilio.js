@@ -42,15 +42,30 @@
 
   const esAdmin = () => { const u = (typeof getUsuario === 'function') ? getUsuario() : null; return !!u && ['dueno', 'gerente', 'jefe_general'].includes(u.rol); };
 
+  // ------------------------------------------------------------------ pantalla que lo usa
+  // Mostrador usa sus variables de siempre (carrito, productos, renderCarrito). Caja Avanzada tiene
+  // pestañas, así que se registra con PedidoDom.usarPantalla({ carrito, catalogo, refrescar, vaciar, ... }).
+  let pantalla = null;
+  PD.usarPantalla = function (p) { pantalla = p || null; };
+  const refrescarCarrito = () => {
+    if (pantalla && pantalla.refrescar) pantalla.refrescar();
+    else if (typeof renderCarrito === 'function') renderCarrito();
+  };
+
   // ------------------------------------------------------------------ carrito y totales
-  const carritoActual = () => (typeof carrito !== 'undefined' && Array.isArray(carrito)) ? carrito : [];
+  const carritoActual = () => {
+    if (pantalla) { const c = pantalla.carrito(); return Array.isArray(c) ? c : []; }
+    return (typeof carrito !== 'undefined' && Array.isArray(carrito)) ? carrito : [];
+  };
   const subtotalCarrito = () => r2(carritoActual().reduce((s, it) => s + GRANEL.subtotal(it), 0));
 
   // Clientes de mayoreo (tiendas): se les cobra el precio de mayoreo del producto cuando es menor.
-  function aplicarMayoreo(activar) {
+  // "lista" solo se pasa al dejar una pestaña de Caja Avanzada (sus renglones ya no son los de la pestaña activa).
+  function aplicarMayoreo(activar, lista) {
     let cambios = 0;
-    const catalogo = (typeof productos !== 'undefined' && Array.isArray(productos)) ? productos : [];
-    carritoActual().forEach((it) => {
+    const catalogo = pantalla && pantalla.catalogo ? (pantalla.catalogo() || [])
+      : (typeof productos !== 'undefined' && Array.isArray(productos)) ? productos : [];
+    (lista || carritoActual()).forEach((it) => {
       if (it.tipo === 'kit' || !it.producto_id) return;
       if (lleno(it.importe)) return; // si el cliente pidió un importe exacto no se toca
       if (activar) {
@@ -63,7 +78,7 @@
         it.precio_unitario = it._precio_normal; delete it._precio_normal; cambios++;
       }
     });
-    if (cambios && typeof renderCarrito === 'function') renderCarrito();
+    if (cambios) refrescarCarrito();
   }
   const hayMayoreoAplicado = () => carritoActual().some((it) => it._precio_normal !== undefined);
 
@@ -95,6 +110,19 @@
     if (btn) btn.textContent = m === 'domicilio' ? '🛵 Continuar con el pedido →' : m === 'recoger' ? '🏪 Continuar con el pedido →' : '🖨 Generar e Imprimir Ticket';
     if (m === 'mostrador') { aplicarMayoreo(false); S = null; }
     else if (S) { S.tipo = m; ajustarPago(); }
+    if (pantalla && pantalla.alCambiarModo) pantalla.alCambiarModo(m);
+  };
+
+  // Caja Avanzada: al dejar una pestaña, lo capturado del pedido (cliente, dirección…) se queda con ella
+  // y sus renglones regresan al precio normal; al volver, se retoma y el mayoreo se pone otra vez al abrir.
+  PD.soltarPestana = function (renglonesDeLaPestana) {
+    aplicarMayoreo(false, renglonesDeLaPestana || []);
+    const s = S; S = null;
+    return s;
+  };
+  PD.retomarPestana = function (s) {
+    S = s || null;
+    if (S) { S.tipo = PD.modo === 'mostrador' ? S.tipo : PD.modo; ajustarPago(); }
   };
 
   // ------------------------------------------------------------------ abrir / cerrar
@@ -118,11 +146,17 @@
     if (foco && !S.cliente) setTimeout(() => foco.focus(), 60);
   };
 
-  PD.cerrar = function () {
+  // otroPedido = true cuando se cierra con «Hacer otro pedido» (se queda en modo pedido).
+  PD.cerrar = function (otroPedido) {
     const o = $('pdOverlay');
     if (o) o.classList.remove('abierto');
     if (!document.querySelector('.pt-overlay')) document.body.classList.remove('hoja-abierta');
-    if (S && S.exito) S = null; // ya se mandó: la siguiente vez empieza limpio
+    if (S && S.exito) {
+      S = null; // ya se mandó: la siguiente vez empieza limpio
+      // Caja Avanzada regresa sola a «Venta» para que la siguiente venta no salga como pedido por error.
+      if (pantalla && pantalla.volverAVenta && otroPedido !== true) PD.setModo('mostrador');
+    }
+    if (pantalla && pantalla.alCerrar) pantalla.alCerrar();
   };
 
   async function cargarApoyo() {
@@ -616,7 +650,7 @@
     if (!el || !S) return;
     const prog = S.cuando === 'programar';
     el.innerHTML = `
-      <span class="pd-imprimir" style="color:var(--muted,#7A7D83); cursor:default">🖨 El ticket se imprime en Mostrador cuando el pedido esté listo</span>
+      <span class="pd-imprimir" style="color:var(--muted,#7A7D83); cursor:default">${esc((pantalla && pantalla.avisoImpresion) || '🖨 El ticket se imprime en Mostrador cuando el pedido esté listo')}</span>
       <span class="pd-pie-total">Total <span id="pdPieTotal">${dinero(totalPedido())}</span></span>
       <button type="button" class="btn btn-secondary" id="pdBtnGuardar" onclick="PedidoDom.enviar(false)" ${S.enviando ? 'disabled' : ''}>📝 Guardar sin enviar</button>
       <button type="button" class="btn btn-primary" id="pdBtnEnviar" onclick="PedidoDom.enviar(true)" ${S.enviando ? 'disabled' : ''}>${prog ? '📅 Programar pedido' : '✓ Enviar pedido a preparar'}</button>`;
@@ -698,12 +732,13 @@
       const p = await apiFetch('/pedidos', { method: 'POST', body: JSON.stringify(construirCuerpo(enviarAhora)) });
       S.exito = p;
       // Ya no se imprime aquí: el ticket sale cuando Mostrador termina de preparar el pedido (js/mostrador-pedidos.js).
-      carrito = [];
-      if (typeof renderCarrito === 'function') renderCarrito();
+      if (pantalla) pantalla.vaciar(); else carrito = [];
+      refrescarCarrito();
       mostrarExito(p);
     } catch (err) {
       const sinInternet = typeof esErrorDeConexion === 'function' && esErrorDeConexion(err);
-      mostrarError(sinInternet ? 'Sin internet: los pedidos necesitan conexión. Para vender ahorita usa el modo Mostrador.' : (err.message || 'No se pudo crear el pedido'));
+      const modoVenta = (pantalla && pantalla.nombreVenta) || 'Mostrador';
+      mostrarError(sinInternet ? `Sin internet: los pedidos necesitan conexión. Para vender ahorita usa el modo ${modoVenta}.` : (err.message || 'No se pudo crear el pedido'));
     } finally {
       if (S) { S.enviando = false; if (!S.exito) renderBotones(); }
     }
@@ -729,7 +764,7 @@
       <div class="acciones">
         ${wa ? `<a class="btn btn-secondary" href="${esc(wa)}" target="_blank" rel="noopener">💬 Confirmar por WhatsApp</a>` : ''}
         <a class="btn btn-secondary" href="pedidos.html">📋 Ver el tablero</a>
-        <button type="button" class="btn btn-primary" onclick="PedidoDom.cerrar()">＋ Hacer otro pedido</button>
+        <button type="button" class="btn btn-primary" onclick="PedidoDom.cerrar(true)">＋ Hacer otro pedido</button>
       </div></div>`;
   }
 

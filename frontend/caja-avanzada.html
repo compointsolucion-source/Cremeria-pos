@@ -9,6 +9,7 @@
 <title>Caja Avanzada - Compoint Punto</title>
 <link rel="stylesheet" href="css/app-theme.css">
 <link rel="stylesheet" href="css/sidebar.css">
+<link rel="stylesheet" href="css/pedidos.css">
 <script src="js/tema.js"></script>
 <script src="js/vendor/socket.io.min.js"></script>
 <script src="js/vendor/html5-qrcode.min.js"></script>
@@ -143,6 +144,21 @@
 
   /* ---- Selector de vista ---- */
   .selector-vista { display: flex; background: rgba(255,255,255,0.14); border-radius: 12px; padding: 4px; gap: 4px; margin-left: auto; margin-right: 10px; }
+
+  /* ---- Venta o pedido (js/caja-avanzada-pedidos.js): en modo pedido el botón grande es naranja ---- */
+  .barra-pedido-av { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  /* (más específico que el color del tema: html[data-color-tema] .zona-total .btn-cobrar-grande) */
+  html body[data-modo-venta="domicilio"] .zona-total .btn-cobrar-grande, html body[data-modo-venta="recoger"] .zona-total .btn-cobrar-grande,
+  html body[data-modo-venta="domicilio"] .vm-ticket .vm-cobrar, html body[data-modo-venta="recoger"] .vm-ticket .vm-cobrar { background: #E8590C; border-color: #E8590C; color: #fff; }
+  body[data-modo-venta="domicilio"] .pestana-ticket.activa::before { content: '🛵'; }
+  body[data-modo-venta="recoger"] .pestana-ticket.activa::before { content: '🏪'; }
+  @media (max-width: 1100px) { .barra-pedido-av .tx-l { display: none; } }
+  @media (max-width: 900px) {
+    .barra-pedido-av { order: 5; width: 100%; margin-left: 0; }
+    .barra-pedido-av .modo-venta { flex: 1; order: 0; }
+    .barra-pedido-av .mp-btn { order: 1; }
+    .barra-pedido-av .modo-venta button { flex: 1; }
+  }
   .selector-vista button { border: none; background: transparent; color: #DDD; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
   .selector-vista button.activa { background: var(--primary, #5FAE46); color: var(--on-primary, #fff); }
 
@@ -241,11 +257,23 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>🖥️ Caja Avanzada</h1></div>
+    <div class="barra-pedido-av">
+      <div class="modo-venta" id="modoVenta" role="group" aria-label="Venta o pedido" title="Venta normal o pedido · la tecla F10 cambia">
+        <button type="button" class="activo" data-modo="mostrador">🛒 Venta</button>
+        <button type="button" data-modo="domicilio">🛵 A domicilio</button>
+        <button type="button" data-modo="recoger">🏪 Para recoger</button>
+      </div>
+      <button type="button" class="mp-btn" id="btnPedidosPrep" title="Pedidos por preparar">📦 <span class="tx-l">Pedidos</span> <b class="mp-n" style="display:none">0</b></button>
+    </div>
     <div class="selector-vista" role="group" aria-label="Vista de la caja">
       <button type="button" id="selVistaClasica" class="activa" onclick="cambiarVistaCaja('clasica')" title="Tabla de productos y teclas rápidas">⌨️ Clásica</button>
       <button type="button" id="selVistaMostrador" onclick="cambiarVistaCaja('mostrador')" title="Productos con fotos y ticket con descuentos, como en Mostrador">🛒 Caja Mostrador</button>
     </div>
   </div>
+
+  <!-- Aviso de pedido nuevo por preparar y lista (los llena js/mostrador-pedidos.js) -->
+  <div class="mp-aviso" id="avisoPedidos" style="display:none"></div>
+  <div class="mp-drawer" id="drawerPedidos"></div>
 
   <div class="contenido-avanzada" id="vistaClasica">
 
@@ -312,7 +340,7 @@
       <div class="total-bloque">
         <span class="total-etiqueta">TOTAL</span>
         <div class="total-grande" id="totalVentaAvanzada">$0.00</div>
-        <button class="btn btn-primary btn-cobrar-grande" onclick="irACobrarAvanzada()">💰 Cobrar</button>
+        <button class="btn btn-primary btn-cobrar-grande" onclick="cobrarOPedidoAv()">💰 Cobrar</button>
       </div>
     </div>
   </div>
@@ -1195,6 +1223,8 @@ function escaparNombreAv(t) {
 }
 
 function renderTablaVentaAvanzada() {
+  // Tomar pedido (js/caja-avanzada-pedidos.js): lo capturado de un pedido se queda con su pestaña.
+  if (window.CajaPedidos) CajaPedidos.revisarPestana();
   const tbody = document.getElementById('tablaVentaAvanzada');
   let total = 0;
   // El renglón que se acaba de agregar o sumar queda elegido: + − y Supr actúan sobre él sin tocar nada.
@@ -2377,6 +2407,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   const enCampoDeTexto = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
   if (enCampoDeTexto) return;
+  if (document.querySelector('.pd-overlay.abierto, #ovPrepPedido')) return; // tomando o preparando un pedido
 
   if (e.key === 'Insert') { e.preventDefault(); abrirVarios(); }
   else if (e.key === 'Delete') { e.preventDefault(); borrarFilaSeleccionadaAvanzada(); }
@@ -2397,6 +2428,8 @@ const equipoConTecladoAv = !!(window.matchMedia && window.matchMedia('(hover: ho
 let ultimoTabAv = 0;
 
 function hayVentanaAbiertaAv() {
+  // Ventanas de pedidos (tomar pedido, lista y preparar): mientras estén abiertas el cursor no se va a la barra de código.
+  if (document.querySelector('.pd-overlay.abierto, .mp-drawer.abierto, #ovPrepPedido')) return true;
   return [...document.querySelectorAll('.modal-overlay, .modal-confirm-overlay')].some(m =>
     m.classList.contains('modal-confirm-overlay') ? m.classList.contains('abierto') : getComputedStyle(m).display !== 'none');
 }
@@ -2436,6 +2469,11 @@ actualizarPanelUltimaVenta();
 </script>
 <script src="js/caja-avanzada-mostrador.js"></script>
 <script src="js/recargas.js"></script>
+<!-- Tomar pedido (a domicilio o para recoger) y Pedidos por preparar, igual que en Mostrador -->
+<script src="js/ubicacion.js"></script>
+<script src="js/pedido-domicilio.js"></script>
+<script src="js/mostrador-pedidos.js"></script>
+<script src="js/caja-avanzada-pedidos.js"></script>
 <script>
 // Vista elegida en este equipo (Clásica o Caja Mostrador) y categorías para la cuadrícula.
 cargarCategoriasAv();

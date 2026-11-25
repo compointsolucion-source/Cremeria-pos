@@ -7,7 +7,7 @@
 // versión más nueva (y se actualiza la copia de respaldo de paso) — la
 // copia guardada solo se usa cuando de verdad no hay conexión. Esto evita
 // quedarse con una versión vieja por olvidar subir CACHE_VERSION.
-const CACHE_VERSION = 'compoint-punto-v91';
+const CACHE_VERSION = 'compoint-punto-v92';
 
 const ARCHIVOS_A_GUARDAR = [
   '/mostrador.html',
@@ -35,6 +35,7 @@ const ARCHIVOS_A_GUARDAR = [
   '/kiosco-fichas.html',
   '/pantalla-turnos.html',
   '/js/caja-avanzada-mostrador.js',
+  '/js/caja-avanzada-pedidos.js',
   '/js/sidebar-nav.js',
   '/js/mostrador.js',
   '/js/mostrador-pedidos.js',
